@@ -27,8 +27,8 @@ impl Actor for Redis {
 
 #[derive(Message, Debug)]
 #[rtype(result="Result<Option<String>, Error>")]
-struct Get {
-    key: String,
+pub struct Get {
+    pub key: String,
 }
 
 impl Handler<Get> for Redis {
@@ -49,10 +49,10 @@ impl Handler<Get> for Redis {
 
 #[derive(Message, Debug, Clone)]
 #[rtype(result="Result<String, Error>")]
-struct Set {
-    key: String,
-    value: String,
-    ttl: Option<u32>,
+pub struct Set {
+    pub key: String,
+    pub value: String,
+    pub ttl: Option<u32>,
 }
 
 impl Handler<Set> for Redis {
@@ -79,7 +79,7 @@ impl Handler<Set> for Redis {
 }
 
 /// Status of deleting result.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum DeleteStatus {
     /// Record sucessfully deleted.
     Deleted(u32),
@@ -89,8 +89,8 @@ pub enum DeleteStatus {
 
 #[derive(Message, Debug)]
 #[rtype(result="Result<DeleteStatus, Error>")]
-struct Delete {
-    key: String,
+pub struct Delete {
+    pub key: String,
 }
 
 impl Handler<Delete> for Redis {
@@ -113,34 +113,5 @@ impl Handler<Delete> for Redis {
                 })
                 .map_err(Error::from)
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use actix_rt;
-    use actix::prelude::*;
-    use crate::actor::{Redis, Get, Set, Delete};
-
-    #[actix_rt::test]
-    async fn test_rw() {
-        let addr = Redis::new().await.start();
-        let message = Set {
-            key: "key".to_owned(), 
-            value: "value".to_owned(), 
-            ttl: None 
-        };
-        let res = addr.send(message.clone()).await.unwrap().unwrap();
-        assert_eq!(res, "OK");
-        let res = addr.send(Get { 
-            key: message.key.clone()
-        }).await;
-        assert_eq!(res.unwrap().unwrap(), Some(message.value));
-
-        let res = addr.send(Delete { 
-            key: message.key 
-        }).await;
-        dbg!(&res);
-        res.unwrap().unwrap();
     }
 }
