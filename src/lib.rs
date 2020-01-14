@@ -1,3 +1,5 @@
+pub mod actor;
+
 #[cfg(test)]
 mod tests {
     #[test]
