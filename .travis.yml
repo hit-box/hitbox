@@ -1,8 +1,13 @@
 language: rust
+
+services:
+  - redis-server
+
 rust:
   - stable
   - beta
   - nightly
+
 jobs:
   allow_failures:
     - rust: nightly
