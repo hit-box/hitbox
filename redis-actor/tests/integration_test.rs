@@ -1,6 +1,6 @@
 use actix_rt;
 use actix::prelude::*;
-use redis_actor::actor::{Redis, Get, Set, Delete, DeleteStatus};
+use redis_actor::actor::{Redis, Get, Set, Delete, DeleteStatus, Lock, LockStatus};
 use tokio::time::{delay_for, Duration};
 
 #[actix_rt::test]
@@ -70,4 +70,23 @@ async fn test_delete() {
         key: message.key.clone()
     }).await.unwrap().unwrap();
     assert_eq!(res, DeleteStatus::Missing);
+}
+
+#[actix_rt::test]
+async fn test_lock() {
+    let addr = Redis::new().await.start();
+    let message = Lock {
+        key: "another_key".to_owned(), 
+        ttl: 1,
+    };
+    let res = addr.send(message.clone()).await.unwrap().unwrap();
+    assert_eq!(res, LockStatus::Acquired);
+
+    let res = addr.send(message.clone()).await.unwrap().unwrap();
+    assert_eq!(res, LockStatus::Locked);
+
+    delay_for(Duration::from_secs(1)).await;
+
+    let res = addr.send(message.clone()).await.unwrap().unwrap();
+    assert_eq!(res, LockStatus::Acquired);
 }
