@@ -7,3 +7,13 @@ jobs:
   allow_failures:
     - rust: nightly
   fast_finish: true
+
+script:
+  - cargo update
+  - cargo check --all --no-default-features
+  - cargo test --all-features --all
+  
+after_success:
+  - cargo install cargo-tarpaulin
+  - cargo tarpaulin --out Xml --all --all-features --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+
