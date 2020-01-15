@@ -14,6 +14,10 @@ script:
   - cargo test --all-features --all
   
 after_success:
-  - cargo install cargo-tarpaulin
-  - cargo tarpaulin --out Xml --all --all-features --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
-
+  - |
+      if [[ "$TRAVIS_RUST_VERSION" == "stable" ]]; then
+          cargo install cargo-tarpaulin
+          cargo tarpaulin --out Xml --all --all-features
+          echo "Uploaded code coverage"
+          cargo tarpaulin --out Xml --all --all-features --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+      fi
