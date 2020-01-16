@@ -76,7 +76,7 @@ async fn test_delete() {
 async fn test_lock() {
     let addr = Redis::new().await.start();
     let message = Lock {
-        key: "another_key".to_owned(), 
+        key: "lock_key".to_owned(), 
         ttl: 1,
     };
     let res = addr.send(message.clone()).await.unwrap().unwrap();
