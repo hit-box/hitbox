@@ -1,21 +1,41 @@
-use actix::prelude::*;
-use log::{info, debug};
 use crate::error::Error;
-use redis::{Client, aio::MultiplexedConnection};
+use actix::prelude::*;
+use log::{debug, info};
+use redis::{aio::MultiplexedConnection, Client};
 
 /// Actix Redis cache backend actor.
 pub struct Redis {
     #[allow(dead_code)]
     client: Client,
-    con: MultiplexedConnection,
+    connection: MultiplexedConnection,
 }
 
 impl Redis {
-    /// Create new Redis cache backend actor instance.
-    pub async fn new() -> Self {
-        let client = Client::open("redis://127.0.0.1/").unwrap();
-        let con = client.get_multiplexed_tokio_connection().await.unwrap();
-        Redis { client, con }
+    pub async fn new() -> Result<Redis, Error> {
+        Self::builder().build().await
+    }
+    pub fn builder() -> RedisBuilder {
+        RedisBuilder::default()
+    }
+}
+
+pub struct RedisBuilder {
+    connection_info: String,
+}
+
+impl Default for RedisBuilder {
+    fn default() -> Self {
+        RedisBuilder {
+            connection_info: "redis://127.0.0.1/".to_owned(),
+        }
+    }
+}
+
+impl RedisBuilder {
+    pub async fn build(&self) -> Result<Redis, Error> {
+        let client = Client::open(self.connection_info.as_str())?;
+        let connection = client.get_multiplexed_tokio_connection().await?;
+        Ok(Redis { client, connection })
     }
 }
 
@@ -30,7 +50,7 @@ impl Actor for Redis {
 
 /// Actix message implements request Redis value by key.
 #[derive(Message, Debug)]
-#[rtype(result="Result<Option<String>, Error>")]
+#[rtype(result = "Result<Option<String>, Error>")]
 pub struct Get {
     pub key: String,
 }
@@ -40,7 +60,7 @@ impl Handler<Get> for Redis {
     type Result = ResponseFuture<Result<Option<String>, Error>>;
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
-        let mut con = self.con.clone();
+        let mut con = self.connection.clone();
         let fut = async move {
             redis::cmd("GET")
                 .arg(msg.key)
@@ -54,7 +74,7 @@ impl Handler<Get> for Redis {
 
 /// Actix message implements writing Redis value by key.
 #[derive(Message, Debug, Clone)]
-#[rtype(result="Result<String, Error>")]
+#[rtype(result = "Result<String, Error>")]
 pub struct Set {
     pub key: String,
     pub value: String,
@@ -66,21 +86,14 @@ impl Handler<Set> for Redis {
     type Result = ResponseFuture<Result<String, Error>>;
 
     fn handle(&mut self, msg: Set, _: &mut Self::Context) -> Self::Result {
-        let mut con = self.con.clone();
+        let mut con = self.connection.clone();
         Box::pin(async move {
             let mut request = redis::cmd("SET");
-            request
-                .arg(msg.key)
-                .arg(msg.value);
+            request.arg(msg.key).arg(msg.value);
             if let Some(ttl) = msg.ttl {
-                request
-                    .arg("EX")
-                    .arg(ttl);
+                request.arg("EX").arg(ttl);
             };
-            request
-                .query_async(&mut con)
-                .await
-                .map_err(Error::from)
+            request.query_async(&mut con).await.map_err(Error::from)
         })
     }
 }
@@ -96,7 +109,7 @@ pub enum DeleteStatus {
 
 /// Struct represent deleting record message.
 #[derive(Message, Debug)]
-#[rtype(result="Result<DeleteStatus, Error>")]
+#[rtype(result = "Result<DeleteStatus, Error>")]
 pub struct Delete {
     pub key: String,
 }
@@ -106,7 +119,7 @@ impl Handler<Delete> for Redis {
     type Result = ResponseFuture<Result<DeleteStatus, Error>>;
 
     fn handle(&mut self, msg: Delete, _: &mut Self::Context) -> Self::Result {
-        let mut con = self.con.clone();
+        let mut con = self.connection.clone();
         Box::pin(async move {
             redis::cmd("DEL")
                 .arg(msg.key)
@@ -126,7 +139,7 @@ impl Handler<Delete> for Redis {
 
 /// Struct represent locking process.
 #[derive(Message, Debug, Clone)]
-#[rtype(result="Result<LockStatus, Error>")]
+#[rtype(result = "Result<LockStatus, Error>")]
 pub struct Lock {
     pub key: String,
     pub ttl: u32,
@@ -147,7 +160,7 @@ impl Handler<Lock> for Redis {
 
     fn handle(&mut self, msg: Lock, _: &mut Self::Context) -> Self::Result {
         debug!("Redis Lock: {}", msg.key);
-        let mut con = self.con.clone();
+        let mut con = self.connection.clone();
         Box::pin(async move {
             redis::cmd("SET")
                 .arg(format!("lock::{}", msg.key))

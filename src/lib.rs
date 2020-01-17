@@ -1,4 +1,5 @@
 pub mod actor;
+pub mod cache;
 
 #[cfg(test)]
 mod tests {
