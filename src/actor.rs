@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use log::{info, debug};
+use log::{debug, info};
 
 pub struct Cache {
     enabled: bool,
@@ -32,9 +32,7 @@ pub struct CacheBuilder {
 
 impl Default for CacheBuilder {
     fn default() -> CacheBuilder {
-        CacheBuilder {
-            enabled: false,
-        }
+        CacheBuilder { enabled: false }
     }
 }
 

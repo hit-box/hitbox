@@ -1,6 +1,6 @@
 use actix::prelude::*;
-use actix_cache::cache::Cacheable;
 use actix_cache::actor::Cache;
+use actix_cache::cache::Cacheable;
 
 pub struct Upstream;
 
@@ -26,9 +26,7 @@ impl Handler<Ping> for Upstream {
     type Result = ResponseFuture<Result<i32, ()>>;
 
     fn handle(&mut self, _msg: Ping, _: &mut Self::Context) -> Self::Result {
-        Box::pin(async {
-            Ok(42)
-        })
+        Box::pin(async { Ok(42) })
     }
 }
 
@@ -68,7 +66,10 @@ impl Handler<Ping> for SyncUpstream {
 async fn test_async_proxy() {
     let cache = Cache::new().start();
     let upstream = Upstream {}.start();
-    let res = cache.send(Ping {}.into_cache(upstream.clone())).await.unwrap();
+    let res = cache
+        .send(Ping {}.into_cache(upstream.clone()))
+        .await
+        .unwrap();
     assert_eq!(res, Ok(42));
     // let res = cache.send(QueryCache { message: Pong {}, upstream: test}).await.unwrap();
     // assert_eq!(res, 42);
