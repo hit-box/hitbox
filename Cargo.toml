@@ -8,8 +8,8 @@ license-file = "LICENSE"
 
 [dependencies]
 actix = "0.9"
-log = "0.4.8"
-actix-rt = "1.0.0"
+log = "0.4"
+actix-rt = "1"
 
 [workspace]
 members = [
