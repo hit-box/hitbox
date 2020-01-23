@@ -10,9 +10,9 @@ workspace = ".."
 [dependencies]
 actix = "0.9"
 log = "0.4"
-redis = { version = "0.14", features = ["tokio-rt-core"] }
+redis = { version = "0.15", features = ["tokio-rt-core"] }
 actix_derive = "0.5"
-actix-rt = "1.0.0"
+actix-rt = "1"
 
 [dev-dependencies]
-tokio = { version = "0.2.9", features = ["time"] }
+tokio = { version = "0.2", features = ["time"] }
