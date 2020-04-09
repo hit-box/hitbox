@@ -98,24 +98,21 @@ where
     M: Message + Cacheable + Send,
     M::Result: MessageResponse<A, M> + Send,
 {
-    type Result = M::Result;
+    type Result = Result<<M as Message>::Result, actix::MailboxError>;
 }
 
-impl<A, M, I, E> Handler<QueryCache<A, M>> for Cache
+impl<A, M> Handler<QueryCache<A, M>> for Cache
 where
     A: Actor + Handler<M> + Send,
-    I: 'static,
-    E: 'static,
-    M: Message<Result = Result<I, E>> + Cacheable + Send + 'static,
-    M::Result: Send,
+    M: Message + Cacheable + Send + 'static,
     M::Result: MessageResponse<A, M> + Send,
     <A as Actor>::Context: ToEnvelope<A, M>,
 {
-    type Result = ResponseFuture<<M as Message>::Result>;
+    type Result = ResponseFuture<Result<<M as Message>::Result, actix::MailboxError>>;
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
         log::warn!("YOHOOOO");
-        let res = async { msg.upstream.send(msg.message).await.unwrap() };
+        let res = async { msg.upstream.send(msg.message).await };
         Box::pin(res)
     }
 }

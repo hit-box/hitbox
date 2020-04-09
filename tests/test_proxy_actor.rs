@@ -54,6 +54,14 @@ impl Actor for SyncUpstream {
     type Context = SyncContext<Self>;
 }
 
+impl Handler<Pong> for SyncUpstream {
+    type Result = i32;
+
+    fn handle(&mut self, _msg: Pong, _: &mut Self::Context) -> Self::Result {
+        42
+    }        
+}
+
 impl Handler<Ping> for SyncUpstream {
     type Result = Result<i32, ()>;
 
@@ -70,17 +78,17 @@ async fn test_async_proxy() {
         .send(Ping {}.into_cache(upstream.clone()))
         .await
         .unwrap();
-    assert_eq!(res, Ok(42));
-    // let res = cache.send(QueryCache { message: Pong {}, upstream: test}).await.unwrap();
-    // assert_eq!(res, 42);
+    assert_eq!(res.unwrap(), Ok(42));
+    let res = cache.send(Pong {}.into_cache(upstream.clone())).await.unwrap();
+    assert_eq!(res.unwrap(), 42);
 }
 
 #[actix_rt::test]
 async fn test_sync_proxy() {
     let upstream = SyncArbiter::start(10, move || SyncUpstream {});
     let cache = Cache::new().start();
-    // let res = cache.send(QueryCache { message: Pong {}, upstream: test}).await.unwrap();
-    // assert_eq!(res, 42);
+    let res = cache.send(Pong {}.into_cache(upstream.clone())).await.unwrap();
+    assert_eq!(res.unwrap(), 42);
     let res = cache.send(Ping {}.into_cache(upstream)).await.unwrap();
-    assert_eq!(res, Ok(42));
+    assert_eq!(res.unwrap(), Ok(42));
 }
