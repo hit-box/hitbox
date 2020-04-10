@@ -11,13 +11,18 @@ actix = "0.9"
 log = "0.4"
 actix-rt = "1"
 actix-cache-redis = "0.1"
+actix-cache-backend = "0.1"
+serde_json = "1"
+serde = "1"
 
 [workspace]
 members = [
   ".",
-  "actix-cache-redis"
+  "actix-cache-redis",
+  "actix-cache-backend",
 ]
 
 [patch.crates-io]
 actix-cache = { path = "." }
 actix-cache-redis = { path = "actix-cache-redis" }
+actix-cache-backend = { path = "actix-cache-backend" }

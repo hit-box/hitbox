@@ -1,5 +1,6 @@
 pub mod actor;
 pub mod cache;
+pub mod backend;
 
 #[cfg(test)]
 mod tests {

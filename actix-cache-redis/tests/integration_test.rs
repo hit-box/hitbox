@@ -1,7 +1,8 @@
 use actix::prelude::*;
 use actix_rt;
-use actix_cache_redis::actor::{Delete, DeleteStatus, Get, Lock, LockStatus, RedisActor, Set};
+use actix_cache_redis::actor::{Delete, DeleteStatus, Lock, LockStatus, RedisActor, Set};
 use actix_cache_redis::error::Error;
+use actix_cache_backend::Get;
 use tokio::time::{delay_for, Duration};
 
 #[actix_rt::test]

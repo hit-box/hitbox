@@ -1,19 +1,15 @@
+use actix_cache_redis::actor::RedisActor;
 use actix::prelude::*;
 use log::{debug, info};
 
 pub struct Cache {
     enabled: bool,
-}
-
-impl Default for Cache {
-    fn default() -> Self {
-        CacheBuilder::default().build()
-    }
+    pub backend: Addr<RedisActor>,
 }
 
 impl Cache {
-    pub fn new() -> Self {
-        Cache::default()
+    pub async fn new() -> Self {
+        CacheBuilder::default().build().await
     }
 }
 
@@ -41,9 +37,10 @@ impl CacheBuilder {
         self.enabled = false;
     }
 
-    pub fn build(&self) -> Cache {
+    pub async fn build(&self) -> Cache {
         Cache {
             enabled: self.enabled,
+            backend: actix_cache_redis::actor::RedisActor::new().await.unwrap().start()
         }
     }
 }

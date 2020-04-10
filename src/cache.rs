@@ -101,18 +101,31 @@ where
     type Result = Result<<M as Message>::Result, actix::MailboxError>;
 }
 
+use serde::Serialize;
+
 impl<A, M> Handler<QueryCache<A, M>> for Cache
 where
     A: Actor + Handler<M> + Send,
     M: Message + Cacheable + Send + 'static,
-    M::Result: MessageResponse<A, M> + Send,
+    M::Result: MessageResponse<A, M> + Send + Serialize,
     <A as Actor>::Context: ToEnvelope<A, M>,
 {
     type Result = ResponseFuture<Result<<M as Message>::Result, actix::MailboxError>>;
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
         log::warn!("YOHOOOO");
-        let res = async { msg.upstream.send(msg.message).await };
+        use actix_cache_redis::actor::Set;
+        let backend = self.backend.clone();
+        let res = async move { 
+            let key = msg.message.cache_key();
+            let data = msg.upstream.send(msg.message).await.unwrap();
+            backend.send(Set { 
+                value: serde_json::to_string(&data).unwrap(), 
+                key,
+                ttl: None 
+            }).await.unwrap().unwrap();
+            Ok(data)
+        };
         Box::pin(res)
     }
 }

@@ -2,6 +2,7 @@ use crate::error::Error;
 use actix::prelude::*;
 use log::{debug, info};
 use redis::{aio::MultiplexedConnection, Client};
+use actix_cache_backend::{BackendError, Get};
 
 /// Actix Redis cache backend actor.
 pub struct RedisActor {
@@ -48,16 +49,9 @@ impl Actor for RedisActor {
     }
 }
 
-/// Actix message implements request Redis value by key.
-#[derive(Message, Debug)]
-#[rtype(result = "Result<Option<String>, Error>")]
-pub struct Get {
-    pub key: String,
-}
-
 /// Implementation of Actix Handler for Get message.
 impl Handler<Get> for RedisActor {
-    type Result = ResponseFuture<Result<Option<String>, Error>>;
+    type Result = ResponseFuture<Result<Option<String>, BackendError>>;
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
         let mut con = self.connection.clone();
@@ -67,6 +61,7 @@ impl Handler<Get> for RedisActor {
                 .query_async(&mut con)
                 .await
                 .map_err(Error::from)
+                .map_err(BackendError::from)
         };
         Box::pin(fut)
     }
