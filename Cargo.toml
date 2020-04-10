@@ -10,9 +10,14 @@ license-file = "LICENSE"
 actix = "0.9"
 log = "0.4"
 actix-rt = "1"
+actix-cache-redis = "0.1"
 
 [workspace]
 members = [
   ".",
-  "redis-actor"
+  "actix-cache-redis"
 ]
+
+[patch.crates-io]
+actix-cache = { path = "." }
+actix-cache-redis = { path = "actix-cache-redis" }

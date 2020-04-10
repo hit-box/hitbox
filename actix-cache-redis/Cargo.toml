@@ -1,9 +1,9 @@
 [package]
-name = "redis-actor"
+name = "actix-cache-redis"
 version = "0.1.0"
 authors = ["Belousow Makc <lib.bmw@gmail.com>"]
 edition = "2018"
-description = "Actix redis interaction actor."
+description = "Actix-cache redis backend actor."
 license-file = "LICENSE"
 workspace = ".."
 

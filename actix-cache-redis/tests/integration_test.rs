@@ -1,12 +1,12 @@
 use actix::prelude::*;
 use actix_rt;
-use redis_actor::actor::{Delete, DeleteStatus, Get, Lock, LockStatus, Redis, Set};
-use redis_actor::error::Error;
+use actix_cache_redis::actor::{Delete, DeleteStatus, Get, Lock, LockStatus, RedisActor, Set};
+use actix_cache_redis::error::Error;
 use tokio::time::{delay_for, Duration};
 
 #[actix_rt::test]
 async fn test_rw() -> Result<(), Error> {
-    let addr = Redis::new().await?.start();
+    let addr = RedisActor::new().await?.start();
     let message = Set {
         key: "key".to_owned(),
         value: "value".to_owned(),
@@ -28,7 +28,7 @@ async fn test_rw() -> Result<(), Error> {
 
 #[actix_rt::test]
 async fn test_set_expired() -> Result<(), Error> {
-    let addr = Redis::new().await?.start();
+    let addr = RedisActor::new().await?.start();
     let message = Set {
         key: "key_expired".to_owned(),
         value: "value".to_owned(),
@@ -57,7 +57,7 @@ async fn test_set_expired() -> Result<(), Error> {
 
 #[actix_rt::test]
 async fn test_delete() -> Result<(), Error> {
-    let addr = Redis::new().await?.start();
+    let addr = RedisActor::new().await?.start();
     let message = Set {
         key: "another_key".to_owned(),
         value: "value".to_owned(),
@@ -90,7 +90,7 @@ async fn test_delete() -> Result<(), Error> {
 
 #[actix_rt::test]
 async fn test_lock() -> Result<(), Error> {
-    let addr = Redis::new().await?.start();
+    let addr = RedisActor::new().await?.start();
     let message = Lock {
         key: "lock_key".to_owned(),
         ttl: 1,

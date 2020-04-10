@@ -4,43 +4,43 @@ use log::{debug, info};
 use redis::{aio::MultiplexedConnection, Client};
 
 /// Actix Redis cache backend actor.
-pub struct Redis {
+pub struct RedisActor {
     #[allow(dead_code)]
     client: Client,
     connection: MultiplexedConnection,
 }
 
-impl Redis {
-    pub async fn new() -> Result<Redis, Error> {
+impl RedisActor {
+    pub async fn new() -> Result<RedisActor, Error> {
         Self::builder().build().await
     }
-    pub fn builder() -> RedisBuilder {
-        RedisBuilder::default()
+    pub fn builder() -> RedisActorBuilder {
+        RedisActorBuilder::default()
     }
 }
 
-pub struct RedisBuilder {
+pub struct RedisActorBuilder {
     connection_info: String,
 }
 
-impl Default for RedisBuilder {
+impl Default for RedisActorBuilder {
     fn default() -> Self {
-        RedisBuilder {
+        Self {
             connection_info: "redis://127.0.0.1/".to_owned(),
         }
     }
 }
 
-impl RedisBuilder {
-    pub async fn build(&self) -> Result<Redis, Error> {
+impl RedisActorBuilder {
+    pub async fn build(&self) -> Result<RedisActor, Error> {
         let client = Client::open(self.connection_info.as_str())?;
         let connection = client.get_multiplexed_tokio_connection().await?;
-        Ok(Redis { client, connection })
+        Ok(RedisActor { client, connection })
     }
 }
 
 /// Implementation actix Actor trait for Redis cache backend.
-impl Actor for Redis {
+impl Actor for RedisActor {
     type Context = Context<Self>;
 
     fn started(&mut self, _: &mut Self::Context) {
@@ -56,7 +56,7 @@ pub struct Get {
 }
 
 /// Implementation of Actix Handler for Get message.
-impl Handler<Get> for Redis {
+impl Handler<Get> for RedisActor {
     type Result = ResponseFuture<Result<Option<String>, Error>>;
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
@@ -82,7 +82,7 @@ pub struct Set {
 }
 
 /// Implementation of Actix Handler for Set message.
-impl Handler<Set> for Redis {
+impl Handler<Set> for RedisActor {
     type Result = ResponseFuture<Result<String, Error>>;
 
     fn handle(&mut self, msg: Set, _: &mut Self::Context) -> Self::Result {
@@ -115,7 +115,7 @@ pub struct Delete {
 }
 
 /// Implementation of Actix Handler for Delete message.
-impl Handler<Delete> for Redis {
+impl Handler<Delete> for RedisActor {
     type Result = ResponseFuture<Result<DeleteStatus, Error>>;
 
     fn handle(&mut self, msg: Delete, _: &mut Self::Context) -> Self::Result {
@@ -155,7 +155,7 @@ pub enum LockStatus {
 }
 
 /// Implementation of Actix Handler for Lock message.
-impl Handler<Lock> for Redis {
+impl Handler<Lock> for RedisActor {
     type Result = ResponseFuture<Result<LockStatus, Error>>;
 
     fn handle(&mut self, msg: Lock, _: &mut Self::Context) -> Self::Result {
