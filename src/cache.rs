@@ -1,9 +1,14 @@
-use crate::actor::Cache;
+use std::boxed::Box;
+
 use actix::{
     dev::{MessageResponse, ToEnvelope},
     Actor, Addr, Handler, Message, ResponseFuture,
 };
-use std::boxed::Box;
+use actix_cache_redis::actor::Set;
+use log::warn;
+use serde::{Serialize, Deserialize};
+
+use crate::actor::Cache;
 
 /// Trait describe cache configuration per message for actix Cache actor.
 pub trait Cacheable {
@@ -92,40 +97,86 @@ where
     message: M,
 }
 
-impl<A, M> Message for QueryCache<A, M>
+impl<'a, A, M> Message for QueryCache<A, M>
 where
     A: Actor,
     M: Message + Cacheable + Send,
-    M::Result: MessageResponse<A, M> + Send,
+    M::Result: MessageResponse<A, M> + Send + Deserialize<'a>,
 {
     type Result = Result<<M as Message>::Result, actix::MailboxError>;
 }
 
-use serde::Serialize;
+use serde::de::DeserializeOwned;
 
-impl<A, M> Handler<QueryCache<A, M>> for Cache
+impl<'a, A, M> Handler<QueryCache<A, M>> for Cache
 where
     A: Actor + Handler<M> + Send,
     M: Message + Cacheable + Send + 'static,
-    M::Result: MessageResponse<A, M> + Send + Serialize,
+    M::Result: MessageResponse<A, M> + Serialize + std::fmt::Debug + DeserializeOwned + Send,
     <A as Actor>::Context: ToEnvelope<A, M>,
 {
     type Result = ResponseFuture<Result<<M as Message>::Result, actix::MailboxError>>;
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
-        log::warn!("YOHOOOO");
-        use actix_cache_redis::actor::Set;
         let backend = self.backend.clone();
+        let key = msg.message.cache_key();
         let res = async move { 
-            let key = msg.message.cache_key();
+            let cached = CachedValue::retrive(&backend, &msg).await;
+            // let cached: CachedValue<_> = serde_json::from_str(c.as_str()).unwrap();
             let data = msg.upstream.send(msg.message).await.unwrap();
             backend.send(Set { 
                 value: serde_json::to_string(&data).unwrap(), 
                 key,
                 ttl: None 
             }).await.unwrap().unwrap();
-            Ok(data)
+            Ok(cached.into_inner())
         };
         Box::pin(res)
     }
+}
+
+use actix_cache_redis::actor::RedisActor;
+use chrono::{DateTime, Utc};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CachedValue<T> {
+    pub data: T,
+    pub expired: DateTime<Utc>,
+}
+
+
+impl<T> CachedValue<T> {
+    async fn retrive<A, M>(backend: &Addr<RedisActor>, msg: &QueryCache<A, M>) -> Self
+    where
+        A: Actor,
+        M: Message + Cacheable + Send,
+        M::Result: MessageResponse<A, M> + Send + 'static,
+        T: DeserializeOwned
+    {
+        use actix_cache_backend::Get;
+        let value = backend
+            .send(Get { key: msg.message.cache_key() })
+            .await;
+        let data = match value {
+            Ok(Ok(value)) => value.unwrap(),
+            _ => {
+                dbg!("+++++++");
+                warn!("Cache backend error.");
+                "".to_owned()
+            }
+        };
+        serde_json::from_str(&data).unwrap()
+    }
+
+    /// Return instance of inner type.
+    pub fn into_inner(self) -> T {
+        self.data
+    }
+
+    // fn deserialize<'a, T>(self) -> Option<T> 
+    // where
+        // T: Deserialize<'a>
+    // {
+        // self.data.map(|data| serde_json::from_str(&data).ok()).flatten()
+    // }
 }
