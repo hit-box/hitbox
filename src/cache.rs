@@ -10,6 +10,7 @@ use log::warn;
 use serde::{Serialize, Deserialize};
 
 use crate::actor::Cache;
+pub use actix_cache_derive::Cacheable;
 
 /// Trait describe cache configuration per message for actix Cache actor.
 pub trait Cacheable {
