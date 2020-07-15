@@ -54,3 +54,19 @@ fn test_message_with_enum() {
     let message = EnumMessage { message_type: MessageType::External };
     assert_eq!(message.cache_key(), "message_type=External".to_string());
 }
+
+#[derive(Serialize)]
+enum TupleMessageType {
+    External(i32),
+}
+
+#[derive(Cacheable, Serialize)]
+struct TupleEnumMessage {
+    message_type: TupleMessageType
+}
+
+#[test]
+fn test_message_with_enum_tuple() {
+    let message = TupleEnumMessage { message_type: TupleMessageType::External(1) };
+    assert_eq!(message.cache_key(), "message_type[External]=1".to_string());
+}
