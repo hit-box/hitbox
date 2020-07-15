@@ -9,7 +9,7 @@ fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
     let gen = quote! {
         impl Cacheable for #name {
             fn cache_key(&self) -> String {
-                serde_urlencoded::to_string(self).unwrap()
+                serde_qs::to_string(self).unwrap()
             }
         }
     };
