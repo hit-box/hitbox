@@ -5,13 +5,17 @@ use log::{debug, info};
 use crate::CacheError;
 
 pub struct Cache {
-    enabled: bool,
-    pub backend: Addr<RedisActor>,
+    pub (crate) enabled: bool,
+    pub (crate) backend: Addr<RedisActor>,
 }
 
 impl Cache {
     pub async fn new() -> Result<Self, CacheError> {
         CacheBuilder::default().build().await
+    }
+
+    pub fn builder() -> CacheBuilder {
+        CacheBuilder::default()
     }
 }
 
@@ -30,13 +34,14 @@ pub struct CacheBuilder {
 
 impl Default for CacheBuilder {
     fn default() -> CacheBuilder {
-        CacheBuilder { enabled: false }
+        CacheBuilder { enabled: true }
     }
 }
 
 impl CacheBuilder {
-    pub fn disable(&mut self) {
-        self.enabled = false;
+    pub fn enabled(mut self, enabled: bool) -> CacheBuilder {
+        self.enabled = enabled;
+        self
     }
 
     pub async fn build(&self) -> Result<Cache, CacheError> {

@@ -127,31 +127,41 @@ where
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
         let backend = self.backend.clone();
         let key = msg.message.cache_key();
+        let enabled = self.enabled;
         let res = async move {
             debug!("Try retrive cached value from backend");
-            let cached = CachedValue::retrive(&backend, &msg).await;
+            let cached = if enabled {
+                CachedValue::retrive(&backend, &msg).await
+            } else {
+                None
+            };
+            // Maybe we should use cached.state() -> CachedValueState enum
+            // and match for this state?
             match cached {
                 Some(res) => {
                     debug!("Cached value retrieved successfully");
                     Ok(res.into_inner())
                 }
                 None => {
-                    debug!("Cache miss, update cache");
+                    debug!("Cache miss");
                     let cache_stale_ttl = msg.message.cache_stale_ttl();
                     let cache_ttl = msg.message.cache_ttl();
                     let upstream_result = msg.upstream.send(msg.message).await?;
                     let cached = CachedValue::new(upstream_result, cache_stale_ttl);
-                    let _ = backend
-                        .send(Set {
-                            value: serde_json::to_string(&cached)?,
-                            key,
-                            ttl: Some(cache_ttl),
-                        })
-                        .await?
-                        .map_err(|error| {
-                            warn!("Updating cache data error");
-                            CacheError::BackendError(error.into())
-                        });
+                    if enabled {
+                        debug!("Update value in cache");
+                        let _ = backend
+                            .send(Set {
+                                value: serde_json::to_string(&cached)?,
+                                key,
+                                ttl: Some(cache_ttl),
+                            })
+                            .await?
+                            .map_err(|error| {
+                                warn!("Updating cache error: {}", error);
+                                CacheError::BackendError(error.into())
+                            });
+                    }
                     Ok(cached.into_inner())
                 }
             }

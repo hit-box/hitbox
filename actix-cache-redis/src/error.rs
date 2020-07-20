@@ -1,8 +1,9 @@
 use actix_cache_backend::BackendError;
 use redis::RedisError;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("Redis backend error: {0}")]
     Redis(RedisError),
 }
 
@@ -13,7 +14,7 @@ impl From<RedisError> for Error {
 }
 
 impl From<Error> for BackendError {
-    fn from(_error: Error) -> Self {
-        Self::Default
+    fn from(error: Error) -> Self {
+        Self::InternalError(Box::new(error))
     }
 }

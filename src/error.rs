@@ -2,7 +2,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CacheError {
-    #[error("Cache backend error")]
+    #[error(transparent)]
     BackendError(#[from] actix_cache_backend::BackendError),
     #[error("Actix upstream actor error")]
     UpstreamError(#[from] actix::MailboxError),

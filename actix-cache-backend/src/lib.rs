@@ -2,9 +2,12 @@ use actix::prelude::*;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum BackendError {
-    #[error("Default error placeholder")]
-    Default,
+pub enum BackendError
+{
+    #[error(transparent)]
+    InternalError(Box<dyn std::error::Error + Send>),
+    #[error(transparent)]
+    ConnectionError(Box<dyn std::error::Error + Send>),
 }
 
 /// Actix message requests cache backend value by key.
