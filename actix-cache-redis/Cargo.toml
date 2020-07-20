@@ -11,7 +11,7 @@ workspace = ".."
 actix-cache-backend = "0.1"
 actix = "0.9"
 log = "0.4"
-redis = { version = "0.15", features = ["tokio-rt-core"] }
+redis = { version = "0.16", features = ["tokio-rt-core"] }
 actix_derive = "0.5"
 actix-rt = "1"
 
