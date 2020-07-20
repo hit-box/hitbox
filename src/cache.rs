@@ -58,7 +58,7 @@ pub trait Cacheable {
     fn cache_stale_ttl(&self) -> u32 {
         let ttl = self.cache_ttl();
         let stale_time = 5;
-        if ttl >= 5 {
+        if ttl >= stale_time {
             ttl - stale_time
         }
         else {
