@@ -59,7 +59,7 @@ impl Handler<Pong> for SyncUpstream {
 
     fn handle(&mut self, _msg: Pong, _: &mut Self::Context) -> Self::Result {
         42
-    }        
+    }
 }
 
 impl Handler<Ping> for SyncUpstream {
@@ -79,7 +79,10 @@ async fn test_async_proxy() {
         .await
         .unwrap();
     assert_eq!(res.unwrap(), Ok(42));
-    let res = cache.send(Pong {}.into_cache(upstream.clone())).await.unwrap();
+    let res = cache
+        .send(Pong {}.into_cache(upstream.clone()))
+        .await
+        .unwrap();
     assert_eq!(res.unwrap(), 42);
 }
 
@@ -87,7 +90,10 @@ async fn test_async_proxy() {
 async fn test_sync_proxy() {
     let upstream = SyncArbiter::start(10, move || SyncUpstream {});
     let cache = Cache::new().await.start();
-    let res = cache.send(Pong {}.into_cache(upstream.clone())).await.unwrap();
+    let res = cache
+        .send(Pong {}.into_cache(upstream.clone()))
+        .await
+        .unwrap();
     assert_eq!(res.unwrap(), 42);
     let res = cache.send(Ping {}.into_cache(upstream)).await.unwrap();
     assert_eq!(res.unwrap(), Ok(42));

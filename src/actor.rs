@@ -1,5 +1,5 @@
-use actix_cache_redis::actor::RedisActor;
 use actix::prelude::*;
+use actix_cache_redis::actor::RedisActor;
 use log::{debug, info};
 
 pub struct Cache {
@@ -40,7 +40,10 @@ impl CacheBuilder {
     pub async fn build(&self) -> Cache {
         Cache {
             enabled: self.enabled,
-            backend: actix_cache_redis::actor::RedisActor::new().await.unwrap().start()
+            backend: actix_cache_redis::actor::RedisActor::new()
+                .await
+                .unwrap()
+                .start(),
         }
     }
 }

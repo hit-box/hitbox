@@ -1,8 +1,10 @@
 use actix::prelude::*;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum BackendError {
-    Default    
+    #[error("Default error placeholder")]
+    Default,
 }
 
 /// Actix message requests cache backend value by key.

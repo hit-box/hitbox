@@ -15,6 +15,11 @@ actix-cache-backend = "0.1"
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+
+[dev-dependencies]
+env_logger = "0.7"
+actix_derive = "0.5"
 
 [workspace]
 members = [
@@ -27,3 +32,7 @@ members = [
 actix-cache = { path = "." }
 actix-cache-redis = { path = "actix-cache-redis" }
 actix-cache-backend = { path = "actix-cache-backend" }
+
+[[example]]
+name = "debug"
+
