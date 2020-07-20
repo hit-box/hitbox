@@ -1,4 +1,4 @@
-use actix_cache::cache::Cacheable;
+use actix_cache::cache::*;
 use serde::Serialize;
 
 #[derive(Cacheable, Serialize)]
@@ -69,4 +69,20 @@ struct TupleEnumMessage {
 fn test_message_with_enum_tuple() {
     let message = TupleEnumMessage { message_type: TupleMessageType::External(1) };
     assert_eq!(message.cache_key(), "message_type[External]=1".to_string());
+}
+
+#[derive(Cacheable, Serialize)]
+#[cache_ttl(42)]
+#[cache_stale_ttl(10)]
+#[cache_version(1)]
+struct TTLMessage {
+    message_type: i32
+}
+
+#[test]
+fn test_message_ttl() {
+    let message = TTLMessage { message_type: 1 };
+    assert_eq!(message.cache_ttl(), 42);
+    assert_eq!(message.cache_stale_ttl(), 32);
+    assert_eq!(message.cache_version(), 1);
 }

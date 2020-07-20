@@ -1,23 +1,22 @@
-extern crate proc_macro;
+//! This crate provides Cacheable derive macros.
+//!
+//! ```edition2018
+//! # use actix_cache::Cacheable;
+//! # use serde_derive::{Serialize, Deserialize};
+//! #
+//! # #[derive(Cacheable, Serialize)]
+//! # struct Message {
+//! #     field: i32,
+//! # };
+//! # let message = Message { field: 42 };
+//! # assert_eq!(message.cache_key(), "id=42".to_string());
+//! ```
+mod cacheable_macro;
+mod macro_attributes;
+use syn::export::TokenStream;
 
-use proc_macro::TokenStream;
-use quote::quote;
-use syn;
-
-fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
-    let name = &ast.ident;
-    let gen = quote! {
-        impl Cacheable for #name {
-            fn cache_key(&self) -> String {
-                serde_qs::to_string(self).unwrap()
-            }
-        }
-    };
-    gen.into()
-}
-
-#[proc_macro_derive(Cacheable)]
+#[proc_macro_derive(Cacheable, attributes(cache_ttl, cache_stale_ttl, cache_version))]
 pub fn cacheable_macro_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
-    impl_cacheable_macro(&ast)
+    cacheable_macro::impl_cacheable_macro(&ast)
 }

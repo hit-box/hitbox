@@ -5,8 +5,10 @@ authors = ["Andrey Ermilov <andrerm@ya.ru>"]
 edition = "2018"
 
 [dependencies]
-syn = "1.0.34"
+syn = { version = "1.0.34", features = ["derive"] }
 quote = "1.0.7"
+serde = "1.0.114"
+proc-macro2 = "1.0.19"
 
 [lib]
 proc-macro = true
