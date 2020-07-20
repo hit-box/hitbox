@@ -36,7 +36,7 @@ async fn main() -> Result<(), CacheError> {
         .filter_level(log::LevelFilter::Debug)
         .init();
 
-    let cache = Cache::new().await.start();
+    let cache = Cache::new().await?.start();
     let upstream = UpstreamActor.start(); 
 
     let msg = Ping(42);
