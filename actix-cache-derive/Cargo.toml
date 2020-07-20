@@ -5,7 +5,7 @@ authors = ["Andrey Ermilov <andrerm@ya.ru>"]
 edition = "2018"
 
 [dependencies]
-syn = { version = "1.0.34", features = ["derive"] }
+syn = "1.0.34"
 quote = "1.0.7"
 serde = "1.0.114"
 proc-macro2 = "1.0.19"
