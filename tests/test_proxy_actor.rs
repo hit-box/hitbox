@@ -59,7 +59,7 @@ impl Handler<Pong> for SyncUpstream {
 
     fn handle(&mut self, _msg: Pong, _: &mut Self::Context) -> Self::Result {
         42
-    }        
+    }
 }
 
 impl Handler<Ping> for SyncUpstream {
@@ -72,22 +72,28 @@ impl Handler<Ping> for SyncUpstream {
 
 #[actix_rt::test]
 async fn test_async_proxy() {
-    let cache = Cache::new().await.start();
+    let cache = Cache::new().await.unwrap().start();
     let upstream = Upstream {}.start();
     let res = cache
         .send(Ping {}.into_cache(upstream.clone()))
         .await
         .unwrap();
     assert_eq!(res.unwrap(), Ok(42));
-    let res = cache.send(Pong {}.into_cache(upstream.clone())).await.unwrap();
+    let res = cache
+        .send(Pong {}.into_cache(upstream.clone()))
+        .await
+        .unwrap();
     assert_eq!(res.unwrap(), 42);
 }
 
 #[actix_rt::test]
 async fn test_sync_proxy() {
     let upstream = SyncArbiter::start(10, move || SyncUpstream {});
-    let cache = Cache::new().await.start();
-    let res = cache.send(Pong {}.into_cache(upstream.clone())).await.unwrap();
+    let cache = Cache::new().await.unwrap().start();
+    let res = cache
+        .send(Pong {}.into_cache(upstream.clone()))
+        .await
+        .unwrap();
     assert_eq!(res.unwrap(), 42);
     let res = cache.send(Ping {}.into_cache(upstream)).await.unwrap();
     assert_eq!(res.unwrap(), Ok(42));

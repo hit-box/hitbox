@@ -31,7 +31,7 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
 
             /// Describe expire\stale timeout value for cache storage in seconds.
             fn cache_stale_ttl(&self) -> u32 {
-                self.cache_ttl() - #cache_stale_ttl
+                #cache_stale_ttl
             }
 
             /// Describe current cache version for this message type.

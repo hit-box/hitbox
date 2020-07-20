@@ -1,8 +1,8 @@
 use crate::error::Error;
 use actix::prelude::*;
+use actix_cache_backend::{BackendError, Get};
 use log::{debug, info};
 use redis::{aio::MultiplexedConnection, Client};
-use actix_cache_backend::{BackendError, Get};
 
 /// Actix Redis cache backend actor.
 pub struct RedisActor {

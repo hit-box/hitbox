@@ -1,5 +1,5 @@
-use redis::RedisError;
 use actix_cache_backend::BackendError;
+use redis::RedisError;
 
 #[derive(Debug)]
 pub enum Error {
