@@ -39,16 +39,25 @@ async fn main() -> Result<(), CacheError> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug)
         .init();
-
-    let cache = Cache::builder()
-        .enabled(true)
-        .build()
+    
+    use actix_cache_redis::actor::RedisActor;
+    let backend = RedisActor::new()
         .await
-        .map_err(|e| {
-            log::error!("{}", e);
-            e
-        })?
+        .map_err(|err| CacheError::BackendError(err.into()))?
         .start();
+
+    let cache = Cache::new(backend)
+        .await?
+        .start();
+    // let cache = Cache::build()
+        // .enabled(true)
+        // .build()
+        // .await
+        // .map_err(|e| {
+            // log::error!("{}", e);
+            // e
+        // })?
+        // .start();
     let upstream = UpstreamActor.start(); 
 
     let msg = Ping(42);

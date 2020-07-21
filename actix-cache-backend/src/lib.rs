@@ -1,5 +1,14 @@
 use actix::prelude::*;
+use actix::dev::ToEnvelope;
 use thiserror::Error;
+
+pub trait Backend
+where
+    Self: Actor + Handler<Set> + Handler<Get>
+{
+    type Actor: Actor<Context=<Self as Backend>::Context> + Handler<Set> + Handler<Get>;
+    type Context: ActorContext + ToEnvelope<Self::Actor, Get> + ToEnvelope<Self::Actor, Set>;
+}
 
 #[derive(Debug, Error)]
 pub enum BackendError

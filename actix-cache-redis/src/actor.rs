@@ -1,6 +1,6 @@
 use crate::error::Error;
 use actix::prelude::*;
-use actix_cache_backend::{BackendError, Get};
+use actix_cache_backend::{BackendError, Get, Set, Backend};
 use log::{debug, info};
 use redis::{aio::MultiplexedConnection, Client};
 
@@ -40,6 +40,12 @@ impl RedisActorBuilder {
     }
 }
 
+impl Backend for RedisActor 
+{
+    type Actor = Self;
+    type Context = Context<Self>;
+}
+
 /// Implementation actix Actor trait for Redis cache backend.
 impl Actor for RedisActor {
     type Context = Context<Self>;
@@ -67,18 +73,18 @@ impl Handler<Get> for RedisActor {
     }
 }
 
-/// Actix message implements writing Redis value by key.
-#[derive(Message, Debug, Clone)]
-#[rtype(result = "Result<String, Error>")]
-pub struct Set {
-    pub key: String,
-    pub value: String,
-    pub ttl: Option<u32>,
-}
+///// Actix message implements writing Redis value by key.
+// #[derive(Message, Debug, Clone)]
+// #[rtype(result = "Result<String, Error>")]
+// pub struct Set {
+    // pub key: String,
+    // pub value: String,
+    // pub ttl: Option<u32>,
+// }
 
 /// Implementation of Actix Handler for Set message.
 impl Handler<Set> for RedisActor {
-    type Result = ResponseFuture<Result<String, Error>>;
+    type Result = ResponseFuture<Result<String, BackendError>>;
 
     fn handle(&mut self, msg: Set, _: &mut Self::Context) -> Self::Result {
         let mut con = self.connection.clone();
@@ -88,7 +94,11 @@ impl Handler<Set> for RedisActor {
             if let Some(ttl) = msg.ttl {
                 request.arg("EX").arg(ttl);
             };
-            request.query_async(&mut con).await.map_err(Error::from)
+            request
+                .query_async(&mut con).
+                await
+                .map_err(Error::from)
+                .map_err(BackendError::from)
         })
     }
 }

@@ -5,8 +5,7 @@ use actix::{
     dev::{MessageResponse, ToEnvelope},
     Actor, Addr, Handler, Message, ResponseFuture,
 };
-use actix_cache_backend::Get;
-use actix_cache_redis::actor::Set;
+use actix_cache_backend::{Get, Set};
 use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 
@@ -115,8 +114,10 @@ where
     type Result = Result<<M as Message>::Result, CacheError>;
 }
 
-impl<'a, A, M> Handler<QueryCache<A, M>> for Cache
+impl<'a, A, M, B> Handler<QueryCache<A, M>> for Cache<B>
 where
+    B: Actor + Backend,
+    <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set>,
     A: Actor + Handler<M> + Send,
     M: Message + Cacheable + Send + 'static,
     M::Result: MessageResponse<A, M> + Serialize + std::fmt::Debug + DeserializeOwned + Send,
@@ -171,6 +172,7 @@ where
 }
 
 use actix_cache_redis::actor::RedisActor;
+use actix_cache_backend::Backend;
 use chrono::{DateTime, Duration, Utc};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -190,8 +192,10 @@ impl<T> CachedValue<T> {
         }
     }
 
-    async fn retrive<A, M>(backend: &Addr<RedisActor>, msg: &QueryCache<A, M>) -> Option<Self>
+    async fn retrive<A, B, M>(backend: &Addr<B>, msg: &QueryCache<A, M>) -> Option<Self>
     where
+        B: Backend,
+        <B as Actor>::Context: ToEnvelope<B, Get>,
         A: Actor,
         M: Message + Cacheable + Send,
         M::Result: MessageResponse<A, M> + Send + 'static,
