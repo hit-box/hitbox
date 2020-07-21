@@ -34,6 +34,43 @@ impl Handler<Ping> for UpstreamActor {
     }
 }
 
+use actix_cache_backend::{BackendError, Backend, Set, Get};
+
+struct DummyBackend;
+
+impl Actor for DummyBackend {
+    type Context = Context<Self>;
+}
+
+impl Backend for DummyBackend {
+    type Actor = Self;
+    type Context = Context<Self>;
+}
+
+
+impl Handler<Get> for DummyBackend {
+    type Result = ResponseFuture<Result<Option<String>, BackendError>>;
+
+    fn handle(&mut self, _msg: Get, _: &mut Self::Context) -> Self::Result {
+        log::warn!("Dummy backend GET");
+        let fut = async move {
+            Ok(None)
+        };
+        Box::pin(fut)
+    }
+}
+
+impl Handler<Set> for DummyBackend {
+    type Result = ResponseFuture<Result<String, BackendError>>;
+
+    fn handle(&mut self, _msg: Set, _: &mut Self::Context) -> Self::Result {
+        log::warn!("Dummy backend SET");
+        Box::pin(async move {
+            Ok("42".to_owned())
+        })
+    }
+}
+
 #[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
     env_logger::builder()
@@ -46,7 +83,9 @@ async fn main() -> Result<(), CacheError> {
         .map_err(|err| CacheError::BackendError(err.into()))?
         .start();
 
-    let cache = Cache::new(backend)
+    let dummy_backend = DummyBackend.start();
+
+    let cache = Cache::new(dummy_backend)
         .await?
         .start();
     // let cache = Cache::build()
