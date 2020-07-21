@@ -86,14 +86,27 @@ fn test_message_with_enum_tuple() {
 #[cache_ttl(42)]
 #[cache_stale_ttl(30)]
 #[cache_version(1)]
-struct TTLMessage {
+struct MacroHelpersMessage {
     message_type: i32
 }
 
 #[test]
-fn test_message_ttl() {
-    let message = TTLMessage { message_type: 1 };
-    assert_eq!(message.cache_ttl(), 1000);
+fn test_macro_helpers_work() {
+    let message = MacroHelpersMessage { message_type: 1 };
+    assert_eq!(message.cache_ttl(), 42);
     assert_eq!(message.cache_stale_ttl(), 30);
     assert_eq!(message.cache_version(), 1);
+}
+
+#[derive(Cacheable, Serialize)]
+struct DefaultMessage {
+    message_type: i32
+}
+
+#[test]
+fn test_default_ttl_stale_ttl_version_work() {
+    let message = DefaultMessage { message_type: 1 };
+    assert_eq!(message.cache_ttl(), 60);
+    assert_eq!(message.cache_stale_ttl(), 55);
+    assert_eq!(message.cache_version(), 0);
 }

@@ -6,6 +6,8 @@ use crate::macro_attributes::find_attribute;
 /// Implementing Cacheable trait.
 ///
 /// Uses `serde_qs` crate to create a unique cache key.
+/// Default implementation of methods `cache_ttl`, `cache_stale_ttl` and `cache_version`
+/// are used if macros of the same name are not used.
 pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
 
@@ -18,7 +20,7 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
         None => proc_macro2::TokenStream::new()
     };
 
-    let cache_ttl_stale_implement = match find_attribute(&ast, "cache_stale_ttl") {
+    let cache_stale_ttl_implement = match find_attribute(&ast, "cache_stale_ttl") {
         Some(cache_stale_ttl) => quote! {
             fn cache_stale_ttl(&self) -> u32 {
                 #cache_stale_ttl
@@ -29,29 +31,20 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
 
     let cache_version_implement = match find_attribute(&ast, "cache_version") {
         Some(cache_version) => quote! {
-            let cache_version = u16::from(cache_version);
-            fn cache_version(&self) -> u16 {
+            fn cache_version(&self) -> u32 {
                 #cache_version
             }
         },
         None => proc_macro2::TokenStream::new()
     };
 
-
     let gen = quote! {
         impl Cacheable for #name {
-            /// Method should return unique identifier for struct object.
             fn cache_key(&self) -> String {
                 serde_qs::to_string(self).unwrap()
             }
-
-            /// Describe time-to-live (ttl) value for cache storage in seconds.
             #cache_ttl_implement
-
-            /// Describe expire\stale timeout value for cache storage in seconds.
-            #cache_ttl_stale_implement
-
-            /// Describe current cache version for this message type.
+            #cache_stale_ttl_implement
             #cache_version_implement
         }
     };

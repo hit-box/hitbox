@@ -5,6 +5,9 @@
 //! # use serde_derive::{Serialize, Deserialize};
 //! #
 //! # #[derive(Cacheable, Serialize)]
+//! # #[cache_ttl(120)]
+//! # #[cache_stale_ttl(100)]
+//! # #[cache_version(100)]
 //! # struct Message {
 //! #     field: i32,
 //! # };
