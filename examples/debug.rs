@@ -69,6 +69,36 @@ impl Handler<Set> for DummyBackend {
     }
 }
 
+struct DummySyncBackend;
+
+impl Actor for DummySyncBackend {
+    type Context = SyncContext<Self>;
+}
+
+impl Backend for DummySyncBackend {
+    type Actor = Self;
+    type Context = SyncContext<Self>;
+}
+
+
+impl Handler<Get> for DummySyncBackend {
+    type Result = Result<Option<String>, BackendError>;
+
+    fn handle(&mut self, _msg: Get, _: &mut Self::Context) -> Self::Result {
+        log::warn!("Dummy sync backend GET");
+        Ok(None)
+    }
+}
+
+impl Handler<Set> for DummySyncBackend {
+    type Result = Result<String, BackendError>;
+
+    fn handle(&mut self, _msg: Set, _: &mut Self::Context) -> Self::Result {
+        log::warn!("Dummy sync backend SET");
+        Ok("42".to_owned())
+    }
+}
+
 #[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
     env_logger::builder()
@@ -82,8 +112,12 @@ async fn main() -> Result<(), CacheError> {
         .start();
 
     let dummy_backend = DummyBackend.start();
+    let dummy_sync_backend = {
+        SyncArbiter::start(3, move || DummySyncBackend)
+    };
 
-    let cache = Cache::new(dummy_backend)
+    // let cache = Cache::new(dummy_backend)
+    let cache = Cache::new(dummy_sync_backend)
         .await?
         .start();
     // let cache = Cache::build()
