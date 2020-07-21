@@ -1,7 +1,6 @@
 use actix::prelude::*;
 use actix_derive::{Message, MessageResponse};
 use actix_cache::{actor::Cache, error::CacheError, cache::Cacheable};
-use actix_cache_derive::Cacheable;
 use serde::{Serialize, Deserialize};
 
 struct UpstreamActor;

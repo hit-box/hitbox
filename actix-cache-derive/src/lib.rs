@@ -1,18 +1,18 @@
 //! This crate provides Cacheable derive macros.
 //!
 //! ```edition2018
-//! # use actix_cache::Cacheable;
-//! # use serde_derive::{Serialize, Deserialize};
-//! #
-//! # #[derive(Cacheable, Serialize)]
-//! # #[cache_ttl(120)]
-//! # #[cache_stale_ttl(100)]
-//! # #[cache_version(100)]
-//! # struct Message {
-//! #     field: i32,
-//! # };
-//! # let message = Message { field: 42 };
-//! # assert_eq!(message.cache_key(), "id=42".to_string());
+//! use actix_cache::cache::Cacheable;
+//! use serde::Serialize;
+//!
+//! #[derive(Cacheable, Serialize)]
+//! #[cache_ttl(120)]
+//! #[cache_stale_ttl(100)]
+//! #[cache_version(100)]
+//! struct Message {
+//!     field: i32,
+//! };
+//! let message = Message { field: 42 };
+//! assert_eq!(message.cache_key(), "field=42".to_string());
 //! ```
 mod cacheable_macro;
 mod macro_attributes;

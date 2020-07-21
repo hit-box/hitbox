@@ -10,5 +10,8 @@ quote = "1"
 serde = "1"
 proc-macro2 = "1"
 
+[dev-dependencies]
+actix-cache = { version = "0.1", features = ["derive"] }
+
 [lib]
 proc-macro = true
