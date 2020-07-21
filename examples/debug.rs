@@ -61,13 +61,11 @@ impl Handler<Get> for DummyBackend {
 }
 
 impl Handler<Set> for DummyBackend {
-    type Result = ResponseFuture<Result<String, BackendError>>;
+    type Result = Result<String, BackendError>;
 
     fn handle(&mut self, _msg: Set, _: &mut Self::Context) -> Self::Result {
         log::warn!("Dummy backend SET");
-        Box::pin(async move {
-            Ok("42".to_owned())
-        })
+        Ok("42".to_owned())
     }
 }
 
