@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::actor::Cache;
 use crate::CacheError;
-pub use actix_cache_derive::Cacheable;
 
 /// Trait describe cache configuration per message for actix Cache actor.
 pub trait Cacheable {

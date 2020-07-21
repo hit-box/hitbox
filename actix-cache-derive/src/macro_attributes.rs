@@ -6,16 +6,16 @@ fn parse_attribute(attr: &Attribute, method: &str) -> Option<u32> {
         let meta = &attr.parse_meta();
         match meta {
             Ok(syn::Meta::List(value)) => {
-                let nested = value.nested.first().expect("Should be parameter");
+                let nested = value.nested.first()?;
                 let result = match nested {
                     NestedMeta::Lit(syn::Lit::Int(value)) => Some(
-                        value.base10_parse().expect("Parameter should be u32")
+                        value.base10_parse().ok()?
                     ),
-                    _ => None
+                    _ => panic!("Parameter for macro {macro} should be u32", macro=method)
                 };
                 result.into()
             },
-            _ => None
+            _ => panic!("{macro} macro should have a parameter of type u32", macro=method)
         }
     } else {
         None
