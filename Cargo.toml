@@ -13,6 +13,8 @@ actix-rt = "1"
 actix-cache-redis = "0.1"
 actix-cache-backend = "0.1"
 serde_json = "1"
+serde_qs = { version = "0.6", optional = true }
+actix-cache-derive = { version = "0.1", optional = true }
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
@@ -26,13 +28,18 @@ members = [
   ".",
   "actix-cache-redis",
   "actix-cache-backend",
+  "actix-cache-derive",
 ]
 
 [patch.crates-io]
 actix-cache = { path = "." }
 actix-cache-redis = { path = "actix-cache-redis" }
 actix-cache-backend = { path = "actix-cache-backend" }
+actix-cache-derive = { path = "actix-cache-derive" }
 
 [[example]]
 name = "debug"
+required-features = ["derive"]
 
+[features]
+derive = ["actix-cache-derive", "serde_qs"]

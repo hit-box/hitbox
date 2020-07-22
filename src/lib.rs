@@ -5,10 +5,5 @@ pub mod error;
 
 pub use error::CacheError;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+#[cfg(feature = "derive")]
+pub use serde_qs;

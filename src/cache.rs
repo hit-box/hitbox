@@ -13,6 +13,10 @@ use serde::{Deserialize, Serialize};
 use crate::actor::Cache;
 use crate::CacheError;
 
+#[cfg(feature = "derive")]
+pub use actix_cache_derive::Cacheable;
+
+
 /// Trait describe cache configuration per message for actix Cache actor.
 pub trait Cacheable {
     /// Method should return unique identifier for struct object.
@@ -67,7 +71,7 @@ pub trait Cacheable {
     }
 
     /// Describe current cache version for this message type.
-    fn cache_version(&self) -> u16 {
+    fn cache_version(&self) -> u32 {
         0
     }
 
