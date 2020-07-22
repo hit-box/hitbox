@@ -2,6 +2,7 @@
 //!
 //! ```edition2018
 //! use actix_cache::cache::Cacheable;
+//! use actix_cache::error::CacheError;
 //! use serde::Serialize;
 //!
 //! #[derive(Cacheable, Serialize)]
@@ -12,7 +13,7 @@
 //!     field: i32,
 //! };
 //! let message = Message { field: 42 };
-//! assert_eq!(message.cache_key(), "field=42".to_string());
+//! assert_eq!(message.cache_key().unwrap(), "field=42".to_string());
 //! ```
 mod cacheable_macro;
 mod macro_attributes;

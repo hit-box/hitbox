@@ -1,8 +1,8 @@
 #[cfg(feature = "derive")]
 mod tests {
-    use actix_cache::cache::*;
+    use actix_cache::cache::Cacheable;
     use serde::Serialize;
-    use actix_cache_derive::Cacheable;
+    use actix_cache::CacheError;
 
     #[derive(Cacheable, Serialize)]
     struct Message {
@@ -13,7 +13,7 @@ mod tests {
     #[test]
     fn test_all_keys() {
         let message = Message { id: 0, alias: "alias".to_string() };
-        assert_eq!(message.cache_key(), "id=0&alias=alias".to_string());
+        assert_eq!(message.cache_key().unwrap(), "id=0&alias=alias".to_string());
     }
 
 
@@ -28,7 +28,7 @@ mod tests {
     #[test]
     fn test_partial() {
         let message = PartialSerializeMessage { id: 0, alias: "alias".to_string() };
-        assert_eq!(message.cache_key(), "id=0".to_string());
+        assert_eq!(message.cache_key().unwrap(), "id=0".to_string());
     }
 
     #[derive(Cacheable, Serialize)]
@@ -39,7 +39,7 @@ mod tests {
     #[test]
     fn test_message_with_vector() {
         let message = VecMessage { id: vec![1, 2, 3] };
-        assert_eq!(message.cache_key(), "id[0]=1&id[1]=2&id[2]=3".to_string());
+        assert_eq!(message.cache_key().unwrap(), "id[0]=1&id[1]=2&id[2]=3".to_string());
     }
 
     #[derive(Serialize)]
@@ -55,7 +55,7 @@ mod tests {
     #[test]
     fn test_message_with_enum() {
         let message = EnumMessage { message_type: MessageType::External };
-        assert_eq!(message.cache_key(), "message_type=External".to_string());
+        assert_eq!(message.cache_key().unwrap(), "message_type=External".to_string());
     }
 
     #[derive(Serialize)]
@@ -71,18 +71,18 @@ mod tests {
     #[test]
     fn test_message_with_enum_tuple() {
         let message = TupleEnumMessage { message_type: TupleMessageType::External(1) };
-        assert_eq!(message.cache_key(), "message_type[External]=1".to_string());
+        assert_eq!(message.cache_key().unwrap(), "message_type[External]=1".to_string());
     }
 
-    // ToDo: fix it
-    // #[derive(Cacheable, Serialize)]
-    // struct TupleMessage(i32);
-    //
-    // #[test]
-    // fn test_tuple_message() {
-    //     let message = TupleMessage(1);
-    //     assert_eq!(message.cache_key(), "1".to_string());
-    // }
+    // Should we support tuple struct?
+    #[derive(Cacheable, Serialize)]
+    struct TupleMessage(i32);
+
+    #[test]
+    fn test_tuple_returns_error() {
+        let message = TupleMessage(1);
+        assert!(message.cache_key().is_err());
+    }
 
     #[derive(Cacheable, Serialize)]
     #[cache_ttl(42)]
