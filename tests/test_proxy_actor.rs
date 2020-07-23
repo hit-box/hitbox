@@ -1,6 +1,7 @@
 use actix::prelude::*;
 use actix_cache::actor::Cache;
 use actix_cache::cache::Cacheable;
+use actix_cache::CacheError;
 
 pub struct Upstream;
 
@@ -17,8 +18,8 @@ impl Actor for Upstream {
 pub struct Ping;
 
 impl Cacheable for Ping {
-    fn cache_key(&self) -> String {
-        "Ping::".to_owned()
+    fn cache_key(&self) -> Result<String, CacheError> {
+        Ok("Ping::".to_owned())
     }
 }
 
@@ -35,8 +36,8 @@ impl Handler<Ping> for Upstream {
 pub struct Pong;
 
 impl Cacheable for Pong {
-    fn cache_key(&self) -> String {
-        "Pong::".to_owned()
+    fn cache_key(&self) -> Result<String, CacheError> {
+        Ok("Pong::".to_owned())
     }
 }
 

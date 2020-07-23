@@ -10,4 +10,6 @@ pub enum CacheError {
     SerializeError(#[from] serde_json::Error),
     #[error("Cached data deserialization error")]
     DeserializeError,
+    #[error("Cache key generation error")]
+    CacheKeyGenerationError(String),
 }

@@ -30,25 +30,27 @@ pub trait Cacheable {
     ///
     /// ```
     /// use actix_cache::cache::Cacheable;
+    /// use actix_cache::CacheError;
     ///
     /// struct QueryNothing {
     ///     id: Option<i32>,
     /// }
     ///
     /// impl Cacheable for QueryNothing {
-    ///     fn cache_key(&self) -> String {
-    ///         format!("database::QueryNothing::id::{}", self.id.map_or_else(
+    ///     fn cache_key(&self) -> Result<String, CacheError> {
+    ///         let key = format!("database::QueryNothing::id::{}", self.id.map_or_else(
     ///             || "None".to_owned(), |id| id.to_string())
-    ///         )
+    ///         );
+    ///         Ok(key)
     ///     }
     /// }
     ///
     /// let query = QueryNothing { id: Some(1) };
-    /// assert_eq!(query.cache_key(), "database::QueryNothing::id::1");
+    /// assert_eq!(query.cache_key().unwrap(), "database::QueryNothing::id::1");
     /// let query = QueryNothing { id: None };
-    /// assert_eq!(query.cache_key(), "database::QueryNothing::id::None");
+    /// assert_eq!(query.cache_key().unwrap(), "database::QueryNothing::id::None");
     /// ```
-    fn cache_key(&self) -> String;
+    fn cache_key(&self) -> Result<String, CacheError>;
 
     /// Describe time-to-live (ttl) value for cache storage in seconds.
     ///
@@ -73,18 +75,6 @@ pub trait Cacheable {
     /// Describe current cache version for this message type.
     fn cache_version(&self) -> u32 {
         0
-    }
-
-    /// Describe cache label.
-    ///
-    /// By default cache label is a cache key prefix: `{actor}::{message type}`.
-    /// This value used for aggregating metrics by actors and message.
-    fn label(&self) -> String {
-        self.cache_key()
-            .split("::")
-            .take(2)
-            .collect::<Vec<&str>>()
-            .join("::")
     }
 
     fn into_cache<A>(self, upstream: Addr<A>) -> QueryCache<A, Self>
@@ -130,12 +120,17 @@ where
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
         let backend = self.backend.clone();
-        let key = msg.message.cache_key();
-        let enabled = self.enabled;
+        let (enabled, cache_key) = match msg.message.cache_key() {
+            Ok(value) => (self.enabled, value),
+            Err(error) => {
+                warn!("Creating cache key error: {}", error);
+                (false, String::new())
+            }
+        };
         let res = async move {
-            debug!("Try retrive cached value from backend");
+            debug!("Try retrieve cached value from backend");
             let cached = if enabled {
-                CachedValue::retrive(&backend, &msg).await
+                CachedValue::retrieve(&backend, cache_key.clone()).await
             } else {
                 None
             };
@@ -157,7 +152,7 @@ where
                         let _ = backend
                             .send(Set {
                                 value: serde_json::to_string(&cached)?,
-                                key,
+                                key: cache_key,
                                 ttl: Some(cache_ttl),
                             })
                             .await?
@@ -194,17 +189,12 @@ impl<T> CachedValue<T> {
         }
     }
 
-    async fn retrive<A, M>(backend: &Addr<RedisActor>, msg: &QueryCache<A, M>) -> Option<Self>
+    async fn retrieve(backend: &Addr<RedisActor>, cache_key: String) -> Option<Self>
     where
-        A: Actor,
-        M: Message + Cacheable + Send,
-        M::Result: MessageResponse<A, M> + Send + 'static,
         T: DeserializeOwned,
     {
         let value = backend
-            .send(Get {
-                key: msg.message.cache_key(),
-            })
+            .send(Get { key: cache_key })
             .await;
         let serialized = match value {
             Ok(Ok(value)) => value,
@@ -242,8 +232,8 @@ mod tests {
     struct Message;
 
     impl Cacheable for Message {
-        fn cache_key(&self) -> String {
-            "Message".to_owned()
+        fn cache_key(&self) -> Result<String, CacheError> {
+            Ok("Message".to_owned())
         }
 
         fn cache_ttl(&self) -> u32 {
