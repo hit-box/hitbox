@@ -77,18 +77,6 @@ pub trait Cacheable {
         0
     }
 
-    /// Describe cache label.
-    ///
-    /// By default cache label is a cache key prefix: `{actor}::{message type}`.
-    /// This value used for aggregating metrics by actors and message.
-    fn label(&self) -> String {
-        self.cache_key().unwrap()
-            .split("::")
-            .take(2)
-            .collect::<Vec<&str>>()
-            .join("::")
-    }
-
     fn into_cache<A>(self, upstream: Addr<A>) -> QueryCache<A, Self>
     where
         A: Actor,
@@ -135,7 +123,7 @@ where
         let (enabled, cache_key) = match msg.message.cache_key() {
             Ok(value) => (self.enabled, value),
             Err(error) => {
-                debug!("Creating cache key error: {}", error);
+                warn!("Creating cache key error: {}", error);
                 (false, String::new())
             }
         };
