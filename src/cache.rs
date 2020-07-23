@@ -132,16 +132,19 @@ where
             let cached = if enabled {
                 CachedValue::retrieve(&backend, cache_key.clone()).await
             } else {
-                None
+                CachedValueState::DoesNotExist
             };
-            // Maybe we should use cached.state() -> CachedValueState enum
-            // and match for this state?
+
             match cached {
-                Some(res) => {
+                CachedValueState::Actual(res) => {
                     debug!("Cached value retrieved successfully");
                     Ok(res.into_inner())
                 }
-                None => {
+                CachedValueState::Stale(res) => {
+                    debug!("Cached value retrieved successfully");
+                    Ok(res.into_inner())
+                }
+                CachedValueState::DoesNotExist => {
                     debug!("Cache miss");
                     let cache_stale_ttl = msg.message.cache_stale_ttl();
                     let cache_ttl = msg.message.cache_ttl();
@@ -172,6 +175,22 @@ where
 use actix_cache_redis::actor::RedisActor;
 use chrono::{DateTime, Duration, Utc};
 
+enum CachedValueState<T> {
+    Actual(CachedValue<T>),
+    DoesNotExist,
+    Stale(CachedValue<T>),
+}
+
+impl<T> From<CachedValue<T>> for CachedValueState<T> {
+    fn from(cached_value: CachedValue<T>) -> Self {
+        if cached_value.expired < Utc::now() {
+            CachedValueState::Stale(cached_value)
+        } else {
+            CachedValueState::Actual(cached_value)
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct CachedValue<T> {
     pub data: T,
@@ -189,7 +208,7 @@ impl<T> CachedValue<T> {
         }
     }
 
-    async fn retrieve(backend: &Addr<RedisActor>, cache_key: String) -> Option<Self>
+    async fn retrieve(backend: &Addr<RedisActor>, cache_key: String) -> CachedValueState<T>
     where
         T: DeserializeOwned,
     {
@@ -207,16 +226,20 @@ impl<T> CachedValue<T> {
                 None
             }
         };
-        serialized
+        let cached_value: Option<CachedValue<T>> = serialized
             .map(|data| {
                 serde_json::from_str(&data)
                     .map_err(|err| {
-                        warn!("Cache data deserializtion error: {}", err);
+                        warn!("Cache data deserialization error: {}", err);
                         err
                     })
                     .ok()
             })
-            .flatten()
+            .flatten();
+        match cached_value {
+            Some(value) => CachedValueState::from(value),
+            None => CachedValueState::DoesNotExist,
+        }
     }
 
     /// Return instance of inner type.

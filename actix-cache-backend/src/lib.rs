@@ -2,8 +2,7 @@ use actix::prelude::*;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum BackendError
-{
+pub enum BackendError {
     #[error(transparent)]
     InternalError(Box<dyn std::error::Error + Send>),
     #[error(transparent)]
@@ -29,7 +28,7 @@ pub struct Set {
 /// Status of deleting result.
 #[derive(Debug, PartialEq)]
 pub enum DeleteStatus {
-    /// Record sucessfully deleted.
+    /// Record successfully deleted.
     Deleted(u32),
     /// Record already missing.
     Missing,
@@ -53,7 +52,7 @@ pub struct Lock {
 /// Enum for representing status of Lock object in backend.
 #[derive(Debug, PartialEq)]
 pub enum LockStatus {
-    /// Lock sucsesfully created and acquired.
+    /// Lock successfully created and acquired.
     Acquired,
     /// Lock object already acquired (locked).
     Locked,
