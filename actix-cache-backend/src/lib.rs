@@ -4,11 +4,10 @@ use thiserror::Error;
 
 pub trait Backend
 where
-    Self: Actor + Handler<Set> + Handler<Get>
+    Self: Actor + Handler<Set> + Handler<Get> + Handler<Lock> + Handler<Delete>
 {
-    // type Actor: Actor<Context=<Self as Backend>::Context> + Handler<Set> + Handler<Get>;
-    type Actor: Actor<Context=<Self as Backend>::Context> + Handler<Set> + Handler<Get>;
-    type Context: ActorContext + ToEnvelope<Self::Actor, Get> + ToEnvelope<Self::Actor, Set>;
+    type Actor: Actor<Context=<Self as Backend>::Context> + Handler<Set> + Handler<Get> + Handler<Lock> + Handler<Delete>;
+    type Context: ActorContext + ToEnvelope<Self::Actor, Get> + ToEnvelope<Self::Actor, Set> + ToEnvelope<Self::Actor, Lock> + ToEnvelope<Self::Actor, Delete>;
 
     // fn start(&self) -> Addr<Self>;
 }
