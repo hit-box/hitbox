@@ -6,7 +6,7 @@ use actix::{
     Actor, Addr, Handler, Message, ResponseFuture,
 };
 use actix_cache_backend::Get;
-use actix_cache_redis::actor::Set;
+use actix_cache_redis::actor::{Set, Lock, LockStatus};
 use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 
@@ -141,7 +141,7 @@ where
                     Ok(res.into_inner())
                 }
                 CachedValueState::Stale(res) => {
-                    debug!("Cached value retrieved successfully");
+                    debug!("Cache is stale, trying to acquire lock.");
                     Ok(res.into_inner())
                 }
                 CachedValueState::DoesNotExist => {
@@ -181,12 +181,17 @@ enum CachedValueState<T> {
     Stale(CachedValue<T>),
 }
 
-impl<T> From<CachedValue<T>> for CachedValueState<T> {
-    fn from(cached_value: CachedValue<T>) -> Self {
-        if cached_value.expired < Utc::now() {
-            CachedValueState::Stale(cached_value)
-        } else {
-            CachedValueState::Actual(cached_value)
+impl<T> From<Option<CachedValue<T>>> for CachedValueState<T> {
+    fn from(cached_value: Option<CachedValue<T>>) -> Self {
+        match cached_value {
+            Some(value) => {
+                if value.expired < Utc::now() {
+                    CachedValueState::Stale(value)
+                } else {
+                    CachedValueState::Actual(value)
+                }
+            }
+            None => CachedValueState::DoesNotExist
         }
     }
 }
@@ -236,10 +241,7 @@ impl<T> CachedValue<T> {
                     .ok()
             })
             .flatten();
-        match cached_value {
-            Some(value) => CachedValueState::from(value),
-            None => CachedValueState::DoesNotExist,
-        }
+        CachedValueState::from(cached_value)
     }
 
     /// Return instance of inner type.
