@@ -6,8 +6,11 @@ pub trait Backend
 where
     Self: Actor + Handler<Set> + Handler<Get>
 {
+    // type Actor: Actor<Context=<Self as Backend>::Context> + Handler<Set> + Handler<Get>;
     type Actor: Actor<Context=<Self as Backend>::Context> + Handler<Set> + Handler<Get>;
     type Context: ActorContext + ToEnvelope<Self::Actor, Get> + ToEnvelope<Self::Actor, Set>;
+
+    // fn start(&self) -> Addr<Self>;
 }
 
 #[derive(Debug, Error)]

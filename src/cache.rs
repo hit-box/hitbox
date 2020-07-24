@@ -171,7 +171,6 @@ where
     }
 }
 
-use actix_cache_redis::actor::RedisActor;
 use actix_cache_backend::Backend;
 use chrono::{DateTime, Duration, Utc};
 

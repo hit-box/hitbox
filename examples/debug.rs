@@ -117,8 +117,8 @@ async fn main() -> Result<(), CacheError> {
     };
 
     // let cache = Cache::new(dummy_backend)
-    let cache = Cache::new(dummy_sync_backend)
-        .await?
+    let cache = Cache::builder()
+        .build(dummy_sync_backend)
         .start();
     // let cache = Cache::build()
         // .enabled(true)

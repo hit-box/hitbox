@@ -5,8 +5,6 @@ use log::{debug, info};
 
 use crate::CacheError;
 
-use actix_cache_backend::{Get, Set};
-
 pub struct Cache<B> 
 where 
     B: Backend,
@@ -18,25 +16,23 @@ where
 impl<B> Cache<B> 
 where
     B: Backend,
-    B::Actor: Handler<Get> + Handler<Set>,
 {
-    pub async fn new(backend: Addr<B>) -> Result<Self, CacheError> {
-        // CacheBuilder::<B>::default().build().await
-        // let backend = RedisActor::new()
-            // .await
-            // .map_err(|err| CacheError::BackendError(err.into()))?
-            // .start();
-        Ok(Cache { enabled: true, backend })
+    pub async fn new() -> Result<Cache<RedisActor>, CacheError> {
+        let backend = RedisActor::new()
+            .await
+            .map_err(|err| CacheError::BackendError(err.into()))?
+            .start();
+        Ok(CacheBuilder::default().build(backend))
     }
 
-    // pub fn builder() -> CacheBuilder<RedisActor> {
-        // CacheBuilder::default()
-    // }
+    pub fn builder() -> CacheBuilder<B> {
+        CacheBuilder::default()
+    }
 }
 
 impl<B> Actor for Cache<B> 
 where
-    B: Actor + Backend,
+    B: Backend,
 {
     type Context = Context<Self>;
 
@@ -46,10 +42,44 @@ where
     }
 }
 
-// pub struct CacheBuilder<B> {
-    // enabled: bool,
-    // backend: Option<B>,
-// }
+use std::marker::PhantomData;
+
+pub struct CacheBuilder<B> 
+where
+    B: Backend + Actor
+{
+    enabled: bool,
+    _p: PhantomData<B>,
+}
+
+impl<B> Default for CacheBuilder<B>
+where
+    B: Backend
+{
+    fn default() -> Self {
+        CacheBuilder {
+            enabled: true,
+            _p: PhantomData::default(),
+        }
+    }
+}
+
+impl<B> CacheBuilder<B>
+where
+    B: Backend,
+{
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    pub fn build(self, backend: Addr<B>) -> Cache<B> {
+        Cache {
+            enabled: self.enabled,
+            backend,
+        }
+    }
+}
 
 // impl<B> Default for CacheBuilder<B> {
     // fn default() -> CacheBuilder<B> {

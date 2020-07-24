@@ -44,6 +44,10 @@ impl Backend for RedisActor
 {
     type Actor = Self;
     type Context = Context<Self>;
+
+    // fn start(&self) -> Addr<Self> {
+        // Self::new().start()
+    // }
 }
 
 /// Implementation actix Actor trait for Redis cache backend.
