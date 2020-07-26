@@ -34,7 +34,7 @@ impl Handler<Ping> for UpstreamActor {
     }
 }
 
-use actix_cache_backend::{BackendError, Backend, Set, Get};
+use actix_cache_backend::{BackendError, Backend, Set, Get, Delete, Lock, DeleteStatus, LockStatus};
 
 struct DummyBackend;
 
@@ -69,6 +69,30 @@ impl Handler<Set> for DummyBackend {
     }
 }
 
+impl Handler<Delete> for DummyBackend {
+    type Result = ResponseFuture<Result<DeleteStatus, BackendError>>;
+
+    fn handle(&mut self, _msg: Delete, _: &mut Self::Context) -> Self::Result {
+        log::warn!("Dummy backend Delete");
+        let fut = async move {
+            Ok(DeleteStatus::Missing)
+        };
+        Box::pin(fut)
+    }
+}
+
+impl Handler<Lock> for DummyBackend {
+    type Result = ResponseFuture<Result<LockStatus, BackendError>>;
+
+    fn handle(&mut self, _msg: Lock, _: &mut Self::Context) -> Self::Result {
+        log::warn!("Dummy backend Lock");
+        let fut = async move {
+            Ok(LockStatus::Acquired)
+        };
+        Box::pin(fut)
+    }
+}
+
 struct DummySyncBackend;
 
 impl Actor for DummySyncBackend {
@@ -99,6 +123,24 @@ impl Handler<Set> for DummySyncBackend {
     }
 }
 
+impl Handler<Delete> for DummySyncBackend {
+    type Result = Result<DeleteStatus, BackendError>;
+
+    fn handle(&mut self, _msg: Delete, _: &mut Self::Context) -> Self::Result {
+        log::warn!("Dummy sync backend Delete");
+        Ok(DeleteStatus::Missing)
+    }
+}
+
+impl Handler<Lock> for DummySyncBackend {
+    type Result = Result<LockStatus, BackendError>;
+
+    fn handle(&mut self, _msg: Lock, _: &mut Self::Context) -> Self::Result {
+        log::warn!("Dummy sync backend Lock");
+        Ok(LockStatus::Acquired)
+    }
+}
+
 #[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
     env_logger::builder()
@@ -120,15 +162,6 @@ async fn main() -> Result<(), CacheError> {
     let cache = Cache::builder()
         .build(dummy_sync_backend)
         .start();
-    // let cache = Cache::build()
-        // .enabled(true)
-        // .build()
-        // .await
-        // .map_err(|e| {
-            // log::error!("{}", e);
-            // e
-        // })?
-        // .start();
     let upstream = UpstreamActor.start(); 
 
     let msg = Ping(42);
