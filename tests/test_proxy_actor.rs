@@ -1,7 +1,5 @@
 use actix::prelude::*;
-use actix_cache::actor::Cache;
-use actix_cache::cache::Cacheable;
-use actix_cache::CacheError;
+use actix_cache::{Cache, Cacheable, CacheError, RedisBackend};
 
 pub struct Upstream;
 
@@ -73,7 +71,7 @@ impl Handler<Ping> for SyncUpstream {
 
 #[actix_rt::test]
 async fn test_async_proxy() {
-    let cache = Cache::<actix_cache_redis::actor::RedisActor>::new().await.unwrap().start();
+    let cache = Cache::<RedisBackend>::new().await.unwrap().start();
     let upstream = Upstream {}.start();
     let res = cache
         .send(Ping {}.into_cache(upstream.clone()))
@@ -90,7 +88,7 @@ async fn test_async_proxy() {
 #[actix_rt::test]
 async fn test_sync_proxy() {
     let upstream = SyncArbiter::start(10, move || SyncUpstream {});
-    let cache = Cache::<actix_cache_redis::actor::RedisActor>::new().await.unwrap().start();
+    let cache = Cache::<RedisBackend>::new().await.unwrap().start();
     let res = cache
         .send(Pong {}.into_cache(upstream.clone()))
         .await
