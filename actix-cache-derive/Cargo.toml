@@ -1,0 +1,18 @@
+[package]
+name = "actix-cache-derive"
+version = "0.1.0"
+authors = ["Andrey Ermilov <andrerm@ya.ru>", "Belousow Makc <lib.bmw@gmail.com>"]
+edition = "2018"
+workspace = ".."
+
+[dependencies]
+syn = "1"
+quote = "1"
+serde = "1"
+proc-macro2 = "1"
+
+[dev-dependencies]
+actix-cache = { version = "0.1", features = ["derive"] }
+
+[lib]
+proc-macro = true

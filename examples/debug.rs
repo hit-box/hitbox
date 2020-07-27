@@ -2,7 +2,6 @@ use actix::prelude::*;
 use actix_derive::{Message, MessageResponse};
 use actix_cache::{actor::Cache, error::CacheError, cache::Cacheable};
 use serde::{Serialize, Deserialize};
-use env_logger;
 
 struct UpstreamActor;
 
@@ -13,14 +12,10 @@ impl Actor for UpstreamActor {
 #[derive(MessageResponse, Deserialize, Serialize, Debug)]
 struct Pong(i32);
 
-#[derive(Message)]
+#[derive(Message, Cacheable, Serialize)]
 #[rtype(result = "Result<Pong, ()>")]
-struct Ping(i32);
-
-impl Cacheable for Ping {
-    fn cache_key(&self) -> String {
-        format!("Ping::{}", self.0)
-    }
+struct Ping {
+    id: i32
 }
 
 impl Handler<Ping> for UpstreamActor {
@@ -29,7 +24,7 @@ impl Handler<Ping> for UpstreamActor {
     fn handle(&mut self, msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
         Box::pin(async move {
             actix_rt::time::delay_for(core::time::Duration::from_secs(3)).await;
-            Ok(Pong(msg.0))
+            Ok(Pong(msg.id))
         })
     }
 }
@@ -164,7 +159,7 @@ async fn main() -> Result<(), CacheError> {
         .start();
     let upstream = UpstreamActor.start(); 
 
-    let msg = Ping(42);
+    let msg = Ping { id: 42 };
     let res = cache.send(msg.into_cache(upstream))
         .await??;
     dbg!(res.unwrap());
