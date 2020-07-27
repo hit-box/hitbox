@@ -4,7 +4,7 @@ pub mod backend {
     use super::*;
     use actix::prelude::*;
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum MockMessage {
         Get(Get),
         Set(Set),
@@ -64,6 +64,21 @@ pub mod backend {
         fn handle(&mut self, msg: Delete, _: &mut Self::Context) -> Self::Result {
             self.messages.push(MockMessage::Delete(msg));
             Ok(DeleteStatus::Missing)
+        }
+    }
+
+    #[derive(Message)]
+    #[rtype(result = "GetMessagesResult")]
+    pub struct GetMessages;
+
+    #[derive(MessageResponse)]
+    pub struct GetMessagesResult(pub Vec<MockMessage>);
+
+    impl Handler<GetMessages> for MockBackend {
+        type Result = GetMessagesResult;
+
+        fn handle(&mut self, _msg: GetMessages, _: &mut Self::Context) -> Self::Result {
+            GetMessagesResult(self.messages.clone())
         }
     }
 }

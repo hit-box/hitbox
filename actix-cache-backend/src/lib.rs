@@ -22,14 +22,14 @@ pub enum BackendError
 }
 
 /// Actix message requests cache backend value by key.
-#[derive(Message, Debug)]
+#[derive(Message, Debug, Clone, PartialEq)]
 #[rtype(result = "Result<Option<String>, BackendError>")]
 pub struct Get {
     pub key: String,
 }
 
 /// Actix message writes cache backend value by key.
-#[derive(Message, Debug, Clone)]
+#[derive(Message, Debug, Clone, PartialEq)]
 #[rtype(result = "Result<String, BackendError>")]
 pub struct Set {
     pub key: String,
@@ -47,14 +47,14 @@ pub enum DeleteStatus {
 }
 
 /// Actix message delete record in backend by key.
-#[derive(Message, Debug)]
+#[derive(Message, Debug, Clone, PartialEq)]
 #[rtype(result = "Result<DeleteStatus, BackendError>")]
 pub struct Delete {
     pub key: String,
 }
 
 /// Actix message creates lock in cache backend.
-#[derive(Message, Debug, Clone)]
+#[derive(Message, Debug, Clone, PartialEq)]
 #[rtype(result = "Result<LockStatus, BackendError>")]
 pub struct Lock {
     pub key: String,

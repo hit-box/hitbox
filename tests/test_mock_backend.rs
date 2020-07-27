@@ -1,5 +1,9 @@
 use actix::prelude::*;
-use actix_cache::{Cache, dev::backend::MockBackend, Cacheable, CacheError};
+use actix_cache::{Cache, Cacheable, CacheError};
+use actix_cache::dev::{
+    Get,
+    backend::{MockBackend, GetMessages, MockMessage}
+};
 use serde::{Serialize, Deserialize};
 
 struct UpstreamActor;
@@ -35,13 +39,17 @@ impl Handler<Ping> for UpstreamActor {
 
 #[actix_rt::test]
 async fn test_mock_backend() {
-    let backend = MockBackend::new();
-    let addr = backend.start();
+    let backend = MockBackend::new().start();
     let cache = Cache::builder()
-        .build(addr.clone())
+        .build(backend.clone())
         .start();
     let upstream = UpstreamActor.start(); 
     let msg = Ping { id: 42 };
     cache.send(msg.into_cache(upstream))
         .await.unwrap().unwrap();
+    let messages = backend.send(GetMessages)
+        .await.unwrap().0;
+    assert_eq!(messages[..1], [
+        MockMessage::Get(Get { key: "Ping::42".to_owned() }),
+    ]);
 }
