@@ -1,20 +1,20 @@
-use std::marker::PhantomData;
 use actix::prelude::*;
-use actix_cache_redis::actor::RedisActor;
 use actix_cache_backend::Backend;
+use actix_cache_redis::actor::RedisActor;
 use log::{debug, info};
+use std::marker::PhantomData;
 
 use crate::CacheError;
 
-pub struct Cache<B> 
-where 
+pub struct Cache<B>
+where
     B: Backend,
 {
-    pub (crate) enabled: bool,
-    pub (crate) backend: Addr<B>,
+    pub(crate) enabled: bool,
+    pub(crate) backend: Addr<B>,
 }
 
-impl<B> Cache<B> 
+impl<B> Cache<B>
 where
     B: Backend,
 {
@@ -31,7 +31,7 @@ where
     }
 }
 
-impl<B> Actor for Cache<B> 
+impl<B> Actor for Cache<B>
 where
     B: Backend,
 {
@@ -43,9 +43,9 @@ where
     }
 }
 
-pub struct CacheBuilder<B> 
+pub struct CacheBuilder<B>
 where
-    B: Backend + Actor
+    B: Backend + Actor,
 {
     enabled: bool,
     _p: PhantomData<B>,
@@ -53,7 +53,7 @@ where
 
 impl<B> Default for CacheBuilder<B>
 where
-    B: Backend
+    B: Backend,
 {
     fn default() -> Self {
         CacheBuilder {

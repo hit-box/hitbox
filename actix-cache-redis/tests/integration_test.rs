@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache_backend::{Get, Set, Delete, DeleteStatus, Lock, LockStatus};
+use actix_cache_backend::{Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 use actix_cache_redis::actor::RedisActor;
 use actix_cache_redis::error::Error;
 use actix_rt;

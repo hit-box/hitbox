@@ -1,4 +1,6 @@
-pub use actix_cache_backend::{Backend, BackendError, Get, Set, Lock, LockStatus, Delete, DeleteStatus};
+pub use actix_cache_backend::{
+    Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set,
+};
 
 pub mod backend {
     use super::*;
@@ -18,7 +20,9 @@ pub mod backend {
 
     impl MockBackend {
         pub fn new() -> Self {
-            MockBackend { messages: Vec::with_capacity(10) }
+            MockBackend {
+                messages: Vec::with_capacity(10),
+            }
         }
     }
 
@@ -57,7 +61,7 @@ pub mod backend {
             Ok(LockStatus::Locked)
         }
     }
-    
+
     impl Handler<Delete> for MockBackend {
         type Result = <Delete as Message>::Result;
 

@@ -1,10 +1,10 @@
 use actix::prelude::*;
-use actix_cache::{Cache, Cacheable, CacheError};
 use actix_cache::dev::{
+    backend::{GetMessages, MockBackend, MockMessage},
     Get,
-    backend::{MockBackend, GetMessages, MockMessage}
 };
-use serde::{Serialize, Deserialize};
+use actix_cache::{Cache, CacheError, Cacheable};
+use serde::{Deserialize, Serialize};
 
 struct UpstreamActor;
 
@@ -13,14 +13,14 @@ impl Actor for UpstreamActor {
 }
 
 #[derive(MessageResponse, Deserialize, Serialize, Debug)]
-struct Pong { 
-    id:i32
+struct Pong {
+    id: i32,
 }
 
 #[derive(Message, Serialize)]
 #[rtype(result = "Pong")]
 struct Ping {
-    pub id: i32
+    pub id: i32,
 }
 
 impl Cacheable for Ping {
@@ -40,16 +40,15 @@ impl Handler<Ping> for UpstreamActor {
 #[actix_rt::test]
 async fn test_mock_backend() {
     let backend = MockBackend::new().start();
-    let cache = Cache::builder()
-        .build(backend.clone())
-        .start();
-    let upstream = UpstreamActor.start(); 
+    let cache = Cache::builder().build(backend.clone()).start();
+    let upstream = UpstreamActor.start();
     let msg = Ping { id: 42 };
-    cache.send(msg.into_cache(upstream))
-        .await.unwrap().unwrap();
-    let messages = backend.send(GetMessages)
-        .await.unwrap().0;
-    assert_eq!(messages[..1], [
-        MockMessage::Get(Get { key: "Ping::42".to_owned() }),
-    ]);
+    cache.send(msg.into_cache(upstream)).await.unwrap().unwrap();
+    let messages = backend.send(GetMessages).await.unwrap().0;
+    assert_eq!(
+        messages[..1],
+        [MockMessage::Get(Get {
+            key: "Ping::42".to_owned()
+        }),]
+    );
 }

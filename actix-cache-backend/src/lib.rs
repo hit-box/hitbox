@@ -1,18 +1,25 @@
-use actix::prelude::*;
 use actix::dev::ToEnvelope;
+use actix::prelude::*;
 use thiserror::Error;
 
 pub trait Backend
 where
-    Self: Actor + Handler<Set> + Handler<Get> + Handler<Lock> + Handler<Delete>
+    Self: Actor + Handler<Set> + Handler<Get> + Handler<Lock> + Handler<Delete>,
 {
-    type Actor: Actor<Context=<Self as Backend>::Context> + Handler<Set> + Handler<Get> + Handler<Lock> + Handler<Delete>;
-    type Context: ActorContext + ToEnvelope<Self::Actor, Get> + ToEnvelope<Self::Actor, Set> + ToEnvelope<Self::Actor, Lock> + ToEnvelope<Self::Actor, Delete>;
+    type Actor: Actor<Context = <Self as Backend>::Context>
+        + Handler<Set>
+        + Handler<Get>
+        + Handler<Lock>
+        + Handler<Delete>;
+    type Context: ActorContext
+        + ToEnvelope<Self::Actor, Get>
+        + ToEnvelope<Self::Actor, Set>
+        + ToEnvelope<Self::Actor, Lock>
+        + ToEnvelope<Self::Actor, Delete>;
 }
 
 #[derive(Debug, Error)]
-pub enum BackendError
-{
+pub enum BackendError {
     #[error(transparent)]
     InternalError(Box<dyn std::error::Error + Send>),
     #[error(transparent)]

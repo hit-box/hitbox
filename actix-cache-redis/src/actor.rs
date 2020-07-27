@@ -1,6 +1,8 @@
 use crate::error::Error;
 use actix::prelude::*;
-use actix_cache_backend::{BackendError, Get, Set, Lock, Delete, LockStatus, DeleteStatus, Backend};
+use actix_cache_backend::{
+    Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set,
+};
 use log::{debug, info};
 use redis::{aio::MultiplexedConnection, Client};
 
@@ -40,8 +42,7 @@ impl RedisActorBuilder {
     }
 }
 
-impl Backend for RedisActor 
-{
+impl Backend for RedisActor {
     type Actor = Self;
     type Context = Context<Self>;
 }
@@ -86,8 +87,8 @@ impl Handler<Set> for RedisActor {
                 request.arg("EX").arg(ttl);
             };
             request
-                .query_async(&mut con).
-                await
+                .query_async(&mut con)
+                .await
                 .map_err(Error::from)
                 .map_err(BackendError::from)
         })

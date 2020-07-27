@@ -1,7 +1,7 @@
 use actix::prelude::*;
+use actix_cache::dev::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 use actix_cache::{Cache, CacheError, Cacheable};
-use actix_cache::dev::{Backend, BackendError, Get, Set, Delete, DeleteStatus, Lock, LockStatus};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 struct UpstreamActor;
 
@@ -15,7 +15,7 @@ struct Pong(i32);
 #[derive(Message, Cacheable, Serialize)]
 #[rtype(result = "Result<Pong, ()>")]
 struct Ping {
-    pub id: i32
+    pub id: i32,
 }
 
 impl Handler<Ping> for UpstreamActor {
@@ -40,15 +40,12 @@ impl Backend for DummyBackend {
     type Context = Context<Self>;
 }
 
-
 impl Handler<Get> for DummyBackend {
     type Result = ResponseFuture<Result<Option<String>, BackendError>>;
 
     fn handle(&mut self, _msg: Get, _: &mut Self::Context) -> Self::Result {
         log::warn!("Dummy backend GET");
-        let fut = async move {
-            Ok(None)
-        };
+        let fut = async move { Ok(None) };
         Box::pin(fut)
     }
 }
@@ -67,9 +64,7 @@ impl Handler<Delete> for DummyBackend {
 
     fn handle(&mut self, _msg: Delete, _: &mut Self::Context) -> Self::Result {
         log::warn!("Dummy backend Delete");
-        let fut = async move {
-            Ok(DeleteStatus::Missing)
-        };
+        let fut = async move { Ok(DeleteStatus::Missing) };
         Box::pin(fut)
     }
 }
@@ -79,9 +74,7 @@ impl Handler<Lock> for DummyBackend {
 
     fn handle(&mut self, _msg: Lock, _: &mut Self::Context) -> Self::Result {
         log::warn!("Dummy backend Lock");
-        let fut = async move {
-            Ok(LockStatus::Acquired)
-        };
+        let fut = async move { Ok(LockStatus::Acquired) };
         Box::pin(fut)
     }
 }
@@ -94,14 +87,11 @@ async fn main() -> Result<(), CacheError> {
 
     let dummy_backend = DummyBackend.start();
 
-    let cache = Cache::builder()
-        .build(dummy_backend)
-        .start();
-    let upstream = UpstreamActor.start(); 
+    let cache = Cache::builder().build(dummy_backend).start();
+    let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
-    let res = cache.send(msg.into_cache(upstream))
-        .await??;
+    let res = cache.send(msg.into_cache(upstream)).await??;
     dbg!(res.unwrap());
 
     Ok(())

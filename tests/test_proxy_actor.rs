@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache::{Cache, Cacheable, CacheError, RedisBackend};
+use actix_cache::{Cache, CacheError, Cacheable, RedisBackend};
 
 pub struct Upstream;
 

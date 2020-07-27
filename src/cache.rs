@@ -15,7 +15,6 @@ use crate::CacheError;
 #[cfg(feature = "derive")]
 pub use actix_cache_derive::Cacheable;
 
-
 /// Trait describe cache configuration per message for actix Cache actor.
 pub trait Cacheable {
     /// Method should return unique identifier for struct object.
@@ -196,9 +195,7 @@ impl<T> CachedValue<T> {
         <B as Actor>::Context: ToEnvelope<B, Get>,
         T: DeserializeOwned,
     {
-        let value = backend
-            .send(Get { key: cache_key })
-            .await;
+        let value = backend.send(Get { key: cache_key }).await;
         let serialized = match value {
             Ok(Ok(value)) => value,
             Ok(Err(error)) => {

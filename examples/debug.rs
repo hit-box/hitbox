@@ -1,7 +1,7 @@
 use actix::prelude::*;
-use actix_derive::{Message, MessageResponse};
 use actix_cache::{Cache, CacheError, Cacheable, RedisBackend};
-use serde::{Serialize, Deserialize};
+use actix_derive::{Message, MessageResponse};
+use serde::{Deserialize, Serialize};
 
 struct UpstreamActor;
 
@@ -15,7 +15,7 @@ struct Pong(i32);
 #[derive(Message, Cacheable, Serialize)]
 #[rtype(result = "Result<Pong, ()>")]
 struct Ping {
-    id: i32
+    id: i32,
 }
 
 impl Handler<Ping> for UpstreamActor {
@@ -34,15 +34,12 @@ async fn main() -> Result<(), CacheError> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug)
         .init();
-    
-    let cache = Cache::<RedisBackend>::new()
-        .await?
-        .start();
-    let upstream = UpstreamActor.start(); 
+
+    let cache = Cache::<RedisBackend>::new().await?.start();
+    let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
-    let res = cache.send(msg.into_cache(upstream))
-        .await??;
+    let res = cache.send(msg.into_cache(upstream)).await??;
     dbg!(res.unwrap());
 
     Ok(())

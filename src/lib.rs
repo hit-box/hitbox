@@ -1,11 +1,11 @@
 pub mod actor;
-pub mod dev;
 pub mod cache;
+pub mod dev;
 pub mod error;
 
-pub use error::CacheError;
 pub use actor::{Cache, CacheBuilder};
-pub use cache::{QueryCache, Cacheable};
+pub use cache::{Cacheable, QueryCache};
+pub use error::CacheError;
 
 pub use actix_cache_redis::actor::RedisActor as RedisBackend;
 

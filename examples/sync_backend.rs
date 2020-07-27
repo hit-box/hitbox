@@ -1,7 +1,7 @@
 use actix::prelude::*;
+use actix_cache::dev::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 use actix_cache::{Cache, CacheError, Cacheable};
-use actix_cache::dev::{Backend, BackendError, Get, Set, Delete, DeleteStatus, Lock, LockStatus};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 struct UpstreamActor;
 
@@ -21,7 +21,7 @@ impl Cacheable for Ping {
 #[derive(Message)]
 #[rtype(result = "Result<Pong, ()>")]
 struct Ping {
-    pub id: i32
+    pub id: i32,
 }
 
 impl Handler<Ping> for UpstreamActor {
@@ -45,7 +45,6 @@ impl Backend for DummySyncBackend {
     type Actor = Self;
     type Context = SyncContext<Self>;
 }
-
 
 impl Handler<Get> for DummySyncBackend {
     type Result = Result<Option<String>, BackendError>;
@@ -89,18 +88,13 @@ async fn main() -> Result<(), CacheError> {
         .filter_level(log::LevelFilter::Debug)
         .init();
 
-    let dummy_sync_backend = {
-        SyncArbiter::start(3, move || DummySyncBackend)
-    };
+    let dummy_sync_backend = { SyncArbiter::start(3, move || DummySyncBackend) };
 
-    let cache = Cache::builder()
-        .build(dummy_sync_backend)
-        .start();
-    let upstream = UpstreamActor.start(); 
+    let cache = Cache::builder().build(dummy_sync_backend).start();
+    let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
-    let res = cache.send(msg.into_cache(upstream))
-        .await??;
+    let res = cache.send(msg.into_cache(upstream)).await??;
     dbg!(res.unwrap());
 
     Ok(())
