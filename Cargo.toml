@@ -1,7 +1,7 @@
 [package]
 name = "actix-cache"
 version = "0.1.0"
-authors = ["Belousow Makc <lib.bmw@gmail.com>"]
+authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"]
 edition = "2018"
 description = "Actix cache actor."
 license-file = "LICENSE"
@@ -39,6 +39,10 @@ actix-cache-derive = { path = "actix-cache-derive" }
 
 [[example]]
 name = "debug"
+required-features = ["derive"]
+
+[[example]]
+name = "async_backend"
 required-features = ["derive"]
 
 [features]

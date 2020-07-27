@@ -13,14 +13,27 @@ impl Actor for UpstreamActor {
 struct Pong(i32);
 
 impl Cacheable for Ping {
-    fn cache_key(&self) -> String {
-        format!("Ping::{}", self.0)
+    fn cache_key(&self) -> Result<String, CacheError> {
+        Ok(format!("Ping::{}", self.id))
     }
 }
 
 #[derive(Message)]
 #[rtype(result = "Result<Pong, ()>")]
-struct Ping(i32);
+struct Ping {
+    pub id: i32
+}
+
+impl Handler<Ping> for UpstreamActor {
+    type Result = ResponseFuture<<Ping as Message>::Result>;
+
+    fn handle(&mut self, msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
+        Box::pin(async move {
+            actix_rt::time::delay_for(core::time::Duration::from_secs(3)).await;
+            Ok(Pong(msg.id))
+        })
+    }
+}
 
 struct DummySyncBackend;
 
@@ -75,25 +88,17 @@ async fn main() -> Result<(), CacheError> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug)
         .init();
-    
-    use actix_cache_redis::actor::RedisActor;
-    let backend = RedisActor::new()
-        .await
-        .map_err(|err| CacheError::BackendError(err.into()))?
-        .start();
 
-    // let dummy_backend = DummySyncBackend.start();
     let dummy_sync_backend = {
         SyncArbiter::start(3, move || DummySyncBackend)
     };
 
-    // let cache = Cache::new(dummy_backend)
     let cache = Cache::builder()
         .build(dummy_sync_backend)
         .start();
     let upstream = UpstreamActor.start(); 
 
-    let msg = Ping(42);
+    let msg = Ping { id: 42 };
     let res = cache.send(msg.into_cache(upstream))
         .await??;
     dbg!(res.unwrap());

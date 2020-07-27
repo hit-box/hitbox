@@ -190,8 +190,10 @@ impl<T> CachedValue<T> {
         }
     }
 
-    async fn retrieve(backend: &Addr<RedisActor>, cache_key: String) -> Option<Self>
+    async fn retrieve<B>(backend: &Addr<B>, cache_key: String) -> Option<Self>
     where
+        B: Backend,
+        <B as Actor>::Context: ToEnvelope<B, Get>,
         T: DeserializeOwned,
     {
         let value = backend
