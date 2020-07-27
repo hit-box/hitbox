@@ -8,8 +8,6 @@ where
 {
     type Actor: Actor<Context=<Self as Backend>::Context> + Handler<Set> + Handler<Get> + Handler<Lock> + Handler<Delete>;
     type Context: ActorContext + ToEnvelope<Self::Actor, Get> + ToEnvelope<Self::Actor, Set> + ToEnvelope<Self::Actor, Lock> + ToEnvelope<Self::Actor, Delete>;
-
-    // fn start(&self) -> Addr<Self>;
 }
 
 #[derive(Debug, Error)]
