@@ -11,12 +11,11 @@ pub use actix_cache_derive::Cacheable;
 use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 
-use crate::actor::Cache;
+use crate::{Cache, CacheError};
 #[cfg(feature = "metrics")]
 use crate::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
-use crate::CacheError;
 
 /// Trait describe cache configuration per message for actix Cache actor.
 pub trait Cacheable {
