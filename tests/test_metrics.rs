@@ -51,7 +51,7 @@ mod tests {
     }
 
     #[actix_rt::test]
-    async fn test_hit_counter_metric() {
+    async fn test_miss_counter_metric() {
         let backend = MockBackend::new().start();
         let cache = Cache::builder().build(backend).start();
         let upstream = Upstream {}.start();
