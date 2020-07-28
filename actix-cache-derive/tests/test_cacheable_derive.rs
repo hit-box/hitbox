@@ -1,6 +1,6 @@
 use actix_cache::cache::Cacheable;
-use serde::Serialize;
 use actix_cache::CacheError;
+use serde::Serialize;
 
 #[derive(Cacheable, Serialize)]
 struct Message {
@@ -10,10 +10,12 @@ struct Message {
 
 #[test]
 fn test_all_keys() {
-    let message = Message { id: 0, alias: "alias".to_string() };
+    let message = Message {
+        id: 0,
+        alias: "alias".to_string(),
+    };
     assert_eq!(message.cache_key().unwrap(), "id=0&alias=alias".to_string());
 }
-
 
 #[derive(Cacheable, Serialize)]
 #[allow(dead_code)]
@@ -25,7 +27,10 @@ struct PartialSerializeMessage {
 
 #[test]
 fn test_partial() {
-    let message = PartialSerializeMessage { id: 0, alias: "alias".to_string() };
+    let message = PartialSerializeMessage {
+        id: 0,
+        alias: "alias".to_string(),
+    };
     assert_eq!(message.cache_key().unwrap(), "id=0".to_string());
 }
 
@@ -37,7 +42,10 @@ struct VecMessage {
 #[test]
 fn test_message_with_vector() {
     let message = VecMessage { id: vec![1, 2, 3] };
-    assert_eq!(message.cache_key().unwrap(), "id[0]=1&id[1]=2&id[2]=3".to_string());
+    assert_eq!(
+        message.cache_key().unwrap(),
+        "id[0]=1&id[1]=2&id[2]=3".to_string()
+    );
 }
 
 #[derive(Serialize)]
@@ -47,13 +55,18 @@ enum MessageType {
 
 #[derive(Cacheable, Serialize)]
 struct EnumMessage {
-    message_type: MessageType
+    message_type: MessageType,
 }
 
 #[test]
 fn test_message_with_enum() {
-    let message = EnumMessage { message_type: MessageType::External };
-    assert_eq!(message.cache_key().unwrap(), "message_type=External".to_string());
+    let message = EnumMessage {
+        message_type: MessageType::External,
+    };
+    assert_eq!(
+        message.cache_key().unwrap(),
+        "message_type=External".to_string()
+    );
 }
 
 #[derive(Serialize)]
@@ -63,13 +76,18 @@ enum TupleMessageType {
 
 #[derive(Cacheable, Serialize)]
 struct TupleEnumMessage {
-    message_type: TupleMessageType
+    message_type: TupleMessageType,
 }
 
 #[test]
 fn test_message_with_enum_tuple() {
-    let message = TupleEnumMessage { message_type: TupleMessageType::External(1) };
-    assert_eq!(message.cache_key().unwrap(), "message_type[External]=1".to_string());
+    let message = TupleEnumMessage {
+        message_type: TupleMessageType::External(1),
+    };
+    assert_eq!(
+        message.cache_key().unwrap(),
+        "message_type[External]=1".to_string()
+    );
 }
 
 // Should we support tuple struct?
@@ -87,7 +105,7 @@ fn test_tuple_returns_error() {
 #[cache_stale_ttl(30)]
 #[cache_version(1)]
 struct MacroHelpersMessage {
-    message_type: i32
+    message_type: i32,
 }
 
 #[test]
@@ -100,7 +118,7 @@ fn test_macro_helpers_work() {
 
 #[derive(Cacheable, Serialize)]
 struct DefaultMessage {
-    message_type: i32
+    message_type: i32,
 }
 
 #[test]

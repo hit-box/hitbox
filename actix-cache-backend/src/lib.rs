@@ -1,9 +1,25 @@
+use actix::dev::ToEnvelope;
 use actix::prelude::*;
 use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum BackendError
+pub trait Backend
+where
+    Self: Actor + Handler<Set> + Handler<Get> + Handler<Lock> + Handler<Delete>,
 {
+    type Actor: Actor<Context = <Self as Backend>::Context>
+        + Handler<Set>
+        + Handler<Get>
+        + Handler<Lock>
+        + Handler<Delete>;
+    type Context: ActorContext
+        + ToEnvelope<Self::Actor, Get>
+        + ToEnvelope<Self::Actor, Set>
+        + ToEnvelope<Self::Actor, Lock>
+        + ToEnvelope<Self::Actor, Delete>;
+}
+
+#[derive(Debug, Error)]
+pub enum BackendError {
     #[error(transparent)]
     InternalError(Box<dyn std::error::Error + Send>),
     #[error(transparent)]
@@ -11,14 +27,14 @@ pub enum BackendError
 }
 
 /// Actix message requests cache backend value by key.
-#[derive(Message, Debug)]
+#[derive(Message, Debug, Clone, PartialEq)]
 #[rtype(result = "Result<Option<String>, BackendError>")]
 pub struct Get {
     pub key: String,
 }
 
 /// Actix message writes cache backend value by key.
-#[derive(Message, Debug, Clone)]
+#[derive(Message, Debug, Clone, PartialEq)]
 #[rtype(result = "Result<String, BackendError>")]
 pub struct Set {
     pub key: String,
@@ -36,14 +52,14 @@ pub enum DeleteStatus {
 }
 
 /// Actix message delete record in backend by key.
-#[derive(Message, Debug)]
+#[derive(Message, Debug, Clone, PartialEq)]
 #[rtype(result = "Result<DeleteStatus, BackendError>")]
 pub struct Delete {
     pub key: String,
 }
 
 /// Actix message creates lock in cache backend.
-#[derive(Message, Debug, Clone)]
+#[derive(Message, Debug, Clone, PartialEq)]
 #[rtype(result = "Result<LockStatus, BackendError>")]
 pub struct Lock {
     pub key: String,
