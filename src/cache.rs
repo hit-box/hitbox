@@ -5,7 +5,7 @@ use actix::{
     dev::{MessageResponse, ToEnvelope},
     Actor, Addr, Handler, Message, ResponseFuture,
 };
-use actix_cache_backend::{Get, Set};
+use actix_cache_backend::{Get, Set, Lock, LockStatus};
 use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 
@@ -107,10 +107,31 @@ where
     type Result = Result<<M as Message>::Result, CacheError>;
 }
 
+async fn set_value<T, B>(
+    value: &CachedValue<T>,
+    backend: Addr<B>,
+    key: String,
+    ttl: Option<u32>,
+) -> Result<(), CacheError>
+where
+    T: Serialize,
+    B: Actor + Backend,
+    <B as Actor>::Context: ToEnvelope<B, Set>,
+{
+    let _ = backend
+        .send(Set { value: serde_json::to_string(value)?, key, ttl })
+        .await?
+        .map_err(|error| {
+            warn!("Updating cache error: {}", error);
+            CacheError::BackendError(error)
+        });
+    Ok(())
+}
+
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for Cache<B>
 where
     B: Actor + Backend,
-    <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set>,
+    <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock>,
     A: Actor + Handler<M> + Send,
     M: Message + Cacheable + Send + 'static,
     M::Result: MessageResponse<A, M> + Serialize + std::fmt::Debug + DeserializeOwned + Send,
@@ -130,41 +151,56 @@ where
         let res = async move {
             debug!("Try retrieve cached value from backend");
             let cached = if enabled {
-                CachedValue::retrieve(&backend, cache_key.clone()).await
+                Some(CachedValue::retrieve(&backend, cache_key.clone()).await)
             } else {
-                CachedValueState::DoesNotExist
+                None
             };
 
             match cached {
-                CachedValueState::Actual(res) => {
+                Some(CachedValueState::Actual(res)) => {
                     debug!("Cached value retrieved successfully");
                     Ok(res.into_inner())
                 }
-                CachedValueState::Stale(res) => {
+                Some(CachedValueState::Stale(res)) => {
                     debug!("Cache is stale, trying to acquire lock.");
-                    Ok(res.into_inner())
+                    let key = msg.message.cache_key()?;
+                    let ttl = 1;
+                    let lock_status = backend
+                        .send(Lock { key, ttl }).await?
+                        // ToDo: use correct error
+                        .map_err(|_| CacheError::DeserializeError)?;
+                    match lock_status {
+                        LockStatus::Acquired => {
+                            debug!("Lock acquired.");
+                            let ttl = Some(msg.message.cache_ttl());
+                            let upstream_result = msg.upstream
+                                .send(msg.message)
+                                .await?;
+                            debug!("Lock acquired.");
+                            let cached = CachedValue::new(upstream_result, 1);
+                            set_value(&cached, backend, cache_key, ttl).await?;
+                            Ok(cached.into_inner())
+                        },
+                        LockStatus::Locked => {
+                            debug!("Cache locked.");
+                            Ok(res.into_inner())
+                        },
+                    }
                 }
-                CachedValueState::DoesNotExist => {
+                Some(CachedValueState::Miss) => {
                     debug!("Cache miss");
                     let cache_stale_ttl = msg.message.cache_stale_ttl();
-                    let cache_ttl = msg.message.cache_ttl();
+                    let ttl = Some(msg.message.cache_ttl());
                     let upstream_result = msg.upstream.send(msg.message).await?;
                     let cached = CachedValue::new(upstream_result, cache_stale_ttl);
-                    if enabled {
-                        debug!("Update value in cache");
-                        let _ = backend
-                            .send(Set {
-                                value: serde_json::to_string(&cached)?,
-                                key: cache_key,
-                                ttl: Some(cache_ttl),
-                            })
-                            .await?
-                            .map_err(|error| {
-                                warn!("Updating cache error: {}", error);
-                                CacheError::BackendError(error.into())
-                            });
-                    }
+                    debug!("Update value in cache");
+                    set_value(&cached, backend, cache_key, ttl).await?;
                     Ok(cached.into_inner())
+                },
+                None => {
+                    debug!("Cache disabled");
+                    let upstream_result = msg.upstream.send(msg.message).await?;
+                    Ok(upstream_result)
                 }
             }
         };
@@ -177,8 +213,8 @@ use chrono::{DateTime, Duration, Utc};
 
 enum CachedValueState<T> {
     Actual(CachedValue<T>),
-    DoesNotExist,
     Stale(CachedValue<T>),
+    Miss,
 }
 
 impl<T> From<Option<CachedValue<T>>> for CachedValueState<T> {
@@ -191,7 +227,7 @@ impl<T> From<Option<CachedValue<T>>> for CachedValueState<T> {
                     CachedValueState::Actual(value)
                 }
             }
-            None => CachedValueState::DoesNotExist
+            None => CachedValueState::Miss
         }
     }
 }
