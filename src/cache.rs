@@ -173,11 +173,12 @@ where
                         LockStatus::Acquired => {
                             debug!("Lock acquired.");
                             let ttl = Some(msg.message.cache_ttl());
+                            let cache_stale_ttl = msg.message.cache_stale_ttl();
                             let upstream_result = msg.upstream
                                 .send(msg.message)
                                 .await?;
                             debug!("Lock acquired.");
-                            let cached = CachedValue::new(upstream_result, 1);
+                            let cached = CachedValue::new(upstream_result, cache_stale_ttl);
                             set_value(&cached, backend, cache_key, ttl).await?;
                             Ok(cached.into_inner())
                         },
