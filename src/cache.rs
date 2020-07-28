@@ -5,8 +5,7 @@ use actix::{
     dev::{MessageResponse, ToEnvelope},
     Actor, Addr, Handler, Message, ResponseFuture,
 };
-use actix_cache_backend::Get;
-use actix_cache_redis::actor::{Set, Lock, LockStatus};
+use actix_cache_backend::{Get, Set};
 use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +14,6 @@ use crate::CacheError;
 
 #[cfg(feature = "derive")]
 pub use actix_cache_derive::Cacheable;
-
 
 /// Trait describe cache configuration per message for actix Cache actor.
 pub trait Cacheable {
@@ -109,8 +107,10 @@ where
     type Result = Result<<M as Message>::Result, CacheError>;
 }
 
-impl<'a, A, M> Handler<QueryCache<A, M>> for Cache
+impl<'a, A, M, B> Handler<QueryCache<A, M>> for Cache<B>
 where
+    B: Actor + Backend,
+    <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set>,
     A: Actor + Handler<M> + Send,
     M: Message + Cacheable + Send + 'static,
     M::Result: MessageResponse<A, M> + Serialize + std::fmt::Debug + DeserializeOwned + Send,
@@ -172,7 +172,7 @@ where
     }
 }
 
-use actix_cache_redis::actor::RedisActor;
+use actix_cache_backend::Backend;
 use chrono::{DateTime, Duration, Utc};
 
 enum CachedValueState<T> {
@@ -213,13 +213,13 @@ impl<T> CachedValue<T> {
         }
     }
 
-    async fn retrieve(backend: &Addr<RedisActor>, cache_key: String) -> CachedValueState<T>
+    async fn retrieve<B>(backend: &Addr<B>, cache_key: String) -> CachedValueState<T>
     where
+        B: Backend,
+        <B as Actor>::Context: ToEnvelope<B, Get>,
         T: DeserializeOwned,
     {
-        let value = backend
-            .send(Get { key: cache_key })
-            .await;
+        let value = backend.send(Get { key: cache_key }).await;
         let serialized = match value {
             Ok(Ok(value)) => value,
             Ok(Err(error)) => {

@@ -1,7 +1,7 @@
+use crate::macro_attributes::find_attribute;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn;
-use crate::macro_attributes::find_attribute;
 
 /// Implementing Cacheable trait.
 ///
@@ -17,7 +17,7 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
                 #cache_ttl
             }
         },
-        None => proc_macro2::TokenStream::new()
+        None => proc_macro2::TokenStream::new(),
     };
 
     let cache_stale_ttl_implement = match find_attribute(&ast, "cache_stale_ttl") {
@@ -26,7 +26,7 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
                 #cache_stale_ttl
             }
         },
-        None => proc_macro2::TokenStream::new()
+        None => proc_macro2::TokenStream::new(),
     };
 
     let cache_version_implement = match find_attribute(&ast, "cache_version") {
@@ -35,7 +35,7 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
                 #cache_version
             }
         },
-        None => proc_macro2::TokenStream::new()
+        None => proc_macro2::TokenStream::new(),
     };
 
     let gen = quote! {
