@@ -18,6 +18,8 @@ actix-cache-derive = { version = "0.1", optional = true }
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
+prometheus = { version = "0.9", optional = true }
+lazy_static = { version = "1", optional = true }
 
 [dev-dependencies]
 env_logger = "0.7"
@@ -45,5 +47,10 @@ required-features = ["derive"]
 name = "async_backend"
 required-features = ["derive"]
 
+[[example]]
+name = "metrics"
+required-features = ["derive", "metrics"]
+
 [features]
 derive = ["actix-cache-derive", "serde_qs"]
+metrics = ["prometheus", "lazy_static"]

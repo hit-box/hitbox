@@ -6,14 +6,17 @@ use actix::{
     Actor, Addr, Handler, Message, ResponseFuture,
 };
 use actix_cache_backend::{Get, Set};
+#[cfg(feature = "derive")]
+pub use actix_cache_derive::Cacheable;
 use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::actor::Cache;
+#[cfg(feature = "metrics")]
+use crate::metrics::{
+    CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
+};
 use crate::CacheError;
-
-#[cfg(feature = "derive")]
-pub use actix_cache_derive::Cacheable;
 
 /// Trait describe cache configuration per message for actix Cache actor.
 pub trait Cacheable {
@@ -119,6 +122,8 @@ where
     type Result = ResponseFuture<Result<<M as Message>::Result, CacheError>>;
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
+        #[cfg(feature = "metrics")]
+        let (actor, message) = (std::any::type_name::<A>(), std::any::type_name::<M>());
         let backend = self.backend.clone();
         let (enabled, cache_key) = match msg.message.cache_key() {
             Ok(value) => (self.enabled, value),
@@ -139,13 +144,30 @@ where
             match cached {
                 Some(res) => {
                     debug!("Cached value retrieved successfully");
+                    #[cfg(feature = "metrics")]
+                    {
+                        CACHE_HIT_COUNTER.with_label_values(&[message, actor]).inc();
+                        CACHE_STALE_COUNTER
+                            .with_label_values(&[message, actor])
+                            .inc();
+                    };
                     Ok(res.into_inner())
                 }
                 None => {
                     debug!("Cache miss");
+                    #[cfg(feature = "metrics")]
+                    CACHE_MISS_COUNTER
+                        .with_label_values(&[message, actor])
+                        .inc();
                     let cache_stale_ttl = msg.message.cache_stale_ttl();
                     let cache_ttl = msg.message.cache_ttl();
+                    #[cfg(feature = "metrics")]
+                    let query_timer = CACHE_UPSTREAM_HANDLING_HISTOGRAM
+                        .with_label_values(&[message, actor])
+                        .start_timer();
                     let upstream_result = msg.upstream.send(msg.message).await?;
+                    #[cfg(feature = "metrics")]
+                    query_timer.observe_duration();
                     let cached = CachedValue::new(upstream_result, cache_stale_ttl);
                     if enabled {
                         debug!("Update value in cache");
