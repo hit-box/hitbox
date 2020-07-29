@@ -158,7 +158,7 @@ where
                             let upstream_result = msg.upstream
                                 .send(msg.message)
                                 .await?;
-                            debug!("Lock acquired.");
+                            debug!("Received value from backend. Try to set.");
                             let cached = CachedValue::new(upstream_result, cache_stale_ttl);
                             cached.store(backend.clone(), cache_key, ttl).await?;
                             backend
