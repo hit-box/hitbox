@@ -4,7 +4,7 @@
 //!
 //! This crate consist of three main part:
 //! * [Cache] actor.
-//! * [Backend] trait and it's implementation ([RedisBackend]).
+//! * [Backend] trait and its implementation ([RedisBackend]).
 //! * [Cacheable] trait.
 //!
 //! ## Features
@@ -12,14 +12,18 @@
 //! * Dogpile effect prevention.
 //! * Stale cache mechanics.
 //! * Automatic cache key generation.
-//! * Detailed prometheus metrics out of the box.
+//! * Detailed Prometheus metrics out of the box.
 //!
 //! ## Feature flags
 //! * derive - Support for [Cacheable] trait derive macros.
-//! * metrics - Support for prometheus metrics.
+//! * metrics - Support for Prometheus metrics.
 //!
 //! ## Example
-//! First of all you should derive [Cacheable] trait for your actix Message:
+//! First of all, you should derive [Cacheable] trait for your actix Message:
+//!
+//! > **_NOTE:_** Default cache key implementation based on serde_qs crate
+//! > and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types). 
+//!
 //!
 //! ```rust
 //! use actix::prelude::*;
@@ -45,7 +49,7 @@
 //!     }
 //! }
 //! ```
-//! Next step is instantiate Cache actor with selected backend:
+//! Next step is to instantiate [Cache] actor with selected backend:
 //!
 //! ```rust
 //! # use actix::prelude::*;
@@ -62,7 +66,7 @@
 //! }
 //! ```
 //!
-//! And the last step is using cache in your code:
+//! And the last step is using cache in your code (actix-web handler for example):
 //!
 //! ```rust
 //! # use actix::prelude::*;
@@ -89,7 +93,10 @@
 //! # }
 //! #
 //! # type Cache = CacheActor<RedisBackend>;
-//! async fn index(fib: web::Data<Addr<FibonacciActor>>, cache: web::Data<Addr<Cache>>) -> impl Responder {
+//! async fn index(
+//!     fib: web::Data<Addr<FibonacciActor>>,
+//!     cache: web::Data<Addr<Cache>>
+//! ) -> impl Responder {
 //!     let query = GetNumber { number: 40 };
 //!     let number = cache
 //!         .send(query.into_cache(&fib))
@@ -100,12 +107,31 @@
 //! }
 //! ```
 //!
+//! This full example and other examples you can see on [github.com](https://github.com/rambler-digital-solutions/actix-cache/blob/master/examples/actix_web.rs)
+//!
 //! ## Backend implementations
+//!
+//! At this time supported or planned next cache backend implementation:
+//! - [x] Redis backend
+//! - [ ] In-memory backend
+//!
+//! But you are welcome to add your own implementation of custom backend.
+//! All you need are define new actix actor struct and implement `actix::Handle` trait for next
+//! `Message`:
+//!
+//! * [Get]
+//! * [Set]
+//! * [Delete]
+//! * [Lock]
 //!
 //! [Cache]: actor/struct.Cache.html
 //! [Cacheable]: cache/trait.Cacheable.html
 //! [Backend]: ../actix_cache_backend/trait.Backend.html
 //! [RedisBackend]: ../actix_cache_redis/actor/struct.RedisActor.html
+//! [Get]: dev/struct.Get.html
+//! [Set]: dev/struct.Set.html
+//! [Delete]: dev/struct.Delete.html
+//! [Lock]: dev/struct.Lock.html
 #![warn(missing_docs)]
 pub mod actor;
 pub mod cache;
