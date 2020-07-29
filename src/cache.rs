@@ -1,3 +1,4 @@
+//! Cacheable trait and implementation of cache logic.
 use serde::de::DeserializeOwned;
 use std::boxed::Box;
 
@@ -11,11 +12,11 @@ pub use actix_cache_derive::Cacheable;
 use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 
-use crate::{Cache, CacheError};
 #[cfg(feature = "metrics")]
 use crate::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
+use crate::{Cache, CacheError};
 
 /// Trait describe cache configuration per message for actix Cache actor.
 pub trait Cacheable {
@@ -77,14 +78,14 @@ pub trait Cacheable {
         0
     }
 
-    fn into_cache<A>(self, upstream: Addr<A>) -> QueryCache<A, Self>
+    fn into_cache<A>(self, upstream: &Addr<A>) -> QueryCache<A, Self>
     where
         A: Actor,
         Self: Message + Send + Sized,
         Self::Result: MessageResponse<A, Self> + Send + 'static,
     {
         QueryCache {
-            upstream,
+            upstream: upstream.clone(),
             message: self,
         }
     }

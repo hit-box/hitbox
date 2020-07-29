@@ -1,8 +1,10 @@
+//! Cache actor and Builder.
+use std::marker::PhantomData;
+
 use actix::prelude::*;
 use actix_cache_backend::Backend;
 use actix_cache_redis::actor::RedisActor;
 use log::{debug, info};
-use std::marker::PhantomData;
 
 use crate::CacheError;
 

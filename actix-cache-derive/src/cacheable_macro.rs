@@ -40,9 +40,9 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
 
     let gen = quote! {
         impl Cacheable for #name {
-            fn cache_key(&self) -> Result<String, CacheError> {
+            fn cache_key(&self) -> Result<String, actix_cache::CacheError> {
                 actix_cache::serde_qs::to_string(self)
-                    .map_err(|error| CacheError::CacheKeyGenerationError(error.to_string()))
+                    .map_err(|error| actix_cache::CacheError::CacheKeyGenerationError(error.to_string()))
             }
             #cache_ttl_implement
             #cache_stale_ttl_implement

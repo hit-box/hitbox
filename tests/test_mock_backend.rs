@@ -43,7 +43,11 @@ async fn test_mock_backend() {
     let cache = Cache::builder().build(backend.clone()).start();
     let upstream = UpstreamActor.start();
     let msg = Ping { id: 42 };
-    cache.send(msg.into_cache(upstream)).await.unwrap().unwrap();
+    cache
+        .send(msg.into_cache(&upstream))
+        .await
+        .unwrap()
+        .unwrap();
     let messages = backend.send(GetMessages).await.unwrap().0;
     assert_eq!(
         messages[..1],

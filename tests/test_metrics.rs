@@ -55,17 +55,11 @@ mod tests {
         let backend = MockBackend::new().start();
         let cache = Cache::builder().build(backend).start();
         let upstream = Upstream {}.start();
-        let res = cache
-            .send(Ping(8).into_cache(upstream.clone()))
-            .await
-            .unwrap();
+        let res = cache.send(Ping(8).into_cache(&upstream)).await.unwrap();
         assert_eq!(res.unwrap(), Ok(8));
-        let res = cache
-            .send(Ping(-42).into_cache(upstream.clone()))
-            .await
-            .unwrap();
+        let res = cache.send(Ping(-42).into_cache(&upstream)).await.unwrap();
         assert_eq!(res.unwrap(), Err(()));
-        let res = cache.send(Pong.into_cache(upstream.clone())).await.unwrap();
+        let res = cache.send(Pong.into_cache(&upstream)).await.unwrap();
         assert_eq!(res.unwrap(), 42);
 
         assert_eq!(
