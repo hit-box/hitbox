@@ -143,17 +143,20 @@ where
             match cached {
                 Some(CachedValueState::Actual(res)) => {
                     debug!("Cached value retrieved successfully");
+
                     #[cfg(feature = "metrics")]
-                    {
-                        CACHE_HIT_COUNTER.with_label_values(&[message, actor]).inc();
-                        CACHE_STALE_COUNTER
-                            .with_label_values(&[message, actor])
-                            .inc();
-                    };
+                    CACHE_HIT_COUNTER
+                        .with_label_values(&[message, actor])
+                        .inc();
+
                     Ok(res.into_inner())
                 }
                 Some(CachedValueState::Stale(res)) => {
                     debug!("Cache is stale, trying to acquire lock.");
+                    #[cfg(feature = "metrics")]
+                    CACHE_STALE_COUNTER
+                        .with_label_values(&[message, actor])
+                        .inc();
                     let lock_key = format!("lock::{}", msg.message.cache_key()?);
                     let ttl = msg.message.cache_ttl() - msg.message.cache_stale_ttl();
                     let lock_status = backend
@@ -194,11 +197,11 @@ where
                         .with_label_values(&[message, actor])
                         .inc();
                     let cache_stale_ttl = msg.message.cache_stale_ttl();
+                    let ttl = Some(msg.message.cache_ttl());
                     #[cfg(feature = "metrics")]
                     let query_timer = CACHE_UPSTREAM_HANDLING_HISTOGRAM
                         .with_label_values(&[message, actor])
                         .start_timer();
-                    let ttl = Some(msg.message.cache_ttl());
                     let upstream_result = msg.upstream.send(msg.message).await?;
                     #[cfg(feature = "metrics")]
                     query_timer.observe_duration();
