@@ -143,12 +143,10 @@ where
             match cached {
                 Some(CachedValueState::Actual(res)) => {
                     debug!("Cached value retrieved successfully");
-
                     #[cfg(feature = "metrics")]
                     CACHE_HIT_COUNTER
                         .with_label_values(&[message, actor])
                         .inc();
-
                     Ok(res.into_inner())
                 }
                 Some(CachedValueState::Stale(res)) => {
@@ -170,9 +168,15 @@ where
                             debug!("Lock acquired.");
                             let ttl = Some(msg.message.cache_ttl());
                             let cache_stale_ttl = msg.message.cache_stale_ttl();
+                            #[cfg(feature = "metrics")]
+                            let query_timer = CACHE_UPSTREAM_HANDLING_HISTOGRAM
+                                .with_label_values(&[message, actor])
+                                .start_timer();
                             let upstream_result = msg.upstream
                                 .send(msg.message)
                                 .await?;
+                            #[cfg(feature = "metrics")]
+                            query_timer.observe_duration();
                             debug!("Received value from backend. Try to set.");
                             let cached = CachedValue::new(upstream_result, cache_stale_ttl);
                             cached.store(backend.clone(), cache_key, ttl).await?;
@@ -212,7 +216,13 @@ where
                 },
                 None => {
                     debug!("Cache disabled");
+                    #[cfg(feature = "metrics")]
+                    let query_timer = CACHE_UPSTREAM_HANDLING_HISTOGRAM
+                        .with_label_values(&[message, actor])
+                        .start_timer();
                     let upstream_result = msg.upstream.send(msg.message).await?;
+                    #[cfg(feature = "metrics")]
+                    query_timer.observe_duration();
                     Ok(upstream_result)
                 }
             }
