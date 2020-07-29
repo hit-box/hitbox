@@ -1,6 +1,7 @@
 use actix::prelude::*;
 use actix_cache::{Cache, CacheError, Cacheable, RedisBackend};
 use actix_derive::{Message, MessageResponse};
+use prometheus::{Encoder, TextEncoder};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -24,7 +25,7 @@ impl Handler<Ping> for UpstreamActor {
 
     fn handle(&mut self, msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
         Box::pin(async move {
-            actix_rt::time::delay_for(core::time::Duration::from_secs(3)).await;
+            actix_rt::time::delay_for(core::time::Duration::from_secs(1)).await;
             Ok(Pong(msg.id))
         })
     }
@@ -40,7 +41,18 @@ async fn main() -> Result<(), CacheError> {
     let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
-    let res = cache.send(msg.into_cache(upstream)).await??;
-    dbg!(res.unwrap());
+    let _ = cache.send(msg.into_cache(upstream.clone())).await??;
+    let msg = Ping { id: 28 };
+    let _ = cache.send(msg.into_cache(upstream)).await??;
+
+    let mut buffer = Vec::new();
+    let encoder = TextEncoder::new();
+
+    // Gather the metrics.
+    let metric_families = prometheus::gather();
+    // Encode them to send.
+    encoder.encode(&metric_families, &mut buffer).unwrap();
+    let output = String::from_utf8(buffer.clone()).unwrap();
+    println!("{}", output);
     Ok(())
 }

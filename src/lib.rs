@@ -2,6 +2,8 @@ pub mod actor;
 pub mod cache;
 pub mod dev;
 pub mod error;
+#[cfg(feature = "metrics")]
+pub mod metrics;
 
 pub use actor::{Cache, CacheBuilder};
 pub use cache::{Cacheable, QueryCache};
