@@ -215,7 +215,6 @@ where
                     Ok(cached.into_inner())
                 },
                 None => {
-                    debug!("Cache disabled");
                     #[cfg(feature = "metrics")]
                     let query_timer = CACHE_UPSTREAM_HANDLING_HISTOGRAM
                         .with_label_values(&[message, actor])
