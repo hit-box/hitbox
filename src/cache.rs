@@ -107,27 +107,6 @@ where
     type Result = Result<<M as Message>::Result, CacheError>;
 }
 
-async fn set_value<T, B>(
-    value: &CachedValue<T>,
-    backend: Addr<B>,
-    key: String,
-    ttl: Option<u32>,
-) -> Result<(), CacheError>
-where
-    T: Serialize,
-    B: Actor + Backend,
-    <B as Actor>::Context: ToEnvelope<B, Set>,
-{
-    let _ = backend
-        .send(Set { value: serde_json::to_string(value)?, key, ttl })
-        .await?
-        .map_err(|error| {
-            warn!("Updating cache error: {}", error);
-            CacheError::BackendError(error)
-        });
-    Ok(())
-}
-
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for Cache<B>
 where
     B: Actor + Backend,
@@ -164,7 +143,7 @@ where
                 Some(CachedValueState::Stale(res)) => {
                     debug!("Cache is stale, trying to acquire lock.");
                     let key = msg.message.cache_key()?;
-                    let ttl = 1;
+                    let ttl = msg.message.cache_ttl() - msg.message.cache_stale_ttl();
                     let lock_status = backend
                         .send(Lock { key, ttl }).await?
                         // ToDo: use correct error
@@ -179,7 +158,7 @@ where
                                 .await?;
                             debug!("Lock acquired.");
                             let cached = CachedValue::new(upstream_result, cache_stale_ttl);
-                            set_value(&cached, backend, cache_key, ttl).await?;
+                            cached.store(backend, cache_key, ttl)?;
                             Ok(cached.into_inner())
                         },
                         LockStatus::Locked => {
@@ -195,7 +174,7 @@ where
                     let upstream_result = msg.upstream.send(msg.message).await?;
                     let cached = CachedValue::new(upstream_result, cache_stale_ttl);
                     debug!("Update value in cache");
-                    set_value(&cached, backend, cache_key, ttl).await?;
+                    cached.store(backend, cache_key, ttl)?;
                     Ok(cached.into_inner())
                 },
                 None => {
@@ -284,6 +263,23 @@ impl<T> CachedValue<T> {
     /// Return instance of inner type.
     pub fn into_inner(self) -> T {
         self.data
+    }
+
+    /// Store inner value into backend.
+    pub fn store<B>(&self, backend: Addr<B>, key: String, ttl: Option<u32>) -> Result<(), CacheError>
+    where
+        T: Serialize,
+        B: Actor + Backend,
+        <B as Actor>::Context: ToEnvelope<B, Set>,
+    {
+        let _ = backend
+            .try_send(Set { value: serde_json::to_string(&self.data)?, key, ttl })
+            .map_err(|error| {
+                warn!("Updating cache error: {}", error);
+                // ToDo: use correct error type
+                CacheError::DeserializeError
+            });
+        Ok(())
     }
 }
 
