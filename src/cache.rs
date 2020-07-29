@@ -5,7 +5,7 @@ use actix::{
     dev::{MessageResponse, ToEnvelope},
     Actor, Addr, Handler, Message, ResponseFuture,
 };
-use actix_cache_backend::{Get, Set, Lock, LockStatus};
+use actix_cache_backend::{Get, Set, Lock, LockStatus, Delete};
 use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 
@@ -110,7 +110,7 @@ where
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for Cache<B>
 where
     B: Actor + Backend,
-    <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock>,
+    <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock> + ToEnvelope<B, Delete>,
     A: Actor + Handler<M> + Send,
     M: Message + Cacheable + Send + 'static,
     M::Result: MessageResponse<A, M> + Serialize + std::fmt::Debug + DeserializeOwned + Send,
@@ -142,12 +142,14 @@ where
                 }
                 Some(CachedValueState::Stale(res)) => {
                     debug!("Cache is stale, trying to acquire lock.");
-                    let key = msg.message.cache_key()?;
+                    let lock_key = format!("lock::{}", msg.message.cache_key()?);
                     let ttl = msg.message.cache_ttl() - msg.message.cache_stale_ttl();
                     let lock_status = backend
-                        .send(Lock { key, ttl }).await?
-                        // ToDo: use correct error
-                        .map_err(|_| CacheError::DeserializeError)?;
+                        .send(Lock { key: lock_key.clone(), ttl }).await?
+                        .map_err(|error| {
+                            warn!("Lock error: {}", error);
+                            CacheError::BackendError(error)
+                        })?;
                     match lock_status {
                         LockStatus::Acquired => {
                             debug!("Lock acquired.");
@@ -158,7 +160,13 @@ where
                                 .await?;
                             debug!("Lock acquired.");
                             let cached = CachedValue::new(upstream_result, cache_stale_ttl);
-                            cached.store(backend, cache_key, ttl)?;
+                            cached.store(backend.clone(), cache_key, ttl).await?;
+                            backend
+                                .send(Delete { key: lock_key }).await?
+                                .map_err(|error| {
+                                    warn!("Lock error: {}", error);
+                                    CacheError::BackendError(error)
+                                })?;
                             Ok(cached.into_inner())
                         },
                         LockStatus::Locked => {
@@ -174,7 +182,7 @@ where
                     let upstream_result = msg.upstream.send(msg.message).await?;
                     let cached = CachedValue::new(upstream_result, cache_stale_ttl);
                     debug!("Update value in cache");
-                    cached.store(backend, cache_key, ttl)?;
+                    cached.store(backend, cache_key, ttl).await?;
                     Ok(cached.into_inner())
                 },
                 None => {
@@ -266,18 +274,18 @@ impl<T> CachedValue<T> {
     }
 
     /// Store inner value into backend.
-    pub fn store<B>(&self, backend: Addr<B>, key: String, ttl: Option<u32>) -> Result<(), CacheError>
+    async fn store<B>(&self, backend: Addr<B>, key: String, ttl: Option<u32>) -> Result<(), CacheError>
     where
         T: Serialize,
         B: Actor + Backend,
         <B as Actor>::Context: ToEnvelope<B, Set>,
     {
         let _ = backend
-            .try_send(Set { value: serde_json::to_string(&self.data)?, key, ttl })
+            .send(Set { value: serde_json::to_string(&self.data)?, key, ttl })
+            .await?
             .map_err(|error| {
                 warn!("Updating cache error: {}", error);
-                // ToDo: use correct error type
-                CacheError::DeserializeError
+                CacheError::BackendError(error)
             });
         Ok(())
     }
