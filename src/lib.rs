@@ -22,7 +22,7 @@
 //! First of all, you should derive [Cacheable] trait for your actix Message:
 //!
 //! > **_NOTE:_** Default cache key implementation based on serde_qs crate
-//! > and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types). 
+//! > and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types).
 //!
 //!
 //! ```rust
@@ -147,4 +147,5 @@ pub use error::CacheError;
 pub use actix_cache_redis::actor::RedisActor as RedisBackend;
 
 #[cfg(feature = "derive")]
+#[doc(hidden)]
 pub use serde_qs;
