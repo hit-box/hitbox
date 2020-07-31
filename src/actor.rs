@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use actix::prelude::*;
 use actix_cache_backend::Backend;
-use actix_cache_redis::actor::RedisActor;
+use actix_cache_redis::RedisBackend;
 use log::{debug, info};
 
 use crate::CacheError;
@@ -45,8 +45,8 @@ where
     /// Initialize new Cache actor with default [RedisBackend].
     ///
     /// [RedisBackend]: ../../actix_cache_redis/actor/struct.RedisActor.html
-    pub async fn new() -> Result<Cache<RedisActor>, CacheError> {
-        let backend = RedisActor::new()
+    pub async fn new() -> Result<Cache<RedisBackend>, CacheError> {
+        let backend = RedisBackend::new()
             .await
             .map_err(|err| CacheError::BackendError(err.into()))?
             .start();

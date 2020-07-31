@@ -1,3 +1,4 @@
+//! Redis backend actor implementation.
 use crate::error::Error;
 use actix::prelude::*;
 use actix_cache_backend::{
@@ -6,27 +7,39 @@ use actix_cache_backend::{
 use log::{debug, info};
 use redis::{aio::MultiplexedConnection, Client};
 
-/// Actix Redis cache backend actor.
-pub struct RedisActor {
-    #[allow(dead_code)]
-    client: Client,
+/// Redis cache backend based on redis-rs crate.
+///
+/// This actor provides redis as storage [Backend] for actix-cache.
+/// Its use one [MultiplexedConnection] for asynchronous network interaction.
+///
+/// [MultiplexedConnection]: TODO
+/// [Backend]: /actix_cache_backend/trait.Backend.html
+pub struct RedisBackend {
     connection: MultiplexedConnection,
 }
 
-impl RedisActor {
-    pub async fn new() -> Result<RedisActor, Error> {
+impl RedisBackend {
+    /// Create new backend instance with default settings.
+    ///
+    /// # Examples
+    /// ```
+    /// #[actix_rt::main]
+    /// async fn main() {
+    /// }
+    /// ```
+    pub async fn new() -> Result<RedisBackend, Error> {
         Self::builder().build().await
     }
-    pub fn builder() -> RedisActorBuilder {
-        RedisActorBuilder::default()
+    pub fn builder() -> RedisBackendBuilder {
+        RedisBackendBuilder::default()
     }
 }
 
-pub struct RedisActorBuilder {
+pub struct RedisBackendBuilder {
     connection_info: String,
 }
 
-impl Default for RedisActorBuilder {
+impl Default for RedisBackendBuilder {
     fn default() -> Self {
         Self {
             connection_info: "redis://127.0.0.1/".to_owned(),
@@ -34,21 +47,26 @@ impl Default for RedisActorBuilder {
     }
 }
 
-impl RedisActorBuilder {
-    pub async fn build(&self) -> Result<RedisActor, Error> {
+impl RedisBackendBuilder {
+    pub fn server(mut self, connection_info: String) -> Self {
+        self.connection_info = connection_info;
+        self
+    }
+
+    pub async fn build(&self) -> Result<RedisBackend, Error> {
         let client = Client::open(self.connection_info.as_str())?;
         let connection = client.get_multiplexed_tokio_connection().await?;
-        Ok(RedisActor { client, connection })
+        Ok(RedisBackend{ connection })
     }
 }
 
-impl Backend for RedisActor {
+impl Backend for RedisBackend {
     type Actor = Self;
     type Context = Context<Self>;
 }
 
 /// Implementation actix Actor trait for Redis cache backend.
-impl Actor for RedisActor {
+impl Actor for RedisBackend {
     type Context = Context<Self>;
 
     fn started(&mut self, _: &mut Self::Context) {
@@ -57,7 +75,7 @@ impl Actor for RedisActor {
 }
 
 /// Implementation of Actix Handler for Get message.
-impl Handler<Get> for RedisActor {
+impl Handler<Get> for RedisBackend {
     type Result = ResponseFuture<Result<Option<String>, BackendError>>;
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
@@ -75,7 +93,7 @@ impl Handler<Get> for RedisActor {
 }
 
 /// Implementation of Actix Handler for Set message.
-impl Handler<Set> for RedisActor {
+impl Handler<Set> for RedisBackend {
     type Result = ResponseFuture<Result<String, BackendError>>;
 
     fn handle(&mut self, msg: Set, _: &mut Self::Context) -> Self::Result {
@@ -96,7 +114,7 @@ impl Handler<Set> for RedisActor {
 }
 
 /// Implementation of Actix Handler for Delete message.
-impl Handler<Delete> for RedisActor {
+impl Handler<Delete> for RedisBackend {
     type Result = ResponseFuture<Result<DeleteStatus, BackendError>>;
 
     fn handle(&mut self, msg: Delete, _: &mut Self::Context) -> Self::Result {
@@ -120,7 +138,7 @@ impl Handler<Delete> for RedisActor {
 }
 
 /// Implementation of Actix Handler for Lock message.
-impl Handler<Lock> for RedisActor {
+impl Handler<Lock> for RedisBackend {
     type Result = ResponseFuture<Result<LockStatus, BackendError>>;
 
     fn handle(&mut self, msg: Lock, _: &mut Self::Context) -> Self::Result {

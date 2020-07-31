@@ -144,7 +144,7 @@ pub use actor::{Cache, CacheBuilder};
 pub use cache::{Cacheable, QueryCache};
 pub use error::CacheError;
 
-pub use actix_cache_redis::actor::RedisActor as RedisBackend;
+pub use actix_cache_redis::RedisBackend;
 
 #[cfg(feature = "derive")]
 #[doc(hidden)]
