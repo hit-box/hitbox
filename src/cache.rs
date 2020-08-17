@@ -188,15 +188,17 @@ where
                     let lock_key = format!("lock::{}", msg.message.cache_key()?);
                     let ttl = msg.message.cache_ttl() - msg.message.cache_stale_ttl();
                     let lock_status = backend
-                        .send(Lock {
-                            key: lock_key.clone(),
-                            ttl,
+                        .send(Lock { key: lock_key.clone(), ttl })
+                        .await
+                        .unwrap_or_else(|error| {
+                            warn!("Lock error {}", error);
+                            Ok(LockStatus::Locked)
                         })
-                        .await?
-                        .map_err(|error| {
-                            warn!("Lock error: {}", error);
-                            CacheError::BackendError(error)
-                        })?;
+                        .unwrap_or_else(|error| {
+                            warn!("Lock error {}", error);
+                            LockStatus::Locked
+                        });
+
                     match lock_status {
                         LockStatus::Acquired => {
                             debug!("Lock acquired.");
@@ -211,14 +213,18 @@ where
                             query_timer.observe_duration();
                             debug!("Received value from backend. Try to set.");
                             let cached = CachedValue::new(upstream_result, cache_stale_ttl);
-                            cached.store(backend.clone(), cache_key, ttl).await?;
-                            backend
+                            cached.store(backend.clone(), cache_key, ttl)
+                                .await
+                                .unwrap_or_else(|error| {
+                                    warn!("Updating cache error: {}", error);
+                                });
+                            let _ = backend
                                 .send(Delete { key: lock_key })
-                                .await?
+                                .await
                                 .map_err(|error| {
                                     warn!("Lock error: {}", error);
-                                    CacheError::BackendError(error)
-                                })?;
+                                    error
+                                });
                             Ok(cached.into_inner())
                         }
                         LockStatus::Locked => {
@@ -244,7 +250,11 @@ where
                     query_timer.observe_duration();
                     let cached = CachedValue::new(upstream_result, cache_stale_ttl);
                     debug!("Update value in cache");
-                    cached.store(backend, cache_key, ttl).await?;
+                    cached.store(backend, cache_key, ttl)
+                        .await
+                        .unwrap_or_else(|error| {
+                            warn!("Updating cache error: {}", error);
+                        });
                     Ok(cached.into_inner())
                 }
                 None => {

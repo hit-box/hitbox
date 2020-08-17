@@ -23,6 +23,8 @@ impl RedisBackend {
     ///
     /// # Examples
     /// ```
+    /// use actix_cache_redis::RedisBackend;
+    ///
     /// #[actix_rt::main]
     /// async fn main() {
     ///     let backend = RedisBackend::new().await;
