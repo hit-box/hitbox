@@ -1,5 +1,4 @@
 use actix_cache::cache::Cacheable;
-use actix_cache::CacheError;
 use serde::Serialize;
 
 #[derive(Cacheable, Serialize)]
