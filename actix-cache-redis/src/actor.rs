@@ -25,16 +25,20 @@ impl RedisBackend {
     /// ```
     /// #[actix_rt::main]
     /// async fn main() {
+    ///     let backend = RedisBackend::new().await;
     /// }
     /// ```
     pub async fn new() -> Result<RedisBackend, Error> {
         Self::builder().build().await
     }
+
+    /// Creates new RedisBackend builder with default settings.
     pub fn builder() -> RedisBackendBuilder {
         RedisBackendBuilder::default()
     }
 }
 
+/// Part of builder pattern implemetation for RedisBackend actor.
 pub struct RedisBackendBuilder {
     connection_info: String,
 }
@@ -48,11 +52,13 @@ impl Default for RedisBackendBuilder {
 }
 
 impl RedisBackendBuilder {
+    /// Set connection info (host, port, database, etc.) for RedisBackend actor.
     pub fn server(mut self, connection_info: String) -> Self {
         self.connection_info = connection_info;
         self
     }
 
+    /// Create new instance of Redis backend with passed settings.
     pub async fn build(&self) -> Result<RedisBackend, Error> {
         let client = Client::open(self.connection_info.as_str())?;
         let connection = client.get_multiplexed_tokio_connection().await?;
