@@ -66,7 +66,8 @@
 //! }
 //! ```
 //!
-//! And the last step is using cache in your code (actix-web handler for example):
+//! And the last step is using cache in your code (actix-web handler for example).
+//! This full example and other examples you can see on [github.com](https://github.com/rambler-digital-solutions/actix-cache/blob/master/examples/actix_web.rs)
 //!
 //! ```rust
 //! # use actix::prelude::*;
@@ -106,8 +107,6 @@
 //!     HttpResponse::Ok().body(format!("Generate Fibonacci number {}", number))
 //! }
 //! ```
-//!
-//! This full example and other examples you can see on [github.com](https://github.com/rambler-digital-solutions/actix-cache/blob/master/examples/actix_web.rs)
 //!
 //! ## Backend implementations
 //!
