@@ -1,4 +1,4 @@
-//! A proxy actor and infrastructure for asynchronous and clear cache interaction
+//! A proxy actor and infrastructure for asynchronous and clear cache interaction for Actix actor and Actix-web frameworks.
 //!
 //! # A tour of actix-cache
 //!
