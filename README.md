@@ -15,7 +15,7 @@ Actix cache is a proxy actor and infrastructure for asynchronous and clear cache
 ## Backend implementations
 
 At this time supported or planned next cache backend implementation:
-- [x] Redis backend
+- [x] Redis backend (actix-cache-redis)
 - [ ] In-memory backend
 
 ## Feature flags
