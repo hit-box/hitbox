@@ -12,6 +12,12 @@ Actix cache is a proxy actor and infrastructure for asynchronous and clear cache
 * Automatic cache key generation.
 * Detailed Prometheus metrics out of the box.
 
+## Backend implementations
+
+At this time supported or planned next cache backend implementation:
+- [x] Redis backend
+- [ ] In-memory backend
+
 ## Feature flags
 * derive - Support for [Cacheable] trait derive macros.
 * metrics - Support for Prometheus metrics.
