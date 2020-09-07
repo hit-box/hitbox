@@ -122,6 +122,9 @@ pub trait Cacheable {
 /// Intermediate actix message which handled by Cache actor.
 ///
 /// This message a product of upstream message and upstream actor address.
+/// In other words, QueryCache is a struct that includes base message with user data 
+/// and address of an actor that is a recipient of this message. 
+/// You can only send QueryCache messages to Cache actor.
 pub struct QueryCache<A, M>
 where
     M: Message + Cacheable + Send,
