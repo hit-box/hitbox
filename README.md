@@ -122,3 +122,4 @@ async fn index(
 
 [Dogpile]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 [Cacheable]: https://docs.rs/actix-cache/latest/actix-cache/cache/trait.Cacheable.html
+[Cache]: https://docs.rs/actix-cache/latest/actix-cache/actor/struct.Cache.html
