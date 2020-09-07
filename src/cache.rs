@@ -100,8 +100,8 @@ pub trait Cacheable {
     /// #[actix_rt::main]
     /// async fn main() {
     ///     let upstream = Upstream.start();
-    ///     let query = QueryNothing { id: Some(1) };
-    ///     query.into_cache(&upstream);
+    ///     let query = QueryNothing { id: Some(1) }
+    ///         .into_cache(&upstream);
     /// }
     /// ```
     ///

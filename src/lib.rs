@@ -9,7 +9,7 @@
 //!
 //! ## Features
 //! * Async/Sync cache backend support.
-//! * Dogpile effect prevention.
+//! * [Dogpile] effect prevention.
 //! * Stale cache mechanics.
 //! * Automatic cache key generation.
 //! * Detailed Prometheus metrics out of the box.
@@ -131,6 +131,7 @@
 //! [Set]: dev/struct.Set.html
 //! [Delete]: dev/struct.Delete.html
 //! [Lock]: dev/struct.Lock.html
+//! [Dogpile]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 #![warn(missing_docs)]
 pub mod actor;
 pub mod cache;
