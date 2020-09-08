@@ -1,29 +1,26 @@
-use serde::de::DeserializeOwned;
+//! Cacheable trait and implementation of cache logic.
 use std::boxed::Box;
 
 use actix::{
     dev::{MessageResponse, ToEnvelope},
     Actor, Addr, Handler, Message, ResponseFuture,
 };
-use actix_cache_backend::{Get, Set, Lock, LockStatus, Delete};
-use log::{debug, warn};
-
+use actix_cache_backend::{Backend, Delete, Get, Lock, LockStatus, Set};
 #[cfg(feature = "derive")]
 pub use actix_cache_derive::Cacheable;
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Duration, Utc};
+use log::{debug, warn};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{Cache, CacheError};
 #[cfg(feature = "metrics")]
 use crate::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
+use crate::{Cache, CacheError};
 
-/// Trait describe cache configuration per message for actix Cache actor.
+/// Trait describe cache configuration per message type for actix Cache actor.
 pub trait Cacheable {
     /// Method should return unique identifier for struct object.
-    ///
-    /// Format of key describes as:
-    /// `{actor}::{message type}::{message attributes}`
     ///
     /// In cache storage it prepends with cache version.
     ///
@@ -78,19 +75,56 @@ pub trait Cacheable {
         0
     }
 
-    fn into_cache<A>(self, upstream: Addr<A>) -> QueryCache<A, Self>
+    /// Helper method to convert Message into [QueryCache] message.
+    ///
+    /// # Examples
+    /// ```
+    /// use actix::prelude::*;
+    /// use actix_derive::Message;
+    /// use actix_cache::cache::{Cacheable, QueryCache};
+    /// use actix_cache::CacheError;
+    /// use serde::Serialize;
+    ///
+    /// struct Upstream;
+    ///
+    /// impl Actor for Upstream {
+    ///     type Context = Context<Self>;
+    /// }
+    ///
+    /// #[derive(Cacheable, Serialize, Message, Debug, Clone, PartialEq)]
+    /// #[rtype(result = "()")]
+    /// struct QueryNothing {
+    ///     id: Option<i32>,
+    /// }
+    ///
+    /// #[actix_rt::main]
+    /// async fn main() {
+    ///     let upstream = Upstream.start();
+    ///     let query = QueryNothing { id: Some(1) }
+    ///         .into_cache(&upstream);
+    /// }
+    /// ```
+    ///
+    /// [QueryCache]: struct.QueryCache.html
+    fn into_cache<A>(self, upstream: &Addr<A>) -> QueryCache<A, Self>
     where
         A: Actor,
         Self: Message + Send + Sized,
         Self::Result: MessageResponse<A, Self> + Send + 'static,
     {
         QueryCache {
-            upstream,
+            upstream: upstream.clone(),
             message: self,
         }
     }
 }
 
+/// Intermediate actix message which handled by Cache actor.
+///
+/// This message a product of upstream message and upstream actor address.
+/// In other words, QueryCache is a struct that includes base message with user data 
+/// and address of an actor that is a recipient of this message. 
+/// You can only send QueryCache messages to Cache actor.
 pub struct QueryCache<A, M>
 where
     M: Message + Cacheable + Send,
@@ -113,7 +147,8 @@ where
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for Cache<B>
 where
     B: Actor + Backend,
-    <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock> + ToEnvelope<B, Delete>,
+    <B as Actor>::Context:
+        ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock> + ToEnvelope<B, Delete>,
     A: Actor + Handler<M> + Send,
     M: Message + Cacheable + Send + 'static,
     M::Result: MessageResponse<A, M> + Serialize + std::fmt::Debug + DeserializeOwned + Send,
@@ -144,9 +179,7 @@ where
                 Some(CachedValueState::Actual(res)) => {
                     debug!("Cached value retrieved successfully");
                     #[cfg(feature = "metrics")]
-                    CACHE_HIT_COUNTER
-                        .with_label_values(&[message, actor])
-                        .inc();
+                    CACHE_HIT_COUNTER.with_label_values(&[message, actor]).inc();
                     Ok(res.into_inner())
                 }
                 Some(CachedValueState::Stale(res)) => {
@@ -178,9 +211,7 @@ where
                             let query_timer = CACHE_UPSTREAM_HANDLING_HISTOGRAM
                                 .with_label_values(&[message, actor])
                                 .start_timer();
-                            let upstream_result = msg.upstream
-                                .send(msg.message)
-                                .await?;
+                            let upstream_result = msg.upstream.send(msg.message).await?;
                             #[cfg(feature = "metrics")]
                             query_timer.observe_duration();
                             debug!("Received value from backend. Try to set.");
@@ -198,11 +229,11 @@ where
                                     error
                                 });
                             Ok(cached.into_inner())
-                        },
+                        }
                         LockStatus::Locked => {
                             debug!("Cache locked.");
                             Ok(res.into_inner())
-                        },
+                        }
                     }
                 }
                 Some(CachedValueState::Miss) => {
@@ -228,7 +259,7 @@ where
                             warn!("Updating cache error: {}", error);
                         });
                     Ok(cached.into_inner())
-                },
+                }
                 None => {
                     #[cfg(feature = "metrics")]
                     let query_timer = CACHE_UPSTREAM_HANDLING_HISTOGRAM
@@ -244,9 +275,6 @@ where
         Box::pin(res)
     }
 }
-
-use actix_cache_backend::Backend;
-use chrono::{DateTime, Duration, Utc};
 
 enum CachedValueState<T> {
     Actual(CachedValue<T>),
@@ -264,7 +292,7 @@ impl<T> From<Option<CachedValue<T>>> for CachedValueState<T> {
                     CachedValueState::Actual(value)
                 }
             }
-            None => CachedValueState::Miss
+            None => CachedValueState::Miss,
         }
     }
 }
@@ -323,14 +351,23 @@ impl<T> CachedValue<T> {
     }
 
     /// Store inner value into backend.
-    async fn store<B>(&self, backend: Addr<B>, key: String, ttl: Option<u32>) -> Result<(), CacheError>
+    async fn store<B>(
+        &self,
+        backend: Addr<B>,
+        key: String,
+        ttl: Option<u32>,
+    ) -> Result<(), CacheError>
     where
         T: Serialize,
         B: Actor + Backend,
         <B as Actor>::Context: ToEnvelope<B, Set>,
     {
         let _ = backend
-            .send(Set { value: serde_json::to_string(&self.data)?, key, ttl })
+            .send(Set {
+                value: serde_json::to_string(&self.data)?,
+                key,
+                ttl,
+            })
             .await?
             .map_err(|error| {
                 warn!("Updating cache error: {}", error);

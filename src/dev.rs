@@ -1,7 +1,10 @@
+//! Structures and traits for custom backend development and testing process.
 pub use actix_cache_backend::{
     Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set,
 };
 
+#[doc(hidden)]
+/// Mocked backend implementation module.
 pub mod backend {
     use super::*;
     use actix::prelude::*;

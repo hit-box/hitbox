@@ -1,8 +1,17 @@
+//! Error decplaration and transformation into [BackendError].
+//!
+//! [BackendError]: ../../actix_cache_backend/enum.BackendError.html
 use actix_cache_backend::BackendError;
 use redis::RedisError;
 
+/// Redis backend error declaration.
+///
+/// Simply, it's just a wrapper for [redis::RedisError].
+///
+/// [redis::RedisError]: TODO
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Wrapper for all kinds redis-rs errors.
     #[error("Redis backend error: {0}")]
     Redis(RedisError),
 }

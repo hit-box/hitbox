@@ -41,9 +41,9 @@ async fn main() -> Result<(), CacheError> {
     let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
-    let _ = cache.send(msg.into_cache(upstream.clone())).await??;
+    let _ = cache.send(msg.into_cache(&upstream)).await??;
     let msg = Ping { id: 28 };
-    let _ = cache.send(msg.into_cache(upstream)).await??;
+    let _ = cache.send(msg.into_cache(&upstream)).await??;
 
     let mut buffer = Vec::new();
     let encoder = TextEncoder::new();
