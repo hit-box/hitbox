@@ -26,7 +26,7 @@ At this time supported or planned next cache backend implementation:
 
 Dependencies:
 
-```yaml
+```toml
 [dependencies]
 actix-cache = "0.2"
 ```
