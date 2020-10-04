@@ -41,7 +41,13 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
     let gen = quote! {
         impl Cacheable for #name {
             fn cache_key(&self) -> Result<String, actix_cache::CacheError> {
+                let message_path = std::any::type_name::<#name>()
+                    .split("::")
+                    .map(|part| part.to_string())
+                    .collect::<Vec<String>>();
+                let message_type = message_path.last().unwrap();
                 actix_cache::serde_qs::to_string(self)
+                    .map(|key| format!("{}::{}", message_type, key))
                     .map_err(|error| actix_cache::CacheError::CacheKeyGenerationError(error.to_string()))
             }
             #cache_ttl_implement
