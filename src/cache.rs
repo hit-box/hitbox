@@ -50,6 +50,9 @@ pub trait Cacheable {
     /// ```
     fn cache_key(&self) -> Result<String, CacheError>;
 
+    /// Method return cache key prefix based on message type.
+    fn cache_key_prefix(&self) -> String;
+
     /// Describe time-to-live (ttl) value for cache storage in seconds.
     ///
     /// After that time value will be removed from cache storage.
