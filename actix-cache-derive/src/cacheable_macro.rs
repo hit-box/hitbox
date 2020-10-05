@@ -1,7 +1,8 @@
-use crate::macro_attributes::find_attribute;
 use proc_macro::TokenStream;
+
 use quote::quote;
-use syn;
+
+use crate::macro_attributes::find_attribute;
 
 /// Implementing Cacheable trait.
 ///
@@ -10,6 +11,21 @@ use syn;
 /// are used if macros of the same name are not used.
 pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
+    let message_type = format!("{}", name);
+
+    let cache_key = quote! {
+        fn cache_key(&self) -> Result<String, actix_cache::CacheError> {
+            actix_cache::serde_qs::to_string(self)
+                .map(|key| format!("{}::{}", self.cache_key_prefix(), key))
+                .map_err(|error| actix_cache::CacheError::CacheKeyGenerationError(error.to_string()))
+        }
+    };
+
+    let cache_key_prefix = quote! {
+        fn cache_key_prefix(&self) -> String {
+            #message_type.to_owned()
+        }
+    };
 
     let cache_ttl_implement = match find_attribute(&ast, "cache_ttl") {
         Some(cache_ttl) => quote! {
@@ -40,10 +56,8 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
 
     let gen = quote! {
         impl Cacheable for #name {
-            fn cache_key(&self) -> Result<String, actix_cache::CacheError> {
-                actix_cache::serde_qs::to_string(self)
-                    .map_err(|error| actix_cache::CacheError::CacheKeyGenerationError(error.to_string()))
-            }
+            #cache_key
+            #cache_key_prefix
             #cache_ttl_implement
             #cache_stale_ttl_implement
             #cache_version_implement

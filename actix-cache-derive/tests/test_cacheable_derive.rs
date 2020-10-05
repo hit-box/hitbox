@@ -13,7 +13,7 @@ fn test_all_keys() {
         id: 0,
         alias: "alias".to_string(),
     };
-    assert_eq!(message.cache_key().unwrap(), "id=0&alias=alias".to_string());
+    assert_eq!(message.cache_key().unwrap(), "Message::id=0&alias=alias".to_string());
 }
 
 #[derive(Cacheable, Serialize)]
@@ -30,7 +30,7 @@ fn test_partial() {
         id: 0,
         alias: "alias".to_string(),
     };
-    assert_eq!(message.cache_key().unwrap(), "id=0".to_string());
+    assert_eq!(message.cache_key().unwrap(), "PartialSerializeMessage::id=0".to_string());
 }
 
 #[derive(Cacheable, Serialize)]
@@ -43,7 +43,7 @@ fn test_message_with_vector() {
     let message = VecMessage { id: vec![1, 2, 3] };
     assert_eq!(
         message.cache_key().unwrap(),
-        "id[0]=1&id[1]=2&id[2]=3".to_string()
+        "VecMessage::id[0]=1&id[1]=2&id[2]=3".to_string()
     );
 }
 
@@ -64,7 +64,7 @@ fn test_message_with_enum() {
     };
     assert_eq!(
         message.cache_key().unwrap(),
-        "message_type=External".to_string()
+        "EnumMessage::message_type=External".to_string()
     );
 }
 
@@ -85,7 +85,7 @@ fn test_message_with_enum_tuple() {
     };
     assert_eq!(
         message.cache_key().unwrap(),
-        "message_type[External]=1".to_string()
+        "TupleEnumMessage::message_type[External]=1".to_string()
     );
 }
 
