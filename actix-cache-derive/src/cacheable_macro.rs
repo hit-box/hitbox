@@ -13,6 +13,14 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let message_type = format!("{}", name);
 
+    let cache_key = quote! {
+        fn cache_key(&self) -> Result<String, actix_cache::CacheError> {
+            actix_cache::serde_qs::to_string(self)
+                .map(|key| format!("{}::{}", #message_type, key))
+                .map_err(|error| actix_cache::CacheError::CacheKeyGenerationError(error.to_string()))
+        }
+    };
+
     let cache_ttl_implement = match find_attribute(&ast, "cache_ttl") {
         Some(cache_ttl) => quote! {
             fn cache_ttl(&self) -> u32 {
@@ -42,11 +50,7 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
 
     let gen = quote! {
         impl Cacheable for #name {
-            fn cache_key(&self) -> Result<String, actix_cache::CacheError> {
-                actix_cache::serde_qs::to_string(self)
-                    .map(|key| format!("{}::{}", #message_type, key))
-                    .map_err(|error| actix_cache::CacheError::CacheKeyGenerationError(error.to_string()))
-            }
+            #cache_key
             #cache_ttl_implement
             #cache_stale_ttl_implement
             #cache_version_implement
