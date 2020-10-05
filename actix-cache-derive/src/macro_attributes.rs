@@ -1,4 +1,3 @@
-use syn;
 use syn::{Attribute, NestedMeta};
 
 fn parse_attribute(attr: &Attribute, method: &str) -> Option<u32> {
@@ -7,11 +6,10 @@ fn parse_attribute(attr: &Attribute, method: &str) -> Option<u32> {
         match meta {
             Ok(syn::Meta::List(value)) => {
                 let nested = value.nested.first()?;
-                let result = match nested {
+                match nested {
                     NestedMeta::Lit(syn::Lit::Int(value)) => Some(value.base10_parse().ok()?),
                     _ => panic!("Parameter for macro {macro} should be u32", macro=method),
-                };
-                result.into()
+                }
             }
             _ => panic!("{macro} macro should have a parameter of type u32", macro=method),
         }
