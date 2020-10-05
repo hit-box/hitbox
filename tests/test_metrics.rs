@@ -16,8 +16,9 @@ mod tests {
 
     impl Cacheable for Ping {
         fn cache_key(&self) -> Result<String, CacheError> {
-            Ok(format!("Ping::{}", self.0))
+            Ok(format!("{}::{}", self.cache_key_prefix(), self.0))
         }
+        fn cache_key_prefix(&self) -> String { "Ping".to_owned() }
     }
 
     impl Handler<Ping> for Upstream {
@@ -38,8 +39,9 @@ mod tests {
 
     impl Cacheable for Pong {
         fn cache_key(&self) -> Result<String, CacheError> {
-            Ok("Pong::".to_owned())
+            Ok(self.cache_key_prefix())
         }
+        fn cache_key_prefix(&self) -> String { "Pong".to_owned() }
     }
 
     impl Handler<Pong> for Upstream {

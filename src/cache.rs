@@ -36,11 +36,12 @@ pub trait Cacheable {
     ///
     /// impl Cacheable for QueryNothing {
     ///     fn cache_key(&self) -> Result<String, CacheError> {
-    ///         let key = format!("database::QueryNothing::id::{}", self.id.map_or_else(
+    ///         let key = format!("{}::id::{}", self.cache_key_prefix(), self.id.map_or_else(
     ///             || "None".to_owned(), |id| id.to_string())
     ///         );
     ///         Ok(key)
     ///     }
+    ///     fn cache_key_prefix(&self) -> String { "database::QueryNothing".to_owned() }
     /// }
     ///
     /// let query = QueryNothing { id: Some(1) };
@@ -390,14 +391,14 @@ mod tests {
         fn cache_key(&self) -> Result<String, CacheError> {
             Ok("Message".to_owned())
         }
-
+        fn cache_key_prefix(&self) -> String { "Message".to_owned() }
         fn cache_ttl(&self) -> u32 {
             2
         }
     }
 
     #[test]
-    fn test_cache_stale_ttl_subtract_owerflow() {
+    fn test_cache_stale_ttl_subtract_overflow() {
         let a = Message;
         assert_eq!(0, a.cache_stale_ttl());
     }
