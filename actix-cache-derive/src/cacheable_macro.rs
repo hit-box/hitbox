@@ -16,7 +16,7 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
     let cache_key = quote! {
         fn cache_key(&self) -> Result<String, actix_cache::CacheError> {
             actix_cache::serde_qs::to_string(self)
-                .map(|key| format!("{}::{}", self.cache_key_prefix(), key))
+                .map(|key| format!("{}::v{}::{}", self.cache_key_prefix(), self.cache_version(), key))
                 .map_err(|error| actix_cache::CacheError::CacheKeyGenerationError(error.to_string()))
         }
     };
