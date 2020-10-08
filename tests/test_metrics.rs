@@ -67,13 +67,13 @@ mod tests {
         assert_eq!(
             2,
             CACHE_MISS_COUNTER
-                .with_label_values(&["test_metrics::tests::Ping", "test_metrics::tests::Upstream"])
+                .with_label_values(&["Ping", "test_metrics::tests::Upstream"])
                 .get()
         );
         assert_eq!(
             1,
             CACHE_MISS_COUNTER
-                .with_label_values(&["test_metrics::tests::Pong", "test_metrics::tests::Upstream"])
+                .with_label_values(&["Pong", "test_metrics::tests::Upstream"])
                 .get()
         );
     }
