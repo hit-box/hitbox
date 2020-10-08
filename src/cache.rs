@@ -162,7 +162,7 @@ where
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
         #[cfg(feature = "metrics")]
-        let (actor, message) = (std::any::type_name::<A>(), std::any::type_name::<M>());
+        let (actor, message) = (std::any::type_name::<A>(), msg.message.cache_key_prefix());
         let backend = self.backend.clone();
         let (enabled, cache_key) = match msg.message.cache_key() {
             Ok(value) => (self.enabled, value),
