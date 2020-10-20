@@ -128,10 +128,3 @@ fn test_default_ttl_stale_ttl_version_work() {
     assert_eq!(message.cache_stale_ttl(), 55);
     assert_eq!(message.cache_version(), 0);
 }
-
-#[derive(Cacheable, Serialize)]
-struct MessageV {
-    id: i32,
-    alias: String,
-    version: usize,
-}
