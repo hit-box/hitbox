@@ -13,7 +13,7 @@ fn test_all_keys() {
         id: 0,
         alias: "alias".to_string(),
     };
-    assert_eq!(message.cache_key().unwrap(), "Message::id=0&alias=alias".to_string());
+    assert_eq!(message.cache_key().unwrap(), "Message::v0::id=0&alias=alias".to_string());
 }
 
 #[derive(Cacheable, Serialize)]
@@ -30,7 +30,7 @@ fn test_partial() {
         id: 0,
         alias: "alias".to_string(),
     };
-    assert_eq!(message.cache_key().unwrap(), "PartialSerializeMessage::id=0".to_string());
+    assert_eq!(message.cache_key().unwrap(), "PartialSerializeMessage::v0::id=0".to_string());
 }
 
 #[derive(Cacheable, Serialize)]
@@ -43,7 +43,7 @@ fn test_message_with_vector() {
     let message = VecMessage { id: vec![1, 2, 3] };
     assert_eq!(
         message.cache_key().unwrap(),
-        "VecMessage::id[0]=1&id[1]=2&id[2]=3".to_string()
+        "VecMessage::v0::id[0]=1&id[1]=2&id[2]=3".to_string()
     );
 }
 
@@ -64,7 +64,7 @@ fn test_message_with_enum() {
     };
     assert_eq!(
         message.cache_key().unwrap(),
-        "EnumMessage::message_type=External".to_string()
+        "EnumMessage::v0::message_type=External".to_string()
     );
 }
 
@@ -85,7 +85,7 @@ fn test_message_with_enum_tuple() {
     };
     assert_eq!(
         message.cache_key().unwrap(),
-        "TupleEnumMessage::message_type[External]=1".to_string()
+        "TupleEnumMessage::v0::message_type[External]=1".to_string()
     );
 }
 
@@ -113,6 +113,7 @@ fn test_macro_helpers_work() {
     assert_eq!(message.cache_ttl(), 42);
     assert_eq!(message.cache_stale_ttl(), 30);
     assert_eq!(message.cache_version(), 1);
+    assert_eq!(message.cache_key().unwrap(), "MacroHelpersMessage::v1::message_type=1".to_string());
 }
 
 #[derive(Cacheable, Serialize)]

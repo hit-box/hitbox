@@ -14,7 +14,7 @@
 //!     field: i32,
 //! };
 //! let message = Message { field: 42 };
-//! assert_eq!(message.cache_key().unwrap(), "Message::field=42".to_string());
+//! assert_eq!(message.cache_key().unwrap(), "Message::v100::field=42".to_string());
 //! ```
 mod cacheable_macro;
 mod macro_attributes;
