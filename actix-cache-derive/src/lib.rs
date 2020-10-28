@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 //! This crate provides Cacheable derive macros.
 //!
-//! ```edition2018
+//! ```edition2018,ignore
 //! use actix_cache::cache::Cacheable;
 //! use actix_cache::error::CacheError;
 //! use serde::Serialize;
