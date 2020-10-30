@@ -369,7 +369,7 @@ impl<T> CachedValue<T> {
     {
         let _ = backend
             .send(Set {
-                value: serde_json::to_string(&self.data)?,
+                value: serde_json::to_string(&self)?,
                 key,
                 ttl,
             })

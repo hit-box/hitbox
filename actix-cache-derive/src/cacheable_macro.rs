@@ -13,7 +13,7 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let message_type = format!("{}", name);
 
-    let cache_key = quote! {
+    let cache_key_implement = quote! {
         fn cache_key(&self) -> Result<String, actix_cache::CacheError> {
             actix_cache::serde_qs::to_string(self)
                 .map(|key| format!("{}::v{}::{}", self.cache_key_prefix(), self.cache_version(), key))
@@ -21,7 +21,7 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
         }
     };
 
-    let cache_key_prefix = quote! {
+    let cache_key_prefix_implement = quote! {
         fn cache_key_prefix(&self) -> String {
             #message_type.to_owned()
         }
@@ -56,8 +56,8 @@ pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
 
     let gen = quote! {
         impl Cacheable for #name {
-            #cache_key
-            #cache_key_prefix
+            #cache_key_implement
+            #cache_key_prefix_implement
             #cache_ttl_implement
             #cache_stale_ttl_implement
             #cache_version_implement
