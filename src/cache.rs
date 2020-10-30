@@ -23,7 +23,7 @@ use crate::actor;
 pub trait Cacheable {
     /// Method should return unique identifier for struct object.
     ///
-    /// In cache storage it prepends with cache version.
+    /// In cache storage it prepends with cache version and Upstream actor name.
     ///
     /// # Examples
     ///
@@ -36,7 +36,7 @@ pub trait Cacheable {
     /// }
     ///
     /// impl Cacheable for QueryNothing {
-    ///     fn cache_key(&self) -> Result<String, CacheError> {
+    ///     fn cache_message_key(&self) -> Result<String, CacheError> {
     ///         let key = format!("{}::id::{}", self.cache_key_prefix(), self.id.map_or_else(
     ///             || "None".to_owned(), |id| id.to_string())
     ///         );
@@ -46,11 +46,11 @@ pub trait Cacheable {
     /// }
     ///
     /// let query = QueryNothing { id: Some(1) };
-    /// assert_eq!(query.cache_key().unwrap(), "database::QueryNothing::id::1");
+    /// assert_eq!(query.cache_message_key().unwrap(), "database::QueryNothing::id::1");
     /// let query = QueryNothing { id: None };
-    /// assert_eq!(query.cache_key().unwrap(), "database::QueryNothing::id::None");
+    /// assert_eq!(query.cache_message_key().unwrap(), "database::QueryNothing::id::None");
     /// ```
-    fn cache_key(&self) -> Result<String, CacheError>;
+    fn cache_message_key(&self) -> Result<String, CacheError>;
 
     /// Method return cache key prefix based on message type.
     fn cache_key_prefix(&self) -> String;
@@ -127,8 +127,8 @@ pub trait Cacheable {
 /// Intermediate actix message which handled by Cache actor.
 ///
 /// This message a product of upstream message and upstream actor address.
-/// In other words, QueryCache is a struct that includes base message with user data 
-/// and address of an actor that is a recipient of this message. 
+/// In other words, QueryCache is a struct that includes base message with user data
+/// and address of an actor that is a recipient of this message.
 /// You can only send QueryCache messages to Cache actor.
 pub struct QueryCache<A, M>
 where
@@ -138,6 +138,33 @@ where
 {
     upstream: Addr<A>,
     message: M,
+}
+
+impl<A, M> QueryCache<A, M>
+where
+    M: Message + Cacheable + Send,
+    M::Result: MessageResponse<A, M> + Send,
+    A: Actor,
+{
+    /// Returns upstream actor type name or <Unknown>.
+    fn upstream_name(&self) -> &'static str {
+        std::any::type_name::<A>()
+            .rsplit("::")
+            .next()
+            .unwrap_or("<Unknown>")
+    }
+
+    /// Returns final cache key.
+    ///
+    /// This method compose final cache key from Cacheable::cache_message_key
+    /// and Upstream actor type name.
+    pub fn cache_key(&self) -> Result<String, CacheError> {
+        Ok(format!(
+            "{}::{}",
+            self.upstream_name(),
+            self.message.cache_message_key()?
+        ))
+    }
 }
 
 impl<'a, A, M> Message for QueryCache<A, M>
@@ -163,9 +190,9 @@ where
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
         #[cfg(feature = "metrics")]
-        let (actor, message) = (std::any::type_name::<A>(), msg.message.cache_key_prefix());
+        let (actor, message) = (msg.upstream_name(), msg.message.cache_key_prefix());
         let backend = self.backend.clone();
-        let (enabled, cache_key) = match msg.message.cache_key() {
+        let (enabled, cache_key) = match msg.cache_key() {
             Ok(value) => (self.enabled, value),
             Err(error) => {
                 warn!("Creating cache key error: {}", error);
@@ -184,7 +211,9 @@ where
                 Some(CachedValueState::Actual(res)) => {
                     debug!("Cached value retrieved successfully");
                     #[cfg(feature = "metrics")]
-                    CACHE_HIT_COUNTER.with_label_values(&[&message, actor]).inc();
+                    CACHE_HIT_COUNTER
+                        .with_label_values(&[&message, actor])
+                        .inc();
                     Ok(res.into_inner())
                 }
                 Some(CachedValueState::Stale(res)) => {
@@ -193,10 +222,13 @@ where
                     CACHE_STALE_COUNTER
                         .with_label_values(&[&message, actor])
                         .inc();
-                    let lock_key = format!("lock::{}", msg.message.cache_key()?);
+                    let lock_key = format!("lock::{}", msg.cache_key()?);
                     let ttl = msg.message.cache_ttl() - msg.message.cache_stale_ttl();
                     let lock_status = backend
-                        .send(Lock { key: lock_key.clone(), ttl })
+                        .send(Lock {
+                            key: lock_key.clone(),
+                            ttl,
+                        })
                         .await
                         .unwrap_or_else(|error| {
                             warn!("Lock error {}", error);
@@ -221,7 +253,8 @@ where
                             query_timer.observe_duration();
                             debug!("Received value from backend. Try to set.");
                             let cached = CachedValue::new(upstream_result, cache_stale_ttl);
-                            cached.store(backend.clone(), cache_key, ttl)
+                            cached
+                                .store(backend.clone(), cache_key, ttl)
                                 .await
                                 .unwrap_or_else(|error| {
                                     warn!("Updating cache error: {}", error);
@@ -258,7 +291,8 @@ where
                     query_timer.observe_duration();
                     let cached = CachedValue::new(upstream_result, cache_stale_ttl);
                     debug!("Update value in cache");
-                    cached.store(backend, cache_key, ttl)
+                    cached
+                        .store(backend, cache_key, ttl)
                         .await
                         .unwrap_or_else(|error| {
                             warn!("Updating cache error: {}", error);
@@ -389,10 +423,12 @@ mod tests {
     struct Message;
 
     impl Cacheable for Message {
-        fn cache_key(&self) -> Result<String, CacheError> {
+        fn cache_message_key(&self) -> Result<String, CacheError> {
             Ok("Message".to_owned())
         }
-        fn cache_key_prefix(&self) -> String { "Message".to_owned() }
+        fn cache_key_prefix(&self) -> String {
+            "Message".to_owned()
+        }
         fn cache_ttl(&self) -> u32 {
             2
         }

@@ -15,10 +15,12 @@ mod tests {
     pub struct Ping(i32);
 
     impl Cacheable for Ping {
-        fn cache_key(&self) -> Result<String, CacheError> {
+        fn cache_message_key(&self) -> Result<String, CacheError> {
             Ok(format!("{}::{}", self.cache_key_prefix(), self.0))
         }
-        fn cache_key_prefix(&self) -> String { "Ping".to_owned() }
+        fn cache_key_prefix(&self) -> String {
+            "Ping".to_owned()
+        }
     }
 
     impl Handler<Ping> for Upstream {
@@ -38,10 +40,12 @@ mod tests {
     pub struct Pong;
 
     impl Cacheable for Pong {
-        fn cache_key(&self) -> Result<String, CacheError> {
+        fn cache_message_key(&self) -> Result<String, CacheError> {
             Ok(self.cache_key_prefix())
         }
-        fn cache_key_prefix(&self) -> String { "Pong".to_owned() }
+        fn cache_key_prefix(&self) -> String {
+            "Pong".to_owned()
+        }
     }
 
     impl Handler<Pong> for Upstream {
@@ -67,13 +71,13 @@ mod tests {
         assert_eq!(
             2,
             CACHE_MISS_COUNTER
-                .with_label_values(&["Ping", "test_metrics::tests::Upstream"])
+                .with_label_values(&["Ping", "Upstream"])
                 .get()
         );
         assert_eq!(
             1,
             CACHE_MISS_COUNTER
-                .with_label_values(&["Pong", "test_metrics::tests::Upstream"])
+                .with_label_values(&["Pong", "Upstream"])
                 .get()
         );
     }

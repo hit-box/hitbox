@@ -25,10 +25,12 @@ struct Ping {
 }
 
 impl Cacheable for Ping {
-    fn cache_key(&self) -> Result<String, CacheError> {
+    fn cache_message_key(&self) -> Result<String, CacheError> {
         Ok(format!("{}::{}", self.cache_key_prefix(), self.id))
     }
-    fn cache_key_prefix(&self) -> String { "Ping".to_owned() }
+    fn cache_key_prefix(&self) -> String {
+        "Ping".to_owned()
+    }
 }
 
 impl Handler<Ping> for UpstreamActor {
@@ -54,7 +56,7 @@ async fn test_mock_backend() {
     assert_eq!(
         messages[..1],
         [MockMessage::Get(Get {
-            key: "Ping::42".to_owned()
+            key: "UpstreamActor::Ping::42".to_owned()
         }),]
     );
 }

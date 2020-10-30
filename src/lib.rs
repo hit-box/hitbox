@@ -44,7 +44,7 @@
 //! # use actix_cache::{Cacheable, CacheError};
 //! # struct Ping { id: i32 }
 //! impl Cacheable for Ping {
-//!     fn cache_key(&self) -> Result<String, CacheError> {
+//!     fn cache_message_key(&self) -> Result<String, CacheError> {
 //!         Ok(format!("{}::{}", self.cache_key_prefix(), self.id))
 //!     }
 //!

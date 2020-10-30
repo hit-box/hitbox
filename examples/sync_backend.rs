@@ -13,10 +13,12 @@ impl Actor for UpstreamActor {
 struct Pong(i32);
 
 impl Cacheable for Ping {
-    fn cache_key(&self) -> Result<String, CacheError> {
+    fn cache_message_key(&self) -> Result<String, CacheError> {
         Ok(format!("{}::{}", self.cache_key_prefix(), self.id))
     }
-    fn cache_key_prefix(&self) -> String { "Pong".to_owned() }
+    fn cache_key_prefix(&self) -> String {
+        "Pong".to_owned()
+    }
 }
 
 #[derive(Message)]

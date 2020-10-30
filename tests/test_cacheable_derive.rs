@@ -13,7 +13,10 @@ fn test_all_keys() {
         id: 0,
         alias: "alias".to_string(),
     };
-    assert_eq!(message.cache_key().unwrap(), "Message::v0::id=0&alias=alias".to_string());
+    assert_eq!(
+        message.cache_message_key().unwrap(),
+        "Message::v0::id=0&alias=alias".to_string()
+    );
 }
 
 #[derive(Cacheable, Serialize)]
@@ -30,7 +33,10 @@ fn test_partial() {
         id: 0,
         alias: "alias".to_string(),
     };
-    assert_eq!(message.cache_key().unwrap(), "PartialSerializeMessage::v0::id=0".to_string());
+    assert_eq!(
+        message.cache_message_key().unwrap(),
+        "PartialSerializeMessage::v0::id=0".to_string()
+    );
 }
 
 #[derive(Cacheable, Serialize)]
@@ -42,7 +48,7 @@ struct VecMessage {
 fn test_message_with_vector() {
     let message = VecMessage { id: vec![1, 2, 3] };
     assert_eq!(
-        message.cache_key().unwrap(),
+        message.cache_message_key().unwrap(),
         "VecMessage::v0::id[0]=1&id[1]=2&id[2]=3".to_string()
     );
 }
@@ -63,7 +69,7 @@ fn test_message_with_enum() {
         message_type: MessageType::External,
     };
     assert_eq!(
-        message.cache_key().unwrap(),
+        message.cache_message_key().unwrap(),
         "EnumMessage::v0::message_type=External".to_string()
     );
 }
@@ -84,7 +90,7 @@ fn test_message_with_enum_tuple() {
         message_type: TupleMessageType::External(1),
     };
     assert_eq!(
-        message.cache_key().unwrap(),
+        message.cache_message_key().unwrap(),
         "TupleEnumMessage::v0::message_type[External]=1".to_string()
     );
 }
@@ -96,7 +102,7 @@ struct TupleMessage(i32);
 #[test]
 fn test_tuple_returns_error() {
     let message = TupleMessage(1);
-    assert!(message.cache_key().is_err());
+    assert!(message.cache_message_key().is_err());
 }
 
 #[derive(Cacheable, Serialize)]
@@ -113,7 +119,10 @@ fn test_macro_helpers_work() {
     assert_eq!(message.cache_ttl(), 42);
     assert_eq!(message.cache_stale_ttl(), 30);
     assert_eq!(message.cache_version(), 1);
-    assert_eq!(message.cache_key().unwrap(), "MacroHelpersMessage::v1::message_type=1".to_string());
+    assert_eq!(
+        message.cache_message_key().unwrap(),
+        "MacroHelpersMessage::v1::message_type=1".to_string()
+    );
 }
 
 #[derive(Cacheable, Serialize)]

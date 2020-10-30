@@ -64,7 +64,7 @@ impl RedisBackendBuilder {
     pub async fn build(&self) -> Result<RedisBackend, Error> {
         let client = Client::open(self.connection_info.as_str())?;
         let connection = client.get_tokio_connection_manager().await?;
-        Ok(RedisBackend{ connection })
+        Ok(RedisBackend { connection })
     }
 }
 
