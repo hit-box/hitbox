@@ -139,6 +139,24 @@ where
     message: M,
 }
 
+impl<A, M> QueryCache<A, M>
+where
+    M: Message + Cacheable + Send,
+    M::Result: MessageResponse<A, M> + Send,
+    A: Actor,
+{
+    fn upstream_name(&self) -> &'static str {
+        std::any::type_name::<A>()
+            .rsplit("::")
+            .next()
+            .unwrap_or("<Unknown>")
+    }
+
+    pub fn cache_key(&self) -> Result<String, CacheError> {
+        Ok(format!("{}::{}", self.upstream_name(), self.message.cache_key()?))
+    }
+}
+
 impl<'a, A, M> Message for QueryCache<A, M>
 where
     A: Actor,
@@ -162,9 +180,9 @@ where
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
         #[cfg(feature = "metrics")]
-        let (actor, message) = (std::any::type_name::<A>(), msg.message.cache_key_prefix());
+        let (actor, message) = (msg.upstream_name(), msg.message.cache_key_prefix());
         let backend = self.backend.clone();
-        let (enabled, cache_key) = match msg.message.cache_key() {
+        let (enabled, cache_key) = match msg.cache_key() {
             Ok(value) => (self.enabled, value),
             Err(error) => {
                 warn!("Creating cache key error: {}", error);
