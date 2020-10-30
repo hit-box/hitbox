@@ -55,9 +55,7 @@
 //!
 //! ```rust
 //! # use actix::prelude::*;
-//! use actix_cache::{CacheError, Cache as CacheActor, RedisBackend};
-//!
-//! type Cache = CacheActor<RedisBackend>;
+//! use actix_cache::{Cache, CacheError, RedisBackend};
 //!
 //! #[actix_rt::main]
 //! async fn main() -> Result<(), CacheError> {
@@ -74,7 +72,7 @@
 //! ```rust
 //! # use actix::prelude::*;
 //! # use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-//! # use actix_cache::{Cache as CacheActor, RedisBackend, Cacheable};
+//! # use actix_cache::{Cache, RedisBackend, Cacheable};
 //! # use serde::Serialize;
 //! #
 //! # struct FibonacciActor;
@@ -95,7 +93,6 @@
 //! #     }
 //! # }
 //! #
-//! # type Cache = CacheActor<RedisBackend>;
 //! async fn index(
 //!     fib: web::Data<Addr<FibonacciActor>>,
 //!     cache: web::Data<Addr<Cache>>
@@ -142,7 +139,7 @@ pub mod error;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 
-pub use actor::{Cache, CacheBuilder};
+pub use actor::{CacheActor, CacheBuilder};
 pub use cache::{Cacheable, QueryCache};
 pub use error::CacheError;
 
@@ -151,3 +148,8 @@ pub use actix_cache_redis::RedisBackend;
 #[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use serde_qs;
+
+/// Default type alias with RedisBackend.
+/// You can disable it and define it manually.
+#[cfg(feature = "redis")]
+pub type Cache = CacheActor<RedisBackend>;

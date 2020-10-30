@@ -16,7 +16,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
-use crate::{Cache, CacheError};
+use crate::CacheError;
+use crate::actor;
 
 /// Trait describe cache configuration per message type for actix Cache actor.
 pub trait Cacheable {
@@ -175,7 +176,7 @@ where
     type Result = Result<<M as Message>::Result, CacheError>;
 }
 
-impl<'a, A, M, B> Handler<QueryCache<A, M>> for Cache<B>
+impl<'a, A, M, B> Handler<QueryCache<A, M>> for actor::CacheActor<B>
 where
     B: Actor + Backend,
     <B as Actor>::Context:

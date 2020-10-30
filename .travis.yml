@@ -15,7 +15,7 @@ jobs:
 
 script:
   - cargo update
-  - cargo check --all --no-default-features
+  - cargo check --all 
   - cargo test --all-features --all
   
 after_success:
