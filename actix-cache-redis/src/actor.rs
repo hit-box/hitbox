@@ -5,7 +5,7 @@ use actix_cache_backend::{
     Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set,
 };
 use log::{debug, info};
-use redis::{aio::MultiplexedConnection, Client};
+use redis::{aio::ConnectionManager, Client};
 
 /// Redis cache backend based on redis-rs crate.
 ///
@@ -15,7 +15,7 @@ use redis::{aio::MultiplexedConnection, Client};
 /// [MultiplexedConnection]: TODO
 /// [Backend]: /actix_cache_backend/trait.Backend.html
 pub struct RedisBackend {
-    connection: MultiplexedConnection,
+    connection: ConnectionManager,
 }
 
 impl RedisBackend {
@@ -63,7 +63,7 @@ impl RedisBackendBuilder {
     /// Create new instance of Redis backend with passed settings.
     pub async fn build(&self) -> Result<RedisBackend, Error> {
         let client = Client::open(self.connection_info.as_str())?;
-        let connection = client.get_multiplexed_tokio_connection().await?;
+        let connection = client.get_tokio_connection_manager().await?;
         Ok(RedisBackend{ connection })
     }
 }
