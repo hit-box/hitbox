@@ -67,11 +67,11 @@ impl Cacheable for Ping {
     fn cache_key_prefix(&self) -> String { "Ping".to_owned() }
 }
 ```
-Next step is to instantiate [CacheActor] with selected backend:
+Next step is to instantiate [CacheActor] with default backend:
 
 ```rust
 use actix::prelude::*;
-use actix_cache::{CacheError, Cache, RedisBackend};
+use actix_cache::{CacheError, Cache};
 
 #[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
@@ -88,7 +88,7 @@ This full example and other examples you can see on [github.com](https://github.
 ```rust
 use actix::prelude::*;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use actix_cache::{Cache, RedisBackend, Cacheable};
+use actix_cache::{Cache, Cacheable};
 use serde::Serialize;
 
 struct FibonacciActor;
