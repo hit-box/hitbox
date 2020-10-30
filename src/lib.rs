@@ -3,7 +3,7 @@
 //! # A tour of actix-cache
 //!
 //! This crate consist of three main part:
-//! * [Cache] actor.
+//! * [CacheActor] actix actor.
 //! * [Backend] trait and its implementation ([RedisBackend]).
 //! * [Cacheable] trait.
 //!
@@ -51,7 +51,7 @@
 //!     fn cache_key_prefix(&self) -> String { "Ping".to_owned() }
 //! }
 //! ```
-//! Next step is to instantiate [Cache] actor with selected backend:
+//! Next step is to instantiate [CacheActor] with default or selected by feature backend:
 //!
 //! ```rust
 //! # use actix::prelude::*;
@@ -61,6 +61,25 @@
 //! async fn main() -> Result<(), CacheError> {
 //!     let cache = Cache::new()
 //!         .await?
+//!         .start();
+//! #   Ok(())
+//! }
+//! ```
+//! Or you can instantiate [CacheActor] with any other backend manually 
+//! (for additional information you can backend examples):
+//!
+//! ```rust
+//! # use actix::prelude::*;
+//! use actix_cache::{CacheActor, CacheError, RedisBackend};
+//!
+//! #[actix_rt::main]
+//! async fn main() -> Result<(), CacheError> {
+//!     let backend = RedisBackend::new()
+//!         .await
+//!         .map_err(|err| CacheError::BackendError(err.into()))?
+//!         .start();
+//!     let cache = CacheActor::builder()
+//!         .build(backend)
 //!         .start();
 //! #   Ok(())
 //! }
@@ -122,7 +141,7 @@
 //! * [Delete]
 //! * [Lock]
 //!
-//! [Cache]: actor/struct.Cache.html
+//! [CacheActor]: actor/struct.CacheActor.html
 //! [Cacheable]: cache/trait.Cacheable.html
 //! [Backend]: ../actix_cache_backend/trait.Backend.html
 //! [RedisBackend]: ../actix_cache_redis/actor/struct.RedisActor.html
@@ -150,6 +169,6 @@ pub use actix_cache_redis::RedisBackend;
 pub use serde_qs;
 
 /// Default type alias with RedisBackend.
-/// You can disable it and define it manually.
+/// You can disable it or define it manually in your code.
 #[cfg(feature = "redis")]
 pub type Cache = CacheActor<RedisBackend>;

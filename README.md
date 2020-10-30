@@ -19,6 +19,7 @@ At this time supported or planned next cache backend implementation:
 - [ ] In-memory backend
 
 ## Feature flags
+* redis - Enabled by default. Add support for redis backend.
 * derive - Support for [Cacheable] trait derive macros.
 * metrics - Support for Prometheus metrics.
 
