@@ -14,7 +14,7 @@ impl Actor for UpstreamActor {
 struct Pong(i32);
 
 #[derive(Message, Cacheable, Serialize)]
-#[rtype(result = "Result<Pong, ()>")]
+#[rtype(result = "Pong")]
 struct Ping {
     id: i32,
 }
@@ -25,7 +25,7 @@ impl Handler<Ping> for UpstreamActor {
     fn handle(&mut self, msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
         Box::pin(async move {
             actix_rt::time::delay_for(core::time::Duration::from_secs(3)).await;
-            Ok(Pong(msg.id))
+            Pong(msg.id)
         })
     }
 }
@@ -41,6 +41,6 @@ async fn main() -> Result<(), CacheError> {
 
     let msg = Ping { id: 42 };
     let res = cache.send(msg.into_cache(&upstream)).await??;
-    dbg!(res.unwrap());
+    dbg!(res);
     Ok(())
 }
