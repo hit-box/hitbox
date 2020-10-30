@@ -19,6 +19,7 @@ At this time supported or planned next cache backend implementation:
 - [ ] In-memory backend
 
 ## Feature flags
+* redis - Enabled by default. Add support for redis backend.
 * derive - Support for [Cacheable] trait derive macros.
 * metrics - Support for Prometheus metrics.
 
@@ -66,11 +67,11 @@ impl Cacheable for Ping {
     fn cache_key_prefix(&self) -> String { "Ping".to_owned() }
 }
 ```
-Next step is to instantiate [Cache] actor with selected backend:
+Next step is to instantiate [CacheActor] with default backend:
 
 ```rust
 use actix::prelude::*;
-use actix_cache::{CacheError, Cache, RedisBackend};
+use actix_cache::{CacheError, Cache};
 
 #[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
@@ -87,7 +88,7 @@ This full example and other examples you can see on [github.com](https://github.
 ```rust
 use actix::prelude::*;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use actix_cache::{Cache, RedisBackend, Cacheable};
+use actix_cache::{Cache, Cacheable};
 use serde::Serialize;
 
 struct FibonacciActor;
@@ -125,4 +126,4 @@ async fn index(
 
 [Dogpile]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 [Cacheable]: https://docs.rs/actix-cache/latest/actix-cache/cache/trait.Cacheable.html
-[Cache]: https://docs.rs/actix-cache/latest/actix-cache/actor/struct.Cache.html
+[CacheActor]: https://docs.rs/actix-cache/latest/actix-cache/actor/struct.CacheActor.html
