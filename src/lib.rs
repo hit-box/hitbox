@@ -149,6 +149,7 @@ pub use actix_cache_redis::RedisBackend;
 #[doc(hidden)]
 pub use serde_qs;
 
+/// Default type alias with RedisBackend.
+/// You can disable it and define it manually.
 #[cfg(feature = "redis")]
-#[doc(hidden)]
 pub type Cache = CacheActor<RedisBackend>;
