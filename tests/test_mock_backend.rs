@@ -3,8 +3,9 @@ use actix_cache::dev::{
     backend::{GetMessages, MockBackend, MockMessage},
     Get,
 };
-use actix_cache::{Cache, CacheError, Cacheable};
+use actix_cache::{CacheError, Cacheable};
 use serde::{Deserialize, Serialize};
+use actix_cache::actor::Cache;
 
 struct UpstreamActor;
 

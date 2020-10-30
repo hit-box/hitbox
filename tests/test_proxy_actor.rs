@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache::{Cache, CacheError, Cacheable, RedisBackend};
+use actix_cache::{Cache, CacheError, Cacheable};
 
 pub struct Upstream;
 
@@ -73,7 +73,7 @@ impl Handler<Ping> for SyncUpstream {
 
 #[actix_rt::test]
 async fn test_async_proxy() {
-    let cache = Cache::<RedisBackend>::new().await.unwrap().start();
+    let cache = Cache::new().await.unwrap().start();
     let upstream = Upstream {}.start();
     let res = cache.send(Ping {}.into_cache(&upstream)).await.unwrap();
     assert_eq!(res.unwrap(), Ok(42));
@@ -84,7 +84,7 @@ async fn test_async_proxy() {
 #[actix_rt::test]
 async fn test_sync_proxy() {
     let upstream = SyncArbiter::start(10, move || SyncUpstream {});
-    let cache = Cache::<RedisBackend>::new().await.unwrap().start();
+    let cache = Cache::new().await.unwrap().start();
     let res = cache.send(Pong {}.into_cache(&upstream)).await.unwrap();
     assert_eq!(res.unwrap(), 42);
     let res = cache.send(Ping {}.into_cache(&upstream)).await.unwrap();

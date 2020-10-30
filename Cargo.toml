@@ -53,6 +53,8 @@ name = "metrics"
 required-features = ["derive", "metrics"]
 
 [features]
-default = ["actix-cache-redis"]
+default = ["redis"]
+
+redis = ["actix-cache-redis"]
 derive = ["actix-cache-derive", "serde_qs"]
 metrics = ["prometheus", "lazy_static"]

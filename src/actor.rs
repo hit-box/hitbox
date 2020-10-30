@@ -18,9 +18,7 @@ use crate::CacheError;
 /// # Example
 /// ```rust
 /// use actix::prelude::*;
-/// use actix_cache::{Cache as CacheActor, RedisBackend, CacheError};
-///
-/// type Cache = CacheActor<RedisBackend>;
+/// use actix_cache::{Cache, RedisBackend, CacheError};
 ///
 /// #[actix_rt::main]
 /// async fn main() -> Result<(), CacheError> {

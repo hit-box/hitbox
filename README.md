@@ -70,9 +70,7 @@ Next step is to instantiate [Cache] actor with selected backend:
 
 ```rust
 use actix::prelude::*;
-use actix_cache::{CacheError, Cache as CacheActor, RedisBackend};
-
-type Cache = CacheActor<RedisBackend>;
+use actix_cache::{CacheError, Cache, RedisBackend};
 
 #[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
@@ -89,7 +87,7 @@ This full example and other examples you can see on [github.com](https://github.
 ```rust
 use actix::prelude::*;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use actix_cache::{Cache as CacheActor, RedisBackend, Cacheable};
+use actix_cache::{Cache, RedisBackend, Cacheable};
 use serde::Serialize;
 
 struct FibonacciActor;
@@ -109,8 +107,6 @@ impl Handler<GetNumber> for FibonacciActor {
         42
     }
 }
-
-type Cache = CacheActor<RedisBackend>;
 
 async fn index(
     fib: web::Data<Addr<FibonacciActor>>,
