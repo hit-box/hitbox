@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache::{Cache as CacheActor, RedisBackend, Cacheable};
+use actix_cache::{Cache, Cacheable};
 use actix_derive::Message;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use serde::Serialize;
@@ -43,8 +43,6 @@ async fn index(
     let number = cache.send(query.into_cache(&fib)).await.unwrap().unwrap();
     HttpResponse::Ok().body(format!("Generate Fibonacci number {}", number))
 }
-
-type Cache = CacheActor<RedisBackend>;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {

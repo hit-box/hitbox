@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache::{Cache, CacheError, Cacheable, RedisBackend};
+use actix_cache::{Cache, CacheError, Cacheable};
 use actix_derive::{Message, MessageResponse};
 use serde::{Deserialize, Serialize};
 
@@ -36,7 +36,7 @@ async fn main() -> Result<(), CacheError> {
         .filter_level(log::LevelFilter::Debug)
         .init();
 
-    let cache = Cache::<RedisBackend>::new().await?.start();
+    let cache = Cache::new().await?.start();
     let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
