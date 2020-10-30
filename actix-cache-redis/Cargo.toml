@@ -9,9 +9,9 @@ workspace = ".."
 
 [dependencies]
 actix-cache-backend = "0.1"
-actix = "0.9"
+actix = "0.10"
 log = "0.4"
-redis = { version = "0.16", features = ["tokio-rt-core"] }
+redis = { version = "0.17", features = ["tokio-rt-core", "connection-manager"] }
 actix_derive = "0.5"
 actix-rt = "1"
 thiserror = "1"
