@@ -67,7 +67,7 @@ impl Cacheable for Ping {
     fn cache_key_prefix(&self) -> String { "Ping".to_owned() }
 }
 ```
-Next step is to instantiate [Cache] actor with selected backend:
+Next step is to instantiate [CacheActor] with selected backend:
 
 ```rust
 use actix::prelude::*;
@@ -126,4 +126,4 @@ async fn index(
 
 [Dogpile]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 [Cacheable]: https://docs.rs/actix-cache/latest/actix-cache/cache/trait.Cacheable.html
-[Cache]: https://docs.rs/actix-cache/latest/actix-cache/actor/struct.Cache.html
+[CacheActor]: https://docs.rs/actix-cache/latest/actix-cache/actor/struct.CacheActor.html
