@@ -53,7 +53,7 @@ async fn test_mock_backend() {
     assert_eq!(
         messages[..1],
         [MockMessage::Get(Get {
-            key: "Ping::42".to_owned()
+            key: "UpstreamActor::Ping::42".to_owned()
         }),]
     );
 }
