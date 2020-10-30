@@ -16,7 +16,7 @@ impl Actor for Upstream {
 pub struct Ping;
 
 impl Cacheable for Ping {
-    fn cache_key(&self) -> Result<String, CacheError> {
+    fn cache_message_key(&self) -> Result<String, CacheError> {
         Ok(self.cache_key_prefix())
     }
     fn cache_key_prefix(&self) -> String {
@@ -37,7 +37,7 @@ impl Handler<Ping> for Upstream {
 pub struct Pong;
 
 impl Cacheable for Pong {
-    fn cache_key(&self) -> Result<String, CacheError> {
+    fn cache_message_key(&self) -> Result<String, CacheError> {
         Ok(self.cache_key_prefix())
     }
     fn cache_key_prefix(&self) -> String {
