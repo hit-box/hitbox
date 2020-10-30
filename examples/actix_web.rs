@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache::{Cache as CacheActor, RedisBackend, Cacheable};
+use actix_cache::{Cache as CacheActor, Cacheable, RedisBackend};
 use actix_derive::Message;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use serde::Serialize;

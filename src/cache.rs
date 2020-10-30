@@ -126,8 +126,8 @@ pub trait Cacheable {
 /// Intermediate actix message which handled by Cache actor.
 ///
 /// This message a product of upstream message and upstream actor address.
-/// In other words, QueryCache is a struct that includes base message with user data 
-/// and address of an actor that is a recipient of this message. 
+/// In other words, QueryCache is a struct that includes base message with user data
+/// and address of an actor that is a recipient of this message.
 /// You can only send QueryCache messages to Cache actor.
 pub struct QueryCache<A, M>
 where
@@ -153,7 +153,11 @@ where
     }
 
     pub fn cache_key(&self) -> Result<String, CacheError> {
-        Ok(format!("{}::{}", self.upstream_name(), self.message.cache_key()?))
+        Ok(format!(
+            "{}::{}",
+            self.upstream_name(),
+            self.message.cache_key()?
+        ))
     }
 }
 
@@ -201,7 +205,9 @@ where
                 Some(CachedValueState::Actual(res)) => {
                     debug!("Cached value retrieved successfully");
                     #[cfg(feature = "metrics")]
-                    CACHE_HIT_COUNTER.with_label_values(&[&message, actor]).inc();
+                    CACHE_HIT_COUNTER
+                        .with_label_values(&[&message, actor])
+                        .inc();
                     Ok(res.into_inner())
                 }
                 Some(CachedValueState::Stale(res)) => {
@@ -213,7 +219,10 @@ where
                     let lock_key = format!("lock::{}", msg.message.cache_key()?);
                     let ttl = msg.message.cache_ttl() - msg.message.cache_stale_ttl();
                     let lock_status = backend
-                        .send(Lock { key: lock_key.clone(), ttl })
+                        .send(Lock {
+                            key: lock_key.clone(),
+                            ttl,
+                        })
                         .await
                         .unwrap_or_else(|error| {
                             warn!("Lock error {}", error);
@@ -238,7 +247,8 @@ where
                             query_timer.observe_duration();
                             debug!("Received value from backend. Try to set.");
                             let cached = CachedValue::new(upstream_result, cache_stale_ttl);
-                            cached.store(backend.clone(), cache_key, ttl)
+                            cached
+                                .store(backend.clone(), cache_key, ttl)
                                 .await
                                 .unwrap_or_else(|error| {
                                     warn!("Updating cache error: {}", error);
@@ -275,7 +285,8 @@ where
                     query_timer.observe_duration();
                     let cached = CachedValue::new(upstream_result, cache_stale_ttl);
                     debug!("Update value in cache");
-                    cached.store(backend, cache_key, ttl)
+                    cached
+                        .store(backend, cache_key, ttl)
                         .await
                         .unwrap_or_else(|error| {
                             warn!("Updating cache error: {}", error);
@@ -409,7 +420,9 @@ mod tests {
         fn cache_key(&self) -> Result<String, CacheError> {
             Ok("Message".to_owned())
         }
-        fn cache_key_prefix(&self) -> String { "Message".to_owned() }
+        fn cache_key_prefix(&self) -> String {
+            "Message".to_owned()
+        }
         fn cache_ttl(&self) -> u32 {
             2
         }
