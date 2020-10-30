@@ -139,7 +139,7 @@ pub mod error;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 
-pub use actor::CacheBuilder;
+pub use actor::{CacheActor, CacheBuilder};
 pub use cache::{Cacheable, QueryCache};
 pub use error::CacheError;
 
@@ -151,5 +151,4 @@ pub use serde_qs;
 
 #[cfg(feature = "redis")]
 #[doc(hidden)]
-pub type Cache = actor::Cache<RedisBackend>;
-
+pub type Cache = CacheActor<RedisBackend>;

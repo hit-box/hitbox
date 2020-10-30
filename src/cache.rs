@@ -149,7 +149,7 @@ where
     type Result = Result<<M as Message>::Result, CacheError>;
 }
 
-impl<'a, A, M, B> Handler<QueryCache<A, M>> for actor::Cache<B>
+impl<'a, A, M, B> Handler<QueryCache<A, M>> for actor::CacheActor<B>
 where
     B: Actor + Backend,
     <B as Actor>::Context:

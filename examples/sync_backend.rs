@@ -1,8 +1,7 @@
 use actix::prelude::*;
 use actix_cache::dev::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
-use actix_cache::{CacheError, Cacheable};
+use actix_cache::{CacheError, Cacheable, CacheActor};
 use serde::{Deserialize, Serialize};
-use actix_cache::actor::Cache;
 
 struct UpstreamActor;
 
@@ -92,7 +91,7 @@ async fn main() -> Result<(), CacheError> {
 
     let dummy_sync_backend = { SyncArbiter::start(3, move || DummySyncBackend) };
 
-    let cache = Cache::builder().build(dummy_sync_backend).start();
+    let cache = CacheActor::builder().build(dummy_sync_backend).start();
     let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };

@@ -5,7 +5,7 @@ use actix_cache::dev::{
 };
 use actix_cache::{CacheError, Cacheable};
 use serde::{Deserialize, Serialize};
-use actix_cache::actor::Cache;
+use actix_cache::CacheActor;
 
 struct UpstreamActor;
 
@@ -42,7 +42,7 @@ impl Handler<Ping> for UpstreamActor {
 #[actix_rt::test]
 async fn test_mock_backend() {
     let backend = MockBackend::new().start();
-    let cache = Cache::builder().build(backend.clone()).start();
+    let cache = CacheActor::builder().build(backend.clone()).start();
     let upstream = UpstreamActor.start();
     let msg = Ping { id: 42 };
     cache

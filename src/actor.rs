@@ -28,7 +28,7 @@ use crate::CacheError;
 /// ```
 ///
 /// [QueryCache]: ../cache/struct.QueryCache.html
-pub struct Cache<B>
+pub struct CacheActor<B>
 where
     B: Backend,
 {
@@ -36,14 +36,14 @@ where
     pub(crate) backend: Addr<B>,
 }
 
-impl<B> Cache<B>
+impl<B> CacheActor<B>
 where
     B: Backend,
 {
     /// Initialize new Cache actor with default [RedisBackend].
     ///
     /// [RedisBackend]: ../../actix_cache_redis/actor/struct.RedisActor.html
-    pub async fn new() -> Result<Cache<RedisBackend>, CacheError> {
+    pub async fn new() -> Result<CacheActor<RedisBackend>, CacheError> {
         let backend = RedisBackend::new()
             .await
             .map_err(|err| CacheError::BackendError(err.into()))?
@@ -57,7 +57,7 @@ where
     }
 }
 
-impl<B> Actor for Cache<B>
+impl<B> Actor for CacheActor<B>
 where
     B: Backend,
 {
@@ -131,8 +131,8 @@ where
     /// [Actor]: https://docs.rs/actix/latest/actix/prelude/trait.Actor.html
     /// [Messages]: https://docs.rs/actix/latest/actix/prelude/trait.Message.html
     /// [Handler]: https://docs.rs/actix/latest/actix/prelude/trait.Handler.html
-    pub fn build(self, backend: Addr<B>) -> Cache<B> {
-        Cache {
+    pub fn build(self, backend: Addr<B>) -> CacheActor<B> {
+        CacheActor {
             enabled: self.enabled,
             backend,
         }
