@@ -145,6 +145,7 @@ where
     M::Result: MessageResponse<A, M> + Send,
     A: Actor,
 {
+    /// Returns upstream actor type name or <Unknown>.
     fn upstream_name(&self) -> &'static str {
         std::any::type_name::<A>()
             .rsplit("::")
@@ -152,6 +153,10 @@ where
             .unwrap_or("<Unknown>")
     }
 
+    /// Returns final cache key.
+    ///
+    /// This method compose final cache key from Cacheable::cache_message_key
+    /// and Upstream actor type name.
     pub fn cache_key(&self) -> Result<String, CacheError> {
         Ok(format!(
             "{}::{}",
