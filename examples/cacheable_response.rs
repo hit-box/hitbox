@@ -6,43 +6,17 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug)]
 struct UpstreamActor;
 
+#[derive(Debug)]
+enum Error {
+    Test,
+}
+
 impl Actor for UpstreamActor {
     type Context = Context<Self>;
 }
 
-enum CacheableResult<T, U> {
-    Cacheable(T),
-    NoneCacheable(U),
-}
-
-trait CacheableResponse<T, E> {
-    fn cache(&self) -> CacheableResult<&T, &E>;
-}
-
-impl<E> CacheableResponse<i32, E> for i32 {
-    fn cache(&self) -> CacheableResult<&i32, &E> {
-        CacheableResult::Cacheable(self)
-    }
-}
-
-impl<T, E> CacheableResponse<T, E> for Result<T, E> {
-    fn cache(&self) -> CacheableResult<&T, &E> {
-        match self {
-            Ok(value) => CacheableResult::Cacheable(value),
-            Err(value) => CacheableResult::NoneCacheable(value),
-        }
-    }
-}
-
-fn test<T>(value: T) {
-
-}
-
-#[derive(MessageResponse, Deserialize, Serialize, Debug)]
+#[derive(MessageResponse, Deserialize, Serialize, Debug, Clone)]
 struct Pong(i32);
-
-#[derive(Debug)]
-enum Error {}
 
 #[derive(Message, Cacheable, Serialize)]
 #[rtype(result = "Result<Pong, Error>")]
@@ -50,13 +24,27 @@ struct Ping {
     id: i32,
 }
 
+// impl<I, E> UpstreamResponse<'a> for Ping 
+// where
+    // Self: Message<Result = Result<I, E>>,
+// {
+    // type UpstreamValue = &'a I;
+    // type UpstreamError = &'a E;
+    // type CacheableResult = Result<UpstreamValue, UpstreamError>;
+    
+    // fn into_upstream_result(result: &'a Self::Result) -> Self::CacheableResult {
+        // result.as_ref()
+    // }
+// }
+
 impl Handler<Ping> for UpstreamActor {
     type Result = ResponseFuture<<Ping as Message>::Result>;
 
     fn handle(&mut self, msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
         Box::pin(async move {
             actix_rt::time::delay_for(core::time::Duration::from_secs(3)).await;
-            Ok(Pong(msg.id))
+            // Ok(Pong(msg.id))
+            Err(Error::Test)
         })
     }
 }
