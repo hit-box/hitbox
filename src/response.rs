@@ -1,44 +1,11 @@
 use actix::Message;
 
-// pub enum CachePolicy<T> {
-    // Cacheable(T),
-    // NonCacheable,
-// }
-
-// pub trait CacheableResponse
-// {
-    // type Cached;
-    // type NonCached;
-    // fn cache_policy(&self) -> CachePolicy<&Self::Cached>;
-// }
-
-// impl CacheableResponse for i32 {
-    // type Cached = i32;
-    // type NonCached = ();
-    // fn cache_policy(&self) -> CachePolicy<&Self::Cached> {
-        // CachePolicy::Cacheable(self)
-    // }
-// }
-
-// impl<T, E> CacheableResponse for Result<T, E> {
-    // type Cached = T;
-    // type NonCached = E;
-    // fn cache_policy(&self) -> CachePolicy<&Self::Cached> {
-        // match self {
-            // Ok(value) => CachePolicy::Cacheable(value),
-            // Err(_) => CachePolicy::NonCacheable,
-        // }
-    // }
-// }
-
 use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
-use crate::cache::CachedValue;
-
-pub enum CachePolicy<T> {
+pub enum CachePolicy<T, U> {
     Cacheable(T),
-    NonCacheable,
+    NonCacheable(U),
 }
 
 #[derive(Error, Debug)]
@@ -55,22 +22,14 @@ where
     Self::Cached: Serialize,
 {
     type Cached;
-    fn cache_policy(&self) -> CachePolicy<&Self::Cached>;
-    fn serialize(&self) -> Result<String, ResponseError>;
-    fn deserialize(data: String) -> Result<Self, ResponseError>;
+    fn into_policy(self) -> CachePolicy<Self::Cached, Self>;
     fn from_cached(cached: Self::Cached) -> Self;
 }
 
 impl CacheableResponse for i32 {
     type Cached = i32;
-    fn cache_policy(&self) -> CachePolicy<&Self::Cached> {
+    fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
         CachePolicy::Cacheable(self)
-    }
-    fn serialize(&self) -> Result<String, ResponseError> {
-        Ok(serde_json::to_string(self)?)
-    }
-    fn deserialize(data: String) -> Result<Self, ResponseError> {
-        Ok(serde_json::from_str(data.as_str())?)
     }
     fn from_cached(cached: Self::Cached) -> Self {
         cached
@@ -82,21 +41,11 @@ where
     I: Serialize + DeserializeOwned,
 {
     type Cached = I;
-    fn cache_policy(&self) -> CachePolicy<&Self::Cached> {
+    fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
         match self {
             Ok(value) => CachePolicy::Cacheable(value),
-            Err(error) => CachePolicy::NonCacheable,
+            Err(ref error) => CachePolicy::NonCacheable(self),
         }
-    }
-    fn serialize(&self) -> Result<String, ResponseError> {
-        match self.cache_policy() {
-            CachePolicy::Cacheable(value) => Ok(serde_json::to_string(value)?),
-            CachePolicy::NonCacheable => Err(ResponseError::NonCacheable),
-        }
-    }
-    fn deserialize(data: String) -> Result<Self, ResponseError> {
-        Ok(serde_json::from_str::<I>(data.as_str())
-            .map(Result::Ok)?)
     }
     fn from_cached(cached: Self::Cached) -> Self {
         Ok(cached)

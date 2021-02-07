@@ -348,20 +348,20 @@ where
                 CachedValueState::Actual(cached) => Ok(cached),
                 _ => {
                     let upstream_result = msg.upstream.send(msg.message).await?;
-                    Ok(upstream_result)
-                    // match upstream_result.cache_policy() {
-                        // CachePolicy::Cacheable(res) => {
-                            // let cached = CachedValue::new(res, stale_ttl);
-                            // cached
-                                // .store(backend, cache_key, Some(ttl))
-                                // .await
-                                // .unwrap_or_else(|error| {
-                                    // warn!("Updating cache error: {}", error);
-                                // });
-                            // Ok(cached.into_inner())
-                        // }
-                        // CachePolicy::NonCacheable(res) => Ok(res),
-                    // }
+                    // Ok(upstream_result)
+                    match upstream_result.into_policy() {
+                        CachePolicy::Cacheable(res) => {
+                            let cached = CachedValue::new(res, stale_ttl);
+                            cached
+                                .store(backend, cache_key, Some(ttl))
+                                .await
+                                .unwrap_or_else(|error| {
+                                    warn!("Updating cache error: {}", error);
+                                });
+                            Ok(CacheableResponse::from_cached(cached.into_inner()))
+                        }
+                        CachePolicy::NonCacheable(res) => Ok(res),
+                    }
                     
                     // match upstream_result {
                         // Ok(upstream_result) => {
@@ -408,7 +408,7 @@ where
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CachedValue<T> {
+struct CachedValue<T> {
     pub data: T,
     pub expired: DateTime<Utc>,
 }
@@ -467,29 +467,22 @@ impl<T> CachedValue<T> {
         ttl: Option<u32>,
     ) -> Result<(), CacheError>
     where
-        T: CacheableResponse,
         B: Actor + Backend,
         <B as Actor>::Context: ToEnvelope<B, Set>,
+        T: Serialize,
     {
-        use crate::response::ResponseError;
-        match self.data.serialize() {
-            Err(ResponseError::Serde(error)) => Err(error.into()),
-            Err(ResponseError::NonCacheable) => return Ok(()),
-            Ok(value) => {
-                backend
-                    .send(Set {
-                        value,
-                        key,
-                        ttl,
-                    })
-                    .await?
-                    .map_err(|error| {
-                        warn!("Updating cache error: {}", error);
-                        CacheError::BackendError(error)
-                    });
-                Ok(())
-            }
-        }
+        let _ = backend
+            .send(Set {
+                value: serde_json::to_string(self)?,
+                key,
+                ttl,
+            })
+            .await?
+            .map_err(|error| {
+                warn!("Updating cache error: {}", error);
+                CacheError::BackendError(error)
+            });
+        Ok(())
     }
 }
 

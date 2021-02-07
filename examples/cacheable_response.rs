@@ -43,8 +43,8 @@ impl Handler<Ping> for UpstreamActor {
     fn handle(&mut self, msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
         Box::pin(async move {
             actix_rt::time::delay_for(core::time::Duration::from_secs(3)).await;
-            // Ok(Pong(msg.id))
-            Err(Error::Test)
+            Ok(Pong(msg.id))
+            // Err(Error::Test)
         })
     }
 }
