@@ -18,7 +18,7 @@
 //! ```
 mod cacheable_macro;
 mod macro_attributes;
-use syn::export::TokenStream;
+use proc_macro::TokenStream;
 
 /// Derive Cacheable macro implementation.
 #[proc_macro_derive(Cacheable, attributes(cache_ttl, cache_stale_ttl, cache_version))]
