@@ -9,7 +9,7 @@ use actix_cache_backend::{Backend, Delete, Get, Lock, LockStatus, Set};
 #[cfg(feature = "derive")]
 pub use actix_cache_derive::Cacheable;
 use chrono::{DateTime, Duration, Utc};
-use log::{debug, warn};
+use log::{debug, warn, info};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "metrics")]
@@ -136,8 +136,8 @@ where
     M::Result: MessageResponse<A, M> + Send,
     A: Actor,
 {
-    upstream: Addr<A>,
-    message: M,
+    pub(crate) upstream: Addr<A>,
+    pub(crate) message: M,
 }
 
 impl<A, M> QueryCache<A, M>
@@ -147,7 +147,7 @@ where
     A: Actor,
 {
     /// Returns upstream actor type name or <Unknown>.
-    fn upstream_name(&self) -> &'static str {
+    pub(crate) fn upstream_name(&self) -> &'static str {
         std::any::type_name::<A>()
             .rsplit("::")
             .next()
@@ -332,10 +332,10 @@ where
     type Result = ResponseFuture<Result<<M as Message>::Result, CacheError>>;
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
-        use crate::response::CachePolicy;
+        // use crate::response::CachePolicy;
         let backend = self.backend.clone();
-        let ttl = msg.message.cache_ttl();
-        let stale_ttl = msg.message.cache_stale_ttl();
+        // let ttl = msg.message.cache_ttl();
+        // let stale_ttl = msg.message.cache_stale_ttl();
         let (enabled, cache_key) = msg.cache_key()
             .map(move |key| (self.enabled, key))
             .unwrap_or_else(|err| {
@@ -343,39 +343,25 @@ where
                 (false, String::new())
             });
         let res = async move {
-            let cached = CachedValue::retrieve(&backend, &cache_key).await;
+            let cached = if enabled {
+                CachedValue::retrieve(&backend, &cache_key).await
+            } else {
+                None
+            };
             match CachedValueState::from(cached) {
-                CachedValueState::Actual(cached) => Ok(cached),
-                _ => {
-                    let upstream_result = msg.upstream.send(msg.message).await?;
-                    // Ok(upstream_result)
-                    match upstream_result.into_policy() {
-                        CachePolicy::Cacheable(res) => {
-                            let cached = CachedValue::new(res, stale_ttl);
-                            cached
-                                .store(backend, cache_key, Some(ttl))
-                                .await
-                                .unwrap_or_else(|error| {
-                                    warn!("Updating cache error: {}", error);
-                                });
-                            Ok(CacheableResponse::from_cached(cached.into_inner()))
-                        }
-                        CachePolicy::NonCacheable(res) => Ok(res),
-                    }
-                    
-                    // match upstream_result {
-                        // Ok(upstream_result) => {
-                            // let cached = CachedValue::new(upstream_result, stale_ttl);
-                            // cached
-                                // .store(backend, cache_key, Some(ttl))
-                                // .await
-                                // .unwrap_or_else(|error| {
-                                    // warn!("Updating cache error: {}", error);
-                                // });
-                            // Ok(Ok(cached.into_inner()))
-                        // }
-                        // Err(err) => Ok(Err(err))
-                    // }
+                CachedValueState::Actual(cached) => {
+                    debug!("Cache hit for {}", cache_key);
+                    Self::handle_actual(msg, cached).await
+                    // Ok(cached)
+                }
+                CachedValueState::Stale(cached) => {
+                    debug!("Cache is stale for {}", cache_key);
+                    Self::handle_stale(msg, &backend, cached, enabled).await
+                    // Ok(cached)
+                }
+                CachedValueState::Miss => {
+                    debug!("Cache miss for {}", cache_key);
+                    Self::handle_miss(msg, &backend, enabled).await
                 }
             }
         };
@@ -408,7 +394,7 @@ where
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct CachedValue<T> {
+pub(crate) struct CachedValue<T> {
     pub data: T,
     pub expired: DateTime<Utc>,
 }
@@ -460,9 +446,9 @@ impl<T> CachedValue<T> {
     }
 
     /// Store inner value into backend.
-    async fn store<B>(
+    pub(crate) async fn store<B>(
         &self,
-        backend: Addr<B>,
+        backend: &Addr<B>,
         key: String,
         ttl: Option<u32>,
     ) -> Result<(), CacheError>

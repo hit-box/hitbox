@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache::{Cache, CacheError, Cacheable};
+use actix_cache::{Cache, CacheError, Cacheable, RedisBackend};
 use actix_derive::{Message, MessageResponse};
 use serde::{Deserialize, Serialize};
 
@@ -24,19 +24,6 @@ struct Ping {
     id: i32,
 }
 
-// impl<I, E> UpstreamResponse<'a> for Ping 
-// where
-    // Self: Message<Result = Result<I, E>>,
-// {
-    // type UpstreamValue = &'a I;
-    // type UpstreamError = &'a E;
-    // type CacheableResult = Result<UpstreamValue, UpstreamError>;
-    
-    // fn into_upstream_result(result: &'a Self::Result) -> Self::CacheableResult {
-        // result.as_ref()
-    // }
-// }
-
 impl Handler<Ping> for UpstreamActor {
     type Result = ResponseFuture<<Ping as Message>::Result>;
 
@@ -54,8 +41,13 @@ async fn main() -> Result<(), CacheError> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug)
         .init();
+    
+    let backend = RedisBackend::new().await.unwrap().start();
 
-    let cache = Cache::new().await?.start();
+    let cache = Cache::builder()
+        // .enabled(false)
+        .build(backend)
+        .start();
     let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
