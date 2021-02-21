@@ -25,16 +25,16 @@ where
     fn into_policy(self) -> CachePolicy<Self::Cached, Self>;
     fn from_cached(cached: Self::Cached) -> Self;
 }
-
-impl CacheableResponse for i32 {
-    type Cached = i32;
-    fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
-        CachePolicy::Cacheable(self)
-    }
-    fn from_cached(cached: Self::Cached) -> Self {
-        cached
-    }
-}
+//
+// impl CacheableResponse for i32 {
+//     type Cached = i32;
+//     fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
+//         CachePolicy::Cacheable(self)
+//     }
+//     fn from_cached(cached: Self::Cached) -> Self {
+//         cached
+//     }
+// }
 
 impl<I, E> CacheableResponse for Result<I, E> 
 where
@@ -51,6 +51,37 @@ where
         Ok(cached)
     }
 }
+
+macro_rules! CACHEABLE_RESPONSE_IMPL {
+    ($type:ty) => {
+        impl CacheableResponse for $type {
+            type Cached = $type;
+            fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
+                CachePolicy::Cacheable(self)
+            }
+            fn from_cached(cached: Self::Cached) -> Self {
+                cached
+            }
+        }
+    };
+}
+
+CACHEABLE_RESPONSE_IMPL!(());
+CACHEABLE_RESPONSE_IMPL!(u8);
+CACHEABLE_RESPONSE_IMPL!(u16);
+CACHEABLE_RESPONSE_IMPL!(u32);
+CACHEABLE_RESPONSE_IMPL!(u64);
+CACHEABLE_RESPONSE_IMPL!(usize);
+CACHEABLE_RESPONSE_IMPL!(i8);
+CACHEABLE_RESPONSE_IMPL!(i16);
+CACHEABLE_RESPONSE_IMPL!(i32);
+CACHEABLE_RESPONSE_IMPL!(i64);
+CACHEABLE_RESPONSE_IMPL!(isize);
+CACHEABLE_RESPONSE_IMPL!(f32);
+CACHEABLE_RESPONSE_IMPL!(f64);
+CACHEABLE_RESPONSE_IMPL!(String);
+CACHEABLE_RESPONSE_IMPL!(bool);
+
 
 #[cfg(test)]
 mod tests {
