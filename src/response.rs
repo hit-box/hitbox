@@ -3,6 +3,9 @@ use actix::Message;
 use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
+#[cfg(feature = "derive")]
+pub use actix_cache_derive::CacheableResponse;
+
 pub enum CachePolicy<T, U> {
     Cacheable(T),
     NonCacheable(U),
@@ -25,18 +28,12 @@ where
     fn into_policy(self) -> CachePolicy<Self::Cached, Self>;
     fn from_cached(cached: Self::Cached) -> Self;
 }
-//
-// impl CacheableResponse for i32 {
-//     type Cached = i32;
-//     fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
-//         CachePolicy::Cacheable(self)
-//     }
-//     fn from_cached(cached: Self::Cached) -> Self {
-//         cached
-//     }
-// }
 
-impl<I, E> CacheableResponse for Result<I, E> 
+// There are several CacheableResponse implementations for the most common types.
+
+/// Implementation `CacheableResponse` for `Result` type.
+/// We store to cache only `Ok` variant.
+impl<I, E> CacheableResponse for Result<I, E>
 where
     I: Serialize + DeserializeOwned,
 {
@@ -52,6 +49,25 @@ where
     }
 }
 
+/// Implementation `CacheableResponse` for `Option` type.
+/// We store to cache only `Some` variant.
+impl<I> CacheableResponse for Option<I>
+where
+    I: Serialize + DeserializeOwned,
+{
+    type Cached = I;
+    fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
+        match self {
+            Some(value) => CachePolicy::Cacheable(value),
+            None => CachePolicy::NonCacheable(self),
+        }
+    }
+    fn from_cached(cached: Self::Cached) -> Self {
+        Some(cached)
+    }
+}
+
+/// Implementation `CacheableResponse` for primitive types.
 macro_rules! CACHEABLE_RESPONSE_IMPL {
     ($type:ty) => {
         impl CacheableResponse for $type {
@@ -81,20 +97,3 @@ CACHEABLE_RESPONSE_IMPL!(f32);
 CACHEABLE_RESPONSE_IMPL!(f64);
 CACHEABLE_RESPONSE_IMPL!(String);
 CACHEABLE_RESPONSE_IMPL!(bool);
-
-
-#[cfg(test)]
-mod tests {
-    use super::CacheableResponse;
-    #[test]
-    fn cacheable_response_result_serialize() {
-        let res: Result<i32, i32> = Ok(42);
-        assert_eq!(res.serialize(), Ok("42".to_owned()));
-    }
-
-    #[test]
-    fn cacheable_response_result_deserialize() {
-        let res = "42".to_owned();
-        assert_eq!(Result::<i32, ()>::deserialize(res), Ok(Ok(42)));
-    }
-}

@@ -2,9 +2,7 @@ use proc_macro::TokenStream;
 
 use quote::quote;
 
-use crate::macro_attributes::find_attribute;
-
-/// Implementing Cacheable trait.
+/// Implementing CacheableResponse trait.
 pub fn impl_macro(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
 
