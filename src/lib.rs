@@ -157,6 +157,7 @@ pub mod dev;
 pub mod error;
 #[cfg(feature = "metrics")]
 pub mod metrics;
+pub mod response;
 
 pub use actor::{CacheActor, CacheBuilder};
 pub use cache::{Cacheable, QueryCache};
