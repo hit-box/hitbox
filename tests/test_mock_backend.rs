@@ -5,7 +5,7 @@ use actix_cache::dev::{
 };
 use actix_cache::{CacheError, Cacheable};
 use serde::{Deserialize, Serialize};
-use actix_cache::CacheActor;
+use actix_cache::{CacheActor, response::{CacheableResponse, CachePolicy}};
 
 struct UpstreamActor;
 
@@ -13,7 +13,7 @@ impl Actor for UpstreamActor {
     type Context = Context<Self>;
 }
 
-#[derive(MessageResponse, Deserialize, Serialize, Debug)]
+#[derive(MessageResponse, CacheableResponse, Deserialize, Serialize, Debug)]
 struct Pong {
     id: i32,
 }
