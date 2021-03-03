@@ -9,7 +9,7 @@ use crate::macro_attributes::find_attribute;
 /// Uses `serde_qs` crate to create a unique cache key.
 /// Default implementation of methods `cache_ttl`, `cache_stale_ttl` and `cache_version`
 /// are used if macros of the same name are not used.
-pub fn impl_cacheable_macro(ast: &syn::DeriveInput) -> TokenStream {
+pub fn impl_macro(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let message_type = format!("{}", name);
 
