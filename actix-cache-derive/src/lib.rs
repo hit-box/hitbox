@@ -25,9 +25,8 @@
 //!
 //! #[derive(CacheableResponse, Serialize)]
 //! pub enum MyResult {
-//!     Success(i32),
-//!     #[cache_ignore]
-//!     Fail(String),
+//!     OptionOne(i32),
+//!     OptionTwo(String),
 //! }
 //! ```
 use proc_macro::TokenStream;
@@ -44,8 +43,9 @@ pub fn cacheable_macro_derive(input: TokenStream) -> TokenStream {
 }
 
 /// Derive CacheableResponse macro implementation.
-#[proc_macro_derive(CacheableResponse, attributes(cache_ignore))]
+#[proc_macro_derive(CacheableResponse)]
 pub fn cacheable_response_macro_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
     cacheable_response_macro::impl_macro(&ast)
 }
+
