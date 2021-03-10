@@ -50,7 +50,7 @@ impl Backend for DummySyncBackend {
 }
 
 impl Handler<Get> for DummySyncBackend {
-    type Result = Result<Option<String>, BackendError>;
+    type Result = Result<Option<Vec<u8>>, BackendError>;
 
     fn handle(&mut self, _msg: Get, _: &mut Self::Context) -> Self::Result {
         log::warn!("Dummy sync backend GET");
@@ -98,7 +98,6 @@ async fn main() -> Result<(), CacheError> {
 
     let msg = Ping { id: 42 };
     let res = cache.send(msg.into_cache(&upstream)).await??;
-    dbg!(res.unwrap());
 
     Ok(())
 }

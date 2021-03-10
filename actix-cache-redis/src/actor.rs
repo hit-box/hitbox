@@ -84,7 +84,7 @@ impl Actor for RedisBackend {
 
 /// Implementation of Actix Handler for Get message.
 impl Handler<Get> for RedisBackend {
-    type Result = ResponseFuture<Result<Option<String>, BackendError>>;
+    type Result = ResponseFuture<Result<Option<Vec<u8>>, BackendError>>;
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
         let mut con = self.connection.clone();

@@ -53,7 +53,7 @@ pub enum BackendError {
 
 /// Actix message requests cache backend value by key.
 #[derive(Message, Debug, Clone, PartialEq)]
-#[rtype(result = "Result<Option<String>, BackendError>")]
+#[rtype(result = "Result<Option<Vec<u8>>, BackendError>")]
 pub struct Get {
     /// Key of cache backend record.
     pub key: String,
@@ -66,7 +66,7 @@ pub struct Set {
     /// Key of cache backend record.
     pub key: String,
     /// Data for sorage by cache key.
-    pub value: String,
+    pub value: Vec<u8>,
     /// Optional value of time-to-live for cache record.
     pub ttl: Option<u32>,
 }
