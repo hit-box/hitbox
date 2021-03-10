@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use actix::prelude::*;
 use actix_cache_backend::Backend;
 use actix_cache_redis::RedisBackend;
-use log::{debug, info};
+use log::{debug, info, warn};
 
 use crate::CacheError;
 #[cfg(feature = "metrics")]
@@ -67,7 +67,7 @@ where
 use actix::dev::{ToEnvelope, MessageResponse};
 use serde::de::DeserializeOwned;
 use crate::response::{CacheableResponse, CachePolicy};
-use crate::{cache::CachedValue, Cacheable, dev::{Get, Set, Lock, Delete}, QueryCache};
+use crate::{cache::CachedValue, Cacheable, dev::{Get, Set, Lock, Delete, LockStatus}, QueryCache};
 
 impl<B> CacheActor<B>
 where
@@ -106,7 +106,7 @@ where
         Ok(cached)
     }
 
-    pub(crate) async fn handle_stale<A, S, M>(msg: QueryCache<A, M>, backend: &Addr<S>, cached: M::Result, cache_enabled: bool) -> Result<M::Result, CacheError> 
+    pub(crate) async fn handle_stale<A, S, M>(msg: QueryCache<A, M>, backend: &Addr<S>, cached: M::Result, lock_enabled: bool) -> Result<M::Result, CacheError> 
     where
         A: Actor + Handler<M>,
         <A as Actor>::Context: ToEnvelope<A, M>,
@@ -123,7 +123,55 @@ where
         CACHE_STALE_COUNTER
             .with_label_values(&[&message, actor])
             .inc();
-        Ok(cached)
+        let cache_key = msg.cache_key()?;
+        if lock_enabled {
+            let lock_status = backend
+                .send(Lock {
+                    key: "lock::test".to_owned(),
+                    ttl: 10,
+                })
+                .await
+                .unwrap_or_else(|error| {
+                    warn!("Backend actor lock error {}", error);
+                    Ok(LockStatus::Locked)
+                })
+                .unwrap_or_else(|error| {
+                    warn!("Lock status retrieve error {}", error);
+                    LockStatus::Locked
+                });
+            match lock_status {
+                LockStatus::Acquired => {
+                    debug!("Lock {} acquired", "HACK!");
+                    let upstream_result = msg.upstream.send(msg.message).await?;
+                    let result = match upstream_result.into_policy() {
+                        CachePolicy::Cacheable(cached) => {
+                            let cached = CachedValue::new(cached, 10);
+                            cached
+                                .store(backend, cache_key, Some(10))
+                                .await
+                                .unwrap_or_else(|error| {
+                                    log::warn!("Updating cache error: {}", error);
+                                });
+                            Ok(CacheableResponse::from_cached(cached.into_inner()))
+                        },
+                        CachePolicy::NonCacheable(cached) => Ok(cached),
+                    };
+                    let _ = backend
+                        .send(Delete { key: "lock::test".to_owned() })
+                        .await
+                        .map_err(|error| {
+                            warn!("Lock error: {}", error);
+                            error
+                        });
+                    result
+                },
+                LockStatus::Locked => {
+                    Ok(cached)
+                }
+            }
+        } else {
+            Err(CacheError::CacheKeyGenerationError("Test".to_owned()))
+        }
     }
 
     pub(crate) async fn handle_miss<A, S, M>(msg: QueryCache<A, M>, backend: &Addr<S>, cache_enabled: bool) -> Result<M::Result, CacheError>

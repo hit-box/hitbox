@@ -344,24 +344,26 @@ where
             });
         let res = async move {
             let cached = if enabled {
-                CachedValue::retrieve(&backend, &cache_key).await
+                Some(CachedValueState::from(CachedValue::retrieve(&backend, &cache_key).await))
             } else {
                 None
             };
-            match CachedValueState::from(cached) {
-                CachedValueState::Actual(cached) => {
+            match cached {
+                Some(CachedValueState::Actual(cached)) => {
                     debug!("Cache hit for {}", cache_key);
                     Self::handle_actual(msg, cached).await
-                    // Ok(cached)
                 }
-                CachedValueState::Stale(cached) => {
+                Some(CachedValueState::Stale(cached)) => {
                     debug!("Cache is stale for {}", cache_key);
-                    Self::handle_stale(msg, &backend, cached, enabled).await
-                    // Ok(cached)
+                    Self::handle_stale(msg, &backend, cached, true).await
                 }
-                CachedValueState::Miss => {
+                Some(CachedValueState::Miss) => {
                     debug!("Cache miss for {}", cache_key);
                     Self::handle_miss(msg, &backend, enabled).await
+                }
+                None => {
+                    debug!("Cache disabled");
+                    Err(CacheError::CacheKeyGenerationError("Hack".to_owned()))
                 }
             }
         };
