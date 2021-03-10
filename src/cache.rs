@@ -430,7 +430,7 @@ impl<T> CachedValue<T> {
         };
         serialized
             .map(|data| {
-                serde_json::from_str(&data)
+                serde_json::from_slice(&data[..])
                     .map_err(|err| {
                         warn!("Cache data deserialization error: {}", err);
                         err
@@ -459,7 +459,7 @@ impl<T> CachedValue<T> {
     {
         let _ = backend
             .send(Set {
-                value: serde_json::to_string(self)?,
+                value: serde_json::to_vec(self)?,
                 key,
                 ttl,
             })

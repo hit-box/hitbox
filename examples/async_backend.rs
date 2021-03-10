@@ -42,7 +42,7 @@ impl Backend for DummyBackend {
 }
 
 impl Handler<Get> for DummyBackend {
-    type Result = ResponseFuture<Result<Option<String>, BackendError>>;
+    type Result = ResponseFuture<Result<Option<Vec<u8>>, BackendError>>;
 
     fn handle(&mut self, _msg: Get, _: &mut Self::Context) -> Self::Result {
         log::warn!("Dummy backend GET");
@@ -92,8 +92,7 @@ async fn main() -> Result<(), CacheError> {
     let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
-    let res = cache.send(msg.into_cache(&upstream)).await??;
-    dbg!(res.unwrap());
+    let _ = cache.send(msg.into_cache(&upstream)).await??;
 
     Ok(())
 }
