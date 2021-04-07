@@ -158,6 +158,8 @@ pub mod error;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 pub mod response;
+pub mod states;
+pub mod settings;
 
 pub use actor::{CacheActor, CacheBuilder};
 pub use cache::{Cacheable, QueryCache};
