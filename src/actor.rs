@@ -96,6 +96,8 @@ where
         M: Message + Send + Cacheable,
         M::Result: MessageResponse<A, M> + Send,
         A: Actor + Handler<M>,
+
+        M: Clone,
     {
         #[cfg(feature = "metrics")] {
             let (actor, message) = (msg.upstream_name(), msg.message.cache_key_prefix());
@@ -116,6 +118,8 @@ where
         M: Message + Send + Cacheable,
         M::Result: MessageResponse<A, M> + CacheableResponse + Send,
         <<M as actix::Message>::Result as CacheableResponse>::Cached: DeserializeOwned,
+
+        M: Clone,
     {
         #[cfg(feature = "metrics")]
         let (actor, message) = (msg.upstream_name(), msg.message.cache_key_prefix());
@@ -184,6 +188,8 @@ where
         M: Message + Send + Cacheable,
         M::Result: MessageResponse<A, M> + CacheableResponse + Send,
         <<M as actix::Message>::Result as CacheableResponse>::Cached: DeserializeOwned,
+
+        M: Clone,
     {
 
         #[cfg(feature = "metrics")]

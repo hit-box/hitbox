@@ -116,6 +116,8 @@ pub trait Cacheable {
         A: Actor,
         Self: Message + Send + Sized,
         Self::Result: MessageResponse<A, Self> + Send + 'static,
+
+        Self: Clone,
     {
         QueryCache {
             upstream: upstream.clone(),
@@ -132,7 +134,7 @@ pub trait Cacheable {
 /// You can only send QueryCache messages to Cache actor.
 pub struct QueryCache<A, M>
 where
-    M: Message + Cacheable + Send,
+    M: Message + Cacheable + Send + Clone,
     M::Result: MessageResponse<A, M> + Send,
     A: Actor,
 {
@@ -142,7 +144,7 @@ where
 
 impl<A, M> QueryCache<A, M>
 where
-    M: Message + Cacheable + Send,
+    M: Message + Cacheable + Send + Clone,
     M::Result: MessageResponse<A, M> + Send,
     A: Actor,
 {
@@ -171,7 +173,7 @@ impl<'a, A, M/*, I, E*/> Message for QueryCache<A, M>
 where
     A: Actor,
     // M: Message<Result = Result<I, E>> + Cacheable + Send,
-    M: Message + Cacheable + Send,
+    M: Message + Cacheable + Send + Clone,
     M::Result: MessageResponse<A, M> + Send,
     // M::Result: MessageResponse<A, M> + Send,
     // I: Deserialize<'a> + 'static,
@@ -182,6 +184,8 @@ where
 
 use crate::response::CacheableResponse;
 use std::fmt::Debug;
+use crate::settings::InitialStateSettings;
+use crate::states::initial::{ActixAdapter, InitialState, UpstreamPolled};
 
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for actor::CacheActor<B>
 where
@@ -190,7 +194,7 @@ where
         ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock> + ToEnvelope<B, Delete>,
     A: Actor + Handler<M> + Send,
     // M: Message<Result = Result<I, E>> + Cacheable + Send + 'static,
-    M: Message + Cacheable + Send + 'static,
+    M: Message + Cacheable + Send + 'static + Clone,
     M::Result: MessageResponse<A, M> + CacheableResponse + std::fmt::Debug + Send,
     <<M as actix::Message>::Result as CacheableResponse>::Cached: Serialize + DeserializeOwned,
     // M::Result: MessageResponse<A, M> + std::fmt::Debug + Send,
@@ -332,42 +336,51 @@ where
     type Result = ResponseFuture<Result<<M as Message>::Result, CacheError>>;
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
-        // use crate::response::CachePolicy;
-        let backend = self.backend.clone();
-        // let ttl = msg.message.cache_ttl();
-        // let stale_ttl = msg.message.cache_stale_ttl();
-        let (enabled, cache_key) = msg.cache_key()
-            .map(move |key| (self.enabled, key))
-            .unwrap_or_else(|err| {
-                warn!("Creating cache key error: {}", err);
-                (false, String::new())
-            });
-        let res = async move {
-            let cached = if enabled {
-                Some(CachedValueState::from(CachedValue::retrieve(&backend, &cache_key).await))
-            } else {
-                None
+        let adapter = ActixAdapter::new(msg);
+        let initial_state = InitialState { adapter };
+        Box::pin(async move {
+            let finish = match initial_state.poll_upstream().await {
+                UpstreamPolled::Successful(state) => state.finish(),
+                _ => unreachable!()
             };
-            match cached {
-                Some(CachedValueState::Actual(cached)) => {
-                    debug!("Cache hit for {}", cache_key);
-                    Self::handle_actual(msg, cached).await
-                }
-                Some(CachedValueState::Stale(cached)) => {
-                    debug!("Cache is stale for {}", cache_key);
-                    Self::handle_stale(msg, &backend, cached, true).await
-                }
-                Some(CachedValueState::Miss) => {
-                    debug!("Cache miss for {}", cache_key);
-                    Self::handle_miss(msg, &backend, enabled).await
-                }
-                None => {
-                    debug!("Cache disabled");
-                    Err(CacheError::CacheKeyGenerationError("Hack".to_owned()))
-                }
-            }
-        };
-        Box::pin(res)
+            Ok(finish.result())
+        })
+        // use crate::response::CachePolicy;
+        // let backend = self.backend.clone();
+        // // let ttl = msg.message.cache_ttl();
+        // // let stale_ttl = msg.message.cache_stale_ttl();
+        // let (enabled, cache_key) = msg.cache_key()
+        //     .map(move |key| (self.enabled, key))
+        //     .unwrap_or_else(|err| {
+        //         warn!("Creating cache key error: {}", err);
+        //         (false, String::new())
+        //     });
+        // let res = async move {
+        //     let cached = if enabled {
+        //         Some(CachedValueState::from(CachedValue::retrieve(&backend, &cache_key).await))
+        //     } else {
+        //         None
+        //     };
+        //     match cached {
+        //         Some(CachedValueState::Actual(cached)) => {
+        //             debug!("Cache hit for {}", cache_key);
+        //             Self::handle_actual(msg, cached).await
+        //         }
+        //         Some(CachedValueState::Stale(cached)) => {
+        //             debug!("Cache is stale for {}", cache_key);
+        //             Self::handle_stale(msg, &backend, cached, true).await
+        //         }
+        //         Some(CachedValueState::Miss) => {
+        //             debug!("Cache miss for {}", cache_key);
+        //             Self::handle_miss(msg, &backend, enabled).await
+        //         }
+        //         None => {
+        //             debug!("Cache disabled");
+        //             Err(CacheError::CacheKeyGenerationError("Hack".to_owned()))
+        //         }
+        //     }
+        // };
+        // Box::pin(res)
     }
 }
 
