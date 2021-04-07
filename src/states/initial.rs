@@ -1,9 +1,7 @@
-use crate::states::cache_polled::CacheStatus;
-use crate::states::{CachePolled, UpstreamPolled};
-use crate::{CacheSettings, Database, InitialStateSettings, Message, Sender, SettingState};
-use std::fmt::Debug;
 use actix::Message;
 use crate::settings::{InitialStateSettings, CacheSettings, SettingState};
+use std::fmt::Debug;
+use crate::states::{CachePolled, CacheStatus, UpstreamPolled};
 
 #[derive(Debug)]
 pub struct InitialState<M>

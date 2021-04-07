@@ -1,6 +1,6 @@
-use crate::states::{FinishState, UpstreamPolled};
-use crate::{Database, Error, Message, Sender, CacheError};
 use actix::Message;
+use crate::states::{UpstreamPolled, FinishState};
+use crate::CacheError;
 
 #[derive(Debug)]
 pub enum CacheStatus<R> {
