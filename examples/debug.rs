@@ -72,6 +72,5 @@ async fn main() -> Result<(), CacheError> {
 
     let msg = Ping { id: 42 };
     let res = cache.send(msg.into_cache(&upstream)).await??;
-    dbg!(res);
     Ok(())
 }

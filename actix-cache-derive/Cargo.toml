@@ -6,7 +6,7 @@ edition = "2018"
 workspace = ".."
 
 [dependencies]
-syn = "1"
+syn = { version = "1", features = ["derive"] }
 quote = "1"
 serde = "1"
 proc-macro2 = "1"

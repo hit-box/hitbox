@@ -9,7 +9,6 @@ struct Message {
     alias: String,
 }
 
-
 struct Upstream;
 
 impl Actor for Upstream {

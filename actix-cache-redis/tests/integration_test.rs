@@ -8,7 +8,7 @@ async fn test_rw() -> Result<(), Error> {
     let addr = RedisBackend::new().await?.start();
     let message = Set {
         key: "key".to_owned(),
-        value: "value".to_owned(),
+        value: b"value".to_vec(),
         ttl: None,
     };
     let res = addr.send(message.clone()).await.unwrap().unwrap();
@@ -30,7 +30,7 @@ async fn test_set_expired() -> Result<(), Error> {
     let addr = RedisBackend::new().await?.start();
     let message = Set {
         key: "key_expired".to_owned(),
-        value: "value".to_owned(),
+        value: b"value".to_vec(),
         ttl: Some(1),
     };
     let res = addr.send(message.clone()).await.unwrap().unwrap();
@@ -59,7 +59,7 @@ async fn test_delete() -> Result<(), Error> {
     let addr = RedisBackend::new().await?.start();
     let message = Set {
         key: "another_key".to_owned(),
-        value: "value".to_owned(),
+        value: b"value".to_vec(),
         ttl: Some(1),
     };
     let res = addr.send(message.clone()).await.unwrap().unwrap();
