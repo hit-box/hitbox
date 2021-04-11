@@ -1,7 +1,7 @@
+pub mod initial;
 // mod cache_polled;
 // mod cache_updated;
 // mod finish;
-pub mod initial;
 // mod upstream_polled;
 //
 // pub use cache_polled::{CachePolled, CacheStatus};

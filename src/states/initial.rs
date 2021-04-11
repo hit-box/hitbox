@@ -1,4 +1,3 @@
-// use actix::Message;
 use crate::settings::{InitialStateSettings, CacheSettings, SettingState};
 use std::fmt::Debug;
 use actix::{Message, Actor, Handler};
@@ -8,7 +7,6 @@ use std::pin::Pin;
 use std::future::Future;
 use actix::dev::{MessageResponse, ToEnvelope};
 use std::marker::PhantomData;
-// use crate::states::{CachePolled, CacheStatus, UpstreamPolled};
 
 pub enum CacheStatus {
     Miss,
@@ -28,8 +26,6 @@ where
     A: Actor + Handler<M>,
     M: Message + Cacheable + Send,
     M::Result: MessageResponse<A, M> + Send,
-
-    M: Clone,
 {
     message: QueryCache<A, M>,
 }
@@ -39,8 +35,6 @@ where
     A: Actor + Handler<M>,
     M: Message + Cacheable + Send,
     M::Result: MessageResponse<A, M> + Send,
-
-    M: Clone,
 {
     pub fn new(message: QueryCache<A, M>) -> Self {
         Self { message }
@@ -53,8 +47,6 @@ where
     A::Context: ToEnvelope<A, M>,
     M: Message<Result = T> + Cacheable + Send + Clone + 'static,
     M::Result: MessageResponse<A, M> + Send,
-
-    M: Clone,
 {
     type UpstreamResult = T;
 

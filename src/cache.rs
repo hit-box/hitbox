@@ -116,8 +116,6 @@ pub trait Cacheable {
         A: Actor,
         Self: Message + Send + Sized,
         Self::Result: MessageResponse<A, Self> + Send + 'static,
-
-        Self: Clone,
     {
         QueryCache {
             upstream: upstream.clone(),
@@ -134,7 +132,7 @@ pub trait Cacheable {
 /// You can only send QueryCache messages to Cache actor.
 pub struct QueryCache<A, M>
 where
-    M: Message + Cacheable + Send + Clone,
+    M: Message + Cacheable + Send,
     M::Result: MessageResponse<A, M> + Send,
     A: Actor,
 {
@@ -144,7 +142,7 @@ where
 
 impl<A, M> QueryCache<A, M>
 where
-    M: Message + Cacheable + Send + Clone,
+    M: Message + Cacheable + Send,
     M::Result: MessageResponse<A, M> + Send,
     A: Actor,
 {
@@ -169,15 +167,11 @@ where
     }
 }
 
-impl<'a, A, M/*, I, E*/> Message for QueryCache<A, M>
+impl<'a, A, M> Message for QueryCache<A, M>
 where
     A: Actor,
-    // M: Message<Result = Result<I, E>> + Cacheable + Send,
-    M: Message + Cacheable + Send + Clone,
+    M: Message + Cacheable + Send,
     M::Result: MessageResponse<A, M> + Send,
-    // M::Result: MessageResponse<A, M> + Send,
-    // I: Deserialize<'a> + 'static,
-    // E: 'static,
 {
     type Result = Result<<M as Message>::Result, CacheError>;
 }
@@ -193,146 +187,11 @@ where
     <B as Actor>::Context:
         ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock> + ToEnvelope<B, Delete>,
     A: Actor + Handler<M> + Send,
-    // M: Message<Result = Result<I, E>> + Cacheable + Send + 'static,
     M: Message + Cacheable + Send + 'static + Clone,
     M::Result: MessageResponse<A, M> + CacheableResponse + std::fmt::Debug + Send,
     <<M as actix::Message>::Result as CacheableResponse>::Cached: Serialize + DeserializeOwned,
-    // M::Result: MessageResponse<A, M> + std::fmt::Debug + Send,
     <A as Actor>::Context: ToEnvelope<A, M>,
-    // I: Debug + Serialize + DeserializeOwned + 'static,
-    // E: Debug + 'static,
 {
-    // type Result = ResponseFuture<Result<<M as Message>::Result, CacheError>>;
-
-    // fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
-        // #[cfg(feature = "metrics")]
-        // let (actor, message) = (msg.upstream_name(), msg.message.cache_key_prefix());
-        // let backend = self.backend.clone();
-        // let (enabled, cache_key) = match msg.cache_key() {
-            // Ok(value) => (self.enabled, value),
-            // Err(error) => {
-                // warn!("Creating cache key error: {}", error);
-                // (false, String::new())
-            // }
-        // };
-        // let res = async move {
-            // debug!("Try retrieve cached value from backend");
-            // let cached = if enabled {
-                // Some(CachedValue::retrieve(&backend, cache_key.clone()).await)
-            // } else {
-                // None
-            // };
-
-            // match cached {
-                // Some(CachedValueState::Actual(res)) => {
-                    // debug!("Cached value retrieved successfully");
-                    // #[cfg(feature = "metrics")]
-                    // CACHE_HIT_COUNTER
-                        // .with_label_values(&[&message, actor])
-                        // .inc();
-                    // Ok(res.into_inner())
-                // }
-                // Some(CachedValueState::Stale(res)) => {
-                    // debug!("Cache is stale, trying to acquire lock.");
-                    // #[cfg(feature = "metrics")]
-                    // CACHE_STALE_COUNTER
-                        // .with_label_values(&[&message, actor])
-                        // .inc();
-                    // let lock_key = format!("lock::{}", msg.cache_key()?);
-                    // let ttl = msg.message.cache_ttl() - msg.message.cache_stale_ttl();
-                    // let lock_status = backend
-                        // .send(Lock {
-                            // key: lock_key.clone(),
-                            // ttl,
-                        // })
-                        // .await
-                        // .unwrap_or_else(|error| {
-                            // warn!("Lock error {}", error);
-                            // Ok(LockStatus::Locked)
-                        // })
-                        // .unwrap_or_else(|error| {
-                            // warn!("Lock error {}", error);
-                            // LockStatus::Locked
-                        // });
-
-                    // match lock_status {
-                        // LockStatus::Acquired => {
-                            // debug!("Lock acquired.");
-                            // let ttl = Some(msg.message.cache_ttl());
-                            // let cache_stale_ttl = msg.message.cache_stale_ttl();
-                            // #[cfg(feature = "metrics")]
-                            // let query_timer = CACHE_UPSTREAM_HANDLING_HISTOGRAM
-                                // .with_label_values(&[&message, actor])
-                                // .start_timer();
-                            // let upstream_result = msg.upstream.send(msg.message).await?;
-
-                            // #[cfg(feature = "metrics")]
-                            // query_timer.observe_duration();
-                            // debug!("Received value from backend. Try to set.");
-                            // let cached = CachedValue::new(upstream_result, cache_stale_ttl);
-                            // cached
-                                // .store(backend.clone(), cache_key, ttl)
-                                // .await
-                                // .unwrap_or_else(|error| {
-                                    // warn!("Updating cache error: {}", error);
-                                // });
-                            // let _ = backend
-                                // .send(Delete { key: lock_key })
-                                // .await
-                                // .map_err(|error| {
-                                    // warn!("Lock error: {}", error);
-                                    // error
-                                // });
-                            // Ok(cached.into_inner())
-                        // }
-                        // LockStatus::Locked => {
-                            // debug!("Cache locked.");
-                            // Ok(res.into_inner())
-                        // }
-                    // }
-                // }
-                // Some(CachedValueState::Miss) => {
-                    // debug!("Cache miss");
-                    // #[cfg(feature = "metrics")]
-                    // CACHE_MISS_COUNTER
-                        // .with_label_values(&[&message, actor])
-                        // .inc();
-                    // let cache_stale_ttl = msg.message.cache_stale_ttl();
-                    // let ttl = Some(msg.message.cache_ttl());
-                    // #[cfg(feature = "metrics")]
-                    // let query_timer = CACHE_UPSTREAM_HANDLING_HISTOGRAM
-                        // .with_label_values(&[&message, actor])
-                        // .start_timer();
-                    // let upstream_result = msg.upstream.send(msg.message).await?;
-                    // #[cfg(feature = "metrics")]
-                    // query_timer.observe_duration();
-                    // let cached = CachedValue::new(upstream_result, cache_stale_ttl);
-                    // dbg!(&M::into_upstream_result(&cached.data));
-                    // debug!("Update value in cache");
-                    // cached
-                        // .store(backend, cache_key, ttl)
-                        // .await
-                        // .unwrap_or_else(|error| {
-                            // warn!("Updating cache error: {}", error);
-                        // });
-                    // Ok(cached.into_inner())
-                // }
-                // None => {
-                    // #[cfg(feature = "metrics")]
-                    // let query_timer = CACHE_UPSTREAM_HANDLING_HISTOGRAM
-                        // .with_label_values(&[&message, actor])
-                        // .start_timer();
-                    // let upstream_result = msg.upstream.send(msg.message).await?;
-                    // dbg!(M::into_upstream_result(&upstream_result));
-                    // #[cfg(feature = "metrics")]
-                    // query_timer.observe_duration();
-                    // Ok(upstream_result)
-                // }
-            // }
-        // };
-        // Box::pin(res)
-    // }
-    //
     type Result = ResponseFuture<Result<<M as Message>::Result, CacheError>>;
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
@@ -345,42 +204,6 @@ where
             };
             Ok(finish.result())
         })
-        // use crate::response::CachePolicy;
-        // let backend = self.backend.clone();
-        // // let ttl = msg.message.cache_ttl();
-        // // let stale_ttl = msg.message.cache_stale_ttl();
-        // let (enabled, cache_key) = msg.cache_key()
-        //     .map(move |key| (self.enabled, key))
-        //     .unwrap_or_else(|err| {
-        //         warn!("Creating cache key error: {}", err);
-        //         (false, String::new())
-        //     });
-        // let res = async move {
-        //     let cached = if enabled {
-        //         Some(CachedValueState::from(CachedValue::retrieve(&backend, &cache_key).await))
-        //     } else {
-        //         None
-        //     };
-        //     match cached {
-        //         Some(CachedValueState::Actual(cached)) => {
-        //             debug!("Cache hit for {}", cache_key);
-        //             Self::handle_actual(msg, cached).await
-        //         }
-        //         Some(CachedValueState::Stale(cached)) => {
-        //             debug!("Cache is stale for {}", cache_key);
-        //             Self::handle_stale(msg, &backend, cached, true).await
-        //         }
-        //         Some(CachedValueState::Miss) => {
-        //             debug!("Cache miss for {}", cache_key);
-        //             Self::handle_miss(msg, &backend, enabled).await
-        //         }
-        //         None => {
-        //             debug!("Cache disabled");
-        //             Err(CacheError::CacheKeyGenerationError("Hack".to_owned()))
-        //         }
-        //     }
-        // };
-        // Box::pin(res)
     }
 }
 
