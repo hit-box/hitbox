@@ -153,6 +153,7 @@
 #![warn(missing_docs)]
 pub mod actor;
 pub mod cache;
+pub mod builder;
 pub mod dev;
 pub mod error;
 #[cfg(feature = "metrics")]
@@ -161,7 +162,7 @@ pub mod response;
 pub mod states;
 pub mod settings;
 
-pub use actor::{CacheActor, CacheBuilder};
+pub use actor::CacheActor;
 pub use cache::{Cacheable, QueryCache};
 pub use error::CacheError;
 

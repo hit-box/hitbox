@@ -31,7 +31,6 @@ impl Handler<Ping> for UpstreamActor {
         Box::pin(async move {
             actix_rt::time::delay_for(core::time::Duration::from_secs(3)).await;
             Ok(Pong(msg.id))
-            // Err(Error::Test)
         })
     }
 }
@@ -45,7 +44,6 @@ async fn main() -> Result<(), CacheError> {
     let backend = RedisBackend::new().await.unwrap().start();
 
     let cache = Cache::builder()
-        // .enabled(false)
         .build(backend)
         .start();
     let upstream = UpstreamActor.start();

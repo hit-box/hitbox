@@ -12,28 +12,6 @@ use crate::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
 
-pub enum StalePolicy {
-    Disabled,
-    Enabled,
-}
-
-impl Default for StalePolicy {
-    fn default() -> StalePolicy {
-        StalePolicy::Disabled
-    }
-}
-
-pub enum CacheLockPolicy {
-    Disabled,
-    Enabled,
-}
-
-impl Default for CacheLockPolicy {
-    fn default() -> CacheLockPolicy {
-        CacheLockPolicy::Enabled
-    }
-}
-
 /// Actix actor implements cache logic.
 ///
 /// This actor implement only `Handler<QueryCache>`.
@@ -58,9 +36,7 @@ pub struct CacheActor<B>
 where
     B: Backend,
 {
-    pub(crate) enabled: bool,
-    pub(crate) stale_cache_policy: StalePolicy,
-    pub(crate) cache_lock_policy: CacheLockPolicy,
+    pub(crate) settings: InitialCacheSettings,
     pub(crate) backend: Addr<B>,
 }
 
@@ -68,6 +44,8 @@ use actix::dev::{ToEnvelope, MessageResponse};
 use serde::de::DeserializeOwned;
 use crate::response::{CacheableResponse, CachePolicy};
 use crate::{cache::CachedValue, Cacheable, dev::{Get, Set, Lock, Delete, LockStatus}, QueryCache};
+use crate::builder::CacheBuilder;
+use crate::settings::InitialCacheSettings;
 
 impl<B> CacheActor<B>
 where
@@ -232,103 +210,5 @@ where
     fn started(&mut self, _: &mut Self::Context) {
         info!("Cache actor started");
         debug!("Cache enabled: {}", self.enabled);
-    }
-}
-
-/// Cache actor configurator.
-///
-/// # Example
-/// ```rust
-/// use actix::prelude::*;
-/// use actix_cache::{Cache, RedisBackend, CacheError};
-///
-/// #[actix_rt::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let backend = RedisBackend::new()
-///         .await?
-///         .start();
-///     let cache = Cache::builder()
-///         .enabled(true)
-///         .build(backend)
-///         .start();
-///     Ok(())
-/// }
-/// ```
-pub struct CacheBuilder<B>
-where
-    B: Backend + Actor,
-{
-    enabled: bool,
-    stale_cache_policy: StalePolicy,
-    cache_lock_policy: CacheLockPolicy,
-    _p: PhantomData<B>,
-}
-
-impl<B> Default for CacheBuilder<B>
-where
-    B: Backend,
-{
-    fn default() -> Self {
-        CacheBuilder {
-            enabled: true,
-            stale_cache_policy: StalePolicy::default(),
-            cache_lock_policy: CacheLockPolicy::default(),
-            _p: PhantomData::default(),
-        }
-    }
-}
-
-impl<B> CacheBuilder<B>
-where
-    B: Backend,
-{
-    /// Enable or disable interaction with cache backend. (Enabled by default)
-    ///
-    /// All messages sent to disabled Cache actor passed directly to an upstream actor.
-    /// If metrics feature is enabled, metrics for these messages collected too.
-    pub fn enabled(mut self, enabled: bool) -> Self {
-        self.enabled = enabled;
-        self
-    }
-
-    /// Enable stale cache mechanics. (Disabled by default)
-    ///
-    /// If it's enable cache actor return stale data in case of upstream [actor error].
-    ///
-    /// [actor error]: https://docs.rs/actix/latest/actix/enum.MailboxError.html
-    pub fn enable_stale_cache(mut self) -> Self {
-        self.stale_cache_policy = StalePolicy::Enabled;
-        self
-    }
-
-    /// Disable cache lock mechanics. (Enabled by default)
-    ///
-    /// Prevents multiple upstream requests for the same cache key in case of cache data is missing.
-    /// If `cache_lock` enabled only the first request will produce an upstream request. 
-    /// The remaining requests wait for a first upstream response and return updated data.
-    /// If `stale_cache` is enabled the remaining requests don't wait for an upstream response 
-    /// and return stale cache data if it exists.
-    pub fn disable_cache_lock(mut self) -> Self {
-        self.cache_lock_policy = CacheLockPolicy::Disabled;
-        self
-    }
-
-    /// Instatiate new [Cache] instance with current configuration and passed backend.
-    ///
-    /// Backend is an [Addr] of actix [Actor] which implements [Backend] trait:
-    ///
-    /// [Cache]: actor/struct.Cache.html
-    /// [Backend]: ../dev/trait.Backend.html
-    /// [Addr]: https://docs.rs/actix/latest/actix/prelude/struct.Addr.html
-    /// [Actor]: https://docs.rs/actix/latest/actix/prelude/trait.Actor.html
-    /// [Messages]: https://docs.rs/actix/latest/actix/prelude/trait.Message.html
-    /// [Handler]: https://docs.rs/actix/latest/actix/prelude/trait.Handler.html
-    pub fn build(self, backend: Addr<B>) -> CacheActor<B> {
-        CacheActor {
-            enabled: self.enabled,
-            stale_cache_policy: self.stale_cache_policy,
-            cache_lock_policy: self.cache_lock_policy,
-            backend,
-        }
     }
 }
