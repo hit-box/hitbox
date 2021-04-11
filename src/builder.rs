@@ -1,6 +1,5 @@
 use actix_cache_backend::Backend;
 use actix::{Actor, Addr};
-use crate::actor::{StalePolicy, CacheLockPolicy};
 use std::marker::PhantomData;
 use crate::CacheActor;
 use crate::settings::{CacheSettings, Status, InitialCacheSettings};
@@ -41,7 +40,7 @@ where
             settings: CacheSettings {
                 cache: Status::Enabled,
                 stale: Status::Disabled,
-                lock: Status::Disabled,
+                lock: Status::Enabled,
             },
             _p: PhantomData::default(),
         }
@@ -82,7 +81,7 @@ where
         self
     }
 
-    /// Instatiate new [Cache] instance with current configuration and passed backend.
+    /// Instantiate new [Cache] instance with current configuration and passed backend.
     ///
     /// Backend is an [Addr] of actix [Actor] which implements [Backend] trait:
     ///

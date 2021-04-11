@@ -161,6 +161,7 @@ pub mod metrics;
 pub mod response;
 pub mod states;
 pub mod settings;
+pub mod adapted;
 
 pub use actor::CacheActor;
 pub use cache::{Cacheable, QueryCache};

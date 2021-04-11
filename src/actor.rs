@@ -36,7 +36,7 @@ pub struct CacheActor<B>
 where
     B: Backend,
 {
-    pub(crate) settings: InitialCacheSettings,
+    pub settings: InitialCacheSettings,
     pub(crate) backend: Addr<B>,
 }
 
@@ -209,6 +209,6 @@ where
 
     fn started(&mut self, _: &mut Self::Context) {
         info!("Cache actor started");
-        debug!("Cache enabled: {}", self.enabled);
+        debug!("Cache enabled: {:?}", self.settings);
     }
 }

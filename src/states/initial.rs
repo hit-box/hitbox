@@ -7,62 +7,17 @@ use std::pin::Pin;
 use std::future::Future;
 use actix::dev::{MessageResponse, ToEnvelope};
 use std::marker::PhantomData;
+use crate::adapted::runtime_adapter::RuntimeAdapter;
 
 pub enum CacheStatus {
     Miss,
     Hit,
 }
 
-type AdapterResult<T> = Pin<Box<dyn Future<Output=Result<T, CacheError>>>>;
-
-pub trait BackendAdapter
-{
-    type UpstreamResult;
-    fn poll_upstream(&self) -> AdapterResult<Self::UpstreamResult>;
-}
-
-pub struct ActixAdapter<A, M>
-where
-    A: Actor + Handler<M>,
-    M: Message + Cacheable + Send,
-    M::Result: MessageResponse<A, M> + Send,
-{
-    message: QueryCache<A, M>,
-}
-
-impl<A, M> ActixAdapter<A, M>
-where
-    A: Actor + Handler<M>,
-    M: Message + Cacheable + Send,
-    M::Result: MessageResponse<A, M> + Send,
-{
-    pub fn new(message: QueryCache<A, M>) -> Self {
-        Self { message }
-    }
-}
-
-impl<A, M, T> BackendAdapter for ActixAdapter<A, M>
-where
-    A: Actor + Handler<M>,
-    A::Context: ToEnvelope<A, M>,
-    M: Message<Result = T> + Cacheable + Send + Clone + 'static,
-    M::Result: MessageResponse<A, M> + Send,
-{
-    type UpstreamResult = T;
-
-    fn poll_upstream(&self) -> AdapterResult<Self::UpstreamResult> {
-        let message = self.message.message.clone();
-        let upstream = self.message.upstream.clone();
-        Box::pin(async move {
-            Ok(upstream.send(message).await.unwrap())
-        })
-    }
-}
-
 #[derive(Debug)]
 pub struct InitialState<A>
 where
-    A: BackendAdapter,
+    A: RuntimeAdapter,
 {
     // pub settings: InitialStateSettings,
     pub adapter: A,
@@ -70,7 +25,7 @@ where
 
 pub struct UpstreamPolledSuccessful<A, T>
 where
-    A: BackendAdapter,
+    A: RuntimeAdapter,
 {
     pub adapter: A,
     pub result: T
@@ -78,7 +33,7 @@ where
 
 impl<A, T> UpstreamPolledSuccessful<A, T>
 where
-    A: BackendAdapter,
+    A: RuntimeAdapter,
     T: Debug,
 {
     pub fn finish(self) -> Finish<T> {
@@ -98,7 +53,7 @@ impl UpstreamPolledError {
 
 pub enum UpstreamPolled<A, T>
 where
-    A: BackendAdapter,
+    A: RuntimeAdapter,
 {
     Successful(UpstreamPolledSuccessful<A, T>),
     Error(UpstreamPolledError),
@@ -106,11 +61,11 @@ where
 
 impl<A> InitialState<A>
 where
-    A: BackendAdapter,
+    A: RuntimeAdapter,
 {
     pub async fn poll_upstream<T>(self) -> UpstreamPolled<A, T>
     where
-        A: BackendAdapter<UpstreamResult = T>
+        A: RuntimeAdapter<UpstreamResult = T>
     {
         match self.adapter.poll_upstream().await {
             Ok(result) => UpstreamPolled::Successful(

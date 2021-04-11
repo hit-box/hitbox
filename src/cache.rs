@@ -179,7 +179,8 @@ where
 use crate::response::CacheableResponse;
 use std::fmt::Debug;
 use crate::settings::InitialCacheSettings;
-use crate::states::initial::{ActixAdapter, InitialState, UpstreamPolled};
+use crate::adapted::actix_runtime_adapter::ActixAdapter;
+use crate::states::initial::{InitialState, UpstreamPolled};
 
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for actor::CacheActor<B>
 where
