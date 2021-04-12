@@ -196,7 +196,7 @@ where
     type Result = ResponseFuture<Result<<M as Message>::Result, CacheError>>;
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
-        let adapter = ActixAdapter::new(msg);
+        let adapter = ActixAdapter::new(msg, self.backend.clone());  // @TODO: remove clone
         let initial_state = InitialState { adapter };
         Box::pin(async move {
             let finish = match initial_state.poll_upstream().await {
