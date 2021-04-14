@@ -197,13 +197,23 @@ where
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
         let adapter = ActixAdapter::new(msg, self.backend.clone());  // @TODO: remove clone
-        let initial_state = InitialState { adapter };
+        let initial_state = InitialState { adapter, settings: self.settings.clone() };
         Box::pin(async move {
-            let finish = match initial_state.poll_upstream().await {
-                UpstreamPolled::Successful(state) => state.finish(),
+            match initial_state.settings {
+                // 1.
+                InitialCacheSettings::CacheDisabled => {
+                    let finish = match initial_state.poll_upstream().await {
+                        UpstreamPolled::Successful(state) => state.finish(),
+                        _ => unreachable!()
+                    };
+                    Ok(finish.result())
+                },
+                // // 2.
+                // InitialCacheSettings::CacheEnabled => {
+                //     let cache = initial_state.poll_
+                // }
                 _ => unreachable!()
-            };
-            Ok(finish.result())
+            }
         })
     }
 }

@@ -56,8 +56,7 @@ where
                 .await
                 .unwrap()
                 .unwrap();
-            let cached_value = CacheState::from_bytes(cached_value.as_ref());
-            cached_value 
+            CacheState::from_bytes(cached_value.as_ref())
         })
     }
 }

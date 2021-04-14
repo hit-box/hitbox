@@ -9,17 +9,12 @@ use actix::dev::{MessageResponse, ToEnvelope};
 use std::marker::PhantomData;
 use crate::adapted::runtime_adapter::RuntimeAdapter;
 
-pub enum CacheStatus {
-    Miss,
-    Hit,
-}
-
 #[derive(Debug)]
 pub struct InitialState<A>
 where
     A: RuntimeAdapter,
 {
-    // pub settings: InitialStateSettings,
+    pub settings: InitialCacheSettings,
     pub adapter: A,
 }
 
@@ -74,6 +69,18 @@ where
             Err(error) => UpstreamPolled::Error(UpstreamPolledError { error }),
         }
     }
+
+    // pub async fn poll_cache<T>(self) -> CachePolled<A, T>
+    // where
+    //     A: RuntimeAdapter<UpstreamResult = T>
+    // {
+    //     match self.adapter.poll_cache().await {
+    //         Ok(result) => UpstreamPolled::Successful(
+    //             UpstreamPolledSuccessful { adapter: self.adapter, result }
+    //         ),
+    //         Err(error) => UpstreamPolled::Error(UpstreamPolledError { error }),
+    //     }
+    // }
 }
 
 #[derive(Debug)]

@@ -59,7 +59,7 @@ mod tests {
     #[actix_rt::test]
     async fn test_miss_counter_metric() {
         let backend = MockBackend::new().start();
-        let cache = CacheActor::builder().build(backend).start();
+        let cache = CacheActor::builder().finish(backend).start();
         let upstream = Upstream {}.start();
         let res = cache.send(Ping(8).into_cache(&upstream)).await.unwrap();
         assert_eq!(res.unwrap(), Ok(8));

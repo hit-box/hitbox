@@ -88,7 +88,7 @@ async fn main() -> Result<(), CacheError> {
 
     let dummy_backend = DummyBackend.start();
 
-    let cache = CacheActor::builder().build(dummy_backend).start();
+    let cache = CacheActor::builder().finish(dummy_backend).start();
     let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };

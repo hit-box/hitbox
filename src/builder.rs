@@ -91,8 +91,8 @@ where
     /// [Actor]: https://docs.rs/actix/latest/actix/prelude/trait.Actor.html
     /// [Messages]: https://docs.rs/actix/latest/actix/prelude/trait.Message.html
     /// [Handler]: https://docs.rs/actix/latest/actix/prelude/trait.Handler.html
-    pub fn build(self, backend: Addr<B>) -> CacheActor<B> {
+    pub fn finish(self, backend: Addr<B>) -> CacheActor<B> {
         let settings = InitialCacheSettings::from(self.settings);
-        CacheActor { settings, backend, }
+        CacheActor { settings, backend }
     }
 }

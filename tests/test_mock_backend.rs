@@ -44,7 +44,7 @@ impl Handler<Ping> for UpstreamActor {
 #[actix_rt::test]
 async fn test_mock_backend() {
     let backend = MockBackend::new().start();
-    let cache = CacheActor::builder().build(backend.clone()).start();
+    let cache = CacheActor::builder().finish(backend.clone()).start();
     let upstream = UpstreamActor.start();
     let msg = Ping { id: 42 };
     cache

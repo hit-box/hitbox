@@ -9,7 +9,7 @@ pub struct CacheSettings {
     pub lock: Status,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum InitialCacheSettings {
     CacheDisabled,
     CacheEnabled,

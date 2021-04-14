@@ -8,5 +8,5 @@ pub trait RuntimeAdapter
 {
     type UpstreamResult;
     fn poll_upstream(&self) -> AdapterResult<Self::UpstreamResult>;
-    fn poll_cache(&self) -> AdapterResult<crate::adapted::actix_runtime_adapter::CacheState<Self::UpstreamResult>>;
+    fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>>;
 }

@@ -79,7 +79,7 @@
 //!         .map_err(|err| CacheError::BackendError(err.into()))?
 //!         .start();
 //!     let cache = CacheActor::builder()
-//!         .build(backend)
+//!         .finish(backend)
 //!         .start();
 //! #   Ok(())
 //! }

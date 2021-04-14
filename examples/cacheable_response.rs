@@ -44,7 +44,10 @@ async fn main() -> Result<(), CacheError> {
     let backend = RedisBackend::new().await.unwrap().start();
 
     let cache = Cache::builder()
-        .build(backend)
+        .enable()
+        .without_stale()
+        .without_lock()
+        .finish(backend)
         .start();
     let upstream = UpstreamActor.start();
 
