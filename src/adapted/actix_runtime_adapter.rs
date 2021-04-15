@@ -81,6 +81,9 @@ impl<T> CachedValue<T> {
             expired: cached_data.expired,
         }
     }
+    pub fn into_inner(self) -> T {
+        self.data
+    }
 }
 
 pub enum CacheState<T> {

@@ -180,7 +180,8 @@ use crate::response::CacheableResponse;
 use std::fmt::Debug;
 use crate::settings::InitialCacheSettings;
 use crate::adapted::actix_runtime_adapter::ActixAdapter;
-use crate::states::initial::{InitialState, UpstreamPolled};
+use crate::states::initial::InitialState;
+use crate::states::upstream_polled::UpstreamPolled;
 
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for actor::CacheActor<B>
 where
@@ -202,11 +203,10 @@ where
             match initial_state.settings {
                 // 1.
                 InitialCacheSettings::CacheDisabled => {
-                    let finish = match initial_state.poll_upstream().await {
-                        UpstreamPolled::Successful(state) => state.finish(),
-                        _ => unreachable!()
-                    };
-                    Ok(finish.result())
+                    match initial_state.poll_upstream().await {
+                        UpstreamPolled::Successful(state) => Ok(state.finish().result()),
+                        UpstreamPolled::Error(error) => Err(error.finish().result()),
+                    }
                 },
                 // // 2.
                 // InitialCacheSettings::CacheEnabled => {

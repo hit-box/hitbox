@@ -1,44 +1,49 @@
-use actix::Message;
-use crate::states::{UpstreamPolled, FinishState};
+use crate::adapted::runtime_adapter::RuntimeAdapter;
+use crate::states::finish::Finish;
+use std::fmt::Debug;
 use crate::CacheError;
+use crate::states::upstream_polled::{UpstreamPolled, UpstreamPolledSuccessful, UpstreamPolledError};
 
-#[derive(Debug)]
-pub enum CacheStatus<R> {
-    Hit(R),
-    Miss,
+pub struct CachePolledSuccessful<A, T>
+where
+    A: RuntimeAdapter,
+{
+    pub adapter: A,
+    pub result: T
 }
 
-#[derive(Debug)]
-pub struct CachePolled<M, R>
+impl<A, T> CachePolledSuccessful<A, T>
 where
-    M: Message<Result = R>,
+    A: RuntimeAdapter,
+    T: Debug,
 {
-    pub cache_status: CacheStatus<R>,
-    pub message: M,
+    pub fn finish(self) -> Finish<T> {
+        Finish { result: self.result }
+    }
 }
 
-impl<M, R> CachePolled<M, R>
-where
-    M: Message<Result = R>,
-{
-    pub fn poll_upstream(self) -> UpstreamPolled<R> {
-        println!("-> Poll upstream");
-        let result = Database.send(&self.message);
-        UpstreamPolled {
-            upstream_result: result,
-        }
-    }
+// pub struct CachePolledError<A, T> {
+//     pub error: CacheError
+// }
+//
+// impl CachePolledError {
+//     pub fn poll_upstream(self) -> UpstreamPolled<A, T>
+//     where
+//         A: RuntimeAdapter<UpstreamResult = T>
+//     {
+//         match self.adapter.poll_upstream().await {
+//             Ok(result) => UpstreamPolled::Successful(
+//                 UpstreamPolledSuccessful { adapter: self.adapter, result }
+//             ),
+//             Err(error) => UpstreamPolled::Error(UpstreamPolledError { error }),
+//         }
+//     }
+// }
 
-    pub fn finish(self) -> Result<FinishState<R>, CacheError> {
-        println!("-> Finish");
-        match self.cache_status {
-            CacheStatus::Hit(cached_value) => Ok(FinishState {
-                result: cached_value,
-            }),
-            CacheStatus::Miss => Err(Error::InvalidTransition(
-                "Transition from CachePolled to Finish are prohibited for CacheStatus::Miss"
-                    .to_owned(),
-            )),
-        }
-    }
+pub enum CachePolled<A, T>
+where
+    A: RuntimeAdapter,
+{
+    Successful(CachePolledSuccessful<A, T>),
+    // Error(CachePolledError),
 }
