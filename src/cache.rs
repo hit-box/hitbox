@@ -182,6 +182,7 @@ use crate::settings::InitialCacheSettings;
 use crate::adapted::actix_runtime_adapter::ActixAdapter;
 use crate::states::initial::InitialState;
 use crate::states::upstream_polled::UpstreamPolled;
+use crate::states::cache_polled::CachePolled;
 
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for actor::CacheActor<B>
 where
@@ -208,10 +209,26 @@ where
                         UpstreamPolled::Error(error) => Err(error.finish().result()),
                     }
                 },
-                // // 2.
-                // InitialCacheSettings::CacheEnabled => {
-                //     let cache = initial_state.poll_
-                // }
+                // 2.
+                InitialCacheSettings::CacheEnabled => {
+                    match initial_state.poll_cache().await {
+                        CachePolled::Successful(state) => Ok(
+                            state.finish().result()
+                        ),
+                        CachePolled::Miss(state) => match state.poll_upstream().await {
+                            UpstreamPolled::Successful(state) => Ok(
+                                state.update_cache().await.finish().result()
+                            ),
+                            UpstreamPolled::Error(error) => Err(error.finish().result()),
+                        },
+                        CachePolled::Error(state) => match state.poll_upstream().await {
+                            UpstreamPolled::Successful(state) => Ok(
+                                state.update_cache().await.finish().result()
+                            ),
+                            UpstreamPolled::Error(error) => Err(error.finish().result()),
+                        },
+                    }
+                }
                 _ => unreachable!()
             }
         })
