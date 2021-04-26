@@ -9,7 +9,7 @@ use actix::dev::{MessageResponse, ToEnvelope};
 use std::marker::PhantomData;
 use crate::adapted::runtime_adapter::RuntimeAdapter;
 use crate::states::upstream_polled::{UpstreamPolled, UpstreamPolledSuccessful, UpstreamPolledError};
-use crate::states::cache_polled::{CachePolled, CachePolledSuccessful, CacheErrorOccurred};
+use crate::states::cache_polled::{CachePolled, CachePolledSuccessful, CacheErrorOccurred, CacheMissed};
 use crate::adapted::actix_runtime_adapter::CacheState;
 
 #[derive(Debug)]
@@ -43,11 +43,12 @@ where
     {
         let cache_result: Result<CacheState<T>, CacheError> = self.adapter.poll_cache().await;
         match cache_result {
-            Ok(value) => {
-                CachePolled::Successful(CachePolledSuccessful {
-                    adapter: self.adapter,
-                    result: value
-                })
+            Ok(value) => match value {
+                CacheState::Actual(result) | CacheState::Stale(result)
+                => CachePolled::Successful(
+                    CachePolledSuccessful { adapter: self.adapter, result }
+                ),
+                CacheState::Miss => CachePolled::Miss(CacheMissed { adapter: self.adapter })
             },
             Err(err) => CachePolled::Error(CacheErrorOccurred { adapter: self.adapter }),
         }

@@ -3,8 +3,7 @@ use crate::states::finish::Finish;
 use std::fmt::Debug;
 use crate::CacheError;
 use crate::states::upstream_polled::{UpstreamPolled, UpstreamPolledSuccessful, UpstreamPolledError};
-use crate::cache::CachedValue;
-use crate::adapted::actix_runtime_adapter::CacheState;
+use crate::adapted::actix_runtime_adapter::{CacheState, CachedValue};
 
 pub struct CacheMissed<A>
     where
@@ -59,7 +58,7 @@ where
     A: RuntimeAdapter,
 {
     pub adapter: A,
-    pub result: CacheState<T>
+    pub result: CachedValue<T>
 }
 
 impl<A, T> CachePolledSuccessful<A, T>
@@ -68,11 +67,7 @@ where
     T: Debug,
 {
     pub fn finish(self) -> Finish<T> {
-        Finish { result: match self.result {
-            CacheState::Actual(value) => value.into_inner(),
-            CacheState::Stale(value) => value.into_inner(),
-            _ => unreachable!()
-        } }
+        Finish { result: self.result.into_inner() }
     }
 }
 
