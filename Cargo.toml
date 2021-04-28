@@ -5,4 +5,5 @@ members = [
     "hitbox-backend",
     "hitbox-derive",
     "hitbox-redis",
+    "examples",
 ]
