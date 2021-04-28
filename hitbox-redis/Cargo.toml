@@ -8,7 +8,7 @@ license-file = "LICENSE"
 workspace = ".."
 
 [dependencies]
-hitbox-backend = "0.1"
+hitbox-backend = { path = "../hitbox-backend" }
 actix = "0.10"
 log = "0.4"
 redis = { version = "0.17", features = ["tokio-rt-core", "connection-manager"] }
