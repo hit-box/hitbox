@@ -3,7 +3,7 @@ name = "hitbox"
 version = "0.1.0"
 authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"]
 edition = "2018"
-description = "Actix cache actor."
+description = "Rust cache system."
 license-file = "LICENSE"
 
 [dependencies]
@@ -30,7 +30,7 @@ actix-web = "3"
 members = [
   ".",
   "hitbox-redis",
-    "hitbox-backend",
+  "hitbox-backend",
   "hitbox-derive",
 ]
 
