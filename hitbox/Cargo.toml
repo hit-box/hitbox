@@ -10,9 +10,9 @@ license-file = "LICENSE"
 actix = "0.10"
 log = "0.4"
 actix-rt = "1"
-hitbox-backend = { path = "../hitbox-backend" }
-hitbox-redis = { path = "../hitbox-redis", optional = true }
-hitbox-derive = { path = "../hitbox-derive", optional = true }
+# hitbox-backend = { path = "../hitbox-backend" }
+# hitbox-redis = { path = "../hitbox-redis", optional = true }
+# hitbox-derive = { path = "../hitbox-derive", optional = true }
 serde_json = "1"
 serde_qs = { version = "0.7", optional = true }
 serde = { version = "1", features = ["derive"] }
@@ -27,8 +27,8 @@ actix_derive = "0.5"
 actix-web = "3"
 
 [features]
-default = ["redis"]
+# default = ["redis"]
 
-redis = ["hitbox-redis"]
-derive = ["hitbox-derive", "serde_qs"]
+# redis = ["hitbox-redis"]
+# derive = ["hitbox-derive", "serde_qs"]
 metrics = ["prometheus", "lazy_static"]
