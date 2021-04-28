@@ -45,7 +45,7 @@ where
         match cache_result {
             Ok(value) => match value {
                 CacheState::Actual(result) | CacheState::Stale(result)
-                => CachePolled::Successful(
+                => CachePolled::Actual(
                     CachePolledSuccessful { adapter: self.adapter, result }
                 ),
                 CacheState::Miss => CachePolled::Miss(CacheMissed { adapter: self.adapter })

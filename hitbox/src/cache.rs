@@ -212,7 +212,10 @@ where
                 // 2.
                 InitialCacheSettings::CacheEnabled => {
                     match initial_state.poll_cache().await {
-                        CachePolled::Successful(state) => Ok(
+                        CachePolled::Actual(state) => Ok(
+                            state.finish().result()
+                        ),
+                        CachePolled::Stale(state) => Ok(
                             state.finish().result()
                         ),
                         CachePolled::Miss(state) => match state.poll_upstream().await {

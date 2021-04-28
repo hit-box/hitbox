@@ -20,7 +20,10 @@ async fn test_cache_enabled_cache_polled_successful() {
     let initial_state = InitialCacheSettings::from(settings);
     let initial_state = InitialState { adapter, settings: initial_state };
     let result = match initial_state.poll_cache().await {
-        CachePolled::Successful(state) => Ok(
+        CachePolled::Actual(state) => Ok(
+            state.finish().result()
+        ),
+        CachePolled::Stale(state) => Ok(
             state.finish().result()
         ),
         CachePolled::Miss(state) => match state.poll_upstream().await {

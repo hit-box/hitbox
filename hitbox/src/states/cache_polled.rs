@@ -75,7 +75,8 @@ pub enum CachePolled<A, T>
 where
     A: RuntimeAdapter,
 {
-    Successful(CachePolledSuccessful<A, T>),
+    Actual(CachePolledSuccessful<A, T>),
+    Stale(CachePolledSuccessful<A, T>),
     Miss(CacheMissed<A>),
     Error(CacheErrorOccurred<A>),
 }
