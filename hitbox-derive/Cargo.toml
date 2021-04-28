@@ -1,5 +1,5 @@
 [package]
-name = "actix-cache-derive"
+name = "hitbox-derive"
 version = "0.1.0"
 authors = ["Andrey Ermilov <andrerm@ya.ru>", "Belousow Makc <lib.bmw@gmail.com>"]
 edition = "2018"

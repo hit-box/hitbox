@@ -1,7 +1,7 @@
 //! Error decplaration and transformation into [BackendError].
 //!
-//! [BackendError]: ../../actix_cache_backend/enum.BackendError.html
-use actix_cache_backend::BackendError;
+//! [BackendError]: ../../hitbox_backend/enum.BackendError.html
+use hitbox_backend::BackendError;
 use redis::RedisError;
 
 /// Redis backend error declaration.

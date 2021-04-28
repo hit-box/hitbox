@@ -1,14 +1,14 @@
 [package]
-name = "actix-cache-redis"
+name = "hitbox-redis"
 version = "0.1.0"
 authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"]
 edition = "2018"
-description = "Actix-cache redis backend actor."
+description = "hitbox redis backend actor."
 license-file = "LICENSE"
 workspace = ".."
 
 [dependencies]
-actix-cache-backend = "0.1"
+hitbox-backend = "0.1"
 actix = "0.10"
 log = "0.4"
 redis = { version = "0.17", features = ["tokio-rt-core", "connection-manager"] }

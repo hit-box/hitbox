@@ -5,9 +5,9 @@ use actix::{
     dev::{MessageResponse, ToEnvelope},
     Actor, Addr, Handler, Message, ResponseFuture,
 };
-use actix_cache_backend::{Backend, Delete, Get, Lock, LockStatus, Set};
+use hitbox_backend::{Backend, Delete, Get, Lock, LockStatus, Set};
 #[cfg(feature = "derive")]
-pub use actix_cache_derive::Cacheable;
+pub use hitbox_derive::Cacheable;
 use chrono::{DateTime, Duration, Utc};
 use log::{debug, warn, info};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -28,8 +28,8 @@ pub trait Cacheable {
     /// # Examples
     ///
     /// ```
-    /// use actix_cache::cache::Cacheable;
-    /// use actix_cache::CacheError;
+    /// use hitbox::cache::Cacheable;
+    /// use hitbox::CacheError;
     ///
     /// struct QueryNothing {
     ///     id: Option<i32>,
@@ -86,8 +86,8 @@ pub trait Cacheable {
     /// ```
     /// use actix::prelude::*;
     /// use actix_derive::Message;
-    /// use actix_cache::cache::{Cacheable, QueryCache};
-    /// use actix_cache::CacheError;
+    /// use hitbox::cache::{Cacheable, QueryCache};
+    /// use hitbox::CacheError;
     /// use serde::Serialize;
     ///
     /// struct Upstream;

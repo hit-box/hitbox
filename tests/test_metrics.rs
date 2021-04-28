@@ -1,8 +1,8 @@
 #[cfg(feature = "metrics")]
 mod tests {
     use actix::prelude::*;
-    use actix_cache::metrics::CACHE_MISS_COUNTER;
-    use actix_cache::{dev::backend::MockBackend, CacheActor, CacheError, Cacheable};
+    use hitbox::metrics::CACHE_MISS_COUNTER;
+    use hitbox::{dev::backend::MockBackend, CacheActor, CacheError, Cacheable};
 
     pub struct Upstream;
 

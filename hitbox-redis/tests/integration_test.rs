@@ -1,6 +1,6 @@
 use actix::prelude::*;
-use actix_cache_backend::{Delete, DeleteStatus, Get, Lock, LockStatus, Set};
-use actix_cache_redis::{error::Error, RedisBackend};
+use hitbox_backend::{Delete, DeleteStatus, Get, Lock, LockStatus, Set};
+use hitbox_redis::{error::Error, RedisBackend};
 use tokio::time::{delay_for, Duration};
 
 #[actix_rt::test]

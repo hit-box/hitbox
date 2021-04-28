@@ -1,11 +1,11 @@
 use actix::prelude::*;
-use actix_cache::dev::{
+use hitbox::dev::{
     backend::{GetMessages, MockBackend, MockMessage},
     Get,
 };
-use actix_cache::{CacheError, Cacheable};
+use hitbox::{CacheError, Cacheable};
 use serde::{Deserialize, Serialize};
-use actix_cache::{CacheActor, response::{CacheableResponse, CachePolicy}};
+use hitbox::{CacheActor, response::{CacheableResponse, CachePolicy}};
 
 struct UpstreamActor;
 
