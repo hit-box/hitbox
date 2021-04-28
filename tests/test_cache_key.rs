@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache::cache::Cacheable;
+use hitbox::cache::Cacheable;
 use serde::Serialize;
 
 #[derive(Cacheable, Serialize, Message)]

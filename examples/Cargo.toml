@@ -1,0 +1,15 @@
+[package]
+name = "hitbox-examples"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+[features]
+default = []
+
+[dev-dependencies]
+
+hitbox = { path = "../hitbox" }
+hitbox-backend = { path = "../hitbox-backend" }
+hitbox-derive = { path = "../hitbox-derive" }
+hitbox-redis = { path = "../hitbox-redis" }

@@ -1,60 +1,8 @@
-[package]
-name = "actix-cache"
-version = "0.1.0"
-authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"]
-edition = "2018"
-description = "Actix cache actor."
-license-file = "LICENSE"
-
-[dependencies]
-actix = "0.10"
-log = "0.4"
-actix-rt = "1"
-actix-cache-backend = "0.1"
-actix-cache-redis = { version = "0.1", optional = true }
-actix-cache-derive = { version = "0.1", optional = true }
-serde_json = "1"
-serde_qs = { version = "0.7", optional = true }
-serde = { version = "1", features = ["derive"] }
-chrono = { version = "0.4", features = ["serde"] }
-thiserror = "1"
-prometheus = { version = "0.10", optional = true }
-lazy_static = { version = "1", optional = true }
-
-[dev-dependencies]
-env_logger = "0.8"
-actix_derive = "0.5"
-actix-web = "3"
-
 [workspace]
+
 members = [
-  ".",
-  "actix-cache-redis",
-  "actix-cache-backend",
-  "actix-cache-derive",
+    "hitbox",
+    "hitbox-backend",
+    "hitbox-derive",
+    "hitbox-redis",
 ]
-
-[patch.crates-io]
-actix-cache = { path = "." }
-actix-cache-redis = { path = "actix-cache-redis" }
-actix-cache-backend = { path = "actix-cache-backend" }
-actix-cache-derive = { path = "actix-cache-derive" }
-
-[[example]]
-name = "debug"
-required-features = ["derive"]
-
-[[example]]
-name = "async_backend"
-required-features = ["derive"]
-
-[[example]]
-name = "metrics"
-required-features = ["derive", "metrics"]
-
-[features]
-default = ["redis"]
-
-redis = ["actix-cache-redis"]
-derive = ["actix-cache-derive", "serde_qs"]
-metrics = ["prometheus", "lazy_static"]

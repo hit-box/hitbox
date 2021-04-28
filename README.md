@@ -1,7 +1,7 @@
-# actix-cache
+# hitbox
 
-[![Build Status](https://travis-ci.org/rambler-digital-solutions/actix-cache.svg?branch=master)](https://travis-ci.org/rambler-digital-solutions/actix-cache)
-[![Coverage Status](https://coveralls.io/repos/github/rambler-digital-solutions/actix-cache/badge.svg?branch=master)](https://coveralls.io/github/rambler-digital-solutions/actix-cache?branch=master)
+[![Build Status](https://travis-ci.org/rambler-digital-solutions/hitbox.svg?branch=master)](https://travis-ci.org/rambler-digital-solutions/hitbox)
+[![Coverage Status](https://coveralls.io/repos/github/rambler-digital-solutions/hitbox/badge.svg?branch=master)](https://coveralls.io/github/rambler-digital-solutions/hitbox?branch=master)
 
 Actix cache is a proxy actor and infrastructure for asynchronous and clear cache interaction for Actix actor and Actix-web frameworks.
 
@@ -15,7 +15,7 @@ Actix cache is a proxy actor and infrastructure for asynchronous and clear cache
 ## Backend implementations
 
 At this time supported or planned next cache backend implementation:
-- [x] Redis backend (actix-cache-redis)
+- [x] Redis backend (hitbox-redis)
 - [ ] In-memory backend
 
 ## Feature flags
@@ -29,7 +29,7 @@ Dependencies:
 
 ```toml
 [dependencies]
-actix-cache = "0.2"
+hitbox = "0.2"
 ```
 
 Code:
@@ -42,7 +42,7 @@ First of all, you should derive [Cacheable] trait for your actix Message:
 
 ```rust
 use actix::prelude::*;
-use actix_cache::Cacheable; // With features=["derive"]
+use hitbox::Cacheable; // With features=["derive"]
 use actix_derive::Message;
 use serde::{Deserialize, Serialize};
 struct Pong;
@@ -56,7 +56,7 @@ struct Ping {
 Or implement that trait manually:
 
 ```rust
-use actix_cache::{Cacheable, CacheError};
+use hitbox::{Cacheable, CacheError};
 
 struct Ping { id: i32 }
 
@@ -71,7 +71,7 @@ Next step is to instantiate [CacheActor] with default backend:
 
 ```rust
 use actix::prelude::*;
-use actix_cache::{CacheError, Cache};
+use hitbox::{CacheError, Cache};
 
 #[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
@@ -83,12 +83,12 @@ async fn main() -> Result<(), CacheError> {
 ```
 
 And the last step is using cache in your code (actix-web handler for example).
-This full example and other examples you can see on [github.com](https://github.com/rambler-digital-solutions/actix-cache/blob/master/examples/actix_web.rs)
+This full example and other examples you can see on [github.com](https://github.com/rambler-digital-solutions/hitbox/blob/master/examples/actix_web.rs)
 
 ```rust
 use actix::prelude::*;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use actix_cache::{Cache, Cacheable};
+use hitbox::{Cache, Cacheable};
 use serde::Serialize;
 
 struct FibonacciActor;
@@ -125,5 +125,5 @@ async fn index(
 
 
 [Dogpile]: https://www.sobstel.org/blog/preventing-dogpile-effect/
-[Cacheable]: https://docs.rs/actix-cache/latest/actix-cache/cache/trait.Cacheable.html
-[CacheActor]: https://docs.rs/actix-cache/latest/actix-cache/actor/struct.CacheActor.html
+[Cacheable]: https://docs.rs/hitbox/latest/hitbox/cache/trait.Cacheable.html
+[CacheActor]: https://docs.rs/hitbox/latest/hitbox/actor/struct.CacheActor.html

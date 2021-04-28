@@ -1,0 +1,9 @@
+[package]
+name = "hitbox-backend"
+version = "0.1.0"
+authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"]
+edition = "2018"
+
+[dependencies]
+actix = "0.10"
+thiserror = "1"
