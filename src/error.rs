@@ -1,12 +1,12 @@
 //! Error implementation and transformations.
 use thiserror::Error;
 
-/// Base actix-cache error.
+/// Base hitbox error.
 #[derive(Error, Debug)]
 pub enum CacheError {
     /// Error described all problems with cache backend interactions.
     #[error(transparent)]
-    BackendError(#[from] actix_cache_backend::BackendError),
+    BackendError(#[from] hitbox_backend::BackendError),
     /// Wrapper for upstream actor mailbox or timeout errors.
     #[error("Actix upstream actor error")]
     UpstreamError(#[from] actix::MailboxError),

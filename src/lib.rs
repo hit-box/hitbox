@@ -1,6 +1,6 @@
 //! A proxy actor and infrastructure for asynchronous and clear cache interaction for Actix actor and Actix-web frameworks.
 //!
-//! # A tour of actix-cache
+//! # A tour of hitbox
 //!
 //! This crate consist of three main part:
 //! * [CacheActor] actix actor.
@@ -27,7 +27,7 @@
 //!
 //! ```rust
 //! use actix::prelude::*;
-//! use actix_cache::Cacheable; // With features=["derive"]
+//! use hitbox::Cacheable; // With features=["derive"]
 //! use actix_derive::Message;
 //! use serde::{Deserialize, Serialize};
 //! # struct Pong;
@@ -41,7 +41,7 @@
 //! Or implement that trait manually:
 //!
 //! ```rust
-//! # use actix_cache::{Cacheable, CacheError};
+//! # use hitbox::{Cacheable, CacheError};
 //! # struct Ping { id: i32 }
 //! impl Cacheable for Ping {
 //!     fn cache_message_key(&self) -> Result<String, CacheError> {
@@ -55,7 +55,7 @@
 //!
 //! ```rust
 //! # use actix::prelude::*;
-//! use actix_cache::{Cache, CacheError, RedisBackend};
+//! use hitbox::{Cache, CacheError, RedisBackend};
 //!
 //! #[actix_rt::main]
 //! async fn main() -> Result<(), CacheError> {
@@ -70,7 +70,7 @@
 //!
 //! ```rust
 //! # use actix::prelude::*;
-//! use actix_cache::{CacheActor, CacheError, RedisBackend};
+//! use hitbox::{CacheActor, CacheError, RedisBackend};
 //!
 //! #[actix_rt::main]
 //! async fn main() -> Result<(), CacheError> {
@@ -86,12 +86,12 @@
 //! ```
 //!
 //! And the last step is using cache in your code (actix-web handler for example).
-//! This full example and other examples you can see on [github.com](https://github.com/rambler-digital-solutions/actix-cache/blob/master/examples/actix_web.rs)
+//! This full example and other examples you can see on [github.com](https://github.com/rambler-digital-solutions/hitbox/blob/master/examples/actix_web.rs)
 //!
 //! ```rust
 //! # use actix::prelude::*;
 //! # use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-//! # use actix_cache::{Cache, RedisBackend, Cacheable};
+//! # use hitbox::{Cache, RedisBackend, Cacheable};
 //! # use serde::Serialize;
 //! #
 //! # struct FibonacciActor;
@@ -143,8 +143,8 @@
 //!
 //! [CacheActor]: actor/struct.CacheActor.html
 //! [Cacheable]: cache/trait.Cacheable.html
-//! [Backend]: ../actix_cache_backend/trait.Backend.html
-//! [RedisBackend]: ../actix_cache_redis/actor/struct.RedisActor.html
+//! [Backend]: ../hitbox_backend/trait.Backend.html
+//! [RedisBackend]: ../hitbox_redis/actor/struct.RedisActor.html
 //! [Get]: dev/struct.Get.html
 //! [Set]: dev/struct.Set.html
 //! [Delete]: dev/struct.Delete.html
@@ -167,7 +167,7 @@ pub use actor::CacheActor;
 pub use cache::{Cacheable, QueryCache};
 pub use error::CacheError;
 
-pub use actix_cache_redis::RedisBackend;
+pub use hitbox_redis::RedisBackend;
 
 #[cfg(feature = "derive")]
 #[doc(hidden)]

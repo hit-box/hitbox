@@ -1,5 +1,5 @@
 //! Structures and traits for custom backend development and testing process.
-pub use actix_cache_backend::{
+pub use hitbox_backend::{
     Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set,
 };
 

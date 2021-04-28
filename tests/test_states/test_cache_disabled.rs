@@ -1,9 +1,9 @@
-use actix_cache::settings::{CacheSettings, Status};
-use actix_cache::dev::MockAdapter;
-use actix_cache::states::initial::InitialState;
-use actix_cache::states::upstream_polled::UpstreamPolled;
-use actix_cache::settings::InitialCacheSettings;
-use actix_cache::CacheError;
+use hitbox::settings::{CacheSettings, Status};
+use hitbox::dev::MockAdapter;
+use hitbox::states::initial::InitialState;
+use hitbox::states::upstream_polled::UpstreamPolled;
+use hitbox::settings::InitialCacheSettings;
+use hitbox::CacheError;
 
 #[actix_rt::test]
 async fn test_cache_disabled_upstream_polled() {

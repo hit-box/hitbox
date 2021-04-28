@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache::{Cache, Cacheable};
+use hitbox::{Cache, Cacheable};
 use actix_derive::Message;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use serde::Serialize;

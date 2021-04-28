@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache::{Cache, CacheError, Cacheable, RedisBackend};
+use hitbox::{Cache, CacheError, Cacheable, RedisBackend};
 use actix_derive::{Message, MessageResponse};
 use serde::{Deserialize, Serialize};
 

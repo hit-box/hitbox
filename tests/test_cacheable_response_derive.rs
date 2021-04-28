@@ -1,4 +1,4 @@
-use actix_cache::response::{CacheableResponse, CachePolicy};
+use hitbox::response::{CacheableResponse, CachePolicy};
 use serde::Serialize;
 
 #[derive(CacheableResponse, Serialize, Clone, Debug, Eq, PartialEq)]

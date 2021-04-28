@@ -3,7 +3,7 @@ use crate::adapted::AdapterResult;
 use crate::{Cacheable, QueryCache};
 use actix::dev::{MessageResponse, ToEnvelope};
 use actix::{Actor, Addr, Handler, Message};
-use actix_cache_backend::{Backend, Get};
+use hitbox_backend::{Backend, Get};
 
 pub struct ActixAdapter<A, M, B>
 where

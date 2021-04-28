@@ -1,5 +1,5 @@
 #![warn(missing_docs)]
-//! Traits and struct messages for actix-cache backend interaction.
+//! Traits and struct messages for hitbox backend interaction.
 //!
 //! If you want implement your own backend, you in the right place.
 use actix::dev::ToEnvelope;

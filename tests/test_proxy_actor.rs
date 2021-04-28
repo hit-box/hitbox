@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_cache::{Cache, CacheError, Cacheable};
+use hitbox::{Cache, CacheError, Cacheable};
 
 pub struct Upstream;
 

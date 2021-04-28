@@ -1,4 +1,4 @@
-use actix_cache_backend::Backend;
+use hitbox_backend::Backend;
 use actix::{Actor, Addr};
 use std::marker::PhantomData;
 use crate::CacheActor;
@@ -9,7 +9,7 @@ use crate::settings::{CacheSettings, Status, InitialCacheSettings};
 /// # Example
 /// ```rust
 /// use actix::prelude::*;
-/// use actix_cache::{Cache, RedisBackend, CacheError};
+/// use hitbox::{Cache, RedisBackend, CacheError};
 ///
 /// #[actix_rt::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -1,6 +1,6 @@
 // use fsm_cache::{CacheSettings, SettingState, InitialState, Message, InitialStateSettings};
 // use actix::Message;
-// use actix_cache::settings::{CacheSettings, SettingState, InitialStateSettings};
+// use hitbox::settings::{CacheSettings, SettingState, InitialStateSettings};
 //
 // #[derive(Debug, PartialEq)]
 // pub struct Ping;

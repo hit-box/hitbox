@@ -3,8 +3,8 @@
 //!
 //! You can see an example of Cacheable derive macro below:
 //! ```edition2018,ignore
-//! use actix_cache::cache::Cacheable;
-//! use actix_cache::error::CacheError;
+//! use hitbox::cache::Cacheable;
+//! use hitbox::error::CacheError;
 //! use serde::Serialize;
 //!
 //! #[derive(Cacheable, Serialize)]
@@ -20,7 +20,7 @@
 //!
 //! CacheableResponse example:
 //! ```edition2018,ignore
-//! use actix_cache::response::CacheableResponse;
+//! use hitbox::response::CacheableResponse;
 //! use serde::Serialize;
 //!
 //! #[derive(CacheableResponse, Serialize)]

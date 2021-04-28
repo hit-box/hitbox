@@ -4,7 +4,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
 #[cfg(feature = "derive")]
-pub use actix_cache_derive::CacheableResponse;
+pub use hitbox_derive::CacheableResponse;
 
 pub enum CachePolicy<T, U> {
     Cacheable(T),

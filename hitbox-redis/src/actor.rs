@@ -1,7 +1,7 @@
 //! Redis backend actor implementation.
 use crate::error::Error;
 use actix::prelude::*;
-use actix_cache_backend::{
+use hitbox_backend::{
     Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set,
 };
 use log::{debug, info};
@@ -9,11 +9,11 @@ use redis::{aio::ConnectionManager, Client};
 
 /// Redis cache backend based on redis-rs crate.
 ///
-/// This actor provides redis as storage [Backend] for actix-cache.
+/// This actor provides redis as storage [Backend] for hitbox.
 /// Its use one [MultiplexedConnection] for asynchronous network interaction.
 ///
 /// [MultiplexedConnection]: TODO
-/// [Backend]: /actix_cache_backend/trait.Backend.html
+/// [Backend]: /hitbox_backend/trait.Backend.html
 pub struct RedisBackend {
     connection: ConnectionManager,
 }
@@ -23,7 +23,7 @@ impl RedisBackend {
     ///
     /// # Examples
     /// ```
-    /// use actix_cache_redis::RedisBackend;
+    /// use hitbox_redis::RedisBackend;
     ///
     /// #[actix_rt::main]
     /// async fn main() {

@@ -2,8 +2,8 @@
 use std::marker::PhantomData;
 
 use actix::prelude::*;
-use actix_cache_backend::Backend;
-use actix_cache_redis::RedisBackend;
+use hitbox_backend::Backend;
+use hitbox_redis::RedisBackend;
 use log::{debug, info, warn};
 
 use crate::CacheError;
@@ -22,7 +22,7 @@ use crate::metrics::{
 /// # Example
 /// ```rust
 /// use actix::prelude::*;
-/// use actix_cache::{Cache, RedisBackend, CacheError};
+/// use hitbox::{Cache, RedisBackend, CacheError};
 ///
 /// #[actix_rt::main]
 /// async fn main() -> Result<(), CacheError> {
@@ -55,7 +55,7 @@ where
 {
     /// Initialize new Cache actor with default [RedisBackend].
     ///
-    /// [RedisBackend]: ../../actix_cache_redis/actor/struct.RedisActor.html
+    /// [RedisBackend]: ../../hitbox_redis/actor/struct.RedisActor.html
     pub async fn new() -> Result<CacheActor<RedisBackend>, CacheError> {
         let backend = RedisBackend::new()
             .await
