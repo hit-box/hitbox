@@ -183,6 +183,7 @@ use crate::adapted::actix_runtime_adapter::ActixAdapter;
 use crate::states::initial::InitialState;
 use crate::states::upstream_polled::UpstreamPolled;
 use crate::states::cache_polled::CachePolled;
+use crate::transition_groups::upstream;
 
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for actor::CacheActor<B>
 where
@@ -203,12 +204,7 @@ where
         Box::pin(async move {
             match initial_state.settings {
                 // 1.
-                InitialCacheSettings::CacheDisabled => {
-                    match initial_state.poll_upstream().await {
-                        UpstreamPolled::Successful(state) => Ok(state.finish().result()),
-                        UpstreamPolled::Error(error) => Err(error.finish().result()),
-                    }
-                },
+                InitialCacheSettings::CacheDisabled => upstream::transition(initial_state).await,
                 // 2.
                 InitialCacheSettings::CacheEnabled => {
                     match initial_state.poll_cache().await {

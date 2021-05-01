@@ -162,6 +162,7 @@ pub mod response;
 pub mod states;
 pub mod settings;
 pub mod adapted;
+pub mod transition_groups;
 
 pub use actor::CacheActor;
 pub use cache::{Cacheable, QueryCache};
