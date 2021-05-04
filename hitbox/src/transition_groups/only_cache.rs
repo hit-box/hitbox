@@ -7,31 +7,22 @@ use std::fmt::Debug;
 use crate::CacheError;
 
 
-pub async fn transition<T, A>(state: InitialState<A>) -> Result<T, CacheError>
+pub async fn transition<T, A>(state: InitialState<A>) -> Finish<T>
 where
     A: RuntimeAdapter,
     A: RuntimeAdapter<UpstreamResult = T>,
     T: Debug,
 {
     match state.poll_cache().await {
-        CachePolled::Actual(state) => Ok(
-            state.finish().result()
-        ),
-        CachePolled::Stale(state) => Ok(
-            state.finish().result()
-        ),
+        CachePolled::Actual(state) => state.finish(),
+        CachePolled::Stale(state) => state.finish(),
         CachePolled::Miss(state) => match state.poll_upstream().await {
-            UpstreamPolled::Successful(state) => Ok(
-                state.update_cache().await.finish().result()
-            ),
-            UpstreamPolled::Error(error) => Err(error.finish().result()),
+            UpstreamPolled::Successful(state) => state.update_cache().await.finish(),
+            UpstreamPolled::Error(error) => error.finish(),
         },
         CachePolled::Error(state) => match state.poll_upstream().await {
-            UpstreamPolled::Successful(state) => Ok(
-                state.update_cache().await.finish().result()
-            ),
-            UpstreamPolled::Error(error) => Err(error.finish().result()),
+            UpstreamPolled::Successful(state) => state.update_cache().await.finish(),
+            UpstreamPolled::Error(error) => error.finish(),
         },
     }
 }
-

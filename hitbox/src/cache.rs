@@ -203,8 +203,8 @@ where
         let initial_state = InitialState { adapter, settings: self.settings.clone() };
         Box::pin(async move {
             match initial_state.settings {
-                InitialCacheSettings::CacheDisabled => upstream::transition(initial_state).await,
-                InitialCacheSettings::CacheEnabled => only_cache::transition(initial_state).await,
+                InitialCacheSettings::CacheDisabled => upstream::transition(initial_state).await.result(),
+                InitialCacheSettings::CacheEnabled => only_cache::transition(initial_state).await.result(),
                 _ => unreachable!()
             }
         })

@@ -67,7 +67,7 @@ where
     T: Debug,
 {
     pub fn finish(self) -> Finish<T> {
-        Finish { result: self.result.into_inner() }
+        Finish { result: Ok(self.result.into_inner()) }
     }
 }
 

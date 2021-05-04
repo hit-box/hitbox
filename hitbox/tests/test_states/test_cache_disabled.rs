@@ -18,8 +18,8 @@ async fn test_cache_disabled_upstream_polled() {
         .finish();
     let initial_state = InitialCacheSettings::from(settings);
     let initial_state = InitialState { adapter, settings: initial_state };
-    let result = upstream::transition(initial_state).await;
-    assert_eq!(result.unwrap(), 42);
+    let finish = upstream::transition(initial_state).await;
+    assert_eq!(finish.result().unwrap(), 42);
 }
 
 #[actix_rt::test]
@@ -35,6 +35,6 @@ async fn test_cache_disabled_upstream_error() {
         .finish();
     let initial_state = InitialCacheSettings::from(settings);
     let initial_state = InitialState { adapter, settings: initial_state };
-    let result = upstream::transition(initial_state).await;
-    assert!(result.is_err());
+    let finish = upstream::transition(initial_state).await;
+    assert!(finish.result().is_err());
 }

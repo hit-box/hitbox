@@ -5,15 +5,15 @@ use crate::states::finish::Finish;
 use std::fmt::Debug;
 use crate::CacheError;
 
-pub async fn transition<T, A>(state: InitialState<A>) -> Result<T, CacheError>
+pub async fn transition<T, A>(state: InitialState<A>) -> Finish<T>
 where
     A: RuntimeAdapter,
     A: RuntimeAdapter<UpstreamResult = T>,
     T: Debug,
 {
     match state.poll_upstream().await {
-        UpstreamPolled::Successful(state) => Ok(state.finish().result()),
-        UpstreamPolled::Error(error) => Err(error.finish().result()),
+        UpstreamPolled::Successful(state) => state.finish(),
+        UpstreamPolled::Error(error) => error.finish(),
     }
 }
 

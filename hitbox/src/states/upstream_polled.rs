@@ -17,7 +17,7 @@ impl<A, T> CacheUpdated<A, T>
         T: Debug,
 {
     pub fn finish(self) -> Finish<T> {
-        Finish { result: self.result }
+        Finish { result: Ok(self.result) }
     }
 }
 
@@ -35,7 +35,7 @@ where
     T: Debug,
 {
     pub fn finish(self) -> Finish<T> {
-        Finish { result: self.result }
+        Finish { result: Ok(self.result) }
     }
 
     pub async fn update_cache(self) -> CacheUpdated<A, T> {
@@ -48,8 +48,8 @@ pub struct UpstreamPolledError {
 }
 
 impl UpstreamPolledError {
-    pub fn finish(self) -> Finish<CacheError> {
-        Finish { result: self.error }
+    pub fn finish<T: Debug>(self) -> Finish<T> {
+        Finish { result: Err(self.error) }
     }
 }
 
@@ -60,3 +60,11 @@ where
     Successful(UpstreamPolledSuccessful<A, T>),
     Error(UpstreamPolledError),
 }
+
+// pub struct UpstreamPolled<A, T>
+// where
+//     A: RuntimeAdapter,
+// {
+//     pub adapter: A,
+//     pub result: T
+// }

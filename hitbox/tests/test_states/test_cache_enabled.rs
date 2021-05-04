@@ -20,6 +20,6 @@ async fn test_cache_enabled_cache_polled_successful() {
         .finish();
     let initial_state = InitialCacheSettings::from(settings);
     let initial_state = InitialState { adapter, settings: initial_state };
-    let result = only_cache::transition(initial_state).await;
-    assert_eq!(result.unwrap(), 42);
+    let finish = only_cache::transition(initial_state).await;
+    assert_eq!(finish.result().unwrap(), 42);
 }
