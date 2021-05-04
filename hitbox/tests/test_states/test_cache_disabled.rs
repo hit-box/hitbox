@@ -4,6 +4,7 @@ use hitbox::states::initial::InitialState;
 use hitbox::states::upstream_polled::UpstreamPolled;
 use hitbox::settings::InitialCacheSettings;
 use hitbox::CacheError;
+use hitbox::transition_groups::upstream;
 
 #[actix_rt::test]
 async fn test_cache_disabled_upstream_polled() {
@@ -17,10 +18,7 @@ async fn test_cache_disabled_upstream_polled() {
         .finish();
     let initial_state = InitialCacheSettings::from(settings);
     let initial_state = InitialState { adapter, settings: initial_state };
-    let result = match initial_state.poll_upstream().await {
-        UpstreamPolled::Successful(state) => Ok(state.finish().result()),
-        UpstreamPolled::Error(error) => Err(error.finish().result()),
-    };
+    let result = upstream::transition(initial_state).await;
     assert_eq!(result.unwrap(), 42);
 }
 
@@ -37,9 +35,6 @@ async fn test_cache_disabled_upstream_error() {
         .finish();
     let initial_state = InitialCacheSettings::from(settings);
     let initial_state = InitialState { adapter, settings: initial_state };
-    let result = match initial_state.poll_upstream().await {
-        UpstreamPolled::Successful(state) => Ok(state.finish().result()),
-        UpstreamPolled::Error(error) => Err(error.finish().result()),
-    };
+    let result = upstream::transition(initial_state).await;
     assert!(result.is_err());
 }
