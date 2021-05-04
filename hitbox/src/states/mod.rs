@@ -1,5 +1,6 @@
 pub mod initial;
 pub mod upstream_polled;
+pub mod stale_upstream_polled;
 pub mod finish;
 pub mod cache_polled;
 // mod cache_updated;
