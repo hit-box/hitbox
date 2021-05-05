@@ -1,5 +1,7 @@
 use crate::adapted::runtime_adapter::RuntimeAdapter;
-use crate::states::upstream_polled::{UpstreamPolledSuccessful, UpstreamPolledError, UpstreamPolledErrorStaleRetrieved};
+use crate::states::upstream_polled::{
+    UpstreamPolledError, UpstreamPolledErrorStaleRetrieved, UpstreamPolledSuccessful,
+};
 
 pub enum UpstreamPolled<A, T>
 where

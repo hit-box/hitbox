@@ -65,7 +65,7 @@
 //! #   Ok(())
 //! }
 //! ```
-//! Or you can instantiate [CacheActor] with any other backend manually 
+//! Or you can instantiate [CacheActor] with any other backend manually
 //! (for additional information you can backend examples):
 //!
 //! ```rust
@@ -152,16 +152,16 @@
 //! [Dogpile]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 #![warn(missing_docs)]
 pub mod actor;
-pub mod cache;
+pub mod adapted;
 pub mod builder;
+pub mod cache;
 pub mod dev;
 pub mod error;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 pub mod response;
-pub mod states;
 pub mod settings;
-pub mod adapted;
+pub mod states;
 pub mod transition_groups;
 
 pub use actor::CacheActor;

@@ -1,6 +1,6 @@
 use actix::prelude::*;
-use hitbox::{Cache, CacheError, Cacheable};
 use actix_derive::{Message, MessageResponse};
+use hitbox::{Cache, CacheError, Cacheable};
 use prometheus::{Encoder, TextEncoder};
 use serde::{Deserialize, Serialize};
 

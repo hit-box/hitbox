@@ -1,8 +1,8 @@
-use hitbox_backend::Backend;
-use actix::{Actor, Addr};
-use std::marker::PhantomData;
+use crate::settings::{CacheSettings, InitialCacheSettings, Status};
 use crate::CacheActor;
-use crate::settings::{CacheSettings, Status, InitialCacheSettings};
+use actix::{Actor, Addr};
+use hitbox_backend::Backend;
+use std::marker::PhantomData;
 
 /// Cache actor configurator.
 ///

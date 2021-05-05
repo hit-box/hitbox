@@ -50,20 +50,16 @@ where
     fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
         let backend = self.backend.clone();
         let cache_key = self.message.cache_key().unwrap();
-        Box::pin(async move { 
-            let cached_value = backend
-                .send(Get { key:  cache_key})
-                .await
-                .unwrap()
-                .unwrap();
+        Box::pin(async move {
+            let cached_value = backend.send(Get { key: cache_key }).await.unwrap().unwrap();
             CacheState::from_bytes(cached_value.as_ref())
         })
     }
 }
 
-use serde::{de::DeserializeOwned, Deserialize};
 use crate::response::CacheableResponse;
 use chrono::{DateTime, Utc};
+use serde::{de::DeserializeOwned, Deserialize};
 
 #[derive(Deserialize)]
 pub struct CachedValue<T> {
@@ -92,14 +88,14 @@ pub enum CacheState<T> {
     Miss,
 }
 
-impl<T, U> CacheState<T> 
+impl<T, U> CacheState<T>
 where
     T: CacheableResponse<Cached = U>,
     U: DeserializeOwned,
 {
     pub fn from_bytes(bytes: Option<&Vec<u8>>) -> Result<Self, crate::CacheError> {
-        let cached_data = bytes
-            .map(|bytes| serde_json::from_slice::<CachedValue<U>>(bytes).unwrap());
+        let cached_data =
+            bytes.map(|bytes| serde_json::from_slice::<CachedValue<U>>(bytes).unwrap());
         Ok(Self::from(cached_data))
     }
 }

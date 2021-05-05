@@ -1,11 +1,11 @@
-mod base;
 mod actual;
-mod stale;
-mod missed;
+mod base;
 mod error;
+mod missed;
+mod stale;
 
-pub use base::CachePolled;
 pub use actual::CachePolledActual;
-pub use stale::CachePolledStale;
-pub use missed::CacheMissed;
+pub use base::CachePolled;
 pub use error::CacheErrorOccurred;
+pub use missed::CacheMissed;
+pub use stale::CachePolledStale;

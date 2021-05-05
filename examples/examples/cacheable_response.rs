@@ -1,6 +1,6 @@
 use actix::prelude::*;
-use hitbox::{Cache, CacheError, Cacheable, RedisBackend};
 use actix_derive::{Message, MessageResponse};
+use hitbox::{Cache, CacheError, Cacheable, RedisBackend};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -40,7 +40,7 @@ async fn main() -> Result<(), CacheError> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug)
         .init();
-    
+
     let backend = RedisBackend::new().await.unwrap().start();
 
     let cache = Cache::builder()
@@ -53,6 +53,5 @@ async fn main() -> Result<(), CacheError> {
 
     let msg = Ping { id: 42 };
     let res = cache.send(msg.into_cache(&upstream)).await??;
-    dbg!(res);
     Ok(())
 }

@@ -1,12 +1,11 @@
-use hitbox::settings::{CacheSettings, Status};
 use hitbox::dev::MockAdapter;
+use hitbox::settings::InitialCacheSettings;
+use hitbox::settings::{CacheSettings, Status};
+use hitbox::states::cache_polled::CachePolled;
 use hitbox::states::initial::InitialState;
 use hitbox::states::upstream_polled::UpstreamPolled;
-use hitbox::settings::InitialCacheSettings;
-use hitbox::CacheError;
-use hitbox::states::cache_polled::CachePolled;
 use hitbox::transition_groups::stale;
-
+use hitbox::CacheError;
 
 #[actix_rt::test]
 async fn test_cache_stale() {
@@ -21,7 +20,10 @@ async fn test_cache_stale() {
         .with_cache_actual()
         .finish();
     let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = InitialState { adapter, settings: initial_state };
+    let initial_state = InitialState {
+        adapter,
+        settings: initial_state,
+    };
     let finish = stale::transition(initial_state).await;
     assert_eq!(finish.result().unwrap(), 42);
 }

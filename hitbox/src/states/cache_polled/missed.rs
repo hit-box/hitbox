@@ -1,9 +1,11 @@
 use crate::adapted::runtime_adapter::RuntimeAdapter;
-use crate::states::upstream_polled::{UpstreamPolled, UpstreamPolledSuccessful, UpstreamPolledError};
+use crate::states::upstream_polled::{
+    UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
+};
 
 pub struct CacheMissed<A>
-    where
-        A: RuntimeAdapter,
+where
+    A: RuntimeAdapter,
 {
     pub adapter: A,
 }
@@ -14,12 +16,13 @@ where
 {
     pub async fn poll_upstream<T>(self) -> UpstreamPolled<A, T>
     where
-        A: RuntimeAdapter<UpstreamResult = T>
+        A: RuntimeAdapter<UpstreamResult = T>,
     {
         match self.adapter.poll_upstream().await {
-            Ok(result) => UpstreamPolled::Successful(
-                UpstreamPolledSuccessful { adapter: self.adapter, result }
-            ),
+            Ok(result) => UpstreamPolled::Successful(UpstreamPolledSuccessful {
+                adapter: self.adapter,
+                result,
+            }),
             Err(error) => UpstreamPolled::Error(UpstreamPolledError { error }),
         }
     }

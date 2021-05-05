@@ -1,9 +1,9 @@
 mod base;
-mod successful;
 mod error;
 mod error_with_stale;
+mod successful;
 
 pub use base::{UpstreamPolled, UpstreamPolledStaleRetrieved};
-pub use successful::UpstreamPolledSuccessful;
 pub use error::UpstreamPolledError;
 pub use error_with_stale::UpstreamPolledErrorStaleRetrieved;
+pub use successful::UpstreamPolledSuccessful;

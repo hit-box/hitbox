@@ -1,5 +1,5 @@
-mod backend;
 mod adapter;
+mod backend;
 
 pub use adapter::MockAdapter;
-pub use backend::{Backend, BackendError, Get, Set, Lock, Delete, LockStatus};
+pub use backend::{Backend, BackendError, Delete, Get, Lock, LockStatus, Set};

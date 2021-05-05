@@ -48,4 +48,3 @@ pub fn cacheable_response_macro_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
     cacheable_response_macro::impl_macro(&ast)
 }
-

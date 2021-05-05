@@ -1,9 +1,7 @@
 //! Redis backend actor implementation.
 use crate::error::Error;
 use actix::prelude::*;
-use hitbox_backend::{
-    Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set,
-};
+use hitbox_backend::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 use log::{debug, info};
 use redis::{aio::ConnectionManager, Client};
 

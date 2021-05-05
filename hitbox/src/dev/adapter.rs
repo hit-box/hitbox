@@ -1,6 +1,6 @@
+use crate::adapted::actix_runtime_adapter::CacheState;
 use crate::adapted::runtime_adapter::RuntimeAdapter;
 use crate::adapted::AdapterResult;
-use crate::adapted::actix_runtime_adapter::CacheState;
 use crate::error::CacheError;
 
 enum MockUpstreamState {
@@ -17,7 +17,7 @@ enum MockCacheState {
 
 pub struct MockAdapter<T>
 where
-    T: Clone
+    T: Clone,
 {
     upstream_value: T,
     upstream_state: MockUpstreamState,
@@ -26,7 +26,7 @@ where
 
 impl<T> MockAdapter<T>
 where
-    T: Clone
+    T: Clone,
 {
     pub fn build() -> MockAdapterBuilder<T> {
         MockAdapterBuilder {
@@ -39,7 +39,7 @@ where
 
 pub struct MockAdapterBuilder<T>
 where
-    T: Clone
+    T: Clone,
 {
     upstream_value: Option<T>,
     upstream_state: MockUpstreamState,
@@ -48,7 +48,7 @@ where
 
 impl<T> MockAdapterBuilder<T>
 where
-    T: Clone
+    T: Clone,
 {
     pub fn with_upstream_value(self, value: T) -> Self {
         MockAdapterBuilder {
@@ -97,14 +97,14 @@ where
 
 impl<T> RuntimeAdapter for MockAdapter<T>
 where
-    T: Clone + 'static
+    T: Clone + 'static,
 {
     type UpstreamResult = T;
     fn poll_upstream(&self) -> AdapterResult<Self::UpstreamResult> {
         let value = self.upstream_value.clone();
         let result = match self.upstream_state {
             MockUpstreamState::Ok => Ok(value),
-            MockUpstreamState::Error => Err(CacheError::DeserializeError)
+            MockUpstreamState::Error => Err(CacheError::DeserializeError),
         };
         Box::pin(async { result })
     }

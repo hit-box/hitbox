@@ -1,7 +1,5 @@
 //! Structures and traits for custom backend development and testing process.
-pub use hitbox_backend::{
-    Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set,
-};
+pub use hitbox_backend::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 
 #[doc(hidden)]
 /// Mocked backend implementation module.

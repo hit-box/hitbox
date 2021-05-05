@@ -1,16 +1,14 @@
 //! Cache actor and Builder.
-use std::marker::PhantomData;
-
 use actix::prelude::*;
 use hitbox_backend::Backend;
 use hitbox_redis::RedisBackend;
-use log::{debug, info, warn};
+use log::{debug, info};
 
-use crate::CacheError;
 #[cfg(feature = "metrics")]
 use crate::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
+use crate::CacheError;
 
 /// Actix actor implements cache logic.
 ///
@@ -40,12 +38,13 @@ where
     pub(crate) backend: Addr<B>,
 }
 
-use actix::dev::{ToEnvelope, MessageResponse};
-use serde::de::DeserializeOwned;
-use crate::response::{CacheableResponse, CachePolicy};
-use crate::{cache::CachedValue, Cacheable, dev::{Get, Set, Lock, Delete, LockStatus}, QueryCache};
 use crate::builder::CacheBuilder;
 use crate::settings::InitialCacheSettings;
+use crate::{
+    dev::{Delete, Get, Lock, Set},
+};
+use actix::dev::{MessageResponse, ToEnvelope};
+use serde::de::DeserializeOwned;
 
 impl<B> CacheActor<B>
 where

@@ -1,5 +1,7 @@
 use crate::adapted::runtime_adapter::RuntimeAdapter;
-use crate::states::cache_polled::{CachePolledActual, CachePolledStale, CacheMissed, CacheErrorOccurred};
+use crate::states::cache_polled::{
+    CacheErrorOccurred, CacheMissed, CachePolledActual, CachePolledStale,
+};
 
 pub enum CachePolled<A, T>
 where

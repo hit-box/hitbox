@@ -5,19 +5,19 @@ use actix::{
     dev::{MessageResponse, ToEnvelope},
     Actor, Addr, Handler, Message, ResponseFuture,
 };
-use hitbox_backend::{Backend, Delete, Get, Lock, LockStatus, Set};
+use chrono::{DateTime, Duration, Utc};
+use hitbox_backend::{Backend, Delete, Get, Lock, Set};
 #[cfg(feature = "derive")]
 pub use hitbox_derive::Cacheable;
-use chrono::{DateTime, Duration, Utc};
-use log::{debug, warn, info};
+use log::warn;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+use crate::actor;
 #[cfg(feature = "metrics")]
 use crate::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
 use crate::CacheError;
-use crate::actor;
 
 /// Trait describe cache configuration per message type for actix Cache actor.
 pub trait Cacheable {
@@ -176,14 +176,14 @@ where
     type Result = Result<<M as Message>::Result, CacheError>;
 }
 
-use crate::response::CacheableResponse;
-use std::fmt::Debug;
-use crate::settings::InitialCacheSettings;
 use crate::adapted::actix_runtime_adapter::ActixAdapter;
+use crate::response::CacheableResponse;
+use crate::settings::InitialCacheSettings;
+use crate::states::cache_polled::CachePolled;
 use crate::states::initial::InitialState;
 use crate::states::upstream_polled::UpstreamPolled;
-use crate::states::cache_polled::CachePolled;
-use crate::transition_groups::{upstream, only_cache, stale};
+use crate::transition_groups::{only_cache, stale, upstream};
+use std::fmt::Debug;
 
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for actor::CacheActor<B>
 where
@@ -199,15 +199,26 @@ where
     type Result = ResponseFuture<Result<<M as Message>::Result, CacheError>>;
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
-        let adapter = ActixAdapter::new(msg, self.backend.clone());  // @TODO: remove clone
-        let initial_state = InitialState { adapter, settings: self.settings.clone() };
+        let adapter = ActixAdapter::new(msg, self.backend.clone()); // @TODO: remove clone
+        let initial_state = InitialState {
+            adapter,
+            settings: self.settings.clone(),
+        };
         Box::pin(async move {
             match initial_state.settings {
-                InitialCacheSettings::CacheDisabled => upstream::transition(initial_state).await.result(),
-                InitialCacheSettings::CacheEnabled => only_cache::transition(initial_state).await.result(),
+                InitialCacheSettings::CacheDisabled => {
+                    upstream::transition(initial_state).await.result()
+                }
+                InitialCacheSettings::CacheEnabled => {
+                    only_cache::transition(initial_state).await.result()
+                }
                 InitialCacheSettings::CacheStale => stale::transition(initial_state).await.result(),
-                InitialCacheSettings::CacheLock => only_cache::transition(initial_state).await.result(),
-                InitialCacheSettings::CacheStaleLock => only_cache::transition(initial_state).await.result(),
+                InitialCacheSettings::CacheLock => {
+                    only_cache::transition(initial_state).await.result()
+                }
+                InitialCacheSettings::CacheStaleLock => {
+                    only_cache::transition(initial_state).await.result()
+                }
             }
         })
     }
@@ -219,7 +230,7 @@ enum CachedValueState<T> {
     Miss,
 }
 
-impl<T, U> From<Option<CachedValue<T>>> for CachedValueState<U> 
+impl<T, U> From<Option<CachedValue<T>>> for CachedValueState<U>
 where
     U: CacheableResponse<Cached = T>,
 {
@@ -227,9 +238,13 @@ where
         match cached_value {
             Some(value) => {
                 if value.expired < Utc::now() {
-                    CachedValueState::Stale(<U as CacheableResponse>::from_cached(value.into_inner()))
+                    CachedValueState::Stale(<U as CacheableResponse>::from_cached(
+                        value.into_inner(),
+                    ))
                 } else {
-                    CachedValueState::Actual(<U as CacheableResponse>::from_cached(value.into_inner()))
+                    CachedValueState::Actual(<U as CacheableResponse>::from_cached(
+                        value.into_inner(),
+                    ))
                 }
             }
             None => CachedValueState::Miss,
@@ -260,7 +275,11 @@ impl<T> CachedValue<T> {
         <B as Actor>::Context: ToEnvelope<B, Get>,
         T: DeserializeOwned,
     {
-        let value = backend.send(Get { key: cache_key.to_owned() }).await;
+        let value = backend
+            .send(Get {
+                key: cache_key.to_owned(),
+            })
+            .await;
         let serialized = match value {
             Ok(Ok(value)) => value,
             Ok(Err(error)) => {

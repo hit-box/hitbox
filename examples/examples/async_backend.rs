@@ -1,8 +1,8 @@
 use actix::prelude::*;
+use hitbox::actor::CacheActor;
 use hitbox::dev::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 use hitbox::{CacheError, Cacheable};
 use serde::{Deserialize, Serialize};
-use hitbox::actor::CacheActor;
 
 struct UpstreamActor;
 

@@ -1,6 +1,6 @@
 use actix::Message;
 
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
 #[cfg(feature = "derive")]

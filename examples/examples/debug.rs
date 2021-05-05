@@ -1,6 +1,6 @@
 use actix::prelude::*;
-use hitbox::{Cache, CacheError, Cacheable};
 use actix_derive::{Message, MessageResponse};
+use hitbox::{Cache, CacheError, Cacheable};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -34,9 +34,7 @@ impl<T, E> CacheableResponse<T, E> for Result<T, E> {
     }
 }
 
-fn test<T>(value: T) {
-
-}
+fn test<T>(value: T) {}
 
 #[derive(MessageResponse, Deserialize, Serialize, Debug)]
 struct Pong(i32);

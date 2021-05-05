@@ -1,9 +1,9 @@
-use crate::states::initial::InitialState;
 use crate::adapted::runtime_adapter::RuntimeAdapter;
-use crate::states::upstream_polled::UpstreamPolled;
 use crate::states::finish::Finish;
-use std::fmt::Debug;
+use crate::states::initial::InitialState;
+use crate::states::upstream_polled::UpstreamPolled;
 use crate::CacheError;
+use std::fmt::Debug;
 
 pub async fn transition<T, A>(state: InitialState<A>) -> Finish<T>
 where
@@ -16,4 +16,3 @@ where
         UpstreamPolled::Error(error) => error.finish(),
     }
 }
-

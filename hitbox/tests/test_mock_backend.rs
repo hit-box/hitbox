@@ -3,9 +3,12 @@ use hitbox::dev::{
     backend::{GetMessages, MockBackend, MockMessage},
     Get,
 };
+use hitbox::{
+    response::{CachePolicy, CacheableResponse},
+    CacheActor,
+};
 use hitbox::{CacheError, Cacheable};
 use serde::{Deserialize, Serialize};
-use hitbox::{CacheActor, response::{CacheableResponse, CachePolicy}};
 
 struct UpstreamActor;
 
