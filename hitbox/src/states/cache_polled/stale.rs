@@ -1,8 +1,7 @@
 use crate::adapted::runtime_adapter::RuntimeAdapter;
 use crate::cache::CachedValue;
 use std::fmt::Debug;
-use crate::states::stale_upstream_polled::{StaleUpstreamPolled, StaleUpstreamPolledError};
-use crate::states::upstream_polled::UpstreamPolledSuccessful;
+use crate::states::upstream_polled::{UpstreamPolledSuccessful, UpstreamPolledStaleRetrieved, UpstreamPolledErrorStaleRetrieved};
 use crate::states::finish::Finish;
 
 pub struct CachePolledStale<A, T>
@@ -18,16 +17,16 @@ where
     A: RuntimeAdapter,
     T: Debug,
 {
-    pub async fn poll_upstream(self) -> StaleUpstreamPolled<A, T>
+    pub async fn poll_upstream(self) -> UpstreamPolledStaleRetrieved<A, T>
     where
         A: RuntimeAdapter<UpstreamResult = T>
     {
         match self.adapter.poll_upstream().await {
-            Ok(result) => StaleUpstreamPolled::Successful(
+            Ok(result) => UpstreamPolledStaleRetrieved::Successful(
                 UpstreamPolledSuccessful { adapter: self.adapter, result }
             ),
-            Err(error) => StaleUpstreamPolled::Error(
-                StaleUpstreamPolledError { error, result: self.result.into_inner() }
+            Err(error) => UpstreamPolledStaleRetrieved::Error(
+                UpstreamPolledErrorStaleRetrieved { error, result: self.result.into_inner() }
             ),
         }
     }
