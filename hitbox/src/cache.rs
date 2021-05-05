@@ -238,7 +238,7 @@ where
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct CachedValue<T> {
+pub struct CachedValue<T> {
     pub data: T,
     pub expired: DateTime<Utc>,
 }
