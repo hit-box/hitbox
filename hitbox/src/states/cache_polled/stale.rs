@@ -5,7 +5,6 @@ use crate::states::stale_upstream_polled::{StaleUpstreamPolled, StaleUpstreamPol
 use crate::states::upstream_polled::UpstreamPolledSuccessful;
 use crate::states::finish::Finish;
 
-/// Cache has stale data.
 pub struct CachePolledStale<A, T>
 where
     A: RuntimeAdapter,

@@ -4,7 +4,6 @@ use crate::states::upstream_polled::{UpstreamPolled, UpstreamPolledSuccessful, U
 use crate::states::finish::Finish;
 use crate::adapted::actix_runtime_adapter::CachedValue;
 
-/// Cache has actual data.
 pub struct CachePolledActual<A, T>
 where
     A: RuntimeAdapter,

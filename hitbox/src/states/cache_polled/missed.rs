@@ -1,7 +1,6 @@
 use crate::adapted::runtime_adapter::RuntimeAdapter;
 use crate::states::upstream_polled::{UpstreamPolled, UpstreamPolledSuccessful, UpstreamPolledError};
 
-/// Cache miss state.
 pub struct CacheMissed<A>
     where
         A: RuntimeAdapter,
