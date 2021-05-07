@@ -1,6 +1,6 @@
 use crate::response::CacheableResponse;
 use chrono::{DateTime, Utc};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Serialize, Deserialize};
 
 #[derive(Deserialize)]
 pub struct CachedValue<T> {

@@ -4,6 +4,7 @@ use crate::states::finish::Finish;
 use std::fmt::Debug;
 use crate::response::{CacheableResponse, CachePolicy};
 use crate::states::cache_policy::{CachePolicyChecked, CachePolicyNonCacheable, CachePolicyCacheable};
+use crate::CachedValue;
 
 pub struct UpstreamPolledSuccessful<A, T>
 where
@@ -26,10 +27,9 @@ where
     }
     pub fn check_cache_policy(self) -> CachePolicyChecked<A, T> {
         match self.result.cache_policy() {
-            CachePolicy::Cacheable(value) => {
-                let serialized = serde_json::to_vec(value).unwrap(); // @ToDo: remove unwrap
+            CachePolicy::Cacheable(_) => {
                 CachePolicyChecked::Cacheable(
-                    CachePolicyCacheable { result: self.result, adapter: self.adapter, serialized }
+                    CachePolicyCacheable { result: self.result, adapter: self.adapter }
                 )
             },
             CachePolicy::NonCacheable(_) => CachePolicyChecked::NonCacheable(

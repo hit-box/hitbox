@@ -5,6 +5,7 @@ use actix::dev::{MessageResponse, ToEnvelope};
 use actix::{Actor, Addr, Handler, Message};
 use hitbox_backend::{Backend, Get};
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 pub struct ActixAdapter<A, M, B>
 where
@@ -57,10 +58,9 @@ where
             CacheState::from_bytes(cached_value.as_ref())
         })
     }
-    // fn update_cache(&self, data: T) -> AdapterResult<T> {
-    //     let r = match data.into_policy() {
-    //         CachePolicy::Cacheable(value) => Ok(value),
-    //         CachePolicy::NonCacheable(value) => Err(value)
-    //     };
-    // }
+
+    fn update_cache<TU: Serialize>(&self, cached_value: CachedValue<TU>) -> AdapterResult<()> {
+        // let serialized = serde_json::to_vec(&cached_value);
+        Box::pin(async { Ok(())})
+    }
 }

@@ -2,6 +2,7 @@ use crate::runtime::{RuntimeAdapter, AdapterResult};
 use crate::error::CacheError;
 use crate::value::{CachedValue, CacheState};
 use chrono::{Utc, DateTime};
+use serde::Serialize;
 
 #[derive(Clone)]
 enum MockUpstreamState<T> {
@@ -118,5 +119,8 @@ where
             MockCacheState::Error => Err(CacheError::DeserializeError)
         };
         Box::pin(async { result })
+    }
+    fn update_cache<U: Serialize>(&self, cached_value: CachedValue<U>) -> AdapterResult<()> {
+        Box::pin(async { Ok(()) })
     }
 }
