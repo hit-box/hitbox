@@ -42,7 +42,6 @@ where
         T: CacheableResponse
     {
         let cache_result: Result<CacheState<T>, CacheError> = self.adapter.poll_cache().await;
-        println!("CachePolled");
         match cache_result {
             Ok(value) => match value {
                 CacheState::Actual(result) => CachePolled::Actual(

@@ -20,7 +20,6 @@ where
         A: RuntimeAdapter<UpstreamResult = T>,
         T: CacheableResponse
     {
-        println!("UpstreamPolled");
         match self.adapter.poll_upstream().await {
             Ok(result) => UpstreamPolled::Successful(UpstreamPolledSuccessful {
                 adapter: self.adapter,

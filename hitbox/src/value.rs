@@ -1,4 +1,4 @@
-use crate::{CacheableResponse, CachePolicy};
+use crate::{CacheableResponse, CachePolicy, CacheError};
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize, Deserialize};
 use std::fmt::Debug;
@@ -40,11 +40,12 @@ where
         }
     }
 
-    pub fn serialize(&self) -> Vec<u8> {
-        match self.data.cache_policy() {
+    pub fn serialize(&self) -> Result<Vec<u8>, CacheError> {
+        let serialized = match self.data.cache_policy() {
             CachePolicy::Cacheable(cache_value) => serde_json::to_vec(&CachedInnerValue { data: cache_value, expired: Utc::now() }).unwrap(),
             CachePolicy::NonCacheable(_) => unreachable!(),
-        }
+        };
+        Ok(serialized)
     }
 
     /// Returns original data from CachedValue
