@@ -3,12 +3,15 @@ use actix::prelude::*;
 use hitbox_backend::Backend;
 use hitbox_redis::RedisBackend;
 use log::{debug, info};
-
 #[cfg(feature = "metrics")]
-use crate::metrics::{
+use hitbox::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
-use crate::CacheError;
+use hitbox::CacheError;
+use crate::builder::CacheBuilder;
+use hitbox::settings::InitialCacheSettings;
+use hitbox::dev::{Delete, Get, Lock, Set};
+use actix::dev::ToEnvelope;
 
 /// Actix actor implements cache logic.
 ///
@@ -37,13 +40,6 @@ where
     pub settings: InitialCacheSettings,
     pub(crate) backend: Addr<B>,
 }
-
-use crate::builder::CacheBuilder;
-use crate::settings::InitialCacheSettings;
-use crate::{
-    dev::{Delete, Get, Lock, Set},
-};
-use actix::dev::ToEnvelope;
 
 impl<B> CacheActor<B>
 where

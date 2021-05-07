@@ -1,10 +1,11 @@
-use crate::runtime::{RuntimeAdapter, AdapterResult};
-use crate::{Cacheable, QueryCache, CachedValue, CacheState};
-use crate::response::{CacheableResponse, CachePolicy};
+use hitbox::runtime::{RuntimeAdapter, AdapterResult};
+use hitbox::{Cacheable, CacheState};
+use hitbox::response::CacheableResponse;
 use actix::dev::{MessageResponse, ToEnvelope};
 use actix::{Actor, Addr, Handler, Message};
 use hitbox_backend::{Backend, Get};
 use serde::de::DeserializeOwned;
+use crate::QueryCache;
 
 pub struct ActixAdapter<A, M, B>
 where

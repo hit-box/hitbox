@@ -1,6 +1,7 @@
 use actix::prelude::*;
 use actix_derive::{Message, MessageResponse};
-use hitbox::{Cache, CacheError, Cacheable, RedisBackend};
+use hitbox::{CacheError, Cacheable, RedisBackend};
+use hitbox_actix::{Cache, messages::IntoCache};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]

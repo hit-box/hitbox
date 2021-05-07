@@ -1,0 +1,15 @@
+[package]
+name = "hitbox-actix"
+version = "0.1.0"
+authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hitbox = { path = "../hitbox" } 
+hitbox-backend = { path = "../hitbox-backend" }
+hitbox-redis = { path = "../hitbox-redis" }
+actix = "0.10"
+serde = { version = "1", features = ["derive"] }
+log = "0.4.14"

@@ -11,6 +11,7 @@ default = []
 hitbox = { path = "../hitbox" }
 hitbox-redis = { path = "../hitbox-redis" }
 hitbox-derive = { path = "../hitbox-derive" }
+hitbox-actix = { path = "../hitbox-actix" }
 actix = "0.10"
 log = "0.4"
 actix-rt = "1"
