@@ -179,9 +179,7 @@ where
 use crate::adapted::actix_runtime_adapter::ActixAdapter;
 use crate::response::CacheableResponse;
 use crate::settings::InitialCacheSettings;
-use crate::states::cache_polled::CachePolled;
 use crate::states::initial::InitialState;
-use crate::states::upstream_polled::UpstreamPolled;
 use crate::transition_groups::{only_cache, stale, upstream};
 use std::fmt::Debug;
 
@@ -265,70 +263,11 @@ impl<T> CachedValue<T> {
         }
     }
 
-    async fn retrieve<B>(backend: &Addr<B>, cache_key: &str) -> Option<CachedValue<T>>
-    where
-        B: Backend,
-        <B as Actor>::Context: ToEnvelope<B, Get>,
-        T: DeserializeOwned,
-    {
-        let value = backend
-            .send(Get {
-                key: cache_key.to_owned(),
-            })
-            .await;
-        let serialized = match value {
-            Ok(Ok(value)) => value,
-            Ok(Err(error)) => {
-                warn!("Cache backend error: {}", error);
-                None
-            }
-            Err(error) => {
-                warn!("Actix error: {}", error);
-                None
-            }
-        };
-        serialized
-            .map(|data| {
-                serde_json::from_slice(&data[..])
-                    .map_err(|err| {
-                        warn!("Cache data deserialization error: {}", err);
-                        err
-                    })
-                    .ok()
-            })
-            .flatten()
-    }
-
     /// Return instance of inner type.
     pub fn into_inner(self) -> T {
         self.data
     }
 
-    /// Store inner value into backend.
-    pub(crate) async fn store<B>(
-        &self,
-        backend: &Addr<B>,
-        key: String,
-        ttl: Option<u32>,
-    ) -> Result<(), CacheError>
-    where
-        B: Actor + Backend,
-        <B as Actor>::Context: ToEnvelope<B, Set>,
-        T: Serialize,
-    {
-        let _ = backend
-            .send(Set {
-                value: serde_json::to_vec(self)?,
-                key,
-                ttl,
-            })
-            .await?
-            .map_err(|error| {
-                warn!("Updating cache error: {}", error);
-                CacheError::BackendError(error)
-            });
-        Ok(())
-    }
 }
 
 #[cfg(test)]

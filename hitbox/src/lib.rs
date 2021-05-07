@@ -150,7 +150,7 @@
 //! [Delete]: dev/struct.Delete.html
 //! [Lock]: dev/struct.Lock.html
 //! [Dogpile]: https://www.sobstel.org/blog/preventing-dogpile-effect/
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 pub mod actor;
 pub mod adapted;
 pub mod builder;

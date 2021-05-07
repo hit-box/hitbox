@@ -1,5 +1,3 @@
-use actix::Message;
-
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
@@ -41,7 +39,7 @@ where
     fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
         match self {
             Ok(value) => CachePolicy::Cacheable(value),
-            Err(ref error) => CachePolicy::NonCacheable(self),
+            Err(_) => CachePolicy::NonCacheable(self),
         }
     }
     fn from_cached(cached: Self::Cached) -> Self {

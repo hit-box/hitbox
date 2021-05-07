@@ -3,7 +3,6 @@ use crate::states::cache_polled::CachePolled;
 use crate::states::finish::Finish;
 use crate::states::initial::InitialState;
 use crate::states::upstream_polled::{UpstreamPolled, UpstreamPolledStaleRetrieved};
-use crate::CacheError;
 use std::fmt::Debug;
 
 pub async fn transition<T, A>(state: InitialState<A>) -> Finish<T>

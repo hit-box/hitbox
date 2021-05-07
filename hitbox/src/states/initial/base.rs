@@ -1,6 +1,5 @@
 use crate::adapted::actix_runtime_adapter::CacheState;
 use crate::adapted::runtime_adapter::RuntimeAdapter;
-use crate::dev::BackendError;
 use crate::settings::InitialCacheSettings;
 use crate::states::cache_polled::{
     CacheErrorOccurred, CacheMissed, CachePolled, CachePolledActual,
@@ -54,7 +53,7 @@ where
                     adapter: self.adapter,
                 }),
             },
-            Err(err) => CachePolled::Error(CacheErrorOccurred {
+            Err(_) => CachePolled::Error(CacheErrorOccurred {
                 adapter: self.adapter,
             }),
         }

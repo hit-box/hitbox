@@ -43,8 +43,7 @@ use crate::settings::InitialCacheSettings;
 use crate::{
     dev::{Delete, Get, Lock, Set},
 };
-use actix::dev::{MessageResponse, ToEnvelope};
-use serde::de::DeserializeOwned;
+use actix::dev::ToEnvelope;
 
 impl<B> CacheActor<B>
 where
