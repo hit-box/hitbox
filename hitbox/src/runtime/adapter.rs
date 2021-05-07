@@ -1,4 +1,5 @@
-use crate::{adapted::actix_runtime_adapter::CacheState, CacheError};
+
+use crate::{CacheState, CacheError};
 use std::future::Future;
 use std::pin::Pin;
 

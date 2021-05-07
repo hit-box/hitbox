@@ -1,5 +1,5 @@
-use crate::adapted::runtime_adapter::RuntimeAdapter;
-use crate::cache::CachedValue;
+use crate::runtime::RuntimeAdapter;
+use crate::CachedValue;
 use crate::states::finish::Finish;
 use crate::states::upstream_polled::{
     UpstreamPolledErrorStaleRetrieved, UpstreamPolledStaleRetrieved, UpstreamPolledSuccessful,

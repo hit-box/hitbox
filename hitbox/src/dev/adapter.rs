@@ -1,6 +1,5 @@
-use crate::adapted::actix_runtime_adapter::CacheState;
-use crate::adapted::runtime_adapter::RuntimeAdapter;
-use crate::adapted::AdapterResult;
+use crate::CacheState;
+use crate::runtime::{RuntimeAdapter, AdapterResult};
 use crate::error::CacheError;
 
 enum MockUpstreamState {

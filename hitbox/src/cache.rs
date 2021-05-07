@@ -218,58 +218,6 @@ where
     }
 }
 
-enum CachedValueState<T> {
-    Actual(T),
-    Stale(T),
-    Miss,
-}
-
-impl<T, U> From<Option<CachedValue<T>>> for CachedValueState<U>
-where
-    U: CacheableResponse<Cached = T>,
-{
-    fn from(cached_value: Option<CachedValue<T>>) -> Self {
-        match cached_value {
-            Some(value) => {
-                if value.expired < Utc::now() {
-                    CachedValueState::Stale(<U as CacheableResponse>::from_cached(
-                        value.into_inner(),
-                    ))
-                } else {
-                    CachedValueState::Actual(<U as CacheableResponse>::from_cached(
-                        value.into_inner(),
-                    ))
-                }
-            }
-            None => CachedValueState::Miss,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CachedValue<T> {
-    pub data: T,
-    pub expired: DateTime<Utc>,
-}
-
-impl<T> CachedValue<T> {
-    pub fn new(data: T, stale: u32) -> Self
-    where
-        T: Serialize + DeserializeOwned,
-    {
-        CachedValue {
-            data,
-            expired: Utc::now() + Duration::seconds(stale as i64),
-        }
-    }
-
-    /// Return instance of inner type.
-    pub fn into_inner(self) -> T {
-        self.data
-    }
-
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

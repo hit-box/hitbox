@@ -160,13 +160,16 @@ pub mod error;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 pub mod response;
+pub mod runtime;
 pub mod settings;
 pub mod states;
 pub mod transition_groups;
+pub mod value;
 
 pub use actor::CacheActor;
 pub use cache::{Cacheable, QueryCache};
 pub use error::CacheError;
+pub use value::{CachedValue, CacheState};
 
 pub use hitbox_redis::RedisBackend;
 
