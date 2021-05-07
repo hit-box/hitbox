@@ -25,7 +25,11 @@ where
             UpstreamPolledStaleRetrieved::Error(state) => state.finish(),
         },
         CachePolled::Miss(state) => match state.poll_upstream().await {
-            UpstreamPolled::Successful(state) => state.update_cache().await.finish(),
+            UpstreamPolled::Successful(state) =>
+                match state.check_cache_policy() {
+                    CachePolicyChecked::Cacheable(state) => state.update_cache().await.finish(),
+                    CachePolicyChecked::NonCacheable(state) => state.finish(),
+                },
             UpstreamPolled::Error(error) => error.finish(),
         },
         CachePolled::Error(state) => match state.poll_upstream().await {

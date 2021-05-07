@@ -1,6 +1,7 @@
 use crate::{CacheableResponse, CachePolicy};
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize, Deserialize};
+use std::fmt::Debug;
 
 /// This struct wraps and represent cached data.
 ///
@@ -80,9 +81,15 @@ impl<T, U> From<Option<CachedValue<U>>> for CacheState<T>
 where
     T: CacheableResponse<Cached = U>,
 {
-    fn from(cached_data: Option<CachedValue<U>>) -> Self {
-        match cached_data {
-            Some(cached_data) => Self::Actual(CachedValue::from_inner(cached_data)),
+    fn from(cached_value: Option<CachedValue<U>>) -> Self {
+        match cached_value {
+            Some(value) => {
+                if value.expired < Utc::now() {
+                    Self::Stale(CachedValue::from_inner(value))
+                } else {
+                    Self::Actual(CachedValue::from_inner(value))
+                }
+            }
             None => Self::Miss,
         }
     }

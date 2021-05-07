@@ -1,9 +1,7 @@
 use crate::CacheState;
 use crate::runtime::RuntimeAdapter;
 use crate::settings::InitialCacheSettings;
-use crate::states::cache_polled::{
-    CacheErrorOccurred, CacheMissed, CachePolled, CachePolledActual,
-};
+use crate::states::cache_polled::{CacheErrorOccurred, CacheMissed, CachePolled, CachePolledActual, CachePolledStale};
 use crate::states::upstream_polled::{
     UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
 };
@@ -47,12 +45,18 @@ where
         println!("CachePolled");
         match cache_result {
             Ok(value) => match value {
-                CacheState::Actual(result) | CacheState::Stale(result) => {
-                    CachePolled::Actual(CachePolledActual {
+                CacheState::Actual(result) => CachePolled::Actual(
+                    CachePolledActual {
                         adapter: self.adapter,
                         result,
-                    })
-                }
+                    }
+                ),
+                CacheState::Stale(result) => CachePolled::Stale(
+                    CachePolledStale {
+                        adapter: self.adapter,
+                        result,
+                    }
+                ),
                 CacheState::Miss => CachePolled::Miss(CacheMissed {
                     adapter: self.adapter,
                 }),
