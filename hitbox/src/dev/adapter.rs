@@ -1,7 +1,6 @@
-use crate::adapted::actix_runtime_adapter::{CacheState, CachedValue};
-use crate::adapted::runtime_adapter::RuntimeAdapter;
-use crate::adapted::AdapterResult;
+use crate::runtime::{RuntimeAdapter, AdapterResult};
 use crate::error::CacheError;
+use crate::value::{CachedValue, CacheState};
 use chrono::{Utc, DateTime};
 
 #[derive(Clone)]

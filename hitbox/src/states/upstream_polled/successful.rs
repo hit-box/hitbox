@@ -1,4 +1,4 @@
-use crate::adapted::runtime_adapter::RuntimeAdapter;
+use crate::runtime::RuntimeAdapter;
 use crate::states::cache_updated::CacheUpdated;
 use crate::states::finish::Finish;
 use std::fmt::Debug;

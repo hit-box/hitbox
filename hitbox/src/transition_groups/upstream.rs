@@ -1,4 +1,4 @@
-use crate::adapted::runtime_adapter::RuntimeAdapter;
+use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
 use crate::states::initial::InitialState;
 use crate::states::upstream_polled::UpstreamPolled;

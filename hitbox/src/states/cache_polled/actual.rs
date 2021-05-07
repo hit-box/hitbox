@@ -1,5 +1,5 @@
-use crate::adapted::actix_runtime_adapter::CachedValue;
-use crate::adapted::runtime_adapter::RuntimeAdapter;
+use crate::CachedValue;
+use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
 use crate::states::upstream_polled::{
     UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,

@@ -1,5 +1,5 @@
-use crate::adapted::actix_runtime_adapter::CacheState;
-use crate::adapted::runtime_adapter::RuntimeAdapter;
+use crate::CacheState;
+use crate::runtime::RuntimeAdapter;
 use crate::settings::InitialCacheSettings;
 use crate::states::cache_polled::{
     CacheErrorOccurred, CacheMissed, CachePolled, CachePolledActual,

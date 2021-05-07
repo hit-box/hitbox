@@ -1,4 +1,4 @@
-use crate::adapted::runtime_adapter::RuntimeAdapter;
+use crate::runtime::RuntimeAdapter;
 use crate::states::cache_polled::{
     CacheErrorOccurred, CacheMissed, CachePolledActual, CachePolledStale,
 };
