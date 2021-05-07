@@ -2,10 +2,12 @@ use crate::runtime::RuntimeAdapter;
 use crate::states::cache_updated::CacheUpdated;
 use crate::states::finish::Finish;
 use std::fmt::Debug;
+use crate::response::CacheableResponse;
 
 pub struct UpstreamPolledSuccessful<A, T>
 where
     A: RuntimeAdapter,
+    T: CacheableResponse
 {
     pub adapter: A,
     pub result: T,
@@ -14,7 +16,7 @@ where
 impl<A, T> UpstreamPolledSuccessful<A, T>
 where
     A: RuntimeAdapter,
-    T: Debug,
+    T: Debug + CacheableResponse
 {
     pub fn finish(self) -> Finish<T> {
         Finish {

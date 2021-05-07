@@ -1,6 +1,6 @@
 use crate::runtime::{RuntimeAdapter, AdapterResult};
 use crate::{Cacheable, QueryCache, CachedValue, CacheState};
-use crate::response::CacheableResponse;
+use crate::response::{CacheableResponse, CachePolicy};
 use actix::dev::{MessageResponse, ToEnvelope};
 use actix::{Actor, Addr, Handler, Message};
 use hitbox_backend::{Backend, Get};
@@ -56,4 +56,10 @@ where
             CacheState::from_bytes(cached_value.as_ref())
         })
     }
+    // fn update_cache(&self, data: T) -> AdapterResult<T> {
+    //     let r = match data.into_policy() {
+    //         CachePolicy::Cacheable(value) => Ok(value),
+    //         CachePolicy::NonCacheable(value) => Err(value)
+    //     };
+    // }
 }
