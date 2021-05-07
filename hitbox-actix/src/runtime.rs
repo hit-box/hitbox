@@ -65,7 +65,6 @@ where
         let serialized = cached_value.serialize();
         let backend = self.backend.clone();
         let cache_key = self.message.cache_key();  // @TODO: Please, don't recalculate cache key multiple times.
-        dbg!(&serialized);
         Box::pin(async move { 
             let key = cache_key?;
             backend.send(Set { key, value: serialized, ttl: None }).await.unwrap().unwrap();

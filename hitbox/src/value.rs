@@ -12,11 +12,11 @@ pub struct CachedValue<T> {
 }
 
 #[derive(Serialize)]
-struct CacheInnerValue<U> 
+struct CachedInnerValue<'a, U> 
 where
-    U: Serialize
+    U: Serialize,
 {
-    data: U,
+    data: &'a U,
     expired: DateTime<Utc>,
 }
 
@@ -41,7 +41,7 @@ where
 
     pub fn serialize(&self) -> Vec<u8> {
         match self.data.cache_policy() {
-            CachePolicy::Cacheable(cache_value) => serde_json::to_vec(cache_value).unwrap(),
+            CachePolicy::Cacheable(cache_value) => serde_json::to_vec(&CachedInnerValue { data: cache_value, expired: Utc::now() }).unwrap(),
             CachePolicy::NonCacheable(_) => unreachable!(),
         }
     }
