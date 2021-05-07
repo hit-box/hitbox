@@ -1,27 +1,30 @@
-use crate::adapted::actix_runtime_adapter::CacheState;
+use crate::adapted::actix_runtime_adapter::{CacheState, CachedValue};
 use crate::adapted::runtime_adapter::RuntimeAdapter;
 use crate::adapted::AdapterResult;
 use crate::error::CacheError;
+use chrono::{Utc, DateTime};
 
-enum MockUpstreamState {
-    Ok,
+#[derive(Clone)]
+enum MockUpstreamState<T> {
+    Ok(T),
     Error,
 }
 
-enum MockCacheState {
-    Actual,
-    Stale,
+#[derive(Clone)]
+enum MockCacheState<T> {
+    Actual(T),
+    Stale((T, DateTime<Utc>)),
     Miss,
     Error,
 }
 
+#[derive(Clone)]
 pub struct MockAdapter<T>
 where
     T: Clone,
 {
-    upstream_value: T,
-    upstream_state: MockUpstreamState,
-    cache_state: MockCacheState,
+    upstream_state: MockUpstreamState<T>,
+    cache_state: MockCacheState<T>,
 }
 
 impl<T> MockAdapter<T>
@@ -30,9 +33,8 @@ where
 {
     pub fn build() -> MockAdapterBuilder<T> {
         MockAdapterBuilder {
-            upstream_value: None,
-            upstream_state: MockUpstreamState::Ok,
-            cache_state: MockCacheState::Actual,
+            upstream_state: MockUpstreamState::Error,
+            cache_state: MockCacheState::Error,
         }
     }
 }
@@ -41,9 +43,8 @@ pub struct MockAdapterBuilder<T>
 where
     T: Clone,
 {
-    upstream_value: Option<T>,
-    upstream_state: MockUpstreamState,
-    cache_state: MockCacheState,
+    upstream_state: MockUpstreamState<T>,
+    cache_state: MockCacheState<T>,
 }
 
 impl<T> MockAdapterBuilder<T>
@@ -52,7 +53,7 @@ where
 {
     pub fn with_upstream_value(self, value: T) -> Self {
         MockAdapterBuilder {
-            upstream_value: Some(value),
+            upstream_state: MockUpstreamState::Ok(value),
             ..self
         }
     }
@@ -62,15 +63,15 @@ where
             ..self
         }
     }
-    pub fn with_cache_actual(self) -> Self {
+    pub fn with_cache_actual(self, value: T) -> Self {
         MockAdapterBuilder {
-            cache_state: MockCacheState::Actual,
+            cache_state: MockCacheState::Actual(value),
             ..self
         }
     }
-    pub fn with_cache_stale(self) -> Self {
+    pub fn with_cache_stale(self, value: T, expired: DateTime<Utc>) -> Self {
         MockAdapterBuilder {
-            cache_state: MockCacheState::Stale,
+            cache_state: MockCacheState::Stale((value, expired)),
             ..self
         }
     }
@@ -88,7 +89,6 @@ where
     }
     pub fn finish(self) -> MockAdapter<T> {
         MockAdapter {
-            upstream_value: self.upstream_value.expect("Upstream value cannot be empty"),
             upstream_state: self.upstream_state,
             cache_state: self.cache_state,
         }
@@ -101,14 +101,23 @@ where
 {
     type UpstreamResult = T;
     fn poll_upstream(&self) -> AdapterResult<Self::UpstreamResult> {
-        let value = self.upstream_value.clone();
-        let result = match self.upstream_state {
-            MockUpstreamState::Ok => Ok(value),
+        let result = match self.clone().upstream_state {
+            MockUpstreamState::Ok(value) => Ok(value),
             MockUpstreamState::Error => Err(CacheError::DeserializeError),
         };
         Box::pin(async { result })
     }
     fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
-        Box::pin(async { Ok(CacheState::Miss) })
+        let result = match self.clone().cache_state {
+            MockCacheState::Actual(value) => Ok(
+                CacheState::Actual(CachedValue::new(value, chrono::Utc::now()))
+            ),
+            MockCacheState::Stale(value) => Ok(
+                CacheState::Stale(CachedValue::new(value.0, value.1))
+            ),
+            MockCacheState::Miss => Ok(CacheState::Miss),
+            MockCacheState::Error => Err(CacheError::DeserializeError)
+        };
+        Box::pin(async { result })
     }
 }

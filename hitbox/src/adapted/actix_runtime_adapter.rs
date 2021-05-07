@@ -68,6 +68,9 @@ pub struct CachedValue<T> {
 }
 
 impl<T> CachedValue<T> {
+    pub fn new(data: T, expired: DateTime<Utc>) -> Self {
+        Self { data, expired }
+    }
     fn from_inner<U>(cached_data: CachedValue<U>) -> Self
     where
         T: CacheableResponse<Cached = U>,

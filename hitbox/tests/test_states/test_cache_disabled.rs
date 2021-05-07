@@ -1,10 +1,7 @@
+use hitbox::settings::{CacheSettings, Status, InitialCacheSettings};
 use hitbox::dev::MockAdapter;
-use hitbox::settings::InitialCacheSettings;
-use hitbox::settings::{CacheSettings, Status};
 use hitbox::states::initial::InitialState;
-use hitbox::states::upstream_polled::UpstreamPolled;
 use hitbox::transition_groups::upstream;
-use hitbox::CacheError;
 
 #[actix_rt::test]
 async fn test_cache_disabled_upstream_polled() {
@@ -30,8 +27,7 @@ async fn test_cache_disabled_upstream_error() {
         stale: Status::Disabled,
         lock: Status::Disabled,
     };
-    let adapter = MockAdapter::build()
-        .with_upstream_value(42)
+    let adapter: MockAdapter<i32> = MockAdapter::build()
         .with_upstream_error()
         .finish();
     let initial_state = InitialCacheSettings::from(settings);
