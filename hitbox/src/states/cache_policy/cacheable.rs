@@ -18,22 +18,18 @@ where
 
 impl<A, T> CachePolicyCacheable<A, T>
 where
-    A: RuntimeAdapter,
+    A: RuntimeAdapter<UpstreamResult=T>,
     T: CacheableResponse
 {
     pub async fn update_cache(self) -> CacheUpdated<A, T> {
-        let value = match self.result.cache_policy() {
-            CachePolicy::Cacheable(value) => value,
-            _ => unreachable!(), // @ToDo: Return error
-        };
-        let cached_value = CachedValue::new(value, chrono::Utc::now());
-        let cache_update_result = self.adapter.update_cache(cached_value).await;
+        let cached_value = CachedValue::new(self.result, chrono::Utc::now());
+        let cache_update_result = self.adapter.update_cache(&cached_value).await;
         if let Err(error) = cache_update_result {
             warn!("Updating cache error: {}", error.to_string())
         };
         CacheUpdated {
             adapter: self.adapter,
-            result: self.result,
+            result: cached_value.into_inner(),
         }
     }
 }

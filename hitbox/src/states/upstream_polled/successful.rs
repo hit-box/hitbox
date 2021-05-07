@@ -2,6 +2,7 @@ use crate::runtime::RuntimeAdapter;
 use crate::states::cache_updated::CacheUpdated;
 use crate::states::finish::Finish;
 use std::fmt::Debug;
+use log::warn;
 use crate::response::{CacheableResponse, CachePolicy};
 use crate::states::cache_policy::{CachePolicyChecked, CachePolicyNonCacheable, CachePolicyCacheable};
 use crate::CachedValue;
@@ -17,7 +18,7 @@ where
 
 impl<A, T> UpstreamPolledSuccessful<A, T>
 where
-    A: RuntimeAdapter,
+    A: RuntimeAdapter<UpstreamResult=T>,
     T: Debug + CacheableResponse
 {
     pub fn finish(self) -> Finish<T> {
@@ -38,9 +39,14 @@ where
         }
     }
     pub async fn update_cache(self) -> CacheUpdated<A, T> {
+        let cached_value = CachedValue::new(self.result, chrono::Utc::now());
+        let cache_update_result = self.adapter.update_cache(&cached_value).await;
+        if let Err(error) = cache_update_result {
+            warn!("Updating cache error: {}", error.to_string())
+        };
         CacheUpdated {
             adapter: self.adapter,
-            result: self.result,
+            result: cached_value.into_inner(),
         }
     }
 }

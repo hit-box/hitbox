@@ -1,9 +1,9 @@
 use hitbox::runtime::{RuntimeAdapter, AdapterResult};
-use hitbox::{Cacheable, CacheState};
+use hitbox::{Cacheable, CacheState, CachedValue};
 use hitbox::response::CacheableResponse;
 use actix::dev::{MessageResponse, ToEnvelope};
 use actix::{Actor, Addr, Handler, Message};
-use hitbox_backend::{Backend, Get};
+use hitbox_backend::{Backend, Get, Set};
 use serde::de::DeserializeOwned;
 use crate::QueryCache;
 use serde::Serialize;
@@ -38,9 +38,9 @@ where
     M: Message<Result = T> + Cacheable + Send + Clone + 'static,
     M::Result: MessageResponse<A, M> + Send,
     B: Backend,
-    <B as Actor>::Context: ToEnvelope<B, Get>,
+    <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set>,
     T: CacheableResponse<Cached = U>,
-    U: DeserializeOwned,
+    U: DeserializeOwned + Serialize,
 {
     type UpstreamResult = T;
 
@@ -60,8 +60,16 @@ where
         })
     }
 
-    fn update_cache<TU: Serialize>(&self, cached_value: CachedValue<TU>) -> AdapterResult<()> {
+    fn update_cache(&self, cached_value: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
         // let serialized = serde_json::to_vec(&cached_value);
-        Box::pin(async { Ok(())})
+        let serialized = cached_value.serialize();
+        let backend = self.backend.clone();
+        let cache_key = self.message.cache_key();  // @TODO: Please, don't recalculate cache key multiple times.
+        dbg!(&serialized);
+        Box::pin(async move { 
+            let key = cache_key?;
+            backend.send(Set { key, value: serialized, ttl: None }).await.unwrap().unwrap();
+            Ok(())
+        })
     }
 }

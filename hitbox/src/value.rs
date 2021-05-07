@@ -1,4 +1,4 @@
-use crate::response::CacheableResponse;
+use crate::{CacheableResponse, CachePolicy};
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize, Deserialize};
 
@@ -11,7 +11,19 @@ pub struct CachedValue<T> {
     expired: DateTime<Utc>,
 }
 
-impl<T> CachedValue<T> {
+#[derive(Serialize)]
+struct CacheInnerValue<U> 
+where
+    U: Serialize
+{
+    data: U,
+    expired: DateTime<Utc>,
+}
+
+impl<T> CachedValue<T> 
+where
+    T: CacheableResponse
+{
     /// Creates new CachedValue
     pub fn new(data: T, expired: DateTime<Utc>) -> Self {
         Self { data, expired }
@@ -24,6 +36,13 @@ impl<T> CachedValue<T> {
         Self {
             data: T::from_cached(cached_data.data),
             expired: cached_data.expired,
+        }
+    }
+
+    pub fn serialize(&self) -> Vec<u8> {
+        match self.data.cache_policy() {
+            CachePolicy::Cacheable(cache_value) => serde_json::to_vec(cache_value).unwrap(),
+            CachePolicy::NonCacheable(_) => unreachable!(),
         }
     }
 

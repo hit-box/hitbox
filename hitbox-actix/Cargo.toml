@@ -13,3 +13,4 @@ hitbox-redis = { path = "../hitbox-redis" }
 actix = "0.10"
 serde = { version = "1", features = ["derive"] }
 log = "0.4.14"
+serde_json = "1.0.64"

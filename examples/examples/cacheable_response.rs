@@ -29,6 +29,7 @@ impl Handler<Ping> for UpstreamActor {
     type Result = ResponseFuture<<Ping as Message>::Result>;
 
     fn handle(&mut self, msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
+        println!("Handler::Ping");
         Box::pin(async move {
             actix_rt::time::delay_for(core::time::Duration::from_secs(3)).await;
             Ok(Pong(msg.id))
