@@ -38,8 +38,9 @@ where
     U: DeserializeOwned,
 {
     pub fn from_bytes(bytes: Option<&Vec<u8>>) -> Result<Self, crate::CacheError> {
-        let cached_data =
-            bytes.map(|bytes| serde_json::from_slice::<CachedValue<U>>(bytes).unwrap());
+        let cached_data = bytes
+            .map(|bytes| serde_json::from_slice::<CachedValue<U>>(bytes))
+            .transpose()?;
         Ok(Self::from(cached_data))
     }
 }
