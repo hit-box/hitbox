@@ -1,23 +1,30 @@
 //! Cacheable trait and implementation of cache logic.
 use std::boxed::Box;
+use std::fmt::Debug;
 
 use actix::{
-    dev::{MessageResponse, ToEnvelope},
-    Actor, Addr, Handler, Message, ResponseFuture,
+    Actor,
+    Addr, dev::{MessageResponse, ToEnvelope}, Handler, Message, ResponseFuture,
 };
 use chrono::{DateTime, Duration, Utc};
-use hitbox_backend::{Backend, Delete, Get, Lock, Set};
-#[cfg(feature = "derive")]
-pub use hitbox_derive::Cacheable;
 use log::warn;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+use hitbox_backend::{Backend, Delete, Get, Lock, Set};
+#[cfg(feature = "derive")]
+pub use hitbox_derive::Cacheable;
+
 use crate::actor;
+use crate::adapted::actix_runtime_adapter::ActixAdapter;
+use crate::CacheError;
 #[cfg(feature = "metrics")]
 use crate::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
-use crate::CacheError;
+use crate::response::CacheableResponse;
+use crate::settings::InitialCacheSettings;
+use crate::states::initial::InitialState;
+use crate::transition_groups::{only_cache, stale, upstream};
 
 /// Trait describe cache configuration per message type for actix Cache actor.
 pub trait Cacheable {
@@ -175,13 +182,6 @@ where
 {
     type Result = Result<<M as Message>::Result, CacheError>;
 }
-
-use crate::adapted::actix_runtime_adapter::ActixAdapter;
-use crate::response::CacheableResponse;
-use crate::settings::InitialCacheSettings;
-use crate::states::initial::InitialState;
-use crate::transition_groups::{only_cache, stale, upstream};
-use std::fmt::Debug;
 
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for actor::CacheActor<B>
 where
