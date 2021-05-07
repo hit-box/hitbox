@@ -2,6 +2,9 @@ use crate::response::CacheableResponse;
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize, Deserialize};
 
+/// This struct wraps and represent cached data.
+///
+/// The expired field defines the UTC data expiration time.
 #[derive(Deserialize)]
 pub struct CachedValue<T> {
     data: T,
@@ -9,9 +12,11 @@ pub struct CachedValue<T> {
 }
 
 impl<T> CachedValue<T> {
+    /// Creates new CachedValue
     pub fn new(data: T, expired: DateTime<Utc>) -> Self {
         Self { data, expired }
     }
+
     fn from_inner<U>(cached_data: CachedValue<U>) -> Self
     where
         T: CacheableResponse<Cached = U>,
@@ -21,14 +26,20 @@ impl<T> CachedValue<T> {
             expired: cached_data.expired,
         }
     }
+
+    /// Returns original data from CachedValue
     pub fn into_inner(self) -> T {
         self.data
     }
 }
 
+/// Represents cuurent state of cached data.
 pub enum CacheState<T> {
+    /// Cached data is exists and actual.
     Actual(CachedValue<T>),
+    /// Cached data is exisis and stale.
     Stale(CachedValue<T>),
+    /// Cached data is not exists.
     Miss,
 }
 
@@ -37,6 +48,7 @@ where
     T: CacheableResponse<Cached = U>,
     U: DeserializeOwned,
 {
+    /// Deserialize optional vector of bytes and check the actuality.
     pub fn from_bytes(bytes: Option<&Vec<u8>>) -> Result<Self, crate::CacheError> {
         let cached_data = bytes
             .map(|bytes| serde_json::from_slice::<CachedValue<U>>(bytes))

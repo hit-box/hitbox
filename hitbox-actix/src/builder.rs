@@ -1,4 +1,4 @@
-use crate::settings::{CacheSettings, InitialCacheSettings, Status};
+use hitbox::settings::{CacheSettings, InitialCacheSettings, Status};
 use crate::CacheActor;
 use actix::{Actor, Addr};
 use hitbox_backend::Backend;
