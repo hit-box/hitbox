@@ -45,14 +45,15 @@ where
     fn poll_upstream(&self) -> AdapterResult<Self::UpstreamResult> {
         let message = self.message.message.clone();
         let upstream = self.message.upstream.clone();
-        Box::pin(async move { Ok(upstream.send(message).await.unwrap()) })
+        Box::pin(async move { Ok(upstream.send(message).await?) })
     }
 
     fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
         let backend = self.backend.clone();
-        let cache_key = self.message.cache_key().unwrap();
+        let cache_key = self.message.cache_key();  // @TODO: Please, don't recalculate cache key multiple times.
         Box::pin(async move {
-            let cached_value = backend.send(Get { key: cache_key }).await.unwrap().unwrap();
+            let key = cache_key?;
+            let cached_value = backend.send(Get { key }).await??;
             CacheState::from_bytes(cached_value.as_ref())
         })
     }
