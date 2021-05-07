@@ -5,10 +5,12 @@ use crate::states::upstream_polled::{
     UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
 };
 use std::fmt::Debug;
+use crate::response::CacheableResponse;
 
 pub struct CachePolledActual<A, T>
 where
     A: RuntimeAdapter,
+    T: CacheableResponse
 {
     pub adapter: A,
     pub result: CachedValue<T>,
@@ -17,7 +19,7 @@ where
 impl<A, T> CachePolledActual<A, T>
 where
     A: RuntimeAdapter,
-    T: Debug,
+    T: Debug + CacheableResponse,
 {
     pub async fn poll_upstream(self) -> UpstreamPolled<A, T>
     where

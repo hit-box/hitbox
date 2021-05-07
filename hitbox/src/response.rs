@@ -23,8 +23,9 @@ where
     Self::Cached: Serialize,
 {
     type Cached;
-    fn into_policy(self) -> CachePolicy<Self::Cached, Self>;
+    fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self>;
     fn from_cached(cached: Self::Cached) -> Self;
+    fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()>;
 }
 
 // There are several CacheableResponse implementations for the most common types.
@@ -36,7 +37,7 @@ where
     I: Serialize + DeserializeOwned,
 {
     type Cached = I;
-    fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
+    fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
         match self {
             Ok(value) => CachePolicy::Cacheable(value),
             Err(_) => CachePolicy::NonCacheable(self),
@@ -44,6 +45,12 @@ where
     }
     fn from_cached(cached: Self::Cached) -> Self {
         Ok(cached)
+    }
+    fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
+        match self {
+            Ok(value) => CachePolicy::Cacheable(value),
+            Err(_) => CachePolicy::NonCacheable(()),
+        }
     }
 }
 
@@ -54,7 +61,7 @@ where
     I: Serialize + DeserializeOwned,
 {
     type Cached = I;
-    fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
+    fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
         match self {
             Some(value) => CachePolicy::Cacheable(value),
             None => CachePolicy::NonCacheable(self),
@@ -63,6 +70,12 @@ where
     fn from_cached(cached: Self::Cached) -> Self {
         Some(cached)
     }
+    fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
+        match self {
+            Some(value) => CachePolicy::Cacheable(value),
+            None => CachePolicy::NonCacheable(()),
+        }
+    }
 }
 
 /// Implementation `CacheableResponse` for primitive types.
@@ -70,11 +83,14 @@ macro_rules! CACHEABLE_RESPONSE_IMPL {
     ($type:ty) => {
         impl CacheableResponse for $type {
             type Cached = $type;
-            fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
+            fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
                 CachePolicy::Cacheable(self)
             }
             fn from_cached(cached: Self::Cached) -> Self {
                 cached
+            }
+            fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
+                CachePolicy::Cacheable(self)
             }
         }
     };
