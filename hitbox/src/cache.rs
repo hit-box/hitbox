@@ -213,12 +213,8 @@ where
                     only_cache::transition(initial_state).await.result()
                 }
                 InitialCacheSettings::CacheStale => stale::transition(initial_state).await.result(),
-                InitialCacheSettings::CacheLock => {
-                    only_cache::transition(initial_state).await.result()
-                }
-                InitialCacheSettings::CacheStaleLock => {
-                    only_cache::transition(initial_state).await.result()
-                }
+                InitialCacheSettings::CacheLock => unimplemented!(),
+                InitialCacheSettings::CacheStaleLock => unimplemented!(),
             }
         })
     }
