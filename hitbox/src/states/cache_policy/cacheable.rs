@@ -1,8 +1,6 @@
-use std::fmt::Debug;
-
 use log::warn;
 
-use crate::response::{CachePolicy, CacheableResponse};
+use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::cache_updated::CacheUpdated;
 use crate::CachedValue;

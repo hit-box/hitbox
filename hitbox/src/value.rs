@@ -1,7 +1,6 @@
 use crate::{CacheError, CachePolicy, CacheableResponse};
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::fmt::Debug;
 
 /// This struct wraps and represent cached data.
 ///

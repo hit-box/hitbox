@@ -1,13 +1,4 @@
 //! Cacheable trait and implementation of cache logic.
-use std::boxed::Box;
-
-use actix::{
-    dev::{MessageResponse, ToEnvelope},
-    Actor, Addr, Handler, Message, ResponseFuture,
-};
-use serde::{de::DeserializeOwned, Serialize};
-
-use hitbox_backend::{Backend, Delete, Get, Lock, Set};
 #[cfg(feature = "derive")]
 pub use hitbox_derive::Cacheable;
 
@@ -15,10 +6,6 @@ pub use hitbox_derive::Cacheable;
 use crate::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
-use crate::response::CacheableResponse;
-use crate::settings::InitialCacheSettings;
-use crate::states::initial::InitialState;
-use crate::transition_groups::{only_cache, stale, upstream};
 use crate::CacheError;
 
 /// Trait describe cache configuration per message type for actix Cache actor.

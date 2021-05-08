@@ -1,6 +1,5 @@
 use crate::response::CacheableResponse;
 use crate::{CacheError, CacheState, CachedValue};
-use serde::Serialize;
 use std::future::Future;
 use std::pin::Pin;
 

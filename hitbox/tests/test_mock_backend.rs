@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use hitbox::dev::{
-    backend::{GetMessages, MockBackend, MockMessage},
+    mock_backend::{GetMessages, MockBackend, MockMessage},
     Get,
 };
 use hitbox::{

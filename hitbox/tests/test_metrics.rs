@@ -2,7 +2,7 @@
 mod tests {
     use actix::prelude::*;
     use hitbox::metrics::CACHE_MISS_COUNTER;
-    use hitbox::{dev::backend::MockBackend, CacheActor, CacheError, Cacheable};
+    use hitbox::{dev::mock_backend::MockBackend, CacheActor, CacheError, Cacheable};
 
     pub struct Upstream;
 
