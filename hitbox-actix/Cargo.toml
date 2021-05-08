@@ -9,8 +9,14 @@ edition = "2018"
 [dependencies]
 hitbox = { path = "../hitbox" } 
 hitbox-backend = { path = "../hitbox-backend" }
-hitbox-redis = { path = "../hitbox-redis" }
+hitbox-redis = { path = "../hitbox-redis", optional = true }
 actix = "0.10"
 serde = { version = "1", features = ["derive"] }
 log = "0.4.14"
 serde_json = "1.0.64"
+
+[features]
+default = ["redis", "derive"]
+
+redis = ["hitbox-redis"]
+derive = ["hitbox/derive"]

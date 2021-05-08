@@ -151,6 +151,7 @@
 //! [Lock]: dev/struct.Lock.html
 //! [Dogpile]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 #![warn(missing_docs)]
+
 pub mod cache;
 pub mod dev;
 pub mod error;
@@ -168,13 +169,6 @@ pub use error::CacheError;
 pub use value::{CachedValue, CacheState};
 pub use response::{CacheableResponse, CachePolicy};
 
-pub use hitbox_redis::RedisBackend;
-
 #[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use serde_qs;
-
-// /// Default type alias with RedisBackend.
-// /// You can disable it or define it manually in your code.
-// #[cfg(feature = "redis")]
-// pub type Cache = CacheActor<RedisBackend>;

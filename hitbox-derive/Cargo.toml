@@ -12,4 +12,5 @@ serde = "1"
 proc-macro2 = "1"
 
 [lib]
+name = "hitbox_derive"
 proc-macro = true
