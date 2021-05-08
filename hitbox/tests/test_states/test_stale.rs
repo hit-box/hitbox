@@ -1,5 +1,5 @@
-use hitbox::settings::{CacheSettings, Status, InitialCacheSettings};
 use hitbox::dev::MockAdapter;
+use hitbox::settings::{CacheSettings, InitialCacheSettings, Status};
 use hitbox::states::initial::InitialState;
 use hitbox::transition_groups::stale;
 
@@ -42,7 +42,6 @@ async fn test_upstream_error() {
     let finish = stale::transition(initial_state).await;
     assert_eq!(finish.result().unwrap(), "stale cache");
 }
-
 
 #[actix_rt::test]
 async fn test_cache_actual() {

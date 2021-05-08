@@ -1,5 +1,5 @@
-use actix::{prelude::*, dev::MessageResponse};
-use hitbox::{Cacheable, CacheError};
+use actix::{dev::MessageResponse, prelude::*};
+use hitbox::{CacheError, Cacheable};
 
 pub trait IntoCache: Cacheable {
     /// Helper method to convert Message into [QueryCache] message.

@@ -1,6 +1,6 @@
-use crate::{CacheableResponse, CachePolicy, CacheError};
+use crate::{CacheError, CachePolicy, CacheableResponse};
 use chrono::{DateTime, Utc};
-use serde::{de::DeserializeOwned, Serialize, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 
 /// This struct wraps and represent cached data.
@@ -13,7 +13,7 @@ pub struct CachedValue<T> {
 }
 
 #[derive(Serialize)]
-struct CachedInnerValue<'a, U> 
+struct CachedInnerValue<'a, U>
 where
     U: Serialize,
 {
@@ -21,9 +21,9 @@ where
     expired: DateTime<Utc>,
 }
 
-impl<T> CachedValue<T> 
+impl<T> CachedValue<T>
 where
-    T: CacheableResponse
+    T: CacheableResponse,
 {
     /// Creates new CachedValue
     pub fn new(data: T, expired: DateTime<Utc>) -> Self {
@@ -42,7 +42,11 @@ where
 
     pub fn serialize(&self) -> Result<Vec<u8>, CacheError> {
         let serialized = match self.data.cache_policy() {
-            CachePolicy::Cacheable(cache_value) => serde_json::to_vec(&CachedInnerValue { data: cache_value, expired: Utc::now() }).unwrap(),
+            CachePolicy::Cacheable(cache_value) => serde_json::to_vec(&CachedInnerValue {
+                data: cache_value,
+                expired: Utc::now(),
+            })
+            .unwrap(),
             CachePolicy::NonCacheable(_) => unreachable!(),
         };
         Ok(serialized)

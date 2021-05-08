@@ -1,5 +1,5 @@
-use hitbox::settings::{CacheSettings, Status, InitialCacheSettings};
 use hitbox::dev::MockAdapter;
+use hitbox::settings::{CacheSettings, InitialCacheSettings, Status};
 use hitbox::states::initial::InitialState;
 use hitbox::transition_groups::only_cache;
 

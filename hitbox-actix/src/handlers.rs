@@ -1,10 +1,16 @@
-use actix::{prelude::*, dev::{ToEnvelope, MessageResponse, ResponseFuture}};
-use hitbox::{Cacheable, CacheableResponse, CacheError, dev::{Backend, Delete, Get, Lock, Set}};
-use hitbox::states::initial::InitialState;
+use crate::{ActixAdapter, CacheActor, QueryCache};
+use actix::{
+    dev::{MessageResponse, ResponseFuture, ToEnvelope},
+    prelude::*,
+};
 use hitbox::settings::InitialCacheSettings;
+use hitbox::states::initial::InitialState;
 use hitbox::transition_groups::{only_cache, stale, upstream};
-use serde::{Serialize, de::DeserializeOwned};
-use crate::{CacheActor, QueryCache, ActixAdapter};
+use hitbox::{
+    dev::{Backend, Delete, Get, Lock, Set},
+    CacheError, Cacheable, CacheableResponse,
+};
+use serde::{de::DeserializeOwned, Serialize};
 
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for CacheActor<B>
 where

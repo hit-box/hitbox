@@ -1,16 +1,16 @@
-use crate::CachedValue;
+use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
 use crate::states::upstream_polled::{
     UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
 };
+use crate::CachedValue;
 use std::fmt::Debug;
-use crate::response::CacheableResponse;
 
 pub struct CachePolledActual<A, T>
 where
     A: RuntimeAdapter,
-    T: CacheableResponse
+    T: CacheableResponse,
 {
     pub adapter: A,
     pub result: CachedValue<T>,

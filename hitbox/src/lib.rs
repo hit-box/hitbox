@@ -166,8 +166,8 @@ pub mod value;
 
 pub use cache::Cacheable;
 pub use error::CacheError;
-pub use value::{CachedValue, CacheState};
-pub use response::{CacheableResponse, CachePolicy};
+pub use response::{CachePolicy, CacheableResponse};
+pub use value::{CacheState, CachedValue};
 
 #[cfg(feature = "derive")]
 #[doc(hidden)]

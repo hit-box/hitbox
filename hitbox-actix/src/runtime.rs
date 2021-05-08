@@ -1,12 +1,12 @@
-use actix::{Actor, Addr, Handler, Message};
 use actix::dev::{MessageResponse, ToEnvelope};
+use actix::{Actor, Addr, Handler, Message};
 use log::warn;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use hitbox::{Cacheable, CachedValue, CacheState};
 use hitbox::response::CacheableResponse;
 use hitbox::runtime::{AdapterResult, RuntimeAdapter};
+use hitbox::{CacheState, Cacheable, CachedValue};
 use hitbox_backend::{Backend, Get, Set};
 
 use crate::QueryCache;
@@ -55,7 +55,7 @@ where
 
     fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
         let backend = self.backend.clone();
-        let cache_key = self.message.cache_key();  // @TODO: Please, don't recalculate cache key multiple times.
+        let cache_key = self.message.cache_key(); // @TODO: Please, don't recalculate cache key multiple times.
         Box::pin(async move {
             let key = cache_key?;
             let cached_value = backend.send(Get { key }).await??;
@@ -66,14 +66,21 @@ where
     fn update_cache(&self, cached_value: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
         let serialized = cached_value.serialize();
         let backend = self.backend.clone();
-        let cache_key = self.message.cache_key();  // @TODO: Please, don't recalculate cache key multiple times.
+        let cache_key = self.message.cache_key(); // @TODO: Please, don't recalculate cache key multiple times.
         Box::pin(async move {
             let serialized = serialized?;
             let key = cache_key?;
-            backend.send(Set { key, value: serialized, ttl: None })
+            backend
+                .send(Set {
+                    key,
+                    value: serialized,
+                    ttl: None,
+                })
                 .await
                 .map_err(|_| warn!("Updating Cache Error. Actix Mailbox Error."))
-                .and_then(|value| value.map_err(|error| warn!("Updating Cache Error. {}", error.to_string())));
+                .and_then(|value| {
+                    value.map_err(|error| warn!("Updating Cache Error. {}", error.to_string()))
+                });
             Ok(())
         })
     }

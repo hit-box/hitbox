@@ -2,8 +2,8 @@
 use std::boxed::Box;
 
 use actix::{
-    Actor,
-    Addr, dev::{MessageResponse, ToEnvelope}, Handler, Message, ResponseFuture,
+    dev::{MessageResponse, ToEnvelope},
+    Actor, Addr, Handler, Message, ResponseFuture,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -11,7 +11,6 @@ use hitbox_backend::{Backend, Delete, Get, Lock, Set};
 #[cfg(feature = "derive")]
 pub use hitbox_derive::Cacheable;
 
-use crate::CacheError;
 #[cfg(feature = "metrics")]
 use crate::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
@@ -20,6 +19,7 @@ use crate::response::CacheableResponse;
 use crate::settings::InitialCacheSettings;
 use crate::states::initial::InitialState;
 use crate::transition_groups::{only_cache, stale, upstream};
+use crate::CacheError;
 
 /// Trait describe cache configuration per message type for actix Cache actor.
 pub trait Cacheable {
@@ -115,14 +115,14 @@ pub trait Cacheable {
     // /// [QueryCache]: struct.QueryCache.html
     // fn into_cache<A>(self, upstream: &Addr<A>) -> QueryCache<A, Self>
     // where
-        // A: Actor,
-        // Self: Message + Send + Sized,
-        // Self::Result: MessageResponse<A, Self> + Send + 'static,
+    // A: Actor,
+    // Self: Message + Send + Sized,
+    // Self::Result: MessageResponse<A, Self> + Send + 'static,
     // {
-        // QueryCache {
-            // upstream: upstream.clone(),
-            // message: self,
-        // }
+    // QueryCache {
+    // upstream: upstream.clone(),
+    // message: self,
+    // }
     // }
 }
 

@@ -1,17 +1,17 @@
 //! Cache actor and Builder.
+use crate::builder::CacheBuilder;
+use actix::dev::ToEnvelope;
 use actix::prelude::*;
-use hitbox_backend::Backend;
-use hitbox_redis::RedisBackend;
-use log::{debug, info};
+use hitbox::dev::{Delete, Get, Lock, Set};
 #[cfg(feature = "metrics")]
 use hitbox::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
-use hitbox::CacheError;
-use crate::builder::CacheBuilder;
 use hitbox::settings::InitialCacheSettings;
-use hitbox::dev::{Delete, Get, Lock, Set};
-use actix::dev::ToEnvelope;
+use hitbox::CacheError;
+use hitbox_backend::Backend;
+use hitbox_redis::RedisBackend;
+use log::{debug, info};
 
 /// Actix actor implements cache logic.
 ///

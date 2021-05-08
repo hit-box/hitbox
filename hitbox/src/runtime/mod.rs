@@ -1,3 +1,3 @@
 pub mod adapter;
 
-pub use adapter::{RuntimeAdapter, AdapterResult};
+pub use adapter::{AdapterResult, RuntimeAdapter};

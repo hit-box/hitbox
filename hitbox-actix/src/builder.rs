@@ -1,6 +1,6 @@
-use hitbox::settings::{CacheSettings, InitialCacheSettings, Status};
 use crate::CacheActor;
 use actix::{Actor, Addr};
+use hitbox::settings::{CacheSettings, InitialCacheSettings, Status};
 use hitbox_backend::Backend;
 use std::marker::PhantomData;
 

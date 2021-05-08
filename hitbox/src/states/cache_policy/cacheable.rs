@@ -2,15 +2,15 @@ use std::fmt::Debug;
 
 use log::warn;
 
-use crate::CachedValue;
-use crate::response::{CacheableResponse, CachePolicy};
+use crate::response::{CachePolicy, CacheableResponse};
 use crate::runtime::RuntimeAdapter;
 use crate::states::cache_updated::CacheUpdated;
+use crate::CachedValue;
 
 pub struct CachePolicyCacheable<A, T>
 where
     A: RuntimeAdapter,
-    T: CacheableResponse
+    T: CacheableResponse,
 {
     pub adapter: A,
     pub result: T,
@@ -18,8 +18,8 @@ where
 
 impl<A, T> CachePolicyCacheable<A, T>
 where
-    A: RuntimeAdapter<UpstreamResult=T>,
-    T: CacheableResponse
+    A: RuntimeAdapter<UpstreamResult = T>,
+    T: CacheableResponse,
 {
     pub async fn update_cache(self) -> CacheUpdated<A, T> {
         let cached_value = CachedValue::new(self.result, chrono::Utc::now());

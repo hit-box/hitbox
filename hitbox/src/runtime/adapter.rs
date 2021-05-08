@@ -1,13 +1,12 @@
-
-use crate::{CacheState, CacheError, CachedValue};
+use crate::response::CacheableResponse;
+use crate::{CacheError, CacheState, CachedValue};
+use serde::Serialize;
 use std::future::Future;
 use std::pin::Pin;
-use serde::Serialize;
-use crate::response::CacheableResponse;
 
 pub type AdapterResult<T> = Pin<Box<dyn Future<Output = Result<T, CacheError>>>>;
 
-pub trait RuntimeAdapter 
+pub trait RuntimeAdapter
 where
     Self::UpstreamResult: CacheableResponse,
 {
