@@ -1,12 +1,15 @@
-use hitbox::runtime::{RuntimeAdapter, AdapterResult};
-use hitbox::{Cacheable, CacheState, CachedValue};
-use hitbox::response::CacheableResponse;
-use actix::dev::{MessageResponse, ToEnvelope};
 use actix::{Actor, Addr, Handler, Message};
-use hitbox_backend::{Backend, Get, Set};
+use actix::dev::{MessageResponse, ToEnvelope};
+use log::warn;
 use serde::de::DeserializeOwned;
-use crate::QueryCache;
 use serde::Serialize;
+
+use hitbox::{Cacheable, CachedValue, CacheState};
+use hitbox::response::CacheableResponse;
+use hitbox::runtime::{AdapterResult, RuntimeAdapter};
+use hitbox_backend::{Backend, Get, Set};
+
+use crate::QueryCache;
 
 pub struct ActixAdapter<A, M, B>
 where
@@ -61,13 +64,16 @@ where
     }
 
     fn update_cache(&self, cached_value: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
-        // let serialized = serde_json::to_vec(&cached_value);
         let serialized = cached_value.serialize();
         let backend = self.backend.clone();
         let cache_key = self.message.cache_key();  // @TODO: Please, don't recalculate cache key multiple times.
-        Box::pin(async move { 
+        Box::pin(async move {
+            let serialized = serialized?;
             let key = cache_key?;
-            backend.send(Set { key, value: serialized, ttl: None }).await.unwrap().unwrap();
+            backend.send(Set { key, value: serialized, ttl: None })
+                .await
+                .map_err(|_| warn!("Updating Cache Error. Actix Mailbox Error."))
+                .and_then(|value| value.map_err(|error| warn!("Updating Cache Error. {}", error.to_string())));
             Ok(())
         })
     }
