@@ -1,9 +1,9 @@
-use crate::runtime::{RuntimeAdapter, AdapterResult};
 use crate::error::CacheError;
-use crate::value::{CachedValue, CacheState};
-use chrono::{Utc, DateTime};
-use serde::Serialize;
+use crate::runtime::{AdapterResult, RuntimeAdapter};
+use crate::value::{CacheState, CachedValue};
 use crate::CacheableResponse;
+use chrono::{DateTime, Utc};
+use serde::Serialize;
 
 #[derive(Clone)]
 enum MockUpstreamState<T> {
@@ -21,16 +21,16 @@ enum MockCacheState<T> {
 
 #[derive(Clone)]
 pub struct MockAdapter<T>
-    where
-        T: Clone,
+where
+    T: Clone,
 {
     upstream_state: MockUpstreamState<T>,
     cache_state: MockCacheState<T>,
 }
 
 impl<T> MockAdapter<T>
-    where
-        T: Clone,
+where
+    T: Clone,
 {
     pub fn build() -> MockAdapterBuilder<T> {
         MockAdapterBuilder {
@@ -41,16 +41,16 @@ impl<T> MockAdapter<T>
 }
 
 pub struct MockAdapterBuilder<T>
-    where
-        T: Clone,
+where
+    T: Clone,
 {
     upstream_state: MockUpstreamState<T>,
     cache_state: MockCacheState<T>,
 }
 
 impl<T> MockAdapterBuilder<T>
-    where
-        T: Clone,
+where
+    T: Clone,
 {
     pub fn with_upstream_value(self, value: T) -> Self {
         MockAdapterBuilder {
@@ -97,8 +97,8 @@ impl<T> MockAdapterBuilder<T>
 }
 
 impl<T> RuntimeAdapter for MockAdapter<T>
-    where
-        T: Clone + CacheableResponse + 'static,
+where
+    T: Clone + CacheableResponse + 'static,
 {
     type UpstreamResult = T;
     fn poll_upstream(&self) -> AdapterResult<Self::UpstreamResult> {
@@ -110,14 +110,15 @@ impl<T> RuntimeAdapter for MockAdapter<T>
     }
     fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
         let result = match self.clone().cache_state {
-            MockCacheState::Actual(value) => Ok(
-                CacheState::Actual(CachedValue::new(value, chrono::Utc::now()))
-            ),
-            MockCacheState::Stale(value) => Ok(
-                CacheState::Stale(CachedValue::new(value.0, value.1))
-            ),
+            MockCacheState::Actual(value) => Ok(CacheState::Actual(CachedValue::new(
+                value,
+                chrono::Utc::now(),
+            ))),
+            MockCacheState::Stale(value) => {
+                Ok(CacheState::Stale(CachedValue::new(value.0, value.1)))
+            }
             MockCacheState::Miss => Ok(CacheState::Miss),
-            MockCacheState::Error => Err(CacheError::DeserializeError)
+            MockCacheState::Error => Err(CacheError::DeserializeError),
         };
         Box::pin(async { result })
     }
