@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use hitbox::response::CacheableResponse;
-use hitbox::runtime::{AdapterResult, RuntimeAdapter};
+use hitbox::runtime::{AdapterResult, RuntimeAdapter, EvictionPolicy, TtlSettings};
 use hitbox::{CacheState, Cacheable, CachedValue};
 use hitbox_backend::{Backend, Get, Set};
 
@@ -65,6 +65,7 @@ where
 
     fn update_cache(&self, cached_value: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
         let serialized = cached_value.serialize();
+        let ttl = self.message.message.cache_ttl();
         let backend = self.backend.clone();
         let cache_key = self.message.cache_key(); // @TODO: Please, don't recalculate cache key multiple times.
         Box::pin(async move {
@@ -74,7 +75,7 @@ where
                 .send(Set {
                     key,
                     value: serialized,
-                    ttl: None,
+                    ttl: Some(ttl),
                 })
                 .await
                 .map_err(|_| warn!("Updating Cache Error. Actix Mailbox Error."))
@@ -83,5 +84,12 @@ where
                 });
             Ok(())
         })
+    }
+    fn eviction_settings(&self) -> EvictionPolicy {
+        let ttl_settings = TtlSettings {
+            ttl: self.message.message.cache_ttl(),
+            stale_ttl: self.message.message.cache_stale_ttl(),
+        };
+        EvictionPolicy::Ttl(ttl_settings)
     }
 }

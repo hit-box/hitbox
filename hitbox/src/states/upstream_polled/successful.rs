@@ -42,7 +42,7 @@ where
         }
     }
     pub async fn update_cache(self) -> CacheUpdated<A, T> {
-        let cached_value = CachedValue::new(self.result, chrono::Utc::now());
+        let cached_value = CachedValue::from((self.result, self.adapter.eviction_settings()));
         let cache_update_result = self.adapter.update_cache(&cached_value).await;
         if let Err(error) = cache_update_result {
             warn!("Updating cache error: {}", error.to_string())

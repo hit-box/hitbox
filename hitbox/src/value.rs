@@ -1,6 +1,7 @@
 use crate::{CacheError, CachePolicy, CacheableResponse};
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use crate::runtime::EvictionPolicy;
 
 /// This struct wraps and represent cached data.
 ///
@@ -9,6 +10,21 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub struct CachedValue<T> {
     data: T,
     expired: DateTime<Utc>,
+}
+
+impl<T> From<(T, EvictionPolicy)> for CachedValue<T> {
+    fn from(model: (T, EvictionPolicy)) -> Self {
+        let (data, eviction_policy) = model;
+        match eviction_policy {
+            EvictionPolicy::Ttl(settings) => {
+                let duration = chrono::Duration::seconds(settings.stale_ttl as i64);
+                Self {
+                    data,
+                    expired: chrono::Utc::now() + duration,
+                }
+            }
+        }
+    }
 }
 
 #[derive(Serialize)]

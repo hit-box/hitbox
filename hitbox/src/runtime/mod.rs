@@ -1,3 +1,3 @@
 pub mod adapter;
 
-pub use adapter::{AdapterResult, RuntimeAdapter};
+pub use adapter::{AdapterResult, RuntimeAdapter, EvictionPolicy, TtlSettings};

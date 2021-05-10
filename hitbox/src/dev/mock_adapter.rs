@@ -1,5 +1,5 @@
 use crate::error::CacheError;
-use crate::runtime::{AdapterResult, RuntimeAdapter};
+use crate::runtime::{AdapterResult, RuntimeAdapter, EvictionPolicy, TtlSettings};
 use crate::value::{CacheState, CachedValue};
 use crate::CacheableResponse;
 use chrono::{DateTime, Utc};
@@ -108,6 +108,7 @@ where
         };
         Box::pin(async { result })
     }
+
     fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
         let result = match self.clone().cache_state {
             MockCacheState::Actual(value) => Ok(CacheState::Actual(CachedValue::new(
@@ -122,7 +123,12 @@ where
         };
         Box::pin(async { result })
     }
+
     fn update_cache(&self, cached_value: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
         Box::pin(async { Ok(()) })
+    }
+
+    fn eviction_settings(&self) -> EvictionPolicy {
+        EvictionPolicy::Ttl(TtlSettings { ttl: 0, stale_ttl: 0 })
     }
 }
