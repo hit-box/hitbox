@@ -45,8 +45,7 @@ async fn main() -> Result<(), CacheError> {
     let backend = RedisBackend::new().await.unwrap().start();
 
     let cache = Cache::builder()
-        // .disable()
-        .without_stale()
+        .with_stale()
         .without_lock()
         .finish(backend)
         .start();

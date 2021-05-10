@@ -18,10 +18,8 @@ impl<T> From<(T, EvictionPolicy)> for CachedValue<T> {
         match eviction_policy {
             EvictionPolicy::Ttl(settings) => {
                 let duration = chrono::Duration::seconds(settings.stale_ttl as i64);
-                Self {
-                    data,
-                    expired: chrono::Utc::now() + duration,
-                }
+                let expired = chrono::Utc::now() + duration;
+                Self { data, expired }
             }
         }
     }
@@ -56,15 +54,13 @@ where
     }
 
     pub fn serialize(&self) -> Result<Vec<u8>, CacheError> {
-        let serialized = match self.data.cache_policy() {
+        match self.data.cache_policy() {
             CachePolicy::Cacheable(cache_value) => serde_json::to_vec(&CachedInnerValue {
                 data: cache_value,
-                expired: Utc::now(),
-            })
-            .unwrap(),
-            CachePolicy::NonCacheable(_) => unreachable!(),
-        };
-        Ok(serialized)
+                expired: self.expired,
+            }).map_err(CacheError::from),
+            CachePolicy::NonCacheable(_) => Err(CacheError::DeserializeError)
+        }
     }
 
     /// Returns original data from CachedValue
@@ -77,7 +73,7 @@ where
 pub enum CacheState<T> {
     /// Cached data is exists and actual.
     Actual(CachedValue<T>),
-    /// Cached data is exisis and stale.
+    /// Cached data is exists and stale.
     Stale(CachedValue<T>),
     /// Cached data is not exists.
     Miss,

@@ -71,7 +71,7 @@ where
         Box::pin(async move {
             let serialized = serialized?;
             let key = cache_key?;
-            backend
+            let _ = backend
                 .send(Set {
                     key,
                     value: serialized,
