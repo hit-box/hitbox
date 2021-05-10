@@ -8,8 +8,16 @@ edition = "2018"
 default = []
 
 [dev-dependencies]
-
-hitbox = { path = "../hitbox" }
-hitbox-backend = { path = "../hitbox-backend" }
-hitbox-derive = { path = "../hitbox-derive" }
-hitbox-redis = { path = "../hitbox-redis" }
+hitbox-actix = { path = "../hitbox-actix" }
+actix = "0.10"
+log = "0.4"
+actix-rt = "1"
+serde_json = "1"
+serde_qs = { version = "0.7" }
+serde = { version = "1", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+prometheus = { version = "0.10" }
+env_logger = "0.8"
+actix_derive = "0.5"
+actix-web = "3"

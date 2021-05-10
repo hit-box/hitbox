@@ -14,10 +14,10 @@ pub fn impl_macro(ast: &syn::DeriveInput) -> TokenStream {
     let message_type = format!("{}", name);
 
     let cache_message_key_implement = quote! {
-        fn cache_message_key(&self) -> Result<String, hitbox::CacheError> {
-            hitbox::serde_qs::to_string(self)
+        fn cache_message_key(&self) -> Result<String, CacheError> {
+            serde_qs::to_string(self)
                 .map(|key| format!("{}::v{}::{}", self.cache_key_prefix(), self.cache_version(), key))
-                .map_err(|error| hitbox::CacheError::CacheKeyGenerationError(error.to_string()))
+                .map_err(|error| CacheError::CacheKeyGenerationError(error.to_string()))
         }
     };
 

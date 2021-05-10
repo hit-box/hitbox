@@ -2,7 +2,7 @@
 mod tests {
     use actix::prelude::*;
     use hitbox::metrics::CACHE_MISS_COUNTER;
-    use hitbox::{dev::backend::MockBackend, CacheActor, CacheError, Cacheable};
+    use hitbox::{dev::mock_backend::MockBackend, CacheActor, CacheError, Cacheable};
 
     pub struct Upstream;
 
@@ -59,7 +59,7 @@ mod tests {
     #[actix_rt::test]
     async fn test_miss_counter_metric() {
         let backend = MockBackend::new().start();
-        let cache = CacheActor::builder().build(backend).start();
+        let cache = CacheActor::builder().finish(backend).start();
         let upstream = Upstream {}.start();
         let res = cache.send(Ping(8).into_cache(&upstream)).await.unwrap();
         assert_eq!(res.unwrap(), Ok(8));

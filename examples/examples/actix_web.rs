@@ -1,7 +1,7 @@
 use actix::prelude::*;
-use hitbox::{Cache, Cacheable};
 use actix_derive::Message;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use hitbox::{Cache, Cacheable};
 use serde::Serialize;
 
 fn fibonacci(n: u8) -> u64 {

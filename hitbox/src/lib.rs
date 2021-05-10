@@ -65,7 +65,7 @@
 //! #   Ok(())
 //! }
 //! ```
-//! Or you can instantiate [CacheActor] with any other backend manually 
+//! Or you can instantiate [CacheActor] with any other backend manually
 //! (for additional information you can backend examples):
 //!
 //! ```rust
@@ -79,7 +79,7 @@
 //!         .map_err(|err| CacheError::BackendError(err.into()))?
 //!         .start();
 //!     let cache = CacheActor::builder()
-//!         .build(backend)
+//!         .finish(backend)
 //!         .start();
 //! #   Ok(())
 //! }
@@ -151,25 +151,24 @@
 //! [Lock]: dev/struct.Lock.html
 //! [Dogpile]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 #![warn(missing_docs)]
-pub mod actor;
+
 pub mod cache;
 pub mod dev;
 pub mod error;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 pub mod response;
+pub mod runtime;
+pub mod settings;
+pub mod states;
+pub mod transition_groups;
+pub mod value;
 
-pub use actor::{CacheActor, CacheBuilder};
-pub use cache::{Cacheable, QueryCache};
+pub use cache::Cacheable;
 pub use error::CacheError;
-
-pub use hitbox_redis::RedisBackend;
+pub use response::{CachePolicy, CacheableResponse};
+pub use value::{CacheState, CachedValue};
 
 #[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use serde_qs;
-
-/// Default type alias with RedisBackend.
-/// You can disable it or define it manually in your code.
-#[cfg(feature = "redis")]
-pub type Cache = CacheActor<RedisBackend>;

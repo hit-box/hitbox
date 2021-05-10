@@ -2,7 +2,9 @@
 
 members = [
     "hitbox",
+    "hitbox-actix",
     "hitbox-backend",
     "hitbox-derive",
     "hitbox-redis",
+    "examples",
 ]

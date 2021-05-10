@@ -1,4 +1,4 @@
-use hitbox::response::{CacheableResponse, CachePolicy};
+use hitbox::response::{CachePolicy, CacheableResponse};
 use serde::Serialize;
 
 #[derive(CacheableResponse, Serialize, Clone, Debug, Eq, PartialEq)]
@@ -9,7 +9,10 @@ struct Message {
 
 #[test]
 fn test_custom_message_into_policy() {
-    let message = Message { id: 0, alias: String::from("alias") };
+    let message = Message {
+        id: 0,
+        alias: String::from("alias"),
+    };
     let policy = message.clone().into_policy();
     match policy {
         CachePolicy::Cacheable(value) => assert_eq!(value, message),

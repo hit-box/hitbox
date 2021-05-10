@@ -1,11 +1,14 @@
 use actix::prelude::*;
 use hitbox::dev::{
-    backend::{GetMessages, MockBackend, MockMessage},
+    mock_backend::{GetMessages, MockBackend, MockMessage},
     Get,
+};
+use hitbox::{
+    response::{CachePolicy, CacheableResponse},
+    CacheActor,
 };
 use hitbox::{CacheError, Cacheable};
 use serde::{Deserialize, Serialize};
-use hitbox::{CacheActor, response::{CacheableResponse, CachePolicy}};
 
 struct UpstreamActor;
 
@@ -44,7 +47,7 @@ impl Handler<Ping> for UpstreamActor {
 #[actix_rt::test]
 async fn test_mock_backend() {
     let backend = MockBackend::new().start();
-    let cache = CacheActor::builder().build(backend.clone()).start();
+    let cache = CacheActor::builder().finish(backend.clone()).start();
     let upstream = UpstreamActor.start();
     let msg = Ping { id: 42 };
     cache
