@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use actix_derive::{Message, MessageResponse};
-use hitbox::{Cache, CacheError, Cacheable};
+use hitbox_actix::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -42,7 +42,7 @@ struct Pong(i32);
 #[derive(Debug)]
 enum Error {}
 
-#[derive(Message, Cacheable, Serialize)]
+#[derive(Message, Cacheable, Serialize, Clone)]
 #[rtype(result = "Result<Pong, Error>")]
 struct Ping {
     id: i32,

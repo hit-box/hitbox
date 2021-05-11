@@ -5,13 +5,13 @@ use crate::CacheableResponse;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum MockUpstreamState<T> {
     Ok(T),
     Error,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum MockCacheState<T> {
     Actual(T),
     Stale((T, DateTime<Utc>)),
@@ -19,7 +19,7 @@ enum MockCacheState<T> {
     Error,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MockAdapter<T>
 where
     T: Clone,

@@ -78,13 +78,13 @@ where
 
     /// Returns final cache key.
     ///
-    /// This method compose final cache key from Cacheable::cache_message_key
+    /// This method compose final cache key from Cacheable::cache_key
     /// and Upstream actor type name.
     pub fn cache_key(&self) -> Result<String, CacheError> {
         Ok(format!(
             "{}::{}",
             self.upstream_name(),
-            self.message.cache_message_key()?
+            self.message.cache_key()?
         ))
     }
 }

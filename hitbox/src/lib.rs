@@ -25,7 +25,7 @@
 //! > and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types).
 //!
 //!
-//! ```rust
+//! ```rust,ignore
 //! use actix::prelude::*;
 //! use hitbox::Cacheable; // With features=["derive"]
 //! use actix_derive::Message;
@@ -40,7 +40,7 @@
 //! ```
 //! Or implement that trait manually:
 //!
-//! ```rust
+//! ```rust,ignore
 //! # use hitbox::{Cacheable, CacheError};
 //! # struct Ping { id: i32 }
 //! impl Cacheable for Ping {
@@ -53,7 +53,7 @@
 //! ```
 //! Next step is to instantiate [CacheActor] with default or selected by feature backend:
 //!
-//! ```rust
+//! ```rust,ignore
 //! # use actix::prelude::*;
 //! use hitbox::{Cache, CacheError, RedisBackend};
 //!
@@ -68,7 +68,7 @@
 //! Or you can instantiate [CacheActor] with any other backend manually
 //! (for additional information you can backend examples):
 //!
-//! ```rust
+//! ```rust,ignore
 //! # use actix::prelude::*;
 //! use hitbox::{CacheActor, CacheError, RedisBackend};
 //!
@@ -88,7 +88,7 @@
 //! And the last step is using cache in your code (actix-web handler for example).
 //! This full example and other examples you can see on [github.com](https://github.com/rambler-digital-solutions/hitbox/blob/master/examples/actix_web.rs)
 //!
-//! ```rust
+//! ```rust,ignore
 //! # use actix::prelude::*;
 //! # use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 //! # use hitbox::{Cache, RedisBackend, Cacheable};
@@ -172,3 +172,9 @@ pub use value::{CacheState, CachedValue};
 #[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use serde_qs as hitbox_serializer;
+
+pub mod prelude {
+    pub use crate::{Cacheable, CacheError, CacheableResponse};
+    #[cfg(feature = "derive")]
+    pub use crate::hitbox_serializer;
+}

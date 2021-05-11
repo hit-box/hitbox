@@ -8,6 +8,7 @@ edition = "2018"
 default = []
 
 [dev-dependencies]
+hitbox = { path = "../hitbox", features = ["derive"] }
 hitbox-actix = { path = "../hitbox-actix", features = ["redis"]}
 actix = "0.10"
 log = "0.4"

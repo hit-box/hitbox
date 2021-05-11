@@ -26,11 +26,3 @@ pub mod prelude {
     pub use crate::{Cache, RedisBackend};
     pub use hitbox::hitbox_serializer;
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}

@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use actix_derive::Message;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use hitbox::{Cache, Cacheable};
+use hitbox_actix::prelude::*;
 use serde::Serialize;
 
 fn fibonacci(n: u8) -> u64 {
@@ -18,7 +18,7 @@ impl Actor for FibonacciActor {
     type Context = SyncContext<Self>;
 }
 
-#[derive(Message, Cacheable, Serialize)]
+#[derive(Message, Cacheable, Serialize, Clone)]
 #[rtype(result = "u64")]
 struct GetNumber {
     number: u8,

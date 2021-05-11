@@ -1,16 +1,7 @@
 //! Cacheable trait and implementation of cache logic.
-use std::boxed::Box;
 
-use actix::{
-    dev::{MessageResponse, ToEnvelope},
-    Actor, Addr, Handler, Message, ResponseFuture,
-};
-use hitbox_backend::{Backend, Delete, Get, Lock, LockStatus, Set};
 #[cfg(feature = "derive")]
 pub use hitbox_derive::Cacheable;
-use chrono::{DateTime, Duration, Utc};
-use log::{debug, warn, info};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "metrics")]
 use crate::metrics::{
@@ -35,7 +26,7 @@ pub trait Cacheable {
     /// }
     ///
     /// impl Cacheable for QueryNothing {
-    ///     fn cache_message_key(&self) -> Result<String, CacheError> {
+    ///     fn cache_key(&self) -> Result<String, CacheError> {
     ///         let key = format!("{}::id::{}", self.cache_key_prefix(), self.id.map_or_else(
     ///             || "None".to_owned(), |id| id.to_string())
     ///         );
@@ -45,11 +36,11 @@ pub trait Cacheable {
     /// }
     ///
     /// let query = QueryNothing { id: Some(1) };
-    /// assert_eq!(query.cache_message_key().unwrap(), "database::QueryNothing::id::1");
+    /// assert_eq!(query.cache_key().unwrap(), "database::QueryNothing::id::1");
     /// let query = QueryNothing { id: None };
-    /// assert_eq!(query.cache_message_key().unwrap(), "database::QueryNothing::id::None");
+    /// assert_eq!(query.cache_key().unwrap(), "database::QueryNothing::id::None");
     /// ```
-    fn cache_message_key(&self) -> Result<String, CacheError>;
+    fn cache_key(&self) -> Result<String, CacheError>;
 
     /// Method return cache key prefix based on message type.
     fn cache_key_prefix(&self) -> String;
@@ -87,7 +78,7 @@ mod tests {
     struct Message;
 
     impl Cacheable for Message {
-        fn cache_message_key(&self) -> Result<String, CacheError> {
+        fn cache_key(&self) -> Result<String, CacheError> {
             Ok("Message".to_owned())
         }
         fn cache_key_prefix(&self) -> String {

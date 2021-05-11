@@ -1,4 +1,4 @@
-use hitbox::response::{CachePolicy, CacheableResponse};
+use hitbox::{CachePolicy, CacheableResponse};
 use serde::Serialize;
 
 #[derive(CacheableResponse, Serialize, Clone, Debug, Eq, PartialEq)]
@@ -13,7 +13,7 @@ fn test_custom_message_into_policy() {
         id: 0,
         alias: String::from("alias"),
     };
-    let policy = message.clone().into_policy();
+    let policy = message.clone().into_cache_policy();
     match policy {
         CachePolicy::Cacheable(value) => assert_eq!(value, message),
         CachePolicy::NonCacheable(_) => assert!(false),
@@ -28,7 +28,7 @@ enum EnumMessage {
 #[test]
 fn test_custom_enum_message_into_policy() {
     let message = EnumMessage::Variant(1);
-    let policy = message.clone().into_policy();
+    let policy = message.clone().into_cache_policy();
     match policy {
         CachePolicy::Cacheable(value) => assert_eq!(value, message),
         CachePolicy::NonCacheable(_) => assert!(false),

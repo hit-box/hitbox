@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use hitbox::dev::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
-use hitbox::{CacheActor, CacheError, Cacheable};
+use hitbox_actix::prelude::*;
 use serde::{Deserialize, Serialize};
 
 struct UpstreamActor;
@@ -13,7 +13,7 @@ impl Actor for UpstreamActor {
 struct Pong(i32);
 
 impl Cacheable for Ping {
-    fn cache_message_key(&self) -> Result<String, CacheError> {
+    fn cache_key(&self) -> Result<String, CacheError> {
         Ok(format!("{}::{}", self.cache_key_prefix(), self.id))
     }
     fn cache_key_prefix(&self) -> String {
@@ -21,7 +21,7 @@ impl Cacheable for Ping {
     }
 }
 
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "Result<Pong, ()>")]
 struct Ping {
     pub id: i32,

@@ -1,7 +1,6 @@
 use actix::prelude::*;
-use hitbox::actor::CacheActor;
 use hitbox::dev::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
-use hitbox::{CacheError, Cacheable};
+use hitbox_actix::prelude::*;
 use serde::{Deserialize, Serialize};
 
 struct UpstreamActor;
@@ -13,7 +12,7 @@ impl Actor for UpstreamActor {
 #[derive(MessageResponse, Deserialize, Serialize, Debug)]
 struct Pong(i32);
 
-#[derive(Message, Cacheable, Serialize)]
+#[derive(Message, Cacheable, Serialize, Clone)]
 #[rtype(result = "Result<Pong, ()>")]
 struct Ping {
     pub id: i32,

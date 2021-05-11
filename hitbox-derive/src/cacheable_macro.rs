@@ -13,8 +13,8 @@ pub fn impl_macro(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let message_type = format!("{}", name);
 
-    let cache_message_key_implement = quote! {
-        fn cache_message_key(&self) -> Result<String, CacheError> {
+    let cache_key_implement = quote! {
+        fn cache_key(&self) -> Result<String, CacheError> {
             hitbox_serializer::to_string(self)
                 .map(|key| format!("{}::v{}::{}", self.cache_key_prefix(), self.cache_version(), key))
                 .map_err(|error| CacheError::CacheKeyGenerationError(error.to_string()))
@@ -56,7 +56,7 @@ pub fn impl_macro(ast: &syn::DeriveInput) -> TokenStream {
 
     let gen = quote! {
         impl Cacheable for #name {
-            #cache_message_key_implement
+            #cache_key_implement
             #cache_key_prefix_implement
             #cache_ttl_implement
             #cache_stale_ttl_implement
