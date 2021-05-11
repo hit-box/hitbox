@@ -15,6 +15,7 @@ impl<T> fmt::Debug for CachePolicyNonCacheable<T> {
 }
 
 impl<T> CachePolicyNonCacheable<T> {
+    #[instrument]
     pub fn finish(self) -> Finish<T> {
         trace!("Finish");
         Finish {

@@ -27,10 +27,7 @@ async fn test_cache_key() {
         message.cache_key().unwrap().as_str(),
         "overloaded cache key"
     );
-    assert_eq!(
-        message.cache_key_prefix().as_str(),
-        "Message"
-    );
+    assert_eq!(message.cache_key_prefix().as_str(), "Message");
     let message = Message {
         id: 28,
         alias: "cow level".to_owned(),
@@ -39,8 +36,5 @@ async fn test_cache_key() {
         message.cache_key().unwrap().as_str(),
         "overloaded cache key"
     );
-    assert_eq!(
-        message.cache_key_prefix().as_str(),
-        "Message"
-    );
+    assert_eq!(message.cache_key_prefix().as_str(), "Message");
 }

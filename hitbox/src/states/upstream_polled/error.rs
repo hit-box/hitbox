@@ -3,8 +3,8 @@ use std::fmt::Debug;
 
 use tracing::{instrument, trace};
 
-use crate::CacheError;
 use crate::states::finish::Finish;
+use crate::CacheError;
 
 pub struct UpstreamPolledError {
     pub error: CacheError,
