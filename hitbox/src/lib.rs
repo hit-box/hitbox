@@ -174,7 +174,7 @@ pub use value::{CacheState, CachedValue};
 pub use serde_qs as hitbox_serializer;
 
 pub mod prelude {
-    pub use crate::{Cacheable, CacheError, CacheableResponse};
     #[cfg(feature = "derive")]
     pub use crate::hitbox_serializer;
+    pub use crate::{CacheError, Cacheable, CacheableResponse};
 }

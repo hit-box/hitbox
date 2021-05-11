@@ -41,11 +41,11 @@ where
                     adapter: self.adapter,
                     result,
                 })
-            },
+            }
             Err(error) => {
                 trace!("UpstreamPolledError");
                 UpstreamPolled::Error(UpstreamPolledError { error })
-            },
+            }
         }
     }
 }

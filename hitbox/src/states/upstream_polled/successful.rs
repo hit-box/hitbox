@@ -3,14 +3,14 @@ use std::fmt::Debug;
 
 use tracing::{instrument, trace, warn};
 
-use crate::CachedValue;
-use crate::response::{CacheableResponse, CachePolicy};
+use crate::response::{CachePolicy, CacheableResponse};
 use crate::runtime::RuntimeAdapter;
 use crate::states::cache_policy::{
     CachePolicyCacheable, CachePolicyChecked, CachePolicyNonCacheable,
 };
 use crate::states::cache_updated::CacheUpdated;
 use crate::states::finish::Finish;
+use crate::CachedValue;
 
 pub struct UpstreamPolledSuccessful<A, T>
 where
@@ -53,7 +53,7 @@ where
                     result: self.result,
                     adapter: self.adapter,
                 })
-            },
+            }
             CachePolicy::NonCacheable(_) => {
                 trace!("CachePolicyNonCacheable");
                 CachePolicyChecked::NonCacheable(CachePolicyNonCacheable {

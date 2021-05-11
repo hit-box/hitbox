@@ -1,8 +1,8 @@
-use tracing::{trace, instrument};
+use std::fmt;
+
+use tracing::{instrument, trace};
 
 use crate::CacheError;
-use std::fmt::Debug;
-use std::fmt;
 
 pub struct Finish<T> {
     pub result: Result<T, CacheError>,

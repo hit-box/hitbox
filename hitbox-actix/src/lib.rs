@@ -21,8 +21,8 @@ pub use hitbox_redis::RedisBackend;
 pub type Cache = CacheActor<RedisBackend>;
 
 pub mod prelude {
-    pub use crate::{CacheActor, CacheBuilder, CacheError, Cacheable, QueryCache, IntoCache};
     #[cfg(feature = "redis")]
     pub use crate::{Cache, RedisBackend};
+    pub use crate::{CacheActor, CacheBuilder, CacheError, Cacheable, IntoCache, QueryCache};
     pub use hitbox::hitbox_serializer;
 }

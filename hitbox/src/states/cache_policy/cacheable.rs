@@ -1,11 +1,11 @@
 use std::fmt;
 
-use tracing::{trace, warn, instrument};
+use tracing::{instrument, trace, warn};
 
-use crate::CachedValue;
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::cache_updated::CacheUpdated;
+use crate::CachedValue;
 
 pub struct CachePolicyCacheable<A, T>
 where
