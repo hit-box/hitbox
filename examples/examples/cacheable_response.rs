@@ -36,10 +36,14 @@ impl Handler<Ping> for UpstreamActor {
     }
 }
 
+use tracing_subscriber::EnvFilter;
+
 #[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
+    let filter = EnvFilter::new("hitbox=trace");
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::TRACE)
+        .with_env_filter(filter)
         .init();
 
     let backend = RedisBackend::new().await.unwrap().start();

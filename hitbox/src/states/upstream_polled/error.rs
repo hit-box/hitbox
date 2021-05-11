@@ -1,13 +1,25 @@
+use std::fmt;
+use std::fmt::Debug;
+
+use tracing::{instrument, trace};
+
 use crate::states::finish::Finish;
 use crate::CacheError;
-use std::fmt::Debug;
 
 pub struct UpstreamPolledError {
     pub error: CacheError,
 }
 
+impl fmt::Debug for UpstreamPolledError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("UpstreamPolledError")
+    }
+}
+
 impl UpstreamPolledError {
-    pub fn finish<T: Debug>(self) -> Finish<T> {
+    #[instrument]
+    pub fn finish<T>(self) -> Finish<T> {
+        trace!("Finish");
         Finish {
             result: Err(self.error),
         }

@@ -1,12 +1,12 @@
 use actix::dev::{MessageResponse, ToEnvelope};
 use actix::{Actor, Addr, Handler, Message};
-use log::warn;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use tracing::warn;
 
 use hitbox::response::CacheableResponse;
-use hitbox::runtime::{AdapterResult, RuntimeAdapter, EvictionPolicy, TtlSettings};
-use hitbox::{CacheState, Cacheable, CachedValue, CacheError};
+use hitbox::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings};
+use hitbox::{CacheError, CacheState, Cacheable, CachedValue};
 use hitbox_backend::{Backend, Get, Set};
 
 use crate::QueryCache;
@@ -36,7 +36,13 @@ where
         let cache_key = message.cache_key()?;
         let cache_stale_ttl = message.message.cache_ttl();
         let cache_ttl = message.message.cache_ttl();
-        Ok(Self { message: Some(message), backend, cache_key, cache_ttl, cache_stale_ttl})
+        Ok(Self {
+            message: Some(message),
+            backend,
+            cache_key,
+            cache_ttl,
+            cache_stale_ttl,
+        })
     }
 }
 
@@ -55,10 +61,11 @@ where
 
     fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
         let message = self.message.take();
-        Box::pin(async move { 
-            let message = message
-                .ok_or(CacheError::CacheKeyGenerationError("Logical error".to_owned()))?;
-            Ok(message.upstream.send(message.message).await?) 
+        Box::pin(async move {
+            let message = message.ok_or(CacheError::CacheKeyGenerationError(
+                "Logical error".to_owned(),
+            ))?;
+            Ok(message.upstream.send(message.message).await?)
         })
     }
 

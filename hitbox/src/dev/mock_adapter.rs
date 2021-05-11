@@ -1,5 +1,5 @@
 use crate::error::CacheError;
-use crate::runtime::{AdapterResult, RuntimeAdapter, EvictionPolicy, TtlSettings};
+use crate::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings};
 use crate::value::{CacheState, CachedValue};
 use crate::CacheableResponse;
 use chrono::{DateTime, Utc};
@@ -128,6 +128,9 @@ where
     }
 
     fn eviction_settings(&self) -> EvictionPolicy {
-        EvictionPolicy::Ttl(TtlSettings { ttl: 0, stale_ttl: 0 })
+        EvictionPolicy::Ttl(TtlSettings {
+            ttl: 0,
+            stale_ttl: 0,
+        })
     }
 }

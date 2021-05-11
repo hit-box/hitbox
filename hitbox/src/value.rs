@@ -1,7 +1,7 @@
+use crate::runtime::EvictionPolicy;
 use crate::{CacheError, CachePolicy, CacheableResponse};
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use crate::runtime::EvictionPolicy;
 
 /// This struct wraps and represent cached data.
 ///
@@ -58,8 +58,9 @@ where
             CachePolicy::Cacheable(cache_value) => serde_json::to_vec(&CachedInnerValue {
                 data: cache_value,
                 expired: self.expired,
-            }).map_err(CacheError::from),
-            CachePolicy::NonCacheable(_) => Err(CacheError::DeserializeError)
+            })
+            .map_err(CacheError::from),
+            CachePolicy::NonCacheable(_) => Err(CacheError::DeserializeError),
         }
     }
 

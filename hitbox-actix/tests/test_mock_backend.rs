@@ -3,9 +3,9 @@ use hitbox::dev::{
     mock_backend::backend::{GetMessages, MockBackend, MockMessage},
     Get,
 };
-use hitbox_actix::prelude::*;
-use hitbox::{CachePolicy, CacheableResponse};
 use hitbox::{CacheError, Cacheable};
+use hitbox::{CachePolicy, CacheableResponse};
+use hitbox_actix::prelude::*;
 use serde::{Deserialize, Serialize};
 
 struct UpstreamActor;

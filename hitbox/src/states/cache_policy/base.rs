@@ -1,7 +1,8 @@
+use std::fmt::Debug;
+
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::cache_policy::{CachePolicyCacheable, CachePolicyNonCacheable};
-use std::fmt::Debug;
 
 pub enum CachePolicyChecked<A, T>
 where
