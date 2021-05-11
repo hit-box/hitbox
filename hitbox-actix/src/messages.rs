@@ -16,7 +16,7 @@ pub trait IntoCache: Cacheable {
     ///     type Context = Context<Self>;
     /// }
     ///
-    /// #[derive(Cacheable, Serialize, Message, Debug, Clone, PartialEq)]
+    /// #[derive(Cacheable, Serialize, Message, Debug, PartialEq)]
     /// #[rtype(result = "()")]
     /// struct QueryNothing {
     ///     id: Option<i32>,

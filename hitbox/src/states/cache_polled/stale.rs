@@ -21,7 +21,7 @@ where
     A: RuntimeAdapter,
     T: Debug + CacheableResponse,
 {
-    pub async fn poll_upstream(self) -> UpstreamPolledStaleRetrieved<A, T>
+    pub async fn poll_upstream(mut self) -> UpstreamPolledStaleRetrieved<A, T>
     where
         A: RuntimeAdapter<UpstreamResult = T>,
     {

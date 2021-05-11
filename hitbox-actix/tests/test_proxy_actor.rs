@@ -11,7 +11,7 @@ impl Actor for Upstream {
     }
 }
 
-#[derive(Message, Clone)]
+#[derive(Message)]
 #[rtype(result = "Result<i32, ()>")]
 pub struct Ping;
 
@@ -32,7 +32,7 @@ impl Handler<Ping> for Upstream {
     }
 }
 
-#[derive(Message, Clone)]
+#[derive(Message)]
 #[rtype(result = "i32")]
 pub struct Pong;
 

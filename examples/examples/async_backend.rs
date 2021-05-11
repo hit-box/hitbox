@@ -12,7 +12,7 @@ impl Actor for UpstreamActor {
 #[derive(MessageResponse, Deserialize, Serialize, Debug)]
 struct Pong(i32);
 
-#[derive(Message, Cacheable, Serialize, Clone)]
+#[derive(Message, Cacheable, Serialize)]
 #[rtype(result = "Result<Pong, ()>")]
 struct Ping {
     pub id: i32,

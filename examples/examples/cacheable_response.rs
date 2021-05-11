@@ -15,10 +15,10 @@ impl Actor for UpstreamActor {
     type Context = Context<Self>;
 }
 
-#[derive(MessageResponse, Deserialize, Serialize, Debug, Clone)]
+#[derive(MessageResponse, Deserialize, Serialize, Debug)]
 struct Pong(i32);
 
-#[derive(Message, Cacheable, Serialize, Clone)]
+#[derive(Message, Cacheable, Serialize)]
 #[rtype(result = "Result<Pong, Error>")]
 struct Ping {
     id: i32,

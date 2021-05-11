@@ -19,7 +19,7 @@ struct Pong {
     id: i32,
 }
 
-#[derive(Message, Serialize, Clone)]
+#[derive(Message, Serialize)]
 #[rtype(result = "Pong")]
 struct Ping {
     pub id: i32,

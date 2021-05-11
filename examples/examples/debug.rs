@@ -42,7 +42,7 @@ struct Pong(i32);
 #[derive(Debug)]
 enum Error {}
 
-#[derive(Message, Cacheable, Serialize, Clone)]
+#[derive(Message, Cacheable, Serialize)]
 #[rtype(result = "Result<Pong, Error>")]
 struct Ping {
     id: i32,

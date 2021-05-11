@@ -18,7 +18,7 @@ impl Actor for FibonacciActor {
     type Context = SyncContext<Self>;
 }
 
-#[derive(Message, Cacheable, Serialize, Clone)]
+#[derive(Message, Cacheable, Serialize)]
 #[rtype(result = "u64")]
 struct GetNumber {
     number: u8,

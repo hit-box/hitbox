@@ -15,7 +15,7 @@ impl<A> CacheMissed<A>
 where
     A: RuntimeAdapter,
 {
-    pub async fn poll_upstream<T>(self) -> UpstreamPolled<A, T>
+    pub async fn poll_upstream<T>(mut self) -> UpstreamPolled<A, T>
     where
         A: RuntimeAdapter<UpstreamResult = T>,
         T: CacheableResponse,

@@ -21,7 +21,7 @@ impl Cacheable for Ping {
     }
 }
 
-#[derive(Message, Clone)]
+#[derive(Message)]
 #[rtype(result = "Result<Pong, ()>")]
 struct Ping {
     pub id: i32,

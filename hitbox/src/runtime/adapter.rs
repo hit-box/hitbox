@@ -19,7 +19,7 @@ where
     Self::UpstreamResult: CacheableResponse,
 {
     type UpstreamResult;
-    fn poll_upstream(&self) -> AdapterResult<Self::UpstreamResult>;
+    fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult>;
     fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>>;
     fn update_cache(&self, cached_value: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()>;
     fn eviction_settings(&self) -> EvictionPolicy;

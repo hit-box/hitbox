@@ -3,7 +3,6 @@ use crate::runtime::{AdapterResult, RuntimeAdapter, EvictionPolicy, TtlSettings}
 use crate::value::{CacheState, CachedValue};
 use crate::CacheableResponse;
 use chrono::{DateTime, Utc};
-use serde::Serialize;
 
 #[derive(Clone, Debug)]
 enum MockUpstreamState<T> {
@@ -101,7 +100,7 @@ where
     T: Clone + CacheableResponse + 'static,
 {
     type UpstreamResult = T;
-    fn poll_upstream(&self) -> AdapterResult<Self::UpstreamResult> {
+    fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
         let result = match self.clone().upstream_state {
             MockUpstreamState::Ok(value) => Ok(value),
             MockUpstreamState::Error => Err(CacheError::DeserializeError),

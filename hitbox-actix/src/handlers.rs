@@ -18,7 +18,7 @@ where
     <B as Actor>::Context:
         ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock> + ToEnvelope<B, Delete>,
     A: Actor + Handler<M> + Send,
-    M: Message + Cacheable + Send + 'static + Clone,
+    M: Message + Cacheable + Send + 'static,
     M::Result: MessageResponse<A, M> + CacheableResponse + std::fmt::Debug + Send,
     <<M as actix::Message>::Result as CacheableResponse>::Cached: Serialize + DeserializeOwned,
     <A as Actor>::Context: ToEnvelope<A, M>,
@@ -26,12 +26,14 @@ where
     type Result = ResponseFuture<Result<<M as Message>::Result, CacheError>>;
 
     fn handle(&mut self, msg: QueryCache<A, M>, _: &mut Self::Context) -> Self::Result {
-        let adapter = ActixAdapter::new(msg, self.backend.clone()); // @TODO: remove clone
-        let initial_state = InitialState {
-            adapter,
-            settings: self.settings.clone(),
-        };
+        let adapter_result = ActixAdapter::new(msg, self.backend.clone()); // @TODO: remove clone
+        let settings = self.settings.clone();
         Box::pin(async move {
+            // let adapter = adapter_result?;
+            let initial_state = InitialState {
+                adapter: adapter_result?,
+                settings,
+            };
             match initial_state.settings {
                 InitialCacheSettings::CacheDisabled => {
                     upstream::transition(initial_state).await.result()

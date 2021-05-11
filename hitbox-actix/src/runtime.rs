@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use hitbox::response::CacheableResponse;
 use hitbox::runtime::{AdapterResult, RuntimeAdapter, EvictionPolicy, TtlSettings};
-use hitbox::{CacheState, Cacheable, CachedValue};
+use hitbox::{CacheState, Cacheable, CachedValue, CacheError};
 use hitbox_backend::{Backend, Get, Set};
 
 use crate::QueryCache;
@@ -18,7 +18,10 @@ where
     M::Result: MessageResponse<A, M> + Send,
     B: Backend,
 {
-    message: QueryCache<A, M>,
+    message: Option<QueryCache<A, M>>,
+    cache_key: String,
+    cache_ttl: u32,
+    cache_stale_ttl: u32,
     backend: Addr<B>,
 }
 
@@ -29,8 +32,11 @@ where
     M::Result: MessageResponse<A, M> + Send,
     B: Backend,
 {
-    pub fn new(message: QueryCache<A, M>, backend: Addr<B>) -> Self {
-        Self { message, backend }
+    pub fn new(message: QueryCache<A, M>, backend: Addr<B>) -> Result<Self, CacheError> {
+        let cache_key = message.cache_key()?;
+        let cache_stale_ttl = message.message.cache_ttl();
+        let cache_ttl = message.message.cache_ttl();
+        Ok(Self { message: Some(message), backend, cache_key, cache_ttl, cache_stale_ttl})
     }
 }
 
@@ -38,7 +44,7 @@ impl<A, M, T, B, U> RuntimeAdapter for ActixAdapter<A, M, B>
 where
     A: Actor + Handler<M>,
     A::Context: ToEnvelope<A, M>,
-    M: Message<Result = T> + Cacheable + Send + Clone + 'static,
+    M: Message<Result = T> + Cacheable + Send + 'static,
     M::Result: MessageResponse<A, M> + Send,
     B: Backend,
     <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set>,
@@ -47,33 +53,34 @@ where
 {
     type UpstreamResult = T;
 
-    fn poll_upstream(&self) -> AdapterResult<Self::UpstreamResult> {
-        let message = self.message.message.clone();
-        let upstream = self.message.upstream.clone();
-        Box::pin(async move { Ok(upstream.send(message).await?) })
+    fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
+        let message = self.message.take();
+        Box::pin(async move { 
+            let message = message
+                .ok_or(CacheError::CacheKeyGenerationError("Logical error".to_owned()))?;
+            Ok(message.upstream.send(message.message).await?) 
+        })
     }
 
     fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
         let backend = self.backend.clone();
-        let cache_key = self.message.cache_key(); // @TODO: Please, don't recalculate cache key multiple times.
+        let cache_key = self.cache_key.clone(); // @TODO: Please, don't recalculate cache key multiple times.
         Box::pin(async move {
-            let key = cache_key?;
-            let cached_value = backend.send(Get { key }).await??;
+            let cached_value = backend.send(Get { key: cache_key }).await??;
             CacheState::from_bytes(cached_value.as_ref())
         })
     }
 
     fn update_cache(&self, cached_value: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
         let serialized = cached_value.serialize();
-        let ttl = self.message.message.cache_ttl();
+        let ttl = self.cache_ttl;
         let backend = self.backend.clone();
-        let cache_key = self.message.cache_key(); // @TODO: Please, don't recalculate cache key multiple times.
+        let cache_key = self.cache_key.clone(); // @TODO: Please, don't recalculate cache key multiple times.
         Box::pin(async move {
             let serialized = serialized?;
-            let key = cache_key?;
             let _ = backend
                 .send(Set {
-                    key,
+                    key: cache_key,
                     value: serialized,
                     ttl: Some(ttl),
                 })
@@ -87,8 +94,8 @@ where
     }
     fn eviction_settings(&self) -> EvictionPolicy {
         let ttl_settings = TtlSettings {
-            ttl: self.message.message.cache_ttl(),
-            stale_ttl: self.message.message.cache_stale_ttl(),
+            ttl: self.cache_ttl,
+            stale_ttl: self.cache_stale_ttl,
         };
         EvictionPolicy::Ttl(ttl_settings)
     }
