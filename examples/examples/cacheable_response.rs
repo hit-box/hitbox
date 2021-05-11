@@ -38,8 +38,8 @@ impl Handler<Ping> for UpstreamActor {
 
 #[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::TRACE)
         .init();
 
     let backend = RedisBackend::new().await.unwrap().start();

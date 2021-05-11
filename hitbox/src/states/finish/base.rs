@@ -1,3 +1,5 @@
+use tracing::trace;
+
 use crate::CacheError;
 use std::fmt::Debug;
 
@@ -11,6 +13,7 @@ where
     T: Debug,
 {
     pub fn result(self) -> Result<T, CacheError> {
+        trace!("Finish -> Result");
         self.result
     }
 }

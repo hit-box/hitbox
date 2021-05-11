@@ -1,6 +1,6 @@
 use actix::dev::{MessageResponse, ToEnvelope};
 use actix::{Actor, Addr, Handler, Message};
-use log::warn;
+use tracing::warn;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 

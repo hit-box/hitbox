@@ -1,11 +1,14 @@
+use std::fmt::Debug;
+
+use tracing::trace;
+
+use crate::CachedValue;
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
 use crate::states::upstream_polled::{
     UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
 };
-use crate::CachedValue;
-use std::fmt::Debug;
 
 pub struct CachePolledActual<A, T>
 where
@@ -26,14 +29,21 @@ where
         A: RuntimeAdapter<UpstreamResult = T>,
     {
         match self.adapter.poll_upstream().await {
-            Ok(result) => UpstreamPolled::Successful(UpstreamPolledSuccessful {
-                adapter: self.adapter,
-                result,
-            }),
-            Err(error) => UpstreamPolled::Error(UpstreamPolledError { error }),
+            Ok(result) => {
+                trace!("-> UpstreamPolledSuccessful");
+                UpstreamPolled::Successful(UpstreamPolledSuccessful {
+                    adapter: self.adapter,
+                    result,
+                })
+            },
+            Err(error) => {
+                trace!("-> UpstreamPolledError");
+                UpstreamPolled::Error(UpstreamPolledError { error })
+            },
         }
     }
     pub fn finish(self) -> Finish<T> {
+        trace!("-> Finish");
         Finish {
             result: Ok(self.result.into_inner()),
         }

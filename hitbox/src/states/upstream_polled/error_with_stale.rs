@@ -1,6 +1,9 @@
-use crate::states::finish::Finish;
-use crate::CacheError;
 use std::fmt::Debug;
+
+use tracing::trace;
+
+use crate::CacheError;
+use crate::states::finish::Finish;
 
 pub struct UpstreamPolledErrorStaleRetrieved<T> {
     pub error: CacheError,
@@ -12,6 +15,7 @@ where
     T: Debug,
 {
     pub fn finish(self) -> Finish<T> {
+        trace!("-> Finish");
         Finish {
             result: Ok(self.result),
         }

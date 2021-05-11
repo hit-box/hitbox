@@ -1,3 +1,5 @@
+use tracing::trace;
+
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::upstream_polled::{
@@ -21,11 +23,17 @@ where
         T: CacheableResponse,
     {
         match self.adapter.poll_upstream().await {
-            Ok(result) => UpstreamPolled::Successful(UpstreamPolledSuccessful {
-                adapter: self.adapter,
-                result,
-            }),
-            Err(error) => UpstreamPolled::Error(UpstreamPolledError { error }),
+            Ok(result) => {
+                trace!("-> UpstreamPolledSuccessful");
+                UpstreamPolled::Successful(UpstreamPolledSuccessful {
+                    adapter: self.adapter,
+                    result,
+                })
+            },
+            Err(error) => {
+                trace!("-> UpstreamPolledError");
+                UpstreamPolled::Error(UpstreamPolledError { error })
+            },
         }
     }
 }

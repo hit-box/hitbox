@@ -1,9 +1,9 @@
-use log::warn;
+use tracing::{trace, warn};
 
+use crate::CachedValue;
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::cache_updated::CacheUpdated;
-use crate::CachedValue;
 
 pub struct CachePolicyCacheable<A, T>
 where
@@ -25,6 +25,7 @@ where
         if let Err(error) = cache_update_result {
             warn!("Updating cache error: {}", error.to_string())
         };
+        trace!("-> CacheUpdate");
         CacheUpdated {
             adapter: self.adapter,
             result: cached_value.into_inner(),

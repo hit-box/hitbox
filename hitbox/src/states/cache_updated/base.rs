@@ -1,6 +1,9 @@
+use std::fmt::Debug;
+
+use tracing::trace;
+
 use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
-use std::fmt::Debug;
 
 pub struct CacheUpdated<A, T>
 where
@@ -16,6 +19,7 @@ where
     T: Debug,
 {
     pub fn finish(self) -> Finish<T> {
+        trace!("-> Finish");
         Finish {
             result: Ok(self.result),
         }
