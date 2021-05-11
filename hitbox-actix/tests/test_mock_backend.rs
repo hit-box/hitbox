@@ -1,12 +1,10 @@
 use actix::prelude::*;
 use hitbox::dev::{
-    mock_backend::{GetMessages, MockBackend, MockMessage},
+    mock_backend::backend::{GetMessages, MockBackend, MockMessage},
     Get,
 };
-use hitbox::{
-    response::{CachePolicy, CacheableResponse},
-    CacheActor,
-};
+use hitbox_actix::prelude::*;
+use hitbox::{CachePolicy, CacheableResponse};
 use hitbox::{CacheError, Cacheable};
 use serde::{Deserialize, Serialize};
 
@@ -21,14 +19,14 @@ struct Pong {
     id: i32,
 }
 
-#[derive(Message, Serialize)]
+#[derive(Message, Serialize, Clone)]
 #[rtype(result = "Pong")]
 struct Ping {
     pub id: i32,
 }
 
 impl Cacheable for Ping {
-    fn cache_message_key(&self) -> Result<String, CacheError> {
+    fn cache_key(&self) -> Result<String, CacheError> {
         Ok(format!("{}::{}", self.cache_key_prefix(), self.id))
     }
     fn cache_key_prefix(&self) -> String {
