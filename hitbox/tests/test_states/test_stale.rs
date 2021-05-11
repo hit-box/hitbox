@@ -14,7 +14,6 @@ async fn test_cache_stale() {
         .with_upstream_value("upstream value")
         .with_cache_stale("stale cache", chrono::Utc::now())
         .finish();
-    dbg!(&adapter);
     let initial_state = InitialCacheSettings::from(settings);
     let initial_state = InitialState {
         adapter,
