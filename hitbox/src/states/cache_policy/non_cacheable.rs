@@ -1,14 +1,22 @@
-use tracing::trace;
-use crate::states::finish::Finish;
-use std::fmt::Debug;
+use std::fmt;
 
-pub struct CachePolicyNonCacheable<T: Debug> {
+use tracing::{instrument, trace};
+
+use crate::states::finish::Finish;
+
+pub struct CachePolicyNonCacheable<T> {
     pub result: T,
 }
 
-impl<T: Debug> CachePolicyNonCacheable<T> {
+impl<T> fmt::Debug for CachePolicyNonCacheable<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("CachePolicyNonCacheable")
+    }
+}
+
+impl<T> CachePolicyNonCacheable<T> {
     pub fn finish(self) -> Finish<T> {
-        trace!("-> Finish");
+        trace!("Finish");
         Finish {
             result: Ok(self.result),
         }

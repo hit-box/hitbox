@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use tracing::trace;
+use tracing::{instrument, trace};
 
 use crate::CachedValue;
 use crate::response::CacheableResponse;
@@ -9,6 +9,7 @@ use crate::states::finish::Finish;
 use crate::states::upstream_polled::{
     UpstreamPolledErrorStaleRetrieved, UpstreamPolledStaleRetrieved, UpstreamPolledSuccessful,
 };
+use std::fmt;
 
 pub struct CachePolledStale<A, T>
 where
@@ -19,25 +20,36 @@ where
     pub result: CachedValue<T>,
 }
 
+impl<A, T> fmt::Debug for CachePolledStale<A, T>
+where
+    A: RuntimeAdapter,
+    T: CacheableResponse,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("CachePolledStale")
+    }
+}
+
 impl<A, T> CachePolledStale<A, T>
 where
     A: RuntimeAdapter,
     T: Debug + CacheableResponse,
 {
+    #[instrument]
     pub async fn poll_upstream(mut self) -> UpstreamPolledStaleRetrieved<A, T>
     where
         A: RuntimeAdapter<UpstreamResult = T>,
     {
         match self.adapter.poll_upstream().await {
             Ok(result) => {
-                trace!("-> UpstreamPolledSuccessful");
+                trace!("UpstreamPolledSuccessful");
                 UpstreamPolledStaleRetrieved::Successful(UpstreamPolledSuccessful {
                     adapter: self.adapter,
                     result,
                 })
             },
             Err(error) => {
-                trace!("-> UpstreamPolledErrorStaleRetrieved");
+                trace!("UpstreamPolledErrorStaleRetrieved");
                 UpstreamPolledStaleRetrieved::Error(UpstreamPolledErrorStaleRetrieved {
                     error,
                     result: self.result.into_inner(),
@@ -45,8 +57,10 @@ where
             },
         }
     }
+
+    #[instrument]
     pub fn finish(self) -> Finish<T> {
-        trace!("-> Finish");
+        trace!("Finish");
         Finish {
             result: Ok(self.result.into_inner()),
         }

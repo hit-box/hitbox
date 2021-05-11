@@ -1,19 +1,23 @@
-use tracing::trace;
+use tracing::{trace, instrument};
 
 use crate::CacheError;
 use std::fmt::Debug;
+use std::fmt;
 
-#[derive(Debug)]
-pub struct Finish<T: Debug> {
+pub struct Finish<T> {
     pub result: Result<T, CacheError>,
 }
 
-impl<T> Finish<T>
-where
-    T: Debug,
-{
+impl<T> fmt::Debug for Finish<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Finish")
+    }
+}
+
+impl<T> Finish<T> {
+    #[instrument]
     pub fn result(self) -> Result<T, CacheError> {
-        trace!("Finish -> Result");
+        trace!("Result");
         self.result
     }
 }
