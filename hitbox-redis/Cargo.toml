@@ -9,12 +9,12 @@ workspace = ".."
 
 [dependencies]
 hitbox-backend = { path = "../hitbox-backend" }
-actix = "0.10"
+actix = "0.11"
 log = "0.4"
-redis = { version = "0.17", features = ["tokio-rt-core", "connection-manager"] }
-actix_derive = "0.5"
-actix-rt = "1"
+redis = { version = "0.20", features = ["tokio-comp", "connection-manager"] }
+actix_derive = "0.6"
+actix-rt = "2"
 thiserror = "1"
 
 [dev-dependencies]
-tokio = { version = "0.2", features = ["time"] }
+tokio = { version = "1", features = ["time"] }

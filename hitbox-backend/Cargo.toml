@@ -5,5 +5,5 @@ authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"
 edition = "2018"
 
 [dependencies]
-actix = "0.10"
+actix = "0.11"
 thiserror = "1"
