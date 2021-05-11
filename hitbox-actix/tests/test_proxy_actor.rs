@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use hitbox::{Cache, CacheError, Cacheable};
+use hitbox_actix::{Cache, CacheError, Cacheable, IntoCache};
 
 pub struct Upstream;
 
@@ -11,7 +11,7 @@ impl Actor for Upstream {
     }
 }
 
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "Result<i32, ()>")]
 pub struct Ping;
 
@@ -32,7 +32,7 @@ impl Handler<Ping> for Upstream {
     }
 }
 
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "i32")]
 pub struct Pong;
 

@@ -23,7 +23,7 @@ use log::{debug, info};
 /// # Example
 /// ```rust
 /// use actix::prelude::*;
-/// use hitbox::{Cache, RedisBackend, CacheError};
+/// use hitbox_actix::{Cache, RedisBackend, CacheError};
 ///
 /// #[actix_rt::main]
 /// async fn main() -> Result<(), CacheError> {

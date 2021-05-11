@@ -15,7 +15,7 @@ pub fn impl_macro(ast: &syn::DeriveInput) -> TokenStream {
 
     let cache_message_key_implement = quote! {
         fn cache_message_key(&self) -> Result<String, CacheError> {
-            serde_qs::to_string(self)
+            hitbox_serializer::to_string(self)
                 .map(|key| format!("{}::v{}::{}", self.cache_key_prefix(), self.cache_version(), key))
                 .map_err(|error| CacheError::CacheKeyGenerationError(error.to_string()))
         }

@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 /// # Example
 /// ```rust
 /// use actix::prelude::*;
-/// use hitbox::{Cache, RedisBackend, CacheError};
+/// use hitbox_actix::{Cache, RedisBackend, CacheError};
 ///
 /// #[actix_rt::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,8 +17,8 @@ use std::marker::PhantomData;
 ///         .await?
 ///         .start();
 ///     let cache = Cache::builder()
-///         .enabled(true)
-///         .build(backend)
+///         .enable()
+///         .finish(backend)
 ///         .start();
 ///     Ok(())
 /// }
@@ -40,7 +40,7 @@ where
             settings: CacheSettings {
                 cache: Status::Enabled,
                 stale: Status::Disabled,
-                lock: Status::Enabled,
+                lock: Status::Disabled,
             },
             _p: PhantomData::default(),
         }

@@ -171,4 +171,4 @@ pub use value::{CacheState, CachedValue};
 
 #[cfg(feature = "derive")]
 #[doc(hidden)]
-pub use serde_qs;
+pub use serde_qs as hitbox_serializer;

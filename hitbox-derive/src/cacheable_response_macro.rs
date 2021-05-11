@@ -9,7 +9,10 @@ pub fn impl_macro(ast: &syn::DeriveInput) -> TokenStream {
     let gen = quote! {
         impl CacheableResponse for #name {
             type Cached = #name;
-            fn into_policy(self) -> CachePolicy<Self::Cached, Self> {
+            fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
+                CachePolicy::Cacheable(self)
+            }
+            fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
                 CachePolicy::Cacheable(self)
             }
             fn from_cached(cached: Self::Cached) -> Self {

@@ -7,9 +7,7 @@ pub trait IntoCache: Cacheable {
     /// # Examples
     /// ```
     /// use actix::prelude::*;
-    /// use actix_derive::Message;
-    /// use hitbox::cache::{Cacheable, QueryCache};
-    /// use hitbox::CacheError;
+    /// use hitbox_actix::prelude::*;
     /// use serde::Serialize;
     ///
     /// struct Upstream;
