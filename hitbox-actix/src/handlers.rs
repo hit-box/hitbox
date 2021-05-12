@@ -29,7 +29,6 @@ where
         let adapter_result = ActixAdapter::new(msg, self.backend.clone()); // @TODO: remove clone
         let settings = self.settings.clone();
         Box::pin(async move {
-            // let adapter = adapter_result?;
             let initial_state = InitialState {
                 adapter: adapter_result?,
                 settings,
