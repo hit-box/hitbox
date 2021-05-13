@@ -83,7 +83,7 @@ pub enum CacheState<T> {
 impl<T, U> CacheState<T>
 where
     T: CacheableResponse<Cached = U>,
-    U: DeserializeOwned,
+    U: DeserializeOwned + Serialize,
 {
     /// Deserialize optional vector of bytes and check the actuality.
     pub fn from_bytes(bytes: Option<&Vec<u8>>) -> Result<Self, crate::CacheError> {
@@ -97,6 +97,7 @@ where
 impl<T, U> From<Option<CachedValue<U>>> for CacheState<T>
 where
     T: CacheableResponse<Cached = U>,
+    U: Serialize,
 {
     fn from(cached_value: Option<CachedValue<U>>) -> Self {
         match cached_value {
