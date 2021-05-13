@@ -54,7 +54,7 @@ where
     M::Result: MessageResponse<A, M> + Send,
     B: Backend,
     <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set>,
-    T: CacheableResponse<Cached = U>,
+    T: CacheableResponse<Cached = U> + 'static,
     U: DeserializeOwned + Serialize,
 {
     type UpstreamResult = T;

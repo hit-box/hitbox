@@ -1,5 +1,6 @@
 use actix::prelude::*;
 use hitbox_actix::{Cache, CacheError, Cacheable, IntoCache};
+use tracing::info;
 
 pub struct Upstream;
 
@@ -7,7 +8,7 @@ impl Actor for Upstream {
     type Context = Context<Self>;
 
     fn started(&mut self, _: &mut Self::Context) {
-        log::info!("Cache actor started");
+        info!("Cache actor started");
     }
 }
 

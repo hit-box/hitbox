@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches:
+    - master
+  pull_request: {}
+
+jobs:
+  check:
+    # Run `cargo check` first to ensure that the pushed code at least compiles.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [1.46.0, stable]
+    steps:
+    - uses: actions/checkout@main
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+        profile: minimal
+        override: true
+    - name: Check
+      uses: actions-rs/cargo@v1
+      with:
+        command: check
+        args: --all --bins --tests --benches
+
+  test:
+    needs: check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [1.46.0, stable, beta]
+        redis-version: [6]
+    steps:
+    - uses: actions/checkout@main
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+        profile: minimal
+        override: true
+    # Starts Redis server needed by hitbox-redis for integration tests.
+    - name: Start Redis
+      uses: supercharge/redis-github-action@1.2.0
+      with:
+        redis-version: ${{ matrix.redis-version }}
+    - name: Run tests
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --workspace --all-features
+  
+    - name: Generate coverage file
+      if: >
+        matrix.rust == 'stable'
+      run: |
+        cargo install cargo-tarpaulin
+        cargo tarpaulin --out Xml --verbose --workspace --all-features --ignore-tests
+
+    - name: Upload to Codecov
+      if: >
+        matrix.rust == 'stable'
+      uses: codecov/codecov-action@v1
+      with:
+        file: cobertura.xml
