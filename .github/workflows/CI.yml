@@ -53,16 +53,14 @@ jobs:
   
     - name: Generate coverage file
       if: >
-        matrix.target.os == 'ubuntu-latest'
-        && matrix.version == 'stable'
+        matrix.rust == 'stable'
       run: |
         cargo install cargo-tarpaulin
         cargo tarpaulin --out Xml --verbose
 
     - name: Upload to Codecov
       if: >
-        matrix.target.os == 'ubuntu-latest'
-        && matrix.version == 'stable'
+        matrix.rust == 'stable'
       uses: codecov/codecov-action@v1
       with:
         file: cobertura.xml
