@@ -15,7 +15,7 @@ jobs:
         rust: [1.46.0, stable]
     steps:
     - uses: actions/checkout@main
-    - uses: action-rs/toolchain@v1
+    - uses: actions-rs/toolchain@v1
       with:
         toolchain: ${{ matrix.rust }}
         profile: minimal
