@@ -37,6 +37,7 @@ where
 impl<T> CachedValue<T>
 where
     T: CacheableResponse,
+    <T as CacheableResponse>::Cached: Serialize,
 {
     /// Creates new CachedValue
     pub fn new(data: T, expired: DateTime<Utc>) -> Self {
