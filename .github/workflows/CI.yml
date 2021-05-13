@@ -56,7 +56,7 @@ jobs:
         matrix.rust == 'stable'
       run: |
         cargo install cargo-tarpaulin
-        cargo tarpaulin --out Xml --verbose
+        cargo tarpaulin --out Xml --verbose --workspace --all-features --ignore-tests
 
     - name: Upload to Codecov
       if: >
