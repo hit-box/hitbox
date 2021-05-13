@@ -32,6 +32,7 @@ jobs:
     strategy:
       matrix:
         rust: [1.46.0, stable, beta]
+        redis-version: [6]
     steps:
     - uses: actions/checkout@main
     - uses: actions-rs/toolchain@v1
@@ -39,6 +40,11 @@ jobs:
         toolchain: ${{ matrix.rust }}
         profile: minimal
         override: true
+    # Starts Redis server needed by hitbox-redis for integration tests.
+    - name: Start Redis
+      uses: supercharge/redis-github-action@1.2.0
+      with:
+        redis-version: ${{ matrix.redis-version }}
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
