@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::Debug;
 
-use tracing::{instrument, trace};
+use tracing::{instrument, trace, warn};
 
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
@@ -52,6 +52,7 @@ where
             }
             Err(error) => {
                 trace!("UpstreamPolledError");
+                warn!("Upstream error {}", error);
                 UpstreamPolled::Error(UpstreamPolledError { error })
             }
         }
@@ -87,8 +88,9 @@ where
                     })
                 }
             },
-            Err(_) => {
+            Err(error) => {
                 trace!("CacheErrorOccurred");
+                warn!("Cache error {}", error);
                 CachePolled::Error(CacheErrorOccurred {
                     adapter: self.adapter,
                 })
