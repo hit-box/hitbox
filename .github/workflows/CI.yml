@@ -49,5 +49,20 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --all
+        args: --workspace --all-features
+  
+    - name: Generate coverage file
+      if: >
+        matrix.target.os == 'ubuntu-latest'
+        && matrix.version == 'stable'
+      run: |
+        cargo install cargo-tarpaulin
+        cargo tarpaulin --out Xml --verbose
 
+    - name: Upload to Codecov
+      if: >
+        matrix.target.os == 'ubuntu-latest'
+        && matrix.version == 'stable'
+      uses: codecov/codecov-action@v1
+      with:
+        file: cobertura.xml
