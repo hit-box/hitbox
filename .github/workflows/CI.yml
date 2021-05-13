@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches:
+    - master
+  pull_request: {}
+
+jobs:
+  check:
+    # Run `cargo check` first to ensure that the pushed code at least compiles.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [1.46.0, stable]
+    steps:
+    - uses: actions/checkout@main
+    - uses: action-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+        profile: minimal
+        override: true
+    - name: Check
+      uses: actions-rs/cargo@v1
+      with:
+        command: check
+        args: --all --bins --tests --benches
