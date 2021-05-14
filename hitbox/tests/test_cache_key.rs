@@ -17,8 +17,8 @@ impl Cacheable for Message {
     }
 }
 
-#[actix_rt::test]
-async fn test_cache_key() {
+#[test]
+fn test_cache_key() {
     let message = Message {
         id: 42,
         alias: "test".to_owned(),
