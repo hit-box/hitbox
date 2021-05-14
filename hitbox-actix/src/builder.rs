@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 /// use actix::prelude::*;
 /// use hitbox_actix::{Cache, RedisBackend, CacheError};
 ///
-/// #[actix_rt::main]
+/// #[actix::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let backend = RedisBackend::new()
 ///         .await?
