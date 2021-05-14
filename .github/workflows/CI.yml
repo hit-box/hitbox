@@ -79,4 +79,4 @@ jobs:
       uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        args: --workspace --all-targets --all-features --bins --examples --tests --benches -- -D warnings
+        args: --workspace --all-features --bins --examples --tests --benches -- -D warnings

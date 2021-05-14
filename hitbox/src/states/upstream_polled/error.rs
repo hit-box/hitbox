@@ -1,5 +1,4 @@
 use std::fmt;
-use std::fmt::Debug;
 
 use tracing::{instrument, trace};
 

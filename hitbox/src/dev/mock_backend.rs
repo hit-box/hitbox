@@ -21,6 +21,12 @@ pub mod backend {
 
     impl MockBackend {
         pub fn new() -> Self {
+            MockBackend::default()
+        }
+    }
+
+    impl Default for MockBackend {
+        fn default() -> Self {
             MockBackend {
                 messages: Vec::with_capacity(10),
             }

@@ -123,7 +123,7 @@ where
         Box::pin(async { result })
     }
 
-    fn update_cache(&self, cached_value: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
+    fn update_cache(&self, _: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
         Box::pin(async { Ok(()) })
     }
 
