@@ -1,8 +1,9 @@
 use std::fmt;
-use std::fmt::Debug;
 
-use tracing::{instrument, trace};
+use tracing::{instrument, trace, warn};
 
+use crate::CacheError;
+use crate::CacheState;
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::settings::InitialCacheSettings;
@@ -12,8 +13,6 @@ use crate::states::cache_polled::{
 use crate::states::upstream_polled::{
     UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
 };
-use crate::CacheError;
-use crate::CacheState;
 
 pub struct InitialState<A>
 where
@@ -52,6 +51,7 @@ where
             }
             Err(error) => {
                 trace!("UpstreamPolledError");
+                warn!("Upstream error {}", error);
                 UpstreamPolled::Error(UpstreamPolledError { error })
             }
         }
@@ -87,8 +87,9 @@ where
                     })
                 }
             },
-            Err(_) => {
+            Err(error) => {
                 trace!("CacheErrorOccurred");
+                warn!("Cache error {}", error);
                 CachePolled::Error(CacheErrorOccurred {
                     adapter: self.adapter,
                 })

@@ -1,15 +1,15 @@
+use std::fmt;
 use std::fmt::Debug;
 
-use tracing::{instrument, trace};
+use tracing::{instrument, trace, warn};
 
+use crate::CachedValue;
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
 use crate::states::upstream_polled::{
     UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
 };
-use crate::CachedValue;
-use std::fmt;
 
 pub struct CachePolledActual<A, T>
 where
@@ -50,6 +50,7 @@ where
             }
             Err(error) => {
                 trace!("UpstreamPolledError");
+                warn!("Upstream error {}", error);
                 UpstreamPolled::Error(UpstreamPolledError { error })
             }
         }

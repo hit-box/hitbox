@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use tracing::{instrument, trace};
+use tracing::{instrument, trace, warn};
 
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
@@ -50,6 +50,7 @@ where
             }
             Err(error) => {
                 trace!("UpstreamPolledErrorStaleRetrieved");
+                warn!("Upstream error {}", error);
                 UpstreamPolledStaleRetrieved::Error(UpstreamPolledErrorStaleRetrieved {
                     error,
                     result: self.result.into_inner(),
