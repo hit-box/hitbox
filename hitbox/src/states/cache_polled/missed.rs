@@ -1,4 +1,4 @@
-use tracing::{instrument, trace};
+use tracing::{instrument, trace, warn};
 
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
@@ -43,6 +43,7 @@ where
             }
             Err(error) => {
                 trace!("UpstreamPolledError");
+                warn!("Upstream error {}", error);
                 UpstreamPolled::Error(UpstreamPolledError { error })
             }
         }

@@ -1,8 +1,9 @@
+use std::fmt;
+
 use tracing::{instrument, trace};
 
-use crate::states::finish::Finish;
 use crate::CacheError;
-use std::fmt;
+use crate::states::finish::Finish;
 
 pub struct UpstreamPolledErrorStaleRetrieved<T> {
     pub error: CacheError,
