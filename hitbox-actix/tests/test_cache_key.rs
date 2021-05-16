@@ -37,7 +37,7 @@ impl Handler<Message> for NextUpstream {
     }
 }
 
-#[actix_rt::test]
+#[actix::test]
 async fn test_final_cache_key() {
     let upstream = Upstream.start();
     let next_upstream = NextUpstream.start();

@@ -64,3 +64,19 @@ jobs:
       uses: codecov/codecov-action@v1
       with:
         file: cobertura.xml
+
+  clippy:
+    # Check for any warnings. This is informational and thus is allowed to fail.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@main
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        components: clippy
+        profile: minimal
+    - name: Clippy
+      uses: actions-rs/clippy-check@v1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        args: --workspace --all-features --bins --examples --tests --benches -- -D warnings

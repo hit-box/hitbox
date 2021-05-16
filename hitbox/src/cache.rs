@@ -2,11 +2,6 @@
 
 #[cfg(feature = "derive")]
 pub use hitbox_derive::Cacheable;
-
-#[cfg(feature = "metrics")]
-use crate::metrics::{
-    CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
-};
 use crate::CacheError;
 
 /// Trait describe cache configuration per message type for actix Cache actor.

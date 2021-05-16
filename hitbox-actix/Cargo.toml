@@ -20,6 +20,3 @@ default = ["redis", "derive"]
 
 redis = ["hitbox-redis"]
 derive = ["hitbox/derive"]
-
-[dev-dependencies]
-actix-rt = "2"
