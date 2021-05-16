@@ -1,0 +1,14 @@
+@startuml
+'https://plantuml.com/state-diagram
+
+[*] --> InitialState
+
+InitialState --> UpstreamPolled::Successful
+InitialState --> UpstreamPolled::Error
+
+UpstreamPolled::Successful --> Finish
+UpstreamPolled::Error --> Finish
+
+Finish --> [*]
+
+@enduml

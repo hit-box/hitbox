@@ -5,6 +5,7 @@ use crate::states::finish::Finish;
 use crate::states::initial::InitialState;
 use crate::states::upstream_polled::UpstreamPolled;
 use std::fmt::Debug;
+use crate::states::cache_policy::CachePolicyChecked;
 
 pub async fn transition<T, A>(state: InitialState<A>) -> Finish<T>
 where
@@ -16,7 +17,10 @@ where
         CachePolled::Actual(state) => state.finish(),
         CachePolled::Stale(state) => state.finish(),
         CachePolled::Miss(state) => match state.poll_upstream().await {
-            UpstreamPolled::Successful(state) => state.update_cache().await.finish(),
+            UpstreamPolled::Successful(state) => match state.check_cache_policy() {
+                CachePolicyChecked::Cacheable(state) => state.update_cache().await.finish(),
+                CachePolicyChecked::NonCacheable(state) => state.finish(),
+            },
             UpstreamPolled::Error(error) => error.finish(),
         },
         CachePolled::Error(state) => match state.poll_upstream().await {
