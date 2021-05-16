@@ -1,11 +1,13 @@
+//! Cached data representation and wrappers.
 use crate::runtime::EvictionPolicy;
 use crate::{CacheError, CachePolicy, CacheableResponse};
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-/// This struct wraps and represent cached data.
+/// This struct wraps and represents cached data.
 ///
 /// The expired field defines the UTC data expiration time.
+/// Used for detection of stale data.
 #[derive(Deserialize)]
 pub struct CachedValue<T> {
     data: T,
@@ -54,6 +56,7 @@ where
         }
     }
 
+    /// Serialize CachedValue into bytes.
     pub fn serialize(&self) -> Result<Vec<u8>, CacheError> {
         match self.data.cache_policy() {
             CachePolicy::Cacheable(cache_value) => serde_json::to_vec(&CachedInnerValue {
@@ -77,7 +80,7 @@ pub enum CacheState<T> {
     Actual(CachedValue<T>),
     /// Cached data is exists and stale.
     Stale(CachedValue<T>),
-    /// Cached data is not exists.
+    /// Cached data does not exists.
     Miss,
 }
 
