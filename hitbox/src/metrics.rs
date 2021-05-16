@@ -1,4 +1,4 @@
-//! Prometheus metrics.
+//! Metrics declaration and initialization.
 use lazy_static::lazy_static;
 use prometheus::{register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec};
 
