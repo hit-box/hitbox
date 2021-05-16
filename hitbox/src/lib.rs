@@ -84,6 +84,7 @@ pub use value::{CacheState, CachedValue};
 #[doc(hidden)]
 pub use serde_qs as hitbox_serializer;
 
+/// The `hitbox` prelude.
 pub mod prelude {
     #[cfg(feature = "derive")]
     pub use crate::hitbox_serializer;
