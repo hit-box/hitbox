@@ -10,7 +10,7 @@ fn test_cache_actual_debug() {
     assert_eq!(format!("{:?}", actual), "CachePolledActual");
 }
 
-#[actix_rt::test]
+#[actix::test]
 async fn test_actual_poll_upstream_successful() {
     let adapter = MockAdapter::build().with_upstream_value(42).finish();
     let actual = CachePolledActual { adapter, result: CachedValue::new(0, chrono::Utc::now()) };
@@ -20,7 +20,7 @@ async fn test_actual_poll_upstream_successful() {
     assert!(matches!(upstream_polled, expected));
 }
 
-#[actix_rt::test]
+#[actix::test]
 async fn test_actual_poll_upstream_error() {
     let adapter: MockAdapter<i32> = MockAdapter::build().with_upstream_error().finish();
     let actual = CachePolledActual { adapter, result: CachedValue::new(0, chrono::Utc::now()) };
@@ -32,7 +32,7 @@ async fn test_actual_poll_upstream_error() {
     assert!(matches!(upstream_polled, expected));
 }
 
-#[actix_rt::test]
+#[actix::test]
 async fn test_error_poll_upstream_successful() {
     let adapter = MockAdapter::build().with_upstream_value(42).finish();
     let actual = CacheErrorOccurred { adapter };
@@ -42,7 +42,7 @@ async fn test_error_poll_upstream_successful() {
     assert!(matches!(upstream_polled, expected));
 }
 
-#[actix_rt::test]
+#[actix::test]
 async fn test_error_poll_upstream_error() {
     let adapter: MockAdapter<i32> = MockAdapter::build().with_upstream_error().finish();
     let actual = CachePolledActual { adapter, result: CachedValue::new(0, chrono::Utc::now()) };
