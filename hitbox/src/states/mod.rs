@@ -12,20 +12,20 @@
 //!
 //! # States
 //! The states module is a set of states of the Hitbox finite state machine.
-//! * [cache_policy] Defines whether the result returned from upstream will be cached.
-//! * [cache_polled] Defines the state of the data that was retrieved from the cache.
-//! * [cache_updated] The state that Hitbox enters after updating the cache.
-//! * [finish] Final state of Hitbox.
-//! * [initial] Initial state of Hitbox.
-//! * [upstream_polled] Defines the state of the data that was retrieved from the upstream.
 //!
 //! [transition_groups]: ../transition_groups/index.html
 //! [InitialCacheSettings]: ../enum.InitialCacheSettings.html
 //! [load profiles]: ../
 
+/// Defines whether the result returned from upstream will be cached.
 pub mod cache_policy;
+/// Defines the state of the data that was retrieved from the cache.
 pub mod cache_polled;
+/// The state that Hitbox enters after updating the cache.
 pub mod cache_updated;
+/// Final state of Hitbox.
 pub mod finish;
+/// Initial state of Hitbox.
 pub mod initial;
+/// Defines the state of the data that was retrieved from the upstream.
 pub mod upstream_polled;
