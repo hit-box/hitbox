@@ -16,6 +16,9 @@ pub enum CacheError {
     /// Wrapper for cache data deserialization problems.
     #[error("Cached data deserialization error")]
     DeserializeError,
+    // /// Wrapper for CacheableResponse serialization or deserialization errors.
+    // #[error("Cache data serialization/deserialization error")]
+    // ResponseError(#[from] crate::response::ResponseError),
     /// Wrapper error for problems with cache key generation.
     #[error("Cache key generation error")]
     CacheKeyGenerationError(String),
