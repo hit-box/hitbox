@@ -16,7 +16,9 @@ where
     A: RuntimeAdapter,
     T: CacheableResponse,
 {
+    /// Runtime adapter.
     pub adapter: A,
+    /// Value retrieved from upstream.
     pub result: T,
 }
 

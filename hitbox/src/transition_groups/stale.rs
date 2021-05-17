@@ -7,6 +7,7 @@ use crate::states::initial::InitialState;
 use crate::states::upstream_polled::{UpstreamPolled, UpstreamPolledStaleRetrieved};
 use std::fmt::Debug;
 
+/// Transition for `InitialCacheSettings::CacheStale` option.
 pub async fn transition<T, A>(state: InitialState<A>) -> Finish<T>
 where
     A: RuntimeAdapter,

@@ -9,6 +9,7 @@ use crate::states::finish::Finish;
 /// The field result of the `CachePolicyCacheable` structure is a value
 /// that is retrieved from the upstream (DB or something similar) and won't be cached.
 pub struct CachePolicyNonCacheable<T> {
+    /// Value retrieved from upstream.
     pub result: T,
 }
 
