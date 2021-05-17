@@ -1,6 +1,7 @@
 @startuml
 'https://plantuml.com/state-diagram
 
+scale 700 width
 [*] --> InitialState
 
 InitialState --> UpstreamPolled::Successful
