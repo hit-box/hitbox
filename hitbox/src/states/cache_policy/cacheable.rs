@@ -7,6 +7,10 @@ use crate::runtime::RuntimeAdapter;
 use crate::states::cache_updated::CacheUpdated;
 use crate::CachedValue;
 
+/// State represents cacheable policy option.
+///
+/// The field result of the `CachePolicyCacheable` structure is a value
+/// that is retrieved from the upstream (DB or something similar) and will be cached.
 pub struct CachePolicyCacheable<A, T>
 where
     A: RuntimeAdapter,
@@ -16,6 +20,7 @@ where
     pub result: T,
 }
 
+/// Required `Debug` implementation to use `instrument` macro.
 impl<A, T> fmt::Debug for CachePolicyCacheable<A, T>
 where
     A: RuntimeAdapter,
@@ -32,6 +37,7 @@ where
     T: CacheableResponse,
 {
     #[instrument]
+    /// Method stores `result` from `CachePolicyCacheable` into cache.
     pub async fn update_cache(self) -> CacheUpdated<A, T> {
         let cached_value = CachedValue::from((self.result, self.adapter.eviction_settings()));
         let cache_update_result = self.adapter.update_cache(&cached_value).await;
