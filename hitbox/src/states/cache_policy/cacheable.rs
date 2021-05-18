@@ -7,10 +7,7 @@ use crate::runtime::RuntimeAdapter;
 use crate::states::cache_updated::CacheUpdated;
 use crate::CachedValue;
 
-/// State represents cacheable policy option.
-///
-/// The field result of the `CachePolicyCacheable` structure is a value
-/// that is retrieved from the upstream (DB or something similar) and will be cached.
+/// This state is a cacheable variant from [CachePolicyChecked](enum.CachePolicyChecked.html).
 pub struct CachePolicyCacheable<A, T>
 where
     A: RuntimeAdapter,

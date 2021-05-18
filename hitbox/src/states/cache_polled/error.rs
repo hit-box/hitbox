@@ -8,6 +8,7 @@ use crate::states::upstream_polled::{
     UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
 };
 
+/// This state is a variant without data from [CachePolled](enum.CachePolled.html).
 pub struct CacheErrorOccurred<A>
 where
     A: RuntimeAdapter,
@@ -15,6 +16,7 @@ where
     pub adapter: A,
 }
 
+/// Required `Debug` implementation to use `instrument` macro.
 impl<A> fmt::Debug for CacheErrorOccurred<A>
 where
     A: RuntimeAdapter,
@@ -29,6 +31,7 @@ where
     A: RuntimeAdapter,
 {
     #[instrument]
+    /// If we can't retrieve data from cache we have to poll upstream.
     pub async fn poll_upstream<T>(mut self) -> UpstreamPolled<A, T>
     where
         A: RuntimeAdapter<UpstreamResult = T>,

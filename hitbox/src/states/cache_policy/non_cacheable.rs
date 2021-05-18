@@ -4,10 +4,7 @@ use tracing::{instrument, trace};
 
 use crate::states::finish::Finish;
 
-/// State represents non cacheable policy option.
-///
-/// The field result of the `CachePolicyCacheable` structure is a value
-/// that is retrieved from the upstream (DB or something similar) and won't be cached.
+/// This state is a non cacheable variant from [CachePolicyChecked](enum.CachePolicyChecked.html).
 pub struct CachePolicyNonCacheable<T> {
     /// Value retrieved from upstream.
     pub result: T,
