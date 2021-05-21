@@ -4,11 +4,11 @@ use crate::CacheError;
 #[cfg(feature = "derive")]
 pub use hitbox_derive::Cacheable;
 
-/// Trait describe cache configuration per message type for actix Cache actor.
+/// Trait describes cache configuration per type that implements this trait.
 pub trait Cacheable {
     /// Method should return unique identifier for struct object.
     ///
-    /// In cache storage it prepends with cache version and Upstream actor name.
+    /// In cache storage it may prepends with cache version and Upstream name.
     ///
     /// # Examples
     ///
