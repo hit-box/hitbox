@@ -1,9 +1,6 @@
 use hitbox::dev::MockAdapter;
-use hitbox::states::cache_polled::{CacheErrorOccurred, CachePolledActual, CachePolledStale};
-use hitbox::states::upstream_polled::{
-    UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
-};
-use hitbox::{CacheError, CachedValue};
+use hitbox::states::cache_polled::{CachePolledActual, CachePolledStale};
+use hitbox::CachedValue;
 
 #[test]
 fn test_cache_actual_debug() {

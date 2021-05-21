@@ -1,7 +1,6 @@
 use hitbox::dev::MockAdapter;
 use hitbox::states::cache_policy::{CachePolicyChecked, CachePolicyNonCacheable};
 use hitbox::states::upstream_polled::UpstreamPolledSuccessful;
-use hitbox::CacheError;
 
 #[test]
 fn test_successful_check_policy_non_cacheable() {

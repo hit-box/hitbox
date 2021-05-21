@@ -1,6 +1,5 @@
 use hitbox::dev::MockAdapter;
 use hitbox::states::cache_policy::{CachePolicyCacheable, CachePolicyNonCacheable};
-use hitbox::CacheError;
 
 #[test]
 fn test_cacheable_debug() {
