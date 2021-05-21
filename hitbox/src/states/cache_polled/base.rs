@@ -16,6 +16,6 @@ where
     Stale(CachePolledStale<A, T>),
     /// Cache not found.
     Miss(CacheMissed<A>),
-    /// Unable to get cache from [Backend].
+    /// Unable to get cache from [Backend](../../../hitbox_backend/trait.Backend.html).
     Error(CacheErrorOccurred<A>),
 }
