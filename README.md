@@ -1,7 +1,7 @@
 # hitbox
 
-[![Build Status](https://travis-ci.org/rambler-digital-solutions/hitbox.svg?branch=master)](https://travis-ci.org/rambler-digital-solutions/hitbox)
-[![Coverage Status](https://coveralls.io/repos/github/rambler-digital-solutions/hitbox/badge.svg?branch=master)](https://coveralls.io/github/rambler-digital-solutions/hitbox?branch=master)
+[![Build status](https://github.com/hit-box/hitbox/actions/workflows/CI.yml/badge.svg)](https://github.com/hit-box/hitbox/actions?query=workflow)
+[![Coverage Status](https://codecov.io/gh/hit-box/hitbox/branch/master/graph/badge.svg?token=tgAm8OBLkY)](https://codecov.io/gh/hit-box/hitbox)
 
 Actix cache is a proxy actor and infrastructure for asynchronous and clear cache interaction for Actix actor and Actix-web frameworks.
 
