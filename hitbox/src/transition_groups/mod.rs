@@ -5,4 +5,3 @@ pub mod only_cache;
 pub mod stale;
 /// transition [Transition diagram](http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/hit-box/hitbox/issue-14/hitbox/diagrams/upstream.puml)
 pub mod upstream;
-

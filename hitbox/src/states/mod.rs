@@ -10,9 +10,9 @@
 //! State machine transitions are defined by the [transition_groups] module and correspond
 //! to the [InitialCacheSettings] options.
 //!
-//! States shouldn't depend on specific implementations of the cache backend and upstream, 
-//! and to interact with them, many states contain an `adapter` field. 
-//! The adapter provides the necessary operations such as getting the cache by key, 
+//! States shouldn't depend on specific implementations of the cache backend and upstream,
+//! and to interact with them, many states contain an `adapter` field.
+//! The adapter provides the necessary operations such as getting the cache by key,
 //! saving the cache, etc.
 //!
 //! # States
@@ -34,4 +34,3 @@ pub mod finish;
 pub mod initial;
 /// Defines the state of the data that was retrieved from the upstream.
 pub mod upstream_polled;
-

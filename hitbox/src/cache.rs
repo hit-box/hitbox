@@ -1,8 +1,8 @@
 //! Cacheable trait and implementation of cache logic.
 
+use crate::CacheError;
 #[cfg(feature = "derive")]
 pub use hitbox_derive::Cacheable;
-use crate::CacheError;
 
 /// Trait describe cache configuration per message type for actix Cache actor.
 pub trait Cacheable {

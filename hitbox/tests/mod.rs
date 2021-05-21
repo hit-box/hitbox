@@ -1,2 +1,2 @@
-mod transitions;
 mod states;
+mod transitions;

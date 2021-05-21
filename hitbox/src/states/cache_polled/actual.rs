@@ -3,13 +3,13 @@ use std::fmt::Debug;
 
 use tracing::{instrument, trace, warn};
 
-use crate::CachedValue;
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
 use crate::states::upstream_polled::{
     UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
 };
+use crate::CachedValue;
 
 /// This state is a variant with actual data from [CachePolled](enum.CachePolled.html).
 pub struct CachePolledActual<A, T>

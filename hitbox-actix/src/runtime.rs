@@ -93,9 +93,7 @@ where
                 })
                 .await
                 .map_err(|error| warn!("Updating Cache Error {}", error))
-                .and_then(|value| {
-                    value.map_err(|error| warn!("Updating Cache Error. {}", error))
-                });
+                .and_then(|value| value.map_err(|error| warn!("Updating Cache Error. {}", error)));
             Ok(())
         })
     }
