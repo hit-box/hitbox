@@ -7,15 +7,19 @@ use crate::runtime::RuntimeAdapter;
 use crate::states::cache_updated::CacheUpdated;
 use crate::CachedValue;
 
+/// This state is a cacheable variant from [CachePolicyChecked](enum.CachePolicyChecked.html).
 pub struct CachePolicyCacheable<A, T>
 where
     A: RuntimeAdapter,
     T: CacheableResponse,
 {
+    /// Runtime adapter.
     pub adapter: A,
+    /// Value retrieved from upstream.
     pub result: T,
 }
 
+/// Required `Debug` implementation to use `instrument` macro.
 impl<A, T> fmt::Debug for CachePolicyCacheable<A, T>
 where
     A: RuntimeAdapter,
@@ -32,6 +36,7 @@ where
     T: CacheableResponse,
 {
     #[instrument]
+    /// Method stores `result` from `CachePolicyCacheable` into cache.
     pub async fn update_cache(self) -> CacheUpdated<A, T> {
         let cached_value = CachedValue::from((self.result, self.adapter.eviction_settings()));
         let cache_update_result = self.adapter.update_cache(&cached_value).await;

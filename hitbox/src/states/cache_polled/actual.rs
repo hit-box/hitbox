@@ -11,15 +11,19 @@ use crate::states::upstream_polled::{
     UpstreamPolled, UpstreamPolledError, UpstreamPolledSuccessful,
 };
 
+/// This state is a variant with actual data from [CachePolled](enum.CachePolled.html).
 pub struct CachePolledActual<A, T>
 where
     A: RuntimeAdapter,
     T: CacheableResponse,
 {
+    /// Runtime adapter.
     pub adapter: A,
+    /// Value retrieved from cache.
     pub result: CachedValue<T>,
 }
 
+/// Required `Debug` implementation to use `instrument` macro.
 impl<A, T> fmt::Debug for CachePolledActual<A, T>
 where
     A: RuntimeAdapter,
@@ -36,27 +40,7 @@ where
     T: Debug + CacheableResponse,
 {
     #[instrument]
-    pub async fn poll_upstream(mut self) -> UpstreamPolled<A, T>
-    where
-        A: RuntimeAdapter<UpstreamResult = T>,
-    {
-        match self.adapter.poll_upstream().await {
-            Ok(result) => {
-                trace!("UpstreamPolledSuccessful");
-                UpstreamPolled::Successful(UpstreamPolledSuccessful {
-                    adapter: self.adapter,
-                    result,
-                })
-            }
-            Err(error) => {
-                trace!("UpstreamPolledError");
-                warn!("Upstream error {}", error);
-                UpstreamPolled::Error(UpstreamPolledError { error })
-            }
-        }
-    }
-
-    #[instrument]
+    /// We have to return actual data.
     pub fn finish(self) -> Finish<T> {
         trace!("Finish");
         Finish {

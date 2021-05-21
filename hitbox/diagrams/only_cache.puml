@@ -1,0 +1,33 @@
+@startuml
+'https://plantuml.com/state-diagram
+
+scale 700 width
+[*] --> InitialState
+
+InitialState --> CachePolled::Actual
+InitialState --> CachePolled::Stale
+InitialState --> CachePolled::Miss
+InitialState --> CachePolled::Error
+
+CachePolled::Actual --> Finish
+CachePolled::Stale --> Finish
+
+CachePolled::Miss --> UpstreamPolled::Successful
+CachePolled::Miss --> UpstreamPolled::Error
+
+CachePolled::Miss --> UpstreamPolled::Successful
+UpstreamPolled::Successful --> CachePolicyChecked::Cacheable
+UpstreamPolled::Successful --> CachePolicyChecked::NonCacheable
+
+CachePolled::Error --> UpstreamPolled::Successful
+CachePolled::Error --> UpstreamPolled::Error
+
+CachePolicyChecked::Cacheable --> CacheUpdated
+CachePolicyChecked::NonCacheable --> Finish
+UpstreamPolled::Error --> Finish
+
+CacheUpdated --> Finish
+
+Finish --> [*]
+
+@enduml
