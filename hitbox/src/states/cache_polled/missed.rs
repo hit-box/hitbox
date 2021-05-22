@@ -7,13 +7,16 @@ use crate::states::upstream_polled::{
 };
 use std::fmt;
 
+/// This state means that there is no cached data.
 pub struct CacheMissed<A>
 where
     A: RuntimeAdapter,
 {
+    /// Runtime adapter.
     pub adapter: A,
 }
 
+/// Required `Debug` implementation to use `instrument` macro.
 impl<A> fmt::Debug for CacheMissed<A>
 where
     A: RuntimeAdapter,
@@ -28,6 +31,7 @@ where
     A: RuntimeAdapter,
 {
     #[instrument]
+    /// Poll data from upstream.
     pub async fn poll_upstream<T>(mut self) -> UpstreamPolled<A, T>
     where
         A: RuntimeAdapter<UpstreamResult = T>,

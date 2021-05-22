@@ -13,6 +13,7 @@ pub struct CacheErrorOccurred<A>
 where
     A: RuntimeAdapter,
 {
+    /// Runtime adapter.
     pub adapter: A,
 }
 

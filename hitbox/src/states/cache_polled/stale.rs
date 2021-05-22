@@ -11,15 +11,19 @@ use crate::states::upstream_polled::{
 use crate::CachedValue;
 use std::fmt;
 
+/// This state means that the data in the cache is stale.
 pub struct CachePolledStale<A, T>
 where
     A: RuntimeAdapter,
     T: CacheableResponse,
 {
+    /// Runtime adapter.
     pub adapter: A,
+    /// Value retrieved from cache.
     pub result: CachedValue<T>,
 }
 
+/// Required `Debug` implementation to use `instrument` macro.
 impl<A, T> fmt::Debug for CachePolledStale<A, T>
 where
     A: RuntimeAdapter,
@@ -36,6 +40,7 @@ where
     T: Debug + CacheableResponse,
 {
     #[instrument]
+    /// Poll data from upstream.
     pub async fn poll_upstream(mut self) -> UpstreamPolledStaleRetrieved<A, T>
     where
         A: RuntimeAdapter<UpstreamResult = T>,
@@ -60,6 +65,7 @@ where
     }
 
     #[instrument]
+    /// Return data with Finish state.
     pub fn finish(self) -> Finish<T> {
         trace!("Finish");
         Finish {
