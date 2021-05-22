@@ -66,7 +66,7 @@ pub trait Cacheable {
         }
     }
 
-    /// Describe current cache version for this message type.
+    /// Describe current cache version for this type.
     fn cache_version(&self) -> u32 {
         0
     }
