@@ -50,6 +50,12 @@ pub trait Cacheable {
     /// Describe expire\stale timeout value for cache storage in seconds.
     ///
     /// After that time cached value marked as stale.
+    ///
+    /// ```
+    /// |__cache_is_valid__|__cache_is_stale__| -> time
+    ///                    ^                  ^
+    ///                 stale_ttl       ttl (cache evicted)
+    /// ```
     fn cache_stale_ttl(&self) -> u32 {
         let ttl = self.cache_ttl();
         let stale_time = 5;
