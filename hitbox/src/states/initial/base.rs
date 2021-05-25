@@ -40,6 +40,7 @@ impl<A> Initial<A>
 where
     A: RuntimeAdapter,
 {
+    /// Create new Initial state.
     pub fn new(settings: CacheSettings, adapter: A) -> Self {
         Self {
             settings: InitialCacheSettings::from(settings),
@@ -111,6 +112,7 @@ where
         }
     }
 
+    /// Run all transitions from Initial state to Result.
     pub async fn transitions<T>(self) -> Result<T, CacheError>
     where
         A: RuntimeAdapter<UpstreamResult = T>,
