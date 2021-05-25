@@ -33,10 +33,10 @@
 //! First of all, you should derive [Cacheable] trait for your struct or enum:
 //!
 //! ```rust
-//! use hitbox::prelude::*; // With features=["derive"]
+//! use hitbox::prelude::*;
 //! use serde::{Deserialize, Serialize};
 //!
-//! #[derive(Cacheable, Serialize)]
+//! #[derive(Cacheable, Serialize)] // With features=["derive"]
 //! struct Ping {
 //!     id: i32,
 //! }
