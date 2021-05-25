@@ -1,5 +1,5 @@
 use hitbox::dev::MockAdapter;
-use hitbox::settings::{CacheSettings, InitialCacheSettings, Status};
+use hitbox::settings::{CacheSettings, Status};
 use hitbox::states::initial::Initial;
 use hitbox::transition_groups::only_cache;
 
@@ -14,11 +14,7 @@ async fn test_cache_enabled_cache_miss() {
         .with_upstream_value(42)
         .with_cache_miss()
         .finish();
-    let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = Initial {
-        adapter,
-        settings: initial_state,
-    };
+    let initial_state = Initial::new(settings, adapter);
     let finish = only_cache::transition(initial_state).await;
     assert_eq!(finish.result().unwrap(), 42);
 }
@@ -34,11 +30,7 @@ async fn test_cache_enabled_cache_hit() {
         .with_upstream_error()
         .with_cache_actual(42)
         .finish();
-    let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = Initial {
-        adapter,
-        settings: initial_state,
-    };
+    let initial_state = Initial::new(settings, adapter);
     let finish = only_cache::transition(initial_state).await;
     assert_eq!(finish.result().unwrap(), 42);
 }
@@ -54,11 +46,7 @@ async fn test_cache_enabled_cache_miss_upstream_error() {
         .with_upstream_error()
         .with_cache_miss()
         .finish();
-    let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = Initial {
-        adapter,
-        settings: initial_state,
-    };
+    let initial_state = Initial::new(settings, adapter);
     let finish = only_cache::transition(initial_state).await;
     assert!(finish.result().is_err());
 }

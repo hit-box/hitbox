@@ -1,6 +1,6 @@
 use crate::CacheActor;
 use actix::{Actor, Addr};
-use hitbox::settings::{CacheSettings, InitialCacheSettings, Status};
+use hitbox::settings::{CacheSettings, Status};
 use hitbox_backend::Backend;
 use std::marker::PhantomData;
 
@@ -92,7 +92,7 @@ where
     /// [Messages]: https://docs.rs/actix/latest/actix/prelude/trait.Message.html
     /// [Handler]: https://docs.rs/actix/latest/actix/prelude/trait.Handler.html
     pub fn finish(self, backend: Addr<B>) -> CacheActor<B> {
-        let settings = InitialCacheSettings::from(self.settings);
+        let settings = CacheSettings::from(self.settings);
         CacheActor { settings, backend }
     }
 }

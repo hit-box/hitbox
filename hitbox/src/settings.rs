@@ -1,8 +1,10 @@
+#[derive(Debug, Clone)]
 pub enum Status {
     Enabled,
     Disabled,
 }
 
+#[derive(Debug, Clone)]
 pub struct CacheSettings {
     pub cache: Status,
     pub stale: Status,
@@ -10,7 +12,7 @@ pub struct CacheSettings {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum InitialCacheSettings {
+pub(crate) enum InitialCacheSettings {
     CacheDisabled,
     CacheEnabled,
     CacheStale,

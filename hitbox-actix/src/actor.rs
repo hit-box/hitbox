@@ -7,7 +7,7 @@ use hitbox::dev::{Delete, Get, Lock, Set};
 use hitbox::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
-use hitbox::settings::InitialCacheSettings;
+use hitbox::settings::CacheSettings;
 use hitbox::CacheError;
 use hitbox_backend::Backend;
 use hitbox_redis::RedisBackend;
@@ -37,7 +37,7 @@ pub struct CacheActor<B>
 where
     B: Backend,
 {
-    pub settings: InitialCacheSettings,
+    pub settings: CacheSettings,
     pub(crate) backend: Addr<B>,
 }
 
@@ -72,6 +72,6 @@ where
 
     fn started(&mut self, _: &mut Self::Context) {
         info!("Cache actor started");
-        debug!("Cache enabled: {:?}", self.settings);
+        // debug!("Cache enabled: {:?}", self.settings);
     }
 }

@@ -3,9 +3,7 @@ use actix::{
     dev::{MessageResponse, ResponseFuture, ToEnvelope},
     prelude::*,
 };
-use hitbox::settings::InitialCacheSettings;
 use hitbox::states::initial::Initial;
-use hitbox::transition_groups::{only_cache, stale, upstream};
 use hitbox::{
     dev::{Backend, Delete, Get, Lock, Set},
     CacheError, Cacheable, CacheableResponse,
@@ -29,21 +27,10 @@ where
         let adapter_result = ActixAdapter::new(msg, self.backend.clone()); // @TODO: remove clone
         let settings = self.settings.clone();
         Box::pin(async move {
-            let initial_state = Initial {
-                adapter: adapter_result?,
-                settings,
-            };
-            match initial_state.settings {
-                InitialCacheSettings::CacheDisabled => {
-                    upstream::transition(initial_state).await.result()
-                }
-                InitialCacheSettings::CacheEnabled => {
-                    only_cache::transition(initial_state).await.result()
-                }
-                InitialCacheSettings::CacheStale => stale::transition(initial_state).await.result(),
-                InitialCacheSettings::CacheLock => unimplemented!(),
-                InitialCacheSettings::CacheStaleLock => unimplemented!(),
-            }
+            let initial_state = Initial::new(settings, adapter_result?);
+            initial_state
+                .transitions()
+                .await
         })
     }
 }

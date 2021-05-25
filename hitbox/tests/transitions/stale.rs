@@ -1,5 +1,5 @@
 use hitbox::dev::MockAdapter;
-use hitbox::settings::{CacheSettings, InitialCacheSettings, Status};
+use hitbox::settings::{CacheSettings, Status};
 use hitbox::states::initial::Initial;
 use hitbox::transition_groups::stale;
 
@@ -14,11 +14,7 @@ async fn test_cache_stale() {
         .with_upstream_value("upstream value")
         .with_cache_stale("stale cache", chrono::Utc::now())
         .finish();
-    let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = Initial {
-        adapter,
-        settings: initial_state,
-    };
+    let initial_state = Initial::new(settings, adapter);
     let finish = stale::transition(initial_state).await;
     assert_eq!(finish.result().unwrap(), "upstream value");
 }
@@ -34,11 +30,7 @@ async fn test_upstream_error() {
         .with_upstream_error()
         .with_cache_stale("stale cache", chrono::Utc::now())
         .finish();
-    let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = Initial {
-        adapter,
-        settings: initial_state,
-    };
+    let initial_state = Initial::new(settings, adapter);
     let finish = stale::transition(initial_state).await;
     assert_eq!(finish.result().unwrap(), "stale cache");
 }
@@ -54,11 +46,7 @@ async fn test_cache_actual() {
         .with_upstream_value("upstream value")
         .with_cache_actual("actual cache")
         .finish();
-    let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = Initial {
-        adapter,
-        settings: initial_state,
-    };
+    let initial_state = Initial::new(settings, adapter);
     let finish = stale::transition(initial_state).await;
     assert_eq!(finish.result().unwrap(), "actual cache");
 }

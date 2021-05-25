@@ -1,5 +1,5 @@
 use hitbox::dev::MockAdapter;
-use hitbox::settings::{CacheSettings, InitialCacheSettings, Status};
+use hitbox::settings::{CacheSettings, Status};
 use hitbox::states::initial::Initial;
 use hitbox::transition_groups::upstream;
 
@@ -11,11 +11,7 @@ async fn test_cache_disabled_upstream_polled() {
         lock: Status::Disabled,
     };
     let adapter = MockAdapter::build().with_upstream_value(42).finish();
-    let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = Initial {
-        adapter,
-        settings: initial_state,
-    };
+    let initial_state = Initial::new(settings, adapter);
     let finish = upstream::transition(initial_state).await;
     assert_eq!(finish.result().unwrap(), 42);
 }
@@ -28,11 +24,7 @@ async fn test_cache_disabled_upstream_error() {
         lock: Status::Disabled,
     };
     let adapter: MockAdapter<i32> = MockAdapter::build().with_upstream_error().finish();
-    let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = Initial {
-        adapter,
-        settings: initial_state,
-    };
+    let initial_state = Initial::new(settings, adapter);
     let finish = upstream::transition(initial_state).await;
     assert!(finish.result().is_err());
 }
