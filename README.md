@@ -18,7 +18,7 @@
  - [ ] Distributed cache locks.
  - [ ] Detailed metrics out of the box.
 
-## Backend realisations
+## Backend implementations
 - [x] [Redis](https://github.com/hit-box/hitbox/tree/master/hitbox-backend)
 - [ ] In-memory backend
 
