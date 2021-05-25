@@ -59,8 +59,8 @@ struct Ping {
 Or implement that trait manually:
 
 ```rust
-# use hitbox::{Cacheable, CacheError};
-# struct Ping { id: i32 }
+use hitbox::{Cacheable, CacheError};
+struct Ping { id: i32 }
 impl Cacheable for Ping {
     fn cache_key(&self) -> Result<String, CacheError> {
         Ok(format!("{}::{}", self.cache_key_prefix(), self.id))
