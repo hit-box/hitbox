@@ -14,14 +14,19 @@ use crate::states::upstream_polled::{
 use crate::transition_groups::{only_cache, stale, upstream};
 use crate::{CacheError, CacheState};
 
+
+/// Initial state.
 pub struct Initial<A>
 where
     A: RuntimeAdapter,
 {
+    /// Base point for deciding what type of transition will be used.
     settings: InitialCacheSettings,
+    /// Runtime adapter.
     pub adapter: A,
 }
 
+/// Required `Debug` implementation to use `instrument` macro.
 impl<A> fmt::Debug for Initial<A>
 where
     A: RuntimeAdapter,
@@ -43,6 +48,7 @@ where
     }
 
     #[instrument]
+    /// Retrieve value from upstream.
     pub async fn poll_upstream<T>(mut self) -> UpstreamPolled<A, T>
     where
         A: RuntimeAdapter<UpstreamResult = T>,
@@ -65,6 +71,7 @@ where
     }
 
     #[instrument]
+    /// Retrieve value from cache.
     pub async fn poll_cache<T>(self) -> CachePolled<A, T>
     where
         A: RuntimeAdapter<UpstreamResult = T>,
