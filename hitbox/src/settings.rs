@@ -1,13 +1,22 @@
+//! Cache settings declaration.
+
+/// Cache setting status state.
 #[derive(Debug, Clone)]
 pub enum Status {
+    /// Setting is enabled.
     Enabled,
+    /// Setting is disabled.
     Disabled,
 }
 
+/// Describes all awailable cache settings.
 #[derive(Debug, Clone)]
 pub struct CacheSettings {
+    /// Enable or disable cache at all.
     pub cache: Status,
+    /// Enable or disable cache stale mechanics.
     pub stale: Status,
+    /// Enable or disable cache lock mechanics.
     pub lock: Status,
 }
 
