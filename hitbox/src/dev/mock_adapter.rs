@@ -5,12 +5,14 @@ use crate::CacheableResponse;
 use chrono::{DateTime, Utc};
 
 #[derive(Clone, Debug)]
+/// Settings for builder.
 enum MockUpstreamState<T> {
     Ok(T),
     Error,
 }
 
 #[derive(Clone, Debug)]
+/// Settings for builder.
 enum MockCacheState<T> {
     Actual(T),
     Stale((T, DateTime<Utc>)),
@@ -19,11 +21,14 @@ enum MockCacheState<T> {
 }
 
 #[derive(Clone, Debug)]
+/// Mock for Adapter.
 pub struct MockAdapter<T>
 where
     T: Clone,
 {
+    /// Upstream state.
     upstream_state: MockUpstreamState<T>,
+    /// Cache state.
     cache_state: MockCacheState<T>,
 }
 
@@ -31,6 +36,7 @@ impl<T> MockAdapter<T>
 where
     T: Clone,
 {
+    /// Return builder.
     pub fn build() -> MockAdapterBuilder<T> {
         MockAdapterBuilder {
             upstream_state: MockUpstreamState::Error,
@@ -39,11 +45,14 @@ where
     }
 }
 
+/// Implement builder pattern.
 pub struct MockAdapterBuilder<T>
 where
     T: Clone,
 {
+    /// Upstream state.
     upstream_state: MockUpstreamState<T>,
+    /// Cache state.
     cache_state: MockCacheState<T>,
 }
 
