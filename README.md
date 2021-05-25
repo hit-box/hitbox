@@ -6,7 +6,7 @@
  Hitbox is an asynchronous caching framework supporting multiple backends and suitable
  for distributed and for single-machine applications.
 
-## Framework integrations:
+## Framework integrations
 - [x] [Actix](https://github.com/hit-box/hitbox/tree/master/hitbox-actix)
 - [ ] Actix-Web
 
