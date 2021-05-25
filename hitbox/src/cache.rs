@@ -51,7 +51,7 @@ pub trait Cacheable {
     ///
     /// After that time cached value marked as stale.
     ///
-    /// ```
+    /// ```ignore
     /// |__cache_is_valid__|__cache_is_stale__| -> time
     ///                    ^                  ^
     ///                 stale_ttl       ttl (cache evicted)
