@@ -19,7 +19,7 @@
 //! The states module is a set of states of the Hitbox finite state machine.
 //!
 //! [transition_groups]: ../transition_groups/index.html
-//! [InitialCacheSettings]: ../enum.InitialCacheSettings.html
+//! [InitialCacheSettings]: ../settings/enum.InitialCacheSettings.html
 //! [load profiles]: ../
 
 /// Defines whether the result returned from upstream will be cached.
