@@ -30,6 +30,9 @@
  Default cache key implementation based on serde_qs crate
  and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types).
 
+## Documentation
+* [Examples](https://github.com/hit-box/hitbox/tree/master/examples/examples)
+
 ## Example
 
 Dependencies:
@@ -44,8 +47,7 @@ Code:
 > **_NOTE:_** Default cache key implementation based on serde_qs crate
 > and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types).
 
-## Example
-First of all, you should derive [Cacheable] trait for your struct or enum:
+First, you should derive [Cacheable] trait for your struct or enum:
 
 ```rust
 use hitbox::prelude::*;
@@ -76,4 +78,3 @@ impl Cacheable for Ping {
 [RedisBackend]: ../hitbox_redis/actor/struct.RedisActor.html
 [hitbox-actix]: ../hitbox_actix/index.html
 [dogpile effect]: https://www.sobstel.org/blog/preventing-dogpile-effect/
- 
