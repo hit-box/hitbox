@@ -4,7 +4,7 @@ use actix::{
     prelude::*,
 };
 use hitbox::settings::InitialCacheSettings;
-use hitbox::states::initial::InitialState;
+use hitbox::states::initial::Initial;
 use hitbox::transition_groups::{only_cache, stale, upstream};
 use hitbox::{
     dev::{Backend, Delete, Get, Lock, Set},
@@ -29,7 +29,7 @@ where
         let adapter_result = ActixAdapter::new(msg, self.backend.clone()); // @TODO: remove clone
         let settings = self.settings.clone();
         Box::pin(async move {
-            let initial_state = InitialState {
+            let initial_state = Initial {
                 adapter: adapter_result?,
                 settings,
             };

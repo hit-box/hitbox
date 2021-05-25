@@ -2,10 +2,10 @@
 'https://plantuml.com/state-diagram
 
 scale 700 width
-[*] --> InitialState
+[*] --> Initial
 
-InitialState --> UpstreamPolled::Successful
-InitialState --> UpstreamPolled::Error
+Initial --> UpstreamPolled::Successful
+Initial --> UpstreamPolled::Error
 
 UpstreamPolled::Successful --> Finish
 UpstreamPolled::Error --> Finish

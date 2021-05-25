@@ -1,2 +1,2 @@
 mod base;
-pub use base::InitialState;
+pub use base::Initial;

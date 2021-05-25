@@ -2,12 +2,12 @@
 'https://plantuml.com/state-diagram
 
 scale 700 width
-[*] --> InitialState
+[*] --> Initial
 
-InitialState --> CachePolled::Actual
-InitialState --> CachePolled::Stale
-InitialState --> CachePolled::Miss
-InitialState --> CachePolled::Error
+Initial --> CachePolled::Actual
+Initial --> CachePolled::Stale
+Initial --> CachePolled::Miss
+Initial --> CachePolled::Error
 
 CachePolled::Actual --> Finish
 CachePolled::Stale --> Finish

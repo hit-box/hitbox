@@ -14,7 +14,7 @@ use crate::states::upstream_polled::{
 use crate::CacheError;
 use crate::CacheState;
 
-pub struct InitialState<A>
+pub struct Initial<A>
 where
     A: RuntimeAdapter,
 {
@@ -22,16 +22,16 @@ where
     pub adapter: A,
 }
 
-impl<A> fmt::Debug for InitialState<A>
+impl<A> fmt::Debug for Initial<A>
 where
     A: RuntimeAdapter,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("InitialState")
+        f.write_str("Initial")
     }
 }
 
-impl<A> InitialState<A>
+impl<A> Initial<A>
 where
     A: RuntimeAdapter,
 {

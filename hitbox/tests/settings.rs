@@ -1,4 +1,4 @@
-// use fsm_cache::{CacheSettings, SettingState, InitialState, Message, InitialStateSettings};
+// use fsm_cache::{CacheSettings, SettingState, Initial, Message, InitialStateSettings};
 // use actix::Message;
 // use hitbox::settings::{CacheSettings, SettingState, InitialStateSettings};
 //
@@ -17,7 +17,7 @@
 //         lock: SettingState::Disabled,
 //     };
 //     let message = Ping;
-//     let initial_state = InitialState::from((settings, message));
-//     assert_eq!(initial_state.settings, InitialStateSettings::CacheDisabled);
-//     assert_eq!(initial_state.message, Ping);
+//     let initial = Initial::from((settings, message));
+//     assert_eq!(initial.settings, InitialStateSettings::CacheDisabled);
+//     assert_eq!(initial.message, Ping);
 // }

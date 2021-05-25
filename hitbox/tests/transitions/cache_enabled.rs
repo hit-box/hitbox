@@ -1,6 +1,6 @@
 use hitbox::dev::MockAdapter;
 use hitbox::settings::{CacheSettings, InitialCacheSettings, Status};
-use hitbox::states::initial::InitialState;
+use hitbox::states::initial::Initial;
 use hitbox::transition_groups::only_cache;
 
 #[actix::test]
@@ -15,7 +15,7 @@ async fn test_cache_enabled_cache_miss() {
         .with_cache_miss()
         .finish();
     let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = InitialState {
+    let initial_state = Initial {
         adapter,
         settings: initial_state,
     };
@@ -35,7 +35,7 @@ async fn test_cache_enabled_cache_hit() {
         .with_cache_actual(42)
         .finish();
     let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = InitialState {
+    let initial_state = Initial {
         adapter,
         settings: initial_state,
     };
@@ -55,7 +55,7 @@ async fn test_cache_enabled_cache_miss_upstream_error() {
         .with_cache_miss()
         .finish();
     let initial_state = InitialCacheSettings::from(settings);
-    let initial_state = InitialState {
+    let initial_state = Initial {
         adapter,
         settings: initial_state,
     };
