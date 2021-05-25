@@ -117,15 +117,15 @@ where
         T: CacheableResponse + fmt::Debug,
     {
         match self.settings {
-            InitialCacheSettings::CacheDisabled => {
+            InitialCacheSettings::Disabled => {
                 upstream::transition(self).await.result()
             }
-            InitialCacheSettings::CacheEnabled => {
+            InitialCacheSettings::Enabled => {
                 only_cache::transition(self).await.result()
             }
-            InitialCacheSettings::CacheStale => stale::transition(self).await.result(),
-            InitialCacheSettings::CacheLock => unimplemented!(),
-            InitialCacheSettings::CacheStaleLock => unimplemented!(),
+            InitialCacheSettings::Stale => stale::transition(self).await.result(),
+            InitialCacheSettings::Lock => unimplemented!(),
+            InitialCacheSettings::StaleLock => unimplemented!(),
         }
     }
 }

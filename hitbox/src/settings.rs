@@ -13,11 +13,11 @@ pub struct CacheSettings {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum InitialCacheSettings {
-    CacheDisabled,
-    CacheEnabled,
-    CacheStale,
-    CacheLock,
-    CacheStaleLock,
+    Disabled,
+    Enabled,
+    Stale,
+    Lock,
+    StaleLock,
 }
 
 impl From<CacheSettings> for InitialCacheSettings {
@@ -26,27 +26,27 @@ impl From<CacheSettings> for InitialCacheSettings {
             CacheSettings {
                 cache: Status::Disabled,
                 ..
-            } => InitialCacheSettings::CacheDisabled,
+            } => InitialCacheSettings::Disabled,
             CacheSettings {
                 cache: Status::Enabled,
                 stale: Status::Disabled,
                 lock: Status::Disabled,
-            } => InitialCacheSettings::CacheEnabled,
+            } => InitialCacheSettings::Enabled,
             CacheSettings {
                 cache: Status::Enabled,
                 stale: Status::Enabled,
                 lock: Status::Disabled,
-            } => InitialCacheSettings::CacheStale,
+            } => InitialCacheSettings::Stale,
             CacheSettings {
                 cache: Status::Enabled,
                 stale: Status::Disabled,
                 lock: Status::Enabled,
-            } => InitialCacheSettings::CacheLock,
+            } => InitialCacheSettings::Lock,
             CacheSettings {
                 cache: Status::Enabled,
                 stale: Status::Enabled,
                 lock: Status::Enabled,
-            } => InitialCacheSettings::CacheStaleLock,
+            } => InitialCacheSettings::StaleLock,
         }
     }
 }
