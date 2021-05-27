@@ -9,7 +9,7 @@ fn test_successful_check_policy_non_cacheable() {
         adapter,
         result: 42,
     };
-    let expected: CachePolicyChecked<MockAdapter<i32>, i32> =
+    let _expected: CachePolicyChecked<MockAdapter<i32>, i32> =
         CachePolicyChecked::NonCacheable(CachePolicyNonCacheable { result: 42 });
-    assert!(matches!(successful.check_cache_policy(), expected));
+    assert!(matches!(successful.check_cache_policy(), _expected));
 }
