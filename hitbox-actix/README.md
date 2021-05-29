@@ -27,7 +27,7 @@
  and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types).
 
 ## Documentation
-* [API Documentation](https://docs.rs/hitbox-acitx/)
+* [API Documentation](https://docs.rs/hitbox-actix/)
 * [Examples](https://github.com/hit-box/hitbox/tree/master/examples/examples)
 
 ### Flow diagrams:
