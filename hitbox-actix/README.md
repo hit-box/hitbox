@@ -15,7 +15,7 @@
  - [ ] Detailed metrics out of the box.
 
 ## Backend implementations
-- [x] [Redis](https://github.com/hit-box/hitbox/tree/master/hitbox-backend)
+- [x] [Redis](https://github.com/hit-box/hitbox/tree/master/hitbox-redis)
 - [ ] In-memory backend
 
  ## Feature flags
@@ -27,7 +27,7 @@
  and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types).
 
 ## Documentation
-* [API Documentation](https://docs.rs/hitbox_acitx/)
+* [API Documentation](https://docs.rs/hitbox-acitx/)
 * [Examples](https://github.com/hit-box/hitbox/tree/master/examples/examples)
 
 ### Flow diagrams:
@@ -119,11 +119,11 @@ async fn main() -> Result<(), CacheError> {
 }
 ```
 
-[Cacheable]: https://docs.rs/hitbox/trait.Cacheable.html
-[CacheableResponse]: https://docs.rs/hitbox/trait.CacheableResponse.html
-[Backend]: https://docs.rs/hitbox_backend/trait.Backend.html
-[RedisBackend]: https://docs.rs/hitbox_redis/struct.RedisActor.html
+[Cacheable]: https://docs.rs/hitbox/latest/hitbox/cache/trait.Cacheable.html
+[CacheableResponse]: https://docs.rs/hitbox/latest/hitbox/response/trait.CacheableResponse.html
+[Backend]: https://docs.rs/hitbox-backend/latest/hitbox_backend/trait.Backend.html
+[RedisBackend]: https://docs.rs/hitbox-redis/latest/hitbox_redis/struct.RedisBackend.html
 [dogpile effect]: https://www.sobstel.org/blog/preventing-dogpile-effect/
-[Message]: https://docs.rs/actix/trait.Message.html
+[Message]: https://docs.rs/actix/latest/actix/trait.Message.html
 
 [Actix]: https://github.com/actix/actix/
