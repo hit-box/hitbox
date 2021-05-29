@@ -1,3 +1,4 @@
+//! [hitbox::runtime::RuntimeAdapter] implementation for Actix runtime.
 use actix::dev::{MessageResponse, ToEnvelope};
 use actix::{Actor, Addr, Handler, Message};
 use serde::de::DeserializeOwned;
@@ -11,6 +12,7 @@ use hitbox_backend::{Backend, Get, Set};
 
 use crate::QueryCache;
 
+/// [`RuntimeAdapter`] for Actix runtime.
 pub struct ActixAdapter<A, M, B>
 where
     A: Actor + Handler<M>,
@@ -32,6 +34,7 @@ where
     M::Result: MessageResponse<A, M> + Send,
     B: Backend,
 {
+    /// Creates new instance of Actix runtime adapter.
     pub fn new(message: QueryCache<A, M>, backend: Addr<B>) -> Result<Self, CacheError> {
         let cache_key = message.cache_key()?;
         let cache_stale_ttl = message.message.cache_ttl();

@@ -1,3 +1,5 @@
+//! Actix Handler<QueryCache> implementation. 
+
 use crate::{ActixAdapter, CacheActor, QueryCache};
 use actix::{
     dev::{MessageResponse, ResponseFuture, ToEnvelope},

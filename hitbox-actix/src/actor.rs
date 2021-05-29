@@ -11,7 +11,7 @@ use hitbox::settings::CacheSettings;
 use hitbox::CacheError;
 use hitbox_backend::Backend;
 use hitbox_redis::RedisBackend;
-use tracing::info;
+use tracing::{info, debug};
 
 /// Actix actor implements cache logic.
 ///
@@ -31,13 +31,11 @@ use tracing::info;
 ///     Ok(())
 /// }
 /// ```
-///
-/// [QueryCache]: ../cache/struct.QueryCache.html
 pub struct CacheActor<B>
 where
     B: Backend,
 {
-    pub settings: CacheSettings,
+    pub(crate) settings: CacheSettings,
     pub(crate) backend: Addr<B>,
 }
 
@@ -47,9 +45,7 @@ where
     <B as Actor>::Context:
         ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock> + ToEnvelope<B, Delete>,
 {
-    /// Initialize new Cache actor with default [RedisBackend].
-    ///
-    /// [RedisBackend]: ../../hitbox_redis/actor/struct.RedisActor.html
+    /// Initialize new Cache actor with default [`hitbox_redis::RedisBackend`].
     pub async fn new() -> Result<CacheActor<RedisBackend>, CacheError> {
         let backend = RedisBackend::new()
             .await
@@ -58,7 +54,7 @@ where
         Ok(CacheBuilder::default().finish(backend))
     }
 
-    /// Creates new [CacheBuilder](struct.CacheBuilder.html) instance for Cache actor configuration.
+    /// Creates new [CacheBuilder] instance for Cache actor configuration.
     pub fn builder() -> CacheBuilder<B> {
         CacheBuilder::default()
     }

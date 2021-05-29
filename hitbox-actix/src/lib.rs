@@ -20,6 +20,7 @@ pub use hitbox_redis::RedisBackend;
 #[cfg(feature = "redis")]
 pub type Cache = CacheActor<RedisBackend>;
 
+/// Prelude for hitbox_actix.
 pub mod prelude {
     #[cfg(feature = "redis")]
     pub use crate::{Cache, RedisBackend};

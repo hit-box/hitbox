@@ -1,6 +1,8 @@
+//! QueryCache message declaration and converting.
 use actix::{dev::MessageResponse, prelude::*};
 use hitbox::{CacheError, Cacheable};
 
+/// Trait describes coversion from any [actix::Message] into QueryCache message.
 pub trait IntoCache: Cacheable {
     /// Helper method to convert Message into [QueryCache] message.
     ///
@@ -29,8 +31,6 @@ pub trait IntoCache: Cacheable {
     ///         .into_cache(&upstream);
     /// }
     /// ```
-    ///
-    /// [QueryCache]: struct.QueryCache.html
     fn into_cache<A>(self, upstream: &Addr<A>) -> QueryCache<A, Self>
     where
         A: Actor,
@@ -58,8 +58,8 @@ where
     M::Result: MessageResponse<A, M> + Send,
     A: Actor,
 {
-    pub upstream: Addr<A>,
-    pub message: M,
+    pub(crate) upstream: Addr<A>,
+    pub(crate) message: M,
 }
 
 impl<A, M> QueryCache<A, M>
