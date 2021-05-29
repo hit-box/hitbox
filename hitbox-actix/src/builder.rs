@@ -1,3 +1,4 @@
+//! CacheActor builder patter implementation.
 use crate::CacheActor;
 use actix::{Actor, Addr};
 use hitbox::settings::{CacheSettings, Status};
@@ -111,7 +112,6 @@ where
     /// [Messages]: https://docs.rs/actix/latest/actix/prelude/trait.Message.html
     /// [Handler]: https://docs.rs/actix/latest/actix/prelude/trait.Handler.html
     pub fn finish(self, backend: Addr<B>) -> CacheActor<B> {
-        let settings = CacheSettings::from(self.settings);
-        CacheActor { settings, backend }
+        CacheActor { settings: self.settings, backend }
     }
 }
