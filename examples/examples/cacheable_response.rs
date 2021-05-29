@@ -7,9 +7,7 @@ use serde::{Deserialize, Serialize};
 struct UpstreamActor;
 
 #[derive(Debug)]
-enum Error {
-    Test,
-}
+struct Error;
 
 impl Actor for UpstreamActor {
     type Context = Context<Self>;
@@ -57,6 +55,6 @@ async fn main() -> Result<(), CacheError> {
 
     let msg = Ping { id: 42 };
     let res = cache.send(msg.into_cache(&upstream)).await??;
-    dbg!(res);
+    println!("{:#?}", res);
     Ok(())
 }

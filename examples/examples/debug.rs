@@ -34,8 +34,6 @@ impl<T, E> CacheableResponse<T, E> for Result<T, E> {
     }
 }
 
-fn test<T>(value: T) {}
-
 #[derive(MessageResponse, Deserialize, Serialize, Debug)]
 struct Pong(i32);
 
@@ -69,6 +67,6 @@ async fn main() -> Result<(), CacheError> {
     let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
-    let res = cache.send(msg.into_cache(&upstream)).await??;
+    let _ = cache.send(msg.into_cache(&upstream)).await??;
     Ok(())
 }

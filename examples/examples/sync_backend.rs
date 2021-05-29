@@ -97,7 +97,7 @@ async fn main() -> Result<(), CacheError> {
     let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
-    let res = cache.send(msg.into_cache(&upstream)).await??;
+    let _ = cache.send(msg.into_cache(&upstream)).await??;
 
     Ok(())
 }
