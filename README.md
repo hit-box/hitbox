@@ -22,13 +22,13 @@
 - [x] [Redis](https://github.com/hit-box/hitbox/tree/master/hitbox-backend)
 - [ ] In-memory backend
 
- ## Feature flags
- * derive - Support for [Cacheable] trait derive macros.
- * metrics - Support for metrics.
+## Feature flags
+* derive - Support for [Cacheable] trait derive macros.
+* metrics - Support for metrics.
 
- ## Restrictions
- Default cache key implementation based on serde_qs crate
- and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types).
+## Restrictions
+Default cache key implementation based on serde_qs crate
+and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types).
 
 ## Documentation
 * [API Documentation](https://docs.rs/hitbox/)
@@ -44,9 +44,6 @@ hitbox = "0.1"
 ```
 
 Code:
-
-> **_NOTE:_** Default cache key implementation based on serde_qs crate
-> and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types).
 
 First, you should derive [Cacheable] trait for your struct or enum:
 
