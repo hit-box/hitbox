@@ -1,4 +1,5 @@
 sign-commit = true
+sign-tag = true
 pre-release-commit-message = "Release {{crate_name}} {{version}} 🎉"
 post-release-commit-message = "Start next {{crate_name}} development iteration {{next_version}}"
 tag-message = "Release {{crate_name}} {{version}}"
