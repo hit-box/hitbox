@@ -13,5 +13,5 @@ If you want to implement your own backend, you in the right place.
 * [Async backend](https://github.com/hit-box/hitbox/blob/master/examples/examples/async_backend.rs)
 * [Sync backend](https://github.com/hit-box/hitbox/blob/master/examples/examples/sync_backend.rs)
 
-[Backend]: https://docs.rs/hitbox_backend/trait.Backend.html
+[Backend]: https://docs.rs/hitbox-backend/latest/hitbox_backend/trait.Backend.html
 [Hitbox]: https://github.com/hit-box/hitbox

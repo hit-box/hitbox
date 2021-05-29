@@ -27,5 +27,5 @@ async fn main() -> Result<(), CacheError> {
 ```
 
 [MultiplexedConnection]: https://docs.rs/redis/latest/redis/aio/struct.MultiplexedConnection.html
-[Backend]: https://docs.rs/hitbox_backend/trait.Backend.html
+[Backend]: https://docs.rs/hitbox-backend/latest/hitbox_backend/trait.Backend.html
 [redis-rs]: https://docs.rs/redis/
