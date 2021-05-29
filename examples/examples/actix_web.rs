@@ -44,7 +44,7 @@ async fn index(
     HttpResponse::Ok().body(format!("Generate Fibonacci number {}", number))
 }
 
-#[actix::main]
+#[actix_rt::main]
 async fn main() -> std::io::Result<()> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug)

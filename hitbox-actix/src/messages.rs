@@ -24,7 +24,7 @@ pub trait IntoCache: Cacheable {
     ///     id: Option<i32>,
     /// }
     ///
-    /// #[actix::main]
+    /// #[actix_rt::main]
     /// async fn main() {
     ///     let upstream = Upstream.start();
     ///     let query = QueryNothing { id: Some(1) }

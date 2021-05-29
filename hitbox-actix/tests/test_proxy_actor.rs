@@ -76,7 +76,7 @@ impl Handler<Ping> for SyncUpstream {
     }
 }
 
-#[actix::test]
+#[actix_rt::test]
 async fn test_async_proxy() {
     let cache = Cache::new().await.unwrap().start();
     let upstream = Upstream {}.start();
@@ -86,7 +86,7 @@ async fn test_async_proxy() {
     assert_eq!(res.unwrap(), 42);
 }
 
-#[actix::test]
+#[actix_rt::test]
 async fn test_sync_proxy() {
     let upstream = SyncArbiter::start(10, move || SyncUpstream {});
     let cache = Cache::new().await.unwrap().start();

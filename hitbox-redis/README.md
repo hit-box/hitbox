@@ -13,7 +13,7 @@ It uses one [MultiplexedConnection] for better connection utilisation.
 use actix::prelude::*;
 use hitbox_actix::prelude::*;
 
-#[actix::main]
+#[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
     let backend = RedisBackend::new()
     	.await?

@@ -23,7 +23,7 @@ impl Handler<Ping> for UpstreamActor {
 
     fn handle(&mut self, msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
         Box::pin(async move {
-            actix_rt::time::sleep(core::time::Duration::from_secs(3)).await;
+            tokio::time::delay_for(core::time::Duration::from_secs(3)).await;
             Ok(Pong(msg.id))
         })
     }
@@ -79,7 +79,7 @@ impl Handler<Lock> for DummyBackend {
     }
 }
 
-#[actix::main]
+#[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug)

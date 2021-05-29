@@ -25,7 +25,7 @@ use tracing::{debug, info};
 /// use actix::prelude::*;
 /// use hitbox_actix::{Cache, RedisBackend, CacheError};
 ///
-/// #[actix::main]
+/// #[actix_rt::main]
 /// async fn main() -> Result<(), CacheError> {
 ///     let cache = Cache::new().await?.start();
 ///     Ok(())

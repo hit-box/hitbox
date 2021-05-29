@@ -11,13 +11,13 @@ categories = ["caching", "asynchronous"]
 keywords = ["cache", "actix", "async", "cache-backend", "hitbox"]
 
 [dependencies]
-hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
-actix = "0.11"
+hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
+actix = "0.10"
 log = "0.4"
-redis = { version = "0.20", features = ["tokio-comp", "connection-manager"] }
-actix_derive = "0.6"
-actix-rt = "2"
+redis = { version = "0.17", features = ["tokio-rt-core", "connection-manager"] }
+actix_derive = "0.5"
 thiserror = "1"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["time"] }
+actix-rt = { version = "1.1" }
+tokio = { version = "0.2", features = ["time"] }

@@ -3,7 +3,7 @@ use hitbox::settings::{CacheSettings, Status};
 use hitbox::states::initial::Initial;
 use hitbox::transition_groups::stale;
 
-#[actix::test]
+#[actix_rt::test]
 async fn test_cache_stale() {
     let settings = CacheSettings {
         cache: Status::Enabled,
@@ -19,7 +19,7 @@ async fn test_cache_stale() {
     assert_eq!(finish.result().unwrap(), "upstream value");
 }
 
-#[actix::test]
+#[actix_rt::test]
 async fn test_upstream_error() {
     let settings = CacheSettings {
         cache: Status::Enabled,
@@ -35,7 +35,7 @@ async fn test_upstream_error() {
     assert_eq!(finish.result().unwrap(), "stale cache");
 }
 
-#[actix::test]
+#[actix_rt::test]
 async fn test_cache_actual() {
     let settings = CacheSettings {
         cache: Status::Enabled,

@@ -28,7 +28,7 @@ impl Handler<Ping> for UpstreamActor {
     fn handle(&mut self, msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
         println!("Handler::Ping");
         Box::pin(async move {
-            actix_rt::time::sleep(core::time::Duration::from_secs(3)).await;
+            tokio::time::delay_for(core::time::Duration::from_secs(3)).await;
             Ok(Pong(msg.id))
         })
     }
@@ -36,7 +36,7 @@ impl Handler<Ping> for UpstreamActor {
 
 use tracing_subscriber::EnvFilter;
 
-#[actix::main]
+#[actix_rt::main]
 async fn main() -> Result<(), CacheError> {
     let filter = EnvFilter::new("hitbox=trace");
     tracing_subscriber::fmt()

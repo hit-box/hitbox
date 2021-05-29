@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use hitbox_backend::{Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 use hitbox_redis::{error::Error, RedisBackend};
-use tokio::time::{sleep, Duration};
+use tokio::time::{delay_for, Duration};
 
 #[actix_rt::test]
 async fn test_rw() -> Result<(), Error> {
@@ -43,7 +43,7 @@ async fn test_set_expired() -> Result<(), Error> {
         .await;
     assert_eq!(res.unwrap().unwrap(), Some(message.value));
 
-    sleep(Duration::from_secs(1)).await;
+    delay_for(Duration::from_secs(1)).await;
 
     let res = addr
         .send(Get {
@@ -74,7 +74,7 @@ async fn test_delete() -> Result<(), Error> {
         .unwrap();
     assert_eq!(res, DeleteStatus::Deleted(1));
 
-    sleep(Duration::from_secs(1)).await;
+    delay_for(Duration::from_secs(1)).await;
 
     let res = addr
         .send(Delete {
@@ -100,7 +100,7 @@ async fn test_lock() -> Result<(), Error> {
     let res = addr.send(message.clone()).await.unwrap().unwrap();
     assert_eq!(res, LockStatus::Locked);
 
-    sleep(Duration::from_secs(1)).await;
+    delay_for(Duration::from_secs(1)).await;
 
     let res = addr.send(message.clone()).await.unwrap().unwrap();
     assert_eq!(res, LockStatus::Acquired);

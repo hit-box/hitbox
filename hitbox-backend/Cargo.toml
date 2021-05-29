@@ -11,5 +11,5 @@ categories = ["caching", "asynchronous"]
 keywords = ["cache", "actix", "async", "cache-backend", "hitbox"]
 
 [dependencies]
-actix = "0.11"
+actix = "0.10"
 thiserror = "1"

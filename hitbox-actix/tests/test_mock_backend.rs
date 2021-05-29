@@ -42,7 +42,7 @@ impl Handler<Ping> for UpstreamActor {
     }
 }
 
-#[actix::test]
+#[actix_rt::test]
 async fn test_mock_backend() {
     let backend = MockBackend::new().start();
     let cache = CacheActor::builder().finish(backend.clone()).start();

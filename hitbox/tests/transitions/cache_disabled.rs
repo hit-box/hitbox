@@ -3,7 +3,7 @@ use hitbox::settings::{CacheSettings, Status};
 use hitbox::states::initial::Initial;
 use hitbox::transition_groups::upstream;
 
-#[actix::test]
+#[actix_rt::test]
 async fn test_cache_disabled_upstream_polled() {
     let settings = CacheSettings {
         cache: Status::Disabled,
@@ -16,7 +16,7 @@ async fn test_cache_disabled_upstream_polled() {
     assert_eq!(finish.result().unwrap(), 42);
 }
 
-#[actix::test]
+#[actix_rt::test]
 async fn test_cache_disabled_upstream_error() {
     let settings = CacheSettings {
         cache: Status::Disabled,
