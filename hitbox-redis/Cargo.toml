@@ -1,6 +1,6 @@
 [package]
 name = "hitbox-redis"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"]
 license = "MIT"
 edition = "2018"
