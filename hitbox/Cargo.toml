@@ -8,12 +8,13 @@ edition = "2018"
 description = "Asynchronous caching framework in Rust."
 readme = "README.md"
 repository = "https://github.com/hit-box/hitbox/"
-keywords = ["logging", "tracing", "metrics", "async"]
+categories = ["caching", "asynchronous"]
+keywords = ["cache", "actix", "async", "cache-backend", "actix-cache"]
 
 [dependencies]
 actix = "0.11"
 hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
-hitbox-derive = { path = "../hitbox-derive", optional = true }
+hitbox-derive = { path = "../hitbox-derive", version = "0.1.0", optional = true }
 serde_json = "1"
 serde_qs = { version = "0.8", optional = true }
 serde = { version = "1", features = ["derive"] }
@@ -24,7 +25,6 @@ lazy_static = { version = "1", optional = true }
 tracing = "0.1"
 
 [dev-dependencies]
-env_logger = "0.8"
 actix_derive = "0.6"
 actix-web = "3"
 
