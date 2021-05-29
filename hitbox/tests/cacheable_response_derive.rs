@@ -16,7 +16,7 @@ fn test_custom_message_into_policy() {
     let policy = message.clone().into_cache_policy();
     match policy {
         CachePolicy::Cacheable(value) => assert_eq!(value, message),
-        CachePolicy::NonCacheable(_) => assert!(false),
+        CachePolicy::NonCacheable(_) => panic!(),
     };
 }
 
@@ -31,6 +31,6 @@ fn test_custom_enum_message_into_policy() {
     let policy = message.clone().into_cache_policy();
     match policy {
         CachePolicy::Cacheable(value) => assert_eq!(value, message),
-        CachePolicy::NonCacheable(_) => assert!(false),
+        CachePolicy::NonCacheable(_) => panic!(),
     };
 }

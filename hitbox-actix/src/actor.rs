@@ -16,7 +16,7 @@ use tracing::{info, debug};
 /// Actix actor implements cache logic.
 ///
 /// This actor implement only `Handler<QueryCache>`.
-/// Where [QueryCache] - Actix message with two fields:
+/// Where [QueryCache](crate::QueryCache) - Actix message with two fields:
 /// * Generic actix message for sending to upstream actor.
 /// * Address of upstream actor
 ///
