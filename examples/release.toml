@@ -1,0 +1,4 @@
+disable-publish = true
+disable-push = true
+disable-tag = true
+pre-release-replacements = []
