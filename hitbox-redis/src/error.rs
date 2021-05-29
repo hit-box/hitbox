@@ -8,7 +8,7 @@ use redis::RedisError;
 ///
 /// Simply, it's just a wrapper for [redis::RedisError].
 ///
-/// [redis::RedisError]: TODO
+/// [redis::RedisError]: redis::RedisError
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Wrapper for all kinds redis-rs errors.
