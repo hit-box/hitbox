@@ -73,7 +73,7 @@ impl Cacheable for Ping {
 }
 ```
 
-[Cacheable]: https://docs.rs/hitbox/trait.Cacheable.html
+[Cacheable]: https://docs.rs/hitbox/latest/hitbox/trait.Cacheable.html
 [CacheableResponse]: https://docs.rs/hitbox/trait.CacheableResponse.html
 [Backend]: https://docs.rs/hitbox/hitbox_backend/trait.Backend.html
 [RedisBackend]: https://docs.rs/hitbox/hitbox_redis/actor/struct.RedisActor.html
