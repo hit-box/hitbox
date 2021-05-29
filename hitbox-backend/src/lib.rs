@@ -16,10 +16,10 @@ use thiserror::Error;
 /// * [Lock]
 /// * [Delete]
 ///
-/// [Get]: ./struct.Get.html
-/// [Set]: ./struct.Set.html
-/// [Delete]: ./struct.Delete.html
-/// [Lock]: ./struct.Lock.html
+/// [Get]: crate::Get
+/// [Set]: crate::Set
+/// [Delete]: crate::Delete
+/// [Lock]: crate::Lock
 pub trait Backend
 where
     Self: Actor + Handler<Set> + Handler<Get> + Handler<Lock> + Handler<Delete>,

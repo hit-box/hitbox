@@ -55,11 +55,11 @@
 //! }
 //! ```
 //!
-//! [Cacheable]: cache/trait.Cacheable.html
-//! [CacheableResponse]: response/trait.CacheableResponse.html
-//! [Backend]: ../hitbox_backend/trait.Backend.html
-//! [RedisBackend]: ../hitbox_redis/actor/struct.RedisActor.html
-//! [hitbox-actix]: ../hitbox_actix/index.html
+//! [Cacheable]: crate::Cacheable
+//! [CacheableResponse]: crate::CacheableResponse
+//! [Backend]: hitbox_backend::Backend
+//! [RedisBackend]: https://docs.rs/hitbox_redis/
+//! [hitbox-actix]: https://docs.rs/hitbox_actix/
 //! [dogpile effect]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 #![warn(missing_docs)]
 

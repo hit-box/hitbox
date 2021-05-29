@@ -1,6 +1,6 @@
 //! Error decplaration and transformation into [BackendError].
 //!
-//! [BackendError]: ../../hitbox_backend/enum.BackendError.html
+//! [BackendError]: hitbox_backend::BackendError
 use hitbox_backend::BackendError;
 use redis::RedisError;
 
