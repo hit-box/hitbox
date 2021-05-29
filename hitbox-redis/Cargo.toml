@@ -3,7 +3,6 @@ name = "hitbox-redis"
 version = "0.1.0"
 authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"]
 license = "MIT"
-license-file = "LICENSE"
 edition = "2018"
 description = "Hitbox redis backend actor."
 readme = "README.md"

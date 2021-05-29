@@ -3,7 +3,6 @@ name = "hitbox-actix"
 version = "0.1.0"
 authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"]
 license = "MIT"
-license-file = "LICENSE"
 edition = "2018"
 description = "Asynchronous caching framework for Actix."
 readme = "README.md"
