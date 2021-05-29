@@ -45,33 +45,6 @@ hitbox_actix = "0.1"
 
 ### Code:
 
-First, you should derive [Cacheable] trait for your struct or enum:
-
-```rust
-use hitbox_actix::prelude::*;
-use serde::{Deserialize, Serialize};
-
-#[derive(Cacheable, Serialize)]
-struct Ping {
-    id: i32,
-}
-```
-Or implement that trait manually:
-
-```rust
-use hitbox::{Cacheable, CacheError};
-
-struct Ping { id: i32 }
-
-impl Cacheable for Ping {
-    fn cache_key(&self) -> Result<String, CacheError> {
-        Ok(format!("{}::{}", self.cache_key_prefix(), self.id))
-    }
-
-    fn cache_key_prefix(&self) -> String { "Ping".to_owned() }
-}
-```
-
 First, you should derive [Cacheable] trait for your actix [Message]:
 
 ```rust
