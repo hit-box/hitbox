@@ -10,8 +10,8 @@ use redis::{aio::ConnectionManager, Client};
 /// This actor provides redis as storage [Backend] for hitbox.
 /// Its use one [MultiplexedConnection] for asynchronous network interaction.
 ///
-/// [MultiplexedConnection]: TODO
-/// [Backend]: /hitbox_backend/trait.Backend.html
+/// [MultiplexedConnection]: redis::aio::MultiplexedConnection
+/// [Backend]: hitbox_backend::Backend
 pub struct RedisBackend {
     connection: ConnectionManager,
 }

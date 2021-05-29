@@ -74,7 +74,7 @@ where
 
     fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
         let backend = self.backend.clone();
-        let cache_key = self.cache_key.clone(); // @TODO: Please, don't recalculate cache key multiple times.
+        let cache_key = self.cache_key.clone();
         Box::pin(async move {
             let cached_value = backend.send(Get { key: cache_key }).await??;
             CacheState::from_bytes(cached_value.as_ref())
@@ -85,7 +85,7 @@ where
         let serialized = cached_value.serialize();
         let ttl = self.cache_ttl;
         let backend = self.backend.clone();
-        let cache_key = self.cache_key.clone(); // @TODO: Please, don't recalculate cache key multiple times.
+        let cache_key = self.cache_key.clone();
         Box::pin(async move {
             let serialized = serialized?;
             let _ = backend

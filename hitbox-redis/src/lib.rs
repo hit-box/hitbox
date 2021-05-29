@@ -4,8 +4,9 @@
 //! This crate uses [redis-rs] as base library for asynchronous interaction with redis nodes.
 //! It use one [MultiplexedConnection] for maximum connection utilisation.
 //!
-/// [MultiplexedConnection]: TODO
-/// [Backend]: /hitbox_backend/trait.Backend.html
+//! [MultiplexedConnection]: redis::aio::MultiplexedConnection
+//! [Backend]: hitbox_backend::Backend
+//! [redis-rs]: redis-rs::aio
 pub mod actor;
 pub mod error;
 
