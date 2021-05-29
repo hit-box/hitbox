@@ -1,8 +1,6 @@
 @startuml
 'https://plantuml.com/sequence-diagram
 
-autonumber
-
 participant GetUsers << (M,#ADD1B2) >>
 participant "QueryCache<GetUsers>" << (M,#ADD1B2) >>
 participant CacheActor
@@ -10,6 +8,8 @@ participant CacheBackend
 participant DatabaseActor
 
 == First request ==
+
+autonumber 1
 
 GetUsers -> "QueryCache<GetUsers>": into_cache()
 activate "QueryCache<GetUsers>"
@@ -34,6 +34,8 @@ deactivate CacheActor
 deactivate "QueryCache<GetUsers>"
 
 == Second request ==
+
+autonumber 1
 
 GetUsers -> "QueryCache<GetUsers>": into_cache()
 activate "QueryCache<GetUsers>"
