@@ -5,7 +5,6 @@ authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"
 edition = "2018"
 description = "hitbox redis backend actor."
 license-file = "LICENSE"
-workspace = ".."
 
 [dependencies]
 hitbox-backend = { path = "../hitbox-backend" }
