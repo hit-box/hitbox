@@ -1,0 +1,50 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+
+participant GetUsers << (M,#ADD1B2) >>
+participant "QueryCache<GetUsers>" << (M,#ADD1B2) >>
+participant CacheActor
+participant CacheBackend
+participant DatabaseActor
+
+== First request ==
+
+GetUsers -> "QueryCache<GetUsers>": into_cache()
+activate "QueryCache<GetUsers>"
+"QueryCache<GetUsers>" --> CacheActor: send()
+activate CacheActor
+CacheActor --> CacheBackend: send()
+activate CacheBackend
+CacheActor <-- CacheBackend:
+deactivate CacheBackend
+note right: No cached data found
+CacheActor --> DatabaseActor: send()
+activate DatabaseActor
+CacheActor <-- DatabaseActor
+deactivate DatabaseActor
+note right: Return data from database
+CacheActor --> CacheBackend: update_cache()
+activate CacheBackend
+CacheActor <-- CacheBackend
+deactivate CacheBackend
+CacheActor -> GetUsers: response
+deactivate CacheActor
+deactivate "QueryCache<GetUsers>"
+
+== Second request ==
+
+GetUsers -> "QueryCache<GetUsers>": into_cache()
+activate "QueryCache<GetUsers>"
+"QueryCache<GetUsers>" --> CacheActor: send()
+activate CacheActor
+CacheActor --> CacheBackend: send()
+activate CacheBackend
+CacheActor <-- CacheBackend:
+deactivate CacheBackend
+note right: Return cached data
+CacheActor -> GetUsers: response
+deactivate CacheActor
+deactivate "QueryCache<GetUsers>"
+@enduml
