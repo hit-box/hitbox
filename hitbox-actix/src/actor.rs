@@ -11,7 +11,7 @@ use hitbox::settings::CacheSettings;
 use hitbox::CacheError;
 use hitbox_backend::Backend;
 use hitbox_redis::RedisBackend;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 /// Actix actor implements cache logic.
 ///

@@ -65,9 +65,9 @@ where
     fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
         let message = self.message.take();
         Box::pin(async move {
-            let message = message.ok_or_else(|| CacheError::CacheKeyGenerationError(
-                "Message already sent to upstream".to_owned(),
-            ))?;
+            let message = message.ok_or_else(|| {
+                CacheError::CacheKeyGenerationError("Message already sent to upstream".to_owned())
+            })?;
             Ok(message.upstream.send(message.message).await?)
         })
     }

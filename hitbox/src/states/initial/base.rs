@@ -4,7 +4,7 @@ use tracing::{instrument, trace, warn};
 
 use crate::response::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
-use crate::settings::{InitialCacheSettings, CacheSettings};
+use crate::settings::{CacheSettings, InitialCacheSettings};
 use crate::states::cache_polled::{
     CacheErrorOccurred, CacheMissed, CachePolled, CachePolledActual, CachePolledStale,
 };
@@ -13,7 +13,6 @@ use crate::states::upstream_polled::{
 };
 use crate::transition_groups::{only_cache, stale, upstream};
 use crate::{CacheError, CacheState};
-
 
 /// Initial state.
 pub struct Initial<A>
@@ -44,7 +43,7 @@ where
     pub fn new(settings: CacheSettings, adapter: A) -> Self {
         Self {
             settings: InitialCacheSettings::from(settings),
-            adapter
+            adapter,
         }
     }
 
@@ -119,12 +118,8 @@ where
         T: CacheableResponse + fmt::Debug,
     {
         match self.settings {
-            InitialCacheSettings::Disabled => {
-                upstream::transition(self).await.result()
-            }
-            InitialCacheSettings::Enabled => {
-                only_cache::transition(self).await.result()
-            }
+            InitialCacheSettings::Disabled => upstream::transition(self).await.result(),
+            InitialCacheSettings::Enabled => only_cache::transition(self).await.result(),
             InitialCacheSettings::Stale => stale::transition(self).await.result(),
             InitialCacheSettings::Lock => unimplemented!(),
             InitialCacheSettings::StaleLock => unimplemented!(),

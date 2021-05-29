@@ -1,4 +1,4 @@
-//! Actix Handler<QueryCache> implementation. 
+//! Actix Handler<QueryCache> implementation.
 
 use crate::{ActixAdapter, CacheActor, QueryCache};
 use actix::{
@@ -30,9 +30,7 @@ where
         let settings = self.settings.clone();
         Box::pin(async move {
             let initial_state = Initial::new(settings, adapter_result?);
-            initial_state
-                .transitions()
-                .await
+            initial_state.transitions().await
         })
     }
 }

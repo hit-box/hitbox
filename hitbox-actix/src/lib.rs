@@ -3,10 +3,10 @@
 //!
 //! [![Build status](https://github.com/hit-box/hitbox/actions/workflows/CI.yml/badge.svg)](https://github.com/hit-box/hitbox/actions?query=workflow)
 //! [![Coverage Status](https://codecov.io/gh/hit-box/hitbox/branch/master/graph/badge.svg?token=tgAm8OBLkY)](https://codecov.io/gh/hit-box/hitbox)
-//! 
+//!
 //! Hitbox-Actix is an asynchronous caching framework for [Actix] actor framework.
 //! It's designed for distributed and for single-machine applications.
-//! 
+//!
 //! ## Features
 //! - [x] Automatic cache key generation.
 //! - [x] Multiple cache backend implementations.
@@ -47,38 +47,38 @@
 //!
 //! First, you should derive [Cacheable] trait for your actix [Message]:
 //!
-//! ```rust
+//! ```rust,ignore
 //! use actix::prelude::*;
 //! use actix_derive::{Message, MessageResponse};
 //! use hitbox_actix::prelude::*;
 //! use serde::{Deserialize, Serialize};
-//! 
+//!
 //! #[derive(Message, Cacheable, Serialize)]
 //! #[rtype(result = "Result<Pong, Error>")]
 //! struct Ping {
 //!     id: i32,
 //! }
-//! 
+//!
 //! #[derive(MessageResponse, Deserialize, Serialize, Debug)]
 //! struct Pong(i32);
-//! 
+//!
 //! #[derive(Debug)]
 //! struct Error;
 //! ```
-//! 
+//!
 //! Next step is declare Upstream actor and implement actix Handler for Ping:
-//! 
-//! ```rust
+//!
+//! ```rust,ignore
 //! #[derive(Debug)]
 //! struct UpstreamActor;
-//! 
+//!
 //! impl Actor for UpstreamActor {
 //!     type Context = Context<Self>;
 //! }
-//! 
+//!
 //! impl Handler<Ping> for UpstreamActor {
 //!     type Result = ResponseFuture<<Ping as Message>::Result>;
-//! 
+//!
 //!     fn handle(&mut self, msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
 //!         println!("Handler::Ping");
 //!         Box::pin(async move {
@@ -89,10 +89,10 @@
 //! }
 //! ```
 //! The last step is initialize and start CacheActor and UpstreamActor:
-//! 
-//! ```rust
+//!
+//! ```rust,ignore
 //! use tracing_subscriber::EnvFilter;
-//! 
+//!
 //! #[actix_rt::main]
 //! async fn main() -> Result<(), CacheError> {
 //!     let filter = EnvFilter::new("hitbox=trace");
@@ -100,17 +100,17 @@
 //!         .with_max_level(tracing::Level::TRACE)
 //!         .with_env_filter(filter)
 //!         .init();
-//! 
+//!
 //!     let backend = RedisBackend::new()
 //!         .await?
 //!         .start();
-//! 
+//!
 //!     let cache = Cache::builder()
 //!         .with_stale()
 //!         .finish(backend)
 //!         .start();
 //!     let upstream = UpstreamActor.start();
-//! 
+//!
 //!     /// And send `Ping` message into cache actor
 //!     let msg = Ping { id: 42 };
 //!     let res = cache.send(msg.into_cache(&upstream)).await??;
@@ -118,7 +118,7 @@
 //!     Ok(())
 //! }
 //! ```
-//! 
+//!
 //! [Cacheable]: hitbox::Cacheable
 //! [CacheableResponse]: hitbox::CacheableResponse
 //! [Backend]: hitbox_backend::Backend
@@ -126,7 +126,7 @@
 //! [dogpile effect]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 //! [Message]: actix::Message
 //! [Actix]: https://github.com/actix/actix/
-  
+
 pub mod actor;
 pub mod builder;
 pub mod handlers;

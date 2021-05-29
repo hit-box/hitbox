@@ -41,7 +41,7 @@ where
     /// Send data to upstream and return [`Self::UpstreamResult`]
     fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult>;
 
-    /// Check cache and return current [state](`crate::CacheState`) of cached data. 
+    /// Check cache and return current [state](`crate::CacheState`) of cached data.
     fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>>;
 
     /// Write or update [`Self::UpstreamResult`] into cache.

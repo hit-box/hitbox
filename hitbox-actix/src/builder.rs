@@ -112,6 +112,9 @@ where
     /// [Messages]: https://docs.rs/actix/latest/actix/prelude/trait.Message.html
     /// [Handler]: https://docs.rs/actix/latest/actix/prelude/trait.Handler.html
     pub fn finish(self, backend: Addr<B>) -> CacheActor<B> {
-        CacheActor { settings: self.settings, backend }
+        CacheActor {
+            settings: self.settings,
+            backend,
+        }
     }
 }

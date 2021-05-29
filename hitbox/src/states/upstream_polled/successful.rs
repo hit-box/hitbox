@@ -3,14 +3,14 @@ use std::fmt::Debug;
 
 use tracing::{instrument, trace, warn};
 
-use crate::CachedValue;
-use crate::response::{CacheableResponse, CachePolicy};
+use crate::response::{CachePolicy, CacheableResponse};
 use crate::runtime::RuntimeAdapter;
 use crate::states::cache_policy::{
     CachePolicyCacheable, CachePolicyChecked, CachePolicyNonCacheable,
 };
 use crate::states::cache_updated::CacheUpdated;
 use crate::states::finish::Finish;
+use crate::CachedValue;
 
 /// Upstream returns value.
 pub struct UpstreamPolledSuccessful<A, T>
