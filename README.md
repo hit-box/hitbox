@@ -70,9 +70,9 @@ impl Cacheable for Ping {
 }
 ```
 
-[Cacheable]: https://docs.rs/hitbox/trait.Cacheable.html
-[CacheableResponse]: https://docs.rs/hitbox/trait.CacheableResponse.html
-[Backend]: https://docs.rs/hitbox/hitbox_backend/trait.Backend.html
-[RedisBackend]: https://docs.rs/hitbox/hitbox_redis/actor/struct.RedisActor.html
-[hitbox-actix]: https://docs.rs/hitbox/hitbox_actix/index.html
+[Cacheable]: https://docs.rs/hitbox/latest/hitbox/cache/trait.Cacheable.html
+[CacheableResponse]: https://docs.rs/hitbox/latest/hitbox/response/trait.CacheableResponse.html
+[Backend]: https://docs.rs/hitbox/latest/hitbox/dev/trait.Backend.html
+[RedisBackend]: https://docs.rs/hitbox-redis/latest/hitbox_redis/
+[hitbox-actix]: https://docs.rs/hitbox-actix/latest/hitbox_actix/
 [dogpile effect]: https://www.sobstel.org/blog/preventing-dogpile-effect/
