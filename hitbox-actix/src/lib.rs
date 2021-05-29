@@ -102,8 +102,8 @@
 //!         .init();
 //! 
 //!     let backend = RedisBackend::new()
-//!     	.await?
-//!     	.start();
+//!         .await?
+//!         .start();
 //! 
 //!     let cache = Cache::builder()
 //!         .with_stale()
