@@ -2,7 +2,7 @@
 //! hitbox [Backend] implementation for Redis.
 //!
 //! This crate uses [redis-rs] as base library for asynchronous interaction with redis nodes.
-//! It use one [MultiplexedConnection] for maximum connection utilisation.
+//! It use one [MultiplexedConnection] for better connection utilisation.
 //!
 //! [MultiplexedConnection]: redis::aio::MultiplexedConnection
 //! [Backend]: hitbox_backend::Backend
