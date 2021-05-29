@@ -8,7 +8,7 @@ description = "Derive macros for asynchronous caching framework in Rust."
 readme = "README.md"
 repository = "https://github.com/hit-box/hitbox/"
 categories = ["caching", "asynchronous"]
-keywords = ["cache", "actix", "async", "cache-backend", "actix-cache", "hitbox"]
+keywords = ["cache", "actix", "async", "cache-backend", "hitbox"]
 
 [dependencies]
 syn = { version = "1", features = ["derive"] }
