@@ -24,6 +24,6 @@ async fn main() -> Result<(), CacheError> {
 }
 ```
 
-[MultiplexedConnection]: redis::aio::MultiplexedConnection
-[Backend]: hitbox_backend::Backend
-[redis-rs]: redis-rs::aio
+[MultiplexedConnection]: https://docs.rs/redis/latest/redis/aio/struct.MultiplexedConnection.html
+[Backend]: https://docs.rs/hitbox_backend/trait.Backend.html
+[redis-rs]: https://docs.rs/redis/
