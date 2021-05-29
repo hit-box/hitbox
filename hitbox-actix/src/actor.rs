@@ -46,6 +46,7 @@ where
         ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock> + ToEnvelope<B, Delete>,
 {
     /// Initialize new Cache actor with default [`hitbox_redis::RedisBackend`].
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> Result<CacheActor<RedisBackend>, CacheError> {
         let backend = RedisBackend::new()
             .await
