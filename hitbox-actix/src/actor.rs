@@ -72,6 +72,6 @@ where
 
     fn started(&mut self, _: &mut Self::Context) {
         info!("Cache actor started");
-        // debug!("Cache enabled: {:?}", self.settings);
+        debug!("Cache enabled: {:?}", self.settings);
     }
 }
