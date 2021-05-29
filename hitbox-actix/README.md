@@ -151,5 +151,6 @@ async fn main() -> Result<(), CacheError> {
 [Backend]: https://docs.rs/hitbox_backend/trait.Backend.html
 [RedisBackend]: https://docs.rs/hitbox_redis/struct.RedisActor.html
 [dogpile effect]: https://www.sobstel.org/blog/preventing-dogpile-effect/
+[Message]: https://docs.rs/actix/trait.Message.html
 
 [Actix]: https://github.com/actix/actix/
