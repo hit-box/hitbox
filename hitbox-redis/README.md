@@ -1,6 +1,8 @@
 # hitbox-redis
 
-Hitbox [Backend] implementation for Redis.
+Hitbox is an asynchronous caching framework supporting multiple backends and suitable for distributed and for single-machine applications.
+
+hitbox-redis is Cache [Backend] implementation for Redis.
 
 This crate uses [redis-rs] as base library for asynchronous interaction with redis nodes.
 It uses one [MultiplexedConnection] for better connection utilisation.
