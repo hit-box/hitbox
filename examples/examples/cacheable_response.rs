@@ -36,7 +36,7 @@ impl Handler<Ping> for UpstreamActor {
 
 use tracing_subscriber::EnvFilter;
 
-#[actix_rt::main]
+#[actix::main]
 async fn main() -> Result<(), CacheError> {
     let filter = EnvFilter::new("hitbox=trace");
     tracing_subscriber::fmt()

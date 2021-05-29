@@ -79,7 +79,7 @@ impl Handler<Lock> for DummyBackend {
     }
 }
 
-#[actix_rt::main]
+#[actix::main]
 async fn main() -> Result<(), CacheError> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug)
