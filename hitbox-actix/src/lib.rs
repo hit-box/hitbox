@@ -140,17 +140,17 @@ pub use messages::{IntoCache, QueryCache};
 pub use runtime::ActixAdapter;
 
 #[cfg(feature = "redis")]
-pub use hitbox_redis::RedisBackend;
+pub use hitbox_redis::{RedisSingle, RedisSingleBackend};
 
 /// Default type alias with RedisBackend.
 /// You can disable it or define it manually in your code.
 #[cfg(feature = "redis")]
-pub type Cache = CacheActor<RedisBackend>;
+pub type Cache = CacheActor<RedisSingle>;
 
 /// Prelude for hitbox_actix.
 pub mod prelude {
     #[cfg(feature = "redis")]
-    pub use crate::{Cache, RedisBackend};
+    pub use crate::{Cache, RedisSingle, RedisSingleBackend};
     pub use crate::{CacheActor, CacheBuilder, CacheError, Cacheable, IntoCache, QueryCache};
     pub use hitbox::hitbox_serializer;
 }

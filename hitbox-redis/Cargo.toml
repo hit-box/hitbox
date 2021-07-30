@@ -14,10 +14,17 @@ keywords = ["cache", "actix", "async", "cache-backend", "hitbox"]
 hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
 actix = "0.12"
 log = "0.4"
-redis = { version = "0.21", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "0.21", features = ["tokio-comp", "connection-manager"], optional = true }
 actix_derive = "0.6"
 actix-rt = "2"
 thiserror = "1"
+redis_cluster_async = { git = "https://github.com/topenkoff/redis-cluster-async", branch = "feature/readonly", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["time"] }
+
+[features]
+default = [ "single" ]
+
+single = [ "redis" ]
+cluster = [ "redis", "redis_cluster_async" ]

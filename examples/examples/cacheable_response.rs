@@ -44,7 +44,7 @@ async fn main() -> Result<(), CacheError> {
         .with_env_filter(filter)
         .init();
 
-    let backend = RedisBackend::new().await.unwrap().start();
+    let backend = RedisSingleBackend::new().await.unwrap().finish().start();
 
     let cache = Cache::builder()
         .with_stale()
