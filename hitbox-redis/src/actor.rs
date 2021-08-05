@@ -10,6 +10,57 @@ use redis::{aio::ConnectionManager, Client};
 use redis_cluster_async::{Client as ClusterClient, Connection as ClusterConnection};
 use std::marker::Unpin;
 
+/// United builder for [RedisSingleBackend] and [RedisClusterBackend]
+///
+/// [RedisSingleBackend]: RedisSingleBackend
+/// [RedisClusterBackend]: RedisClusterBackend
+pub struct RedisBuilder;
+
+impl RedisBuilder {
+    /// Create new backend for redis single instance
+    ///
+    /// # Examples
+    /// ```
+    /// use hitbox_redis::RedisBuilder;
+    ///
+    /// #[actix_rt::main]
+    /// async fn main() {
+    ///     let backend = RedisBuilder::single_new().await;
+    /// }
+    /// ```
+    #[cfg(feature = "single")]
+    pub async fn single_new() -> Result<RedisSingleBackend, Error> {
+        RedisSingleBackend::new().await
+    }
+
+    /// Create builder for redis single instance
+    #[cfg(feature = "single")]
+    pub fn single_builder() -> RedisSingleBuilder {
+        RedisSingleBackend::builder()
+    }
+    /// Create new backend for redis cluster instance
+    ///
+    /// # Examples
+    /// ```
+    /// use hitbox_redis::RedisBuilder;
+    ///
+    /// #[actix_rt::main]
+    /// async fn main() {
+    ///     let backend = RedisBuilder::cluster_new().await;
+    /// }
+    /// ```
+
+    #[cfg(feature = "cluster")]
+    pub async fn cluster_new() -> Result<RedisClusterBackend, Error> {
+        RedisClusterBackend::new().await
+    }
+
+    /// Create builder for redis cluster instance
+    #[cfg(feature = "cluster")]
+    pub fn cluster_builder() -> RedisClusterBuilder {
+        RedisClusterBackend::builder()
+    }
+}
 /// Redis cache backend based on redis-rs crate.
 ///
 /// This actor provides redis as storage [Backend] for hitbox.
@@ -60,22 +111,12 @@ pub struct RedisSingleBackend {
 #[cfg(feature = "single")]
 impl RedisSingleBackend {
     /// Create new backend instance for redis single instance with default settings.
-    ///
-    /// # Examples
-    /// ```
-    /// use hitbox_redis::RedisSingleBackend;
-    ///
-    /// #[actix_rt::main]
-    /// async fn main() {
-    ///     let backend = RedisSingleBackend::new().await;
-    /// }
-    /// ```
-    pub async fn new() -> Result<Self, Error> {
+    async fn new() -> Result<Self, Error> {
         Self::builder().build().await
     }
 
     /// Creates new RedisSingleBackend builder with default settings.
-    pub fn builder() -> RedisSingleBuilder {
+    fn builder() -> RedisSingleBuilder {
         RedisSingleBuilder::default()
     }
 
@@ -152,22 +193,12 @@ pub struct RedisClusterBackend {
 #[cfg(feature = "cluster")]
 impl RedisClusterBackend {
     /// Create new backend instance for redis cluster instance with default settings.
-    ///
-    /// # Examples
-    /// ```
-    /// use hitbox_redis::RedisClusterBackend;
-    ///
-    /// #[actix_rt::main]
-    /// async fn main() {
-    ///     let backend = RedisClusterBackend::new().await;
-    /// }
-    /// ```
-    pub async fn new() -> Result<Self, Error> {
+    async fn new() -> Result<Self, Error> {
         Self::builder().build().await
     }
 
     /// Creates new RedisClusterBackend builder with default settings.
-    pub fn builder() -> RedisClusterBuilder {
+    fn builder() -> RedisClusterBuilder {
         RedisClusterBuilder::default()
     }
 

@@ -10,12 +10,12 @@
 pub mod actor;
 pub mod error;
 
-#[doc(inline)]
-pub use crate::actor::RedisBackend;
 #[cfg(feature = "cluster")]
-pub use crate::actor::{RedisClusterBackend, RedisClusterBuilder};
+use crate::actor::RedisClusterBackend;
 #[cfg(feature = "single")]
-pub use crate::actor::{RedisSingleBackend, RedisSingleBuilder};
+use crate::actor::RedisSingleBackend;
+#[doc(inline)]
+pub use crate::actor::{RedisBackend, RedisBuilder};
 
 /// Type alias with RedisBackend with connection to redis single instanse.
 #[cfg(feature = "cluster")]
