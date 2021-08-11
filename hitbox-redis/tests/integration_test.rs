@@ -5,7 +5,9 @@ use tokio::time::{sleep, Duration};
 
 #[actix_rt::test]
 async fn test_rw() -> Result<(), Error> {
-    let addr = RedisBuilder::single_new().await?.finish().start();
+    let addr = RedisBuilder::single("redis://127.0.0.1:6379")
+        .await?
+        .start();
     let message = Set {
         key: "key".to_owned(),
         value: b"value".to_vec(),
@@ -27,7 +29,9 @@ async fn test_rw() -> Result<(), Error> {
 
 #[actix_rt::test]
 async fn test_set_expired() -> Result<(), Error> {
-    let addr = RedisBuilder::single_new().await?.finish().start();
+    let addr = RedisBuilder::single("redis://127.0.0.1:6379")
+        .await?
+        .start();
     let message = Set {
         key: "key_expired".to_owned(),
         value: b"value".to_vec(),
@@ -56,7 +60,9 @@ async fn test_set_expired() -> Result<(), Error> {
 
 #[actix_rt::test]
 async fn test_delete() -> Result<(), Error> {
-    let addr = RedisBuilder::single_new().await?.finish().start();
+    let addr = RedisBuilder::single("redis://127.0.0.1:6379")
+        .await?
+        .start();
     let message = Set {
         key: "another_key".to_owned(),
         value: b"value".to_vec(),
@@ -89,7 +95,9 @@ async fn test_delete() -> Result<(), Error> {
 
 #[actix_rt::test]
 async fn test_lock() -> Result<(), Error> {
-    let addr = RedisBuilder::single_new().await?.finish().start();
+    let addr = RedisBuilder::single("redis://127.0.0.1:6379")
+        .await?
+        .start();
     let message = Lock {
         key: "lock_key".to_owned(),
         ttl: 1,

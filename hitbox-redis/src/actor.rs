@@ -4,6 +4,7 @@ use actix::prelude::*;
 use hitbox_backend::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 use log::{debug, info};
 use redis::aio::ConnectionLike;
+use redis::IntoConnectionInfo;
 #[cfg(feature = "single")]
 use redis::{aio::ConnectionManager, Client};
 #[cfg(feature = "cluster")]
@@ -25,18 +26,14 @@ impl RedisBuilder {
     ///
     /// #[actix_rt::main]
     /// async fn main() {
-    ///     let backend = RedisBuilder::single_new().await;
+    ///     let backend = RedisBuilder::single("redis://127.0.0.1:6379").await;
     /// }
     /// ```
     #[cfg(feature = "single")]
-    pub async fn single_new() -> Result<RedisSingleBackend, Error> {
-        RedisSingleBackend::new().await
-    }
-
-    /// Create builder for redis single instance
-    #[cfg(feature = "single")]
-    pub fn single_builder() -> RedisSingleBuilder {
-        RedisSingleBackend::builder()
+    pub async fn single<T: IntoConnectionInfo>(
+        address: T,
+    ) -> Result<RedisBackend<RedisSingleBackend>, Error> {
+        RedisSingleBackend::build(address).await
     }
     /// Create new backend for redis cluster instance
     ///
@@ -46,19 +43,22 @@ impl RedisBuilder {
     ///
     /// #[actix_rt::main]
     /// async fn main() {
-    ///     let backend = RedisBuilder::cluster_new().await;
+    ///     let nodes = vec![
+    ///         "redis://127.0.0.1:6379",
+    ///         "redis://127.0.0.1:6378",
+    ///         "redis://127.0.0.1:6377",
+    ///     ];
+    ///     let readonly = true;
+    ///     let backend = RedisBuilder::cluster(nodes, readonly).await;
     /// }
     /// ```
-
+    ///
     #[cfg(feature = "cluster")]
-    pub async fn cluster_new() -> Result<RedisClusterBackend, Error> {
-        RedisClusterBackend::new().await
-    }
-
-    /// Create builder for redis cluster instance
-    #[cfg(feature = "cluster")]
-    pub fn cluster_builder() -> RedisClusterBuilder {
-        RedisClusterBackend::builder()
+    pub async fn cluster<T: IntoConnectionInfo + Clone>(
+        addresses: Vec<T>,
+        readonly: bool,
+    ) -> Result<RedisBackend<RedisClusterBackend>, Error> {
+        RedisClusterBackend::build(addresses, readonly).await
     }
 }
 /// Redis cache backend based on redis-rs crate.
@@ -110,19 +110,17 @@ pub struct RedisSingleBackend {
 
 #[cfg(feature = "single")]
 impl RedisSingleBackend {
-    /// Create new backend instance for redis single instance with default settings.
-    async fn new() -> Result<Self, Error> {
-        Self::builder().build().await
-    }
-
-    /// Creates new RedisSingleBackend builder with default settings.
-    fn builder() -> RedisSingleBuilder {
-        RedisSingleBuilder::default()
-    }
-
-    /// Creates new RedisBackend from RedisSingleBackend
-    pub fn finish(self) -> RedisBackend<Self> {
-        RedisBackend { backend: self }
+    ///
+    pub async fn build<T: IntoConnectionInfo>(
+        connection_info: T,
+    ) -> Result<RedisBackend<Self>, Error> {
+        let client = Client::open(connection_info)?;
+        let connection = client.get_tokio_connection_manager().await?;
+        let backend = Self {
+            master: connection.clone(),
+            slave: connection,
+        };
+        Ok(RedisBackend { backend })
     }
 }
 
@@ -139,47 +137,13 @@ impl RedisConnection for RedisSingleBackend {
     }
 }
 
-/// Part of builder pattern implemetation for RedisBackend actor in single instance.
-#[cfg(feature = "single")]
-pub struct RedisSingleBuilder {
-    connection_info: String,
-}
-
-#[cfg(feature = "single")]
-impl Default for RedisSingleBuilder {
-    fn default() -> Self {
-        Self {
-            connection_info: "redis://127.0.0.1:6379".to_owned(),
-        }
-    }
-}
-
-#[cfg(feature = "single")]
-impl RedisSingleBuilder {
-    /// Set connection info (host, port, database, etc.) for RedisBackend actor.
-    pub fn server(mut self, connection_info: String) -> Self {
-        self.connection_info = connection_info;
-        self
-    }
-
-    /// Create new instance of Redis backend with passed settings.
-    pub async fn build(&self) -> Result<RedisSingleBackend, Error> {
-        let client = Client::open(self.connection_info.as_str())?;
-        let connection = client.get_tokio_connection_manager().await?;
-        Ok(RedisSingleBackend {
-            master: connection.clone(),
-            slave: connection,
-        })
-    }
-}
-
 /// Redis cluster backend based on redis_cluster_async crate.
 /// redis_cluster_async based on redis-rs and gives similar functionality
 /// for working with reids.
 ///
 /// This backend create connections to redis cluster instance and
 /// create actor [RedisBackend], which provides redis as storage [Backend] for hitbox.
-/// Its use one [MultiplexedConnection] for asynchronous network interaction.
+/// Its use multiple [MultiplexedConnection] for asynchronous network interaction.
 ///
 /// [MultiplexedConnection]: redis::aio::MultiplexedConnection
 /// [Backend]: hitbox_backend::Backend
@@ -193,18 +157,19 @@ pub struct RedisClusterBackend {
 #[cfg(feature = "cluster")]
 impl RedisClusterBackend {
     /// Create new backend instance for redis cluster instance with default settings.
-    async fn new() -> Result<Self, Error> {
-        Self::builder().build().await
-    }
-
-    /// Creates new RedisClusterBackend builder with default settings.
-    fn builder() -> RedisClusterBuilder {
-        RedisClusterBuilder::default()
-    }
-
-    /// Creates new RedisBackend actor from RedisClusterBackend
-    pub fn finish(self) -> RedisBackend<Self> {
-        RedisBackend { backend: self }
+    pub async fn build<T: IntoConnectionInfo + Clone>(
+        addresses: Vec<T>,
+        readonly: bool,
+    ) -> Result<RedisBackend<Self>, Error> {
+        let master_client = ClusterClient::open(addresses.clone())?;
+        let slave_client = ClusterClient::open(addresses)?.readonly(readonly);
+        let master_connection = master_client.get_connection().await?;
+        let slave_connection = slave_client.get_connection().await?;
+        let backend = Self {
+            master: master_connection,
+            slave: slave_connection,
+        };
+        Ok(RedisBackend { backend })
     }
 }
 
@@ -218,57 +183,6 @@ impl RedisConnection for RedisClusterBackend {
 
     fn get_slave_connection(&self) -> Self::Connection {
         self.slave.clone()
-    }
-}
-
-/// Part of builder pattern implemetation for RedisBackend actor in cluster instance.
-#[cfg(feature = "cluster")]
-pub struct RedisClusterBuilder {
-    readonly: bool,
-    connection_info: Vec<String>,
-}
-
-#[cfg(feature = "cluster")]
-impl Default for RedisClusterBuilder {
-    fn default() -> Self {
-        Self {
-            readonly: false,
-            connection_info: vec![
-                "redis://127.0.0.1:6379".to_string(),
-                "redis://127.0.0.1:6378".to_string(),
-                "redis://127.0.0.1:6377".to_string(),
-            ],
-        }
-    }
-}
-
-#[cfg(feature = "cluster")]
-impl RedisClusterBuilder {
-    /// Set connection info (host, port, database, etc.) for RedisBackend actor.
-    pub fn server(mut self, connection_info: Vec<String>) -> Self {
-        self.connection_info = connection_info;
-        self
-    }
-
-    /// Set flag `readonly` which tells redis client where to get the data - from master or from
-    /// slave.
-    pub fn readonly(mut self, readonly: bool) -> Self {
-        self.readonly = readonly;
-        self
-    }
-
-    /// Create new instance of Redis backend with passed settings.
-    pub async fn build(&self) -> Result<RedisClusterBackend, Error> {
-        let master_client = ClusterClient::open(self.connection_info.clone())?;
-        let slave_client = ClusterClient::open(self.connection_info.clone())
-            .unwrap()
-            .readonly(self.readonly);
-        let master_connection = master_client.get_connection().await?;
-        let slave_connection = slave_client.get_connection().await?;
-        Ok(RedisClusterBackend {
-            master: master_connection,
-            slave: slave_connection,
-        })
     }
 }
 

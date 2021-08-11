@@ -44,7 +44,10 @@ async fn main() -> Result<(), CacheError> {
         .with_env_filter(filter)
         .init();
 
-    let backend = RedisBuilder::single_new().await.unwrap().finish().start();
+    let backend = RedisBuilder::single("redis://127.0.0.1:6379")
+        .await
+        .unwrap()
+        .start();
 
     let cache = Cache::builder()
         .with_stale()

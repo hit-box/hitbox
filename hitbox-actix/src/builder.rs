@@ -14,9 +14,8 @@ use std::marker::PhantomData;
 ///
 /// #[actix::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let backend = RedisBuilder::single_new()
+///     let backend = RedisBuilder::single("redis://127.0.0.1:6379")
 ///         .await?
-///         .finish()
 ///         .start();
 ///     let cache = Cache::builder()
 ///         .enable()

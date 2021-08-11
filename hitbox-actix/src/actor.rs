@@ -48,10 +48,9 @@ where
     /// Initialize new Cache actor with default [`hitbox_redis::RedisBackend`].
     #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> Result<CacheActor<RedisSingle>, CacheError> {
-        let backend = RedisBuilder::single_new()
+        let backend = RedisBuilder::single("redis://127.0.0.1:6379")
             .await
             .map_err(|err| CacheError::BackendError(err.into()))?
-            .finish()
             .start();
         Ok(CacheBuilder::default().finish(backend))
     }
