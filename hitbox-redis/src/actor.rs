@@ -3,8 +3,7 @@ use crate::error::Error;
 use actix::prelude::*;
 use hitbox_backend::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 use log::{debug, info};
-use redis::aio::ConnectionLike;
-use redis::IntoConnectionInfo;
+use redis::{aio::ConnectionLike, IntoConnectionInfo};
 #[cfg(feature = "single")]
 use redis::{aio::ConnectionManager, Client};
 #[cfg(feature = "cluster")]
@@ -110,11 +109,9 @@ pub struct RedisSingleBackend {
 
 #[cfg(feature = "single")]
 impl RedisSingleBackend {
-    ///
-    pub async fn build<T: IntoConnectionInfo>(
-        connection_info: T,
-    ) -> Result<RedisBackend<Self>, Error> {
-        let client = Client::open(connection_info)?;
+    /// Create new backend instance for redis single instance.
+    async fn build<T: IntoConnectionInfo>(address: T) -> Result<RedisBackend<Self>, Error> {
+        let client = Client::open(address)?;
         let connection = client.get_tokio_connection_manager().await?;
         let backend = Self {
             master: connection.clone(),
@@ -156,8 +153,8 @@ pub struct RedisClusterBackend {
 
 #[cfg(feature = "cluster")]
 impl RedisClusterBackend {
-    /// Create new backend instance for redis cluster instance with default settings.
-    pub async fn build<T: IntoConnectionInfo + Clone>(
+    /// Create new backend instance for redis cluster instance.
+    async fn build<T: IntoConnectionInfo + Clone>(
         addresses: Vec<T>,
         readonly: bool,
     ) -> Result<RedisBackend<Self>, Error> {
