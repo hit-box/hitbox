@@ -24,7 +24,7 @@ redis_cluster_async = { git = "https://github.com/topenkoff/redis-cluster-async"
 tokio = { version = "1", features = ["time"] }
 
 [features]
-default = [ "single" ]
+default = [ "standalone" ]
 
-single = [ "redis" ]
+standalone = [ "redis" ]
 cluster = [ "redis", "redis_cluster_async" ]

@@ -4,20 +4,20 @@ use actix::prelude::*;
 use hitbox_backend::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 use log::{debug, info};
 use redis::{aio::ConnectionLike, IntoConnectionInfo};
-#[cfg(feature = "single")]
+#[cfg(feature = "standalone")]
 use redis::{aio::ConnectionManager, Client};
 #[cfg(feature = "cluster")]
 use redis_cluster_async::{Client as ClusterClient, Connection as ClusterConnection};
 use std::marker::Unpin;
 
-/// United builder for [RedisSingleBackend] and [RedisClusterBackend]
+/// United builder for [RedisStandaloneBackend] and [RedisClusterBackend]
 ///
-/// [RedisSingleBackend]: RedisSingleBackend
+/// [RedisStandaloneBackend]: RedisStandaloneBackend
 /// [RedisClusterBackend]: RedisClusterBackend
 pub struct RedisBuilder;
 
 impl RedisBuilder {
-    /// Create new backend for redis single instance
+    /// Create new backend for redis standalone instance
     ///
     /// # Examples
     /// ```
@@ -25,14 +25,14 @@ impl RedisBuilder {
     ///
     /// #[actix_rt::main]
     /// async fn main() {
-    ///     let backend = RedisBuilder::single("redis://127.0.0.1:6379").await;
+    ///     let backend = RedisBuilder::standalone("redis://127.0.0.1:6379").await;
     /// }
     /// ```
-    #[cfg(feature = "single")]
-    pub async fn single<T: IntoConnectionInfo>(
+    #[cfg(feature = "standalone")]
+    pub async fn standalone<T: IntoConnectionInfo>(
         address: T,
-    ) -> Result<RedisBackend<RedisSingleBackend>, Error> {
-        RedisSingleBackend::build(address).await
+    ) -> Result<RedisBackend<RedisStandaloneBackend>, Error> {
+        RedisStandaloneBackend::build(address).await
     }
     /// Create new backend for redis cluster instance
     ///
@@ -92,24 +92,24 @@ where
     fn get_slave_connection(&self) -> Self::Connection;
 }
 
-/// Redis single backend based redis-rs crate.
+/// Redis standalone backend based redis-rs crate.
 ///
-/// This backend create connections to redis single instance and create actor [RedisBackend],
+/// This backend create connections to redis standalone instance and create actor [RedisBackend],
 /// which provides redis as storage [Backend] for hitbox.
 /// Its use one [MultiplexedConnection] for asynchronous network interaction.
 ///
 /// [MultiplexedConnection]: redis::aio::MultiplexedConnection
 /// [Backend]: hitbox_backend::Backend
 /// [RedisBackend]: RedisBackend
-#[cfg(feature = "single")]
-pub struct RedisSingleBackend {
+#[cfg(feature = "standalone")]
+pub struct RedisStandaloneBackend {
     master: ConnectionManager,
     slave: ConnectionManager,
 }
 
-#[cfg(feature = "single")]
-impl RedisSingleBackend {
-    /// Create new backend instance for redis single instance.
+#[cfg(feature = "standalone")]
+impl RedisStandaloneBackend {
+    /// Create new backend instance for redis standalone instance.
     async fn build<T: IntoConnectionInfo>(address: T) -> Result<RedisBackend<Self>, Error> {
         let client = Client::open(address)?;
         let connection = client.get_tokio_connection_manager().await?;
@@ -121,8 +121,8 @@ impl RedisSingleBackend {
     }
 }
 
-#[cfg(feature = "single")]
-impl RedisConnection for RedisSingleBackend {
+#[cfg(feature = "standalone")]
+impl RedisConnection for RedisStandaloneBackend {
     type Connection = ConnectionManager;
 
     fn get_master_connection(&self) -> Self::Connection {

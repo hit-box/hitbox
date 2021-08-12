@@ -10,7 +10,7 @@ use hitbox::metrics::{
 use hitbox::settings::CacheSettings;
 use hitbox::CacheError;
 use hitbox_backend::Backend;
-use hitbox_redis::{RedisBuilder, RedisSingle};
+use hitbox_redis::{RedisBuilder, RedisStandalone};
 use tracing::{debug, info};
 
 /// Actix actor implements cache logic.
@@ -47,8 +47,8 @@ where
 {
     /// Initialize new Cache actor with default [`hitbox_redis::RedisBackend`].
     #[allow(clippy::new_ret_no_self)]
-    pub async fn new() -> Result<CacheActor<RedisSingle>, CacheError> {
-        let backend = RedisBuilder::single("redis://127.0.0.1:6379")
+    pub async fn new() -> Result<CacheActor<RedisStandalone>, CacheError> {
+        let backend = RedisBuilder::standalone("redis://127.0.0.1:6379")
             .await
             .map_err(|err| CacheError::BackendError(err.into()))?
             .start();

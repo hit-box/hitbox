@@ -12,14 +12,14 @@ pub mod error;
 
 #[cfg(feature = "cluster")]
 use crate::actor::RedisClusterBackend;
-#[cfg(feature = "single")]
-use crate::actor::RedisSingleBackend;
+#[cfg(feature = "standalone")]
+use crate::actor::RedisStandaloneBackend;
 #[doc(inline)]
 pub use crate::actor::{RedisBackend, RedisBuilder};
 
-/// Type alias with RedisBackend with connection to redis single instanse.
+/// Type alias with RedisBackend with connection to redis standalone instanse.
 #[cfg(feature = "cluster")]
 pub type RedisCluster = actor::RedisBackend<RedisClusterBackend>;
 /// Type alias with RedisBackend with connection to redis cluster instanse.
-#[cfg(feature = "single")]
-pub type RedisSingle = actor::RedisBackend<RedisSingleBackend>;
+#[cfg(feature = "standalone")]
+pub type RedisStandalone = actor::RedisBackend<RedisStandaloneBackend>;
