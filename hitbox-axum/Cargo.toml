@@ -1,0 +1,23 @@
+[package]
+name = "hitbox-axum"
+version = "0.1.0"
+authors = ["Belousow Makc <lib.bmw@gmail.com>", "Andrey Ermilov <andrerm@ya.ru>"]
+license = "MIT"
+edition = "2018"
+description = "Asynchronous caching framework for Axum."
+readme = "README.md"
+repository = "https://github.com/hit-box/hitbox/"
+categories = ["caching", "asynchronous"]
+keywords = ["cache", "axum", "tokio", "async", "cache-backend", "hitbox"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hitbox = { path = "../hitbox", version = "0.1.0" }
+tower-layer = "0.3.1"
+tower-service = "0.3.1"
+serde = "1"
+serde_json = "1"
+axum = "0.2"
+sha2 = "0.9"
+futures = "0.3"
