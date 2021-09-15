@@ -55,8 +55,8 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .data(fib.clone())
-            .data(cache.clone())
+            .app_data(fib.clone())
+            .app_data(cache.clone())
             .route("/fibonacci/{num}", web::get().to(index))
     })
     .bind("127.0.0.1:8080")?
