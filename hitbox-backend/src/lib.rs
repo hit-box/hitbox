@@ -1,10 +1,18 @@
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 //! Traits and struct messages for hitbox backend interaction.
 //!
 //! If you want implement your own backend, you in the right place.
 use actix::dev::ToEnvelope;
 use actix::prelude::*;
 use thiserror::Error;
+
+mod value;
+mod serializer;
+mod backend;
+mod response;
+
+pub use value::CachedValue;
+pub use response::{CacheableResponse, CachePolicy};
 
 /// Define the behavior needed of an cache layer to work with cache backend.
 ///
