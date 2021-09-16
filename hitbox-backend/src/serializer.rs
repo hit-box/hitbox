@@ -51,6 +51,7 @@ pub struct JsonSerializer;
 
 impl Serializer for JsonSerializer {
     type Raw = String;
+
     fn deserialize<T, U>(data: Self::Raw) -> Result<CachedValue<T>, ()> 
     where
         U: DeserializeOwned,
@@ -59,6 +60,7 @@ impl Serializer for JsonSerializer {
         let deserialized: SerializableCachedValue<U> = serde_json::from_str(&data).map_err(|_| ())?;
         Ok(CachedValue::from(deserialized))
     }
+
     fn serialize<T, U>(value: CachedValue<T>) -> Result<Option<Self::Raw>, ()>
     where
         T: CacheableResponse<Cached = U>,
