@@ -2,12 +2,16 @@ use crate::service::CacheService;
 use tower_layer::Layer;
 use crate::CacheableRequest;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
+pub struct CacheConfig;
+
+#[derive(Debug, Default)]
 pub struct CacheLayer {
     cache_key_prefix: Option<String>,
     ttl: Option<u32>,
     stale_ttl: Option<u32>,
     cache_version: Option<u32>,
+    cache_config: CacheConfig,
 }
 
 impl CacheLayer {

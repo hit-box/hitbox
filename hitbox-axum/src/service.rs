@@ -4,7 +4,7 @@ use axum::http::{Request, Response};
 use futures::future::BoxFuture;
 use tower_service::Service;
 
-use crate::CacheableRequest;
+use crate::{CacheableRequest, CacheLayer};
 use hitbox::cache::Cacheable;
 
 #[derive(Clone)]
@@ -34,7 +34,6 @@ impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for CacheService<S>
     }
 
     fn call(&mut self, request: Request<ReqBody>) -> Self::Future {
-        // self.service.call(wrapper.into_inner())
         let clone = self.service.clone();
         let mut service = std::mem::replace(&mut self.service, clone);
 
