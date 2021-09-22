@@ -2,17 +2,17 @@ use axum::http::Request;
 use hitbox::cache::Cacheable;
 use hitbox::CacheError;
 
-pub struct Wrapper<T> {
+pub struct CacheableRequest<T> {
     pub request: Request<T>,
 }
 
-impl<T> Wrapper<T> {
+impl<T> CacheableRequest<T> {
     pub fn into_inner(self) -> Request<T> {
         self.request
     }
 }
 
-impl<T> Cacheable for Wrapper<T> {
+impl<T> Cacheable for CacheableRequest<T> {
     fn cache_key(&self) -> Result<String, CacheError> {
         let path = self.request.uri().path();
         let method = self.request.method();
@@ -39,14 +39,14 @@ impl<T> Cacheable for Wrapper<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::Wrapper;
+    use crate::CacheableRequest;
     use axum::http::Request;
     use hitbox::cache::Cacheable;
 
     #[test]
     fn test_cache_key() {
         let request = Request::new(String::from("Hello world"));
-        let wrapper = Wrapper { request };
+        let wrapper = CacheableRequest { request };
         assert_eq!(wrapper.cache_key().unwrap(), String::from("/:GET:"))
     }
 }

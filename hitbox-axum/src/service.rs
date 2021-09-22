@@ -4,7 +4,8 @@ use axum::http::{Request, Response};
 use futures::future::BoxFuture;
 use tower_service::Service;
 
-use crate::Wrapper;
+use crate::CacheableRequest;
+use hitbox::cache::Cacheable;
 
 #[derive(Clone)]
 pub struct CacheService<S> {
@@ -38,7 +39,9 @@ impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for CacheService<S>
         let mut service = std::mem::replace(&mut self.service, clone);
 
         Box::pin(async move {
-            let wrapper = Wrapper { request };
+            let wrapper = CacheableRequest { request };
+            let cache_key = wrapper.cache_key().unwrap_or_default();
+            println!("Cache key: {}", cache_key);
             let res: Response<ResBody> = service.call(wrapper.into_inner()).await?;
             Ok(res)
         })

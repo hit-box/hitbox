@@ -2,5 +2,5 @@ mod cacheable;
 mod layer;
 mod service;
 
-pub use cacheable::Wrapper;
+pub use cacheable::CacheableRequest;
 pub use layer::CacheLayer;

@@ -10,10 +10,8 @@ use hitbox_axum::CacheLayer;
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route(
-        "/:user_id/index.html",
-        get(handler.layer(CacheLayer::new())),
-    );
+    let cache_layer = CacheLayer::new();
+    let app = Router::new().route("/users/:user_id/", get(handler.layer(cache_layer)));
 
     let addr: SocketAddr = ([127, 0, 0, 1], 3000).into();
     axum::Server::bind(&addr)
