@@ -1,12 +1,10 @@
+use crate::config::CacheConfig;
 use crate::service::CacheService;
 use tower_layer::Layer;
 
 #[derive(Debug, Default)]
 pub struct CacheLayer {
-    cache_key_prefix: Option<String>,
-    ttl: Option<u32>,
-    stale_ttl: Option<u32>,
-    cache_version: Option<u32>,
+    cache_config: CacheConfig,
 }
 
 impl CacheLayer {
@@ -19,7 +17,7 @@ impl<S> Layer<S> for CacheLayer {
     type Service = CacheService<S>;
 
     fn layer(&self, service: S) -> Self::Service {
-        CacheService::new(service)
+        CacheService::new(service, self.cache_config.clone())
     }
 }
 
@@ -51,10 +49,12 @@ impl CacheLayerBuilder {
 
     pub fn finish(self) -> CacheLayer {
         CacheLayer {
-            cache_key_prefix: self.key_prefix,
-            ttl: self.ttl,
-            stale_ttl: self.stale_ttl,
-            cache_version: self.version,
+            cache_config: CacheConfig {
+                cache_key_prefix: self.key_prefix,
+                ttl: self.ttl,
+                stale_ttl: self.stale_ttl,
+                cache_version: self.version,
+            },
         }
     }
 }
