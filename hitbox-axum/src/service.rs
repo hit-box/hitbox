@@ -4,7 +4,7 @@ use axum::http::{Request, Response};
 use futures::future::BoxFuture;
 use tower_service::Service;
 
-use crate::{CacheableRequest, CacheLayer};
+use crate::CacheableRequest;
 use hitbox::cache::Cacheable;
 
 #[derive(Clone)]
