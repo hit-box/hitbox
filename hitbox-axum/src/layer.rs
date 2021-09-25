@@ -1,5 +1,4 @@
 use crate::service::CacheService;
-use crate::CacheableRequest;
 use tower_layer::Layer;
 
 #[derive(Debug, Default)]
