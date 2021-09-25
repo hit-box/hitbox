@@ -25,7 +25,7 @@ impl<T> Cacheable for CacheableRequest<T> {
     }
 
     fn cache_key_prefix(&self) -> String {
-        match &self.cache_config.cache_key_prefix {
+        match &self.cache_config.key_prefix {
             Some(x) => format!("{}:", x),
             None => "".to_string(),
         }
@@ -46,7 +46,7 @@ impl<T> Cacheable for CacheableRequest<T> {
     }
 
     fn cache_version(&self) -> u32 {
-        match &self.cache_config.cache_version {
+        match &self.cache_config.version {
             Some(x) => *x,
             None => 0,
         }
