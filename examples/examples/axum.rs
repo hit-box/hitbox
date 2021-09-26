@@ -15,12 +15,13 @@ async fn main() {
         .stale_ttl(30)
         .version(1)
         .key_prefix("ferris")
-        // .by_path()
-        // .by_path_extended(parse)
-        // .by_header("X-Request")
-        // .by_header("X-Location")
-        // .by_query()
-        // .by_body()
+        .by_method()
+        .by_path()
+        .path_parser(| path: String | -> String { path.trim_start_matches("/v1").to_string() })
+        .by_header("X-Request")
+        .by_header("X-Location")
+        .by_query()
+        .by_body()
         .finish();
     let app = Router::new().route("/users/:user_id/", get(handler.layer(cache_layer)));
 

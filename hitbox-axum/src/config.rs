@@ -4,4 +4,10 @@ pub struct CacheConfig {
     pub ttl: Option<u32>,
     pub stale_ttl: Option<u32>,
     pub version: Option<u32>,
+    pub by_method: bool,
+    pub by_path: bool,
+    pub path_parser: Option<fn (String) -> String>,
+    pub by_headers: Vec<String>,
+    pub by_query: bool,
+    pub by_body: bool,
 }
