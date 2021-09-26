@@ -11,10 +11,10 @@ use hitbox_axum::CacheLayer;
 #[tokio::main]
 async fn main() {
     let cache_layer = CacheLayer::build()
-        .with_ttl(30)
-        .with_stale(30)
-        .with_version(1)
-        .with_key_prefix("ferris")
+        .ttl(30)
+        .stale_ttl(30)
+        .version(1)
+        .key_prefix("ferris")
         // .by_path()
         // .by_path_extended(parse)
         // .by_header("X-Request")
