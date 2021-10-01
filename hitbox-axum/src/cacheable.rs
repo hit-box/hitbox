@@ -45,11 +45,6 @@ impl<T> Cacheable for CacheableRequest<T> {
             if let Some(query) = self.request.uri().query() { key_parts.push(query.to_string()) }
         }
 
-        // TODO: как получить body
-        if self.cache_config.by_body {
-            todo!()
-        }
-
         Ok(key_parts.join(":"))
     }
 
@@ -107,7 +102,6 @@ mod tests {
             path_parser: Some(| path: String | -> String { path.trim_start_matches("/v1").to_string() }),
             by_headers: vec![String::from("HEADER_FIRST"), String::from("HEADER_SECOND")],
             by_query: true,
-            by_body: false,  // TODO: make true
         };
         let wrapper = CacheableRequest {
             request,
