@@ -10,11 +10,11 @@ use std::marker::PhantomData;
 /// # Example
 /// ```rust
 /// use actix::prelude::*;
-/// use hitbox_actix::{Cache, RedisBackend, CacheError};
+/// use hitbox_actix::{Cache, RedisBuilder, CacheError};
 ///
 /// #[actix::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let backend = RedisBackend::new()
+///     let backend = RedisBuilder::standalone("redis://127.0.0.1:6379")
 ///         .await?
 ///         .start();
 ///     let cache = Cache::builder()
