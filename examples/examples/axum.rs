@@ -21,7 +21,6 @@ async fn main() {
         .by_header("X-Request")
         .by_header("X-Location")
         .by_query()
-        .by_body()
         .finish();
     let app = Router::new().route("/users/:user_id/", get(handler.layer(cache_layer)));
 

@@ -32,7 +32,6 @@ pub struct CacheLayerBuilder {
     path_parser: Option<fn (String) -> String>,
     by_headers: Vec<String>,
     by_query: bool,
-    by_body: bool,
 }
 
 impl CacheLayerBuilder {
@@ -72,10 +71,6 @@ impl CacheLayerBuilder {
         self.by_query = true;
         self
     }
-    pub fn by_body(mut self) -> CacheLayerBuilder {
-        self.by_body = true;
-        self
-    }
 
     pub fn finish(self) -> CacheLayer {
         CacheLayer {
@@ -89,7 +84,6 @@ impl CacheLayerBuilder {
                 path_parser: self.path_parser,
                 by_headers: self.by_headers,
                 by_query: self.by_query,
-                by_body: self.by_body,
             },
         }
     }

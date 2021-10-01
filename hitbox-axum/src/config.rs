@@ -9,5 +9,4 @@ pub struct CacheConfig {
     pub path_parser: Option<fn (String) -> String>,
     pub by_headers: Vec<String>,
     pub by_query: bool,
-    pub by_body: bool,
 }
