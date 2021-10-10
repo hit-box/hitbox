@@ -3,6 +3,7 @@
 members = [
     "hitbox",
     "hitbox-actix",
+    "hitbox-axum",
     "hitbox-backend",
     "hitbox-derive",
     "hitbox-redis",

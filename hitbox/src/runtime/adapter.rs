@@ -4,7 +4,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 /// Type alias for backend or upstream operations in runtime adapter.
-pub type AdapterResult<T> = Pin<Box<dyn Future<Output = Result<T, CacheError>>>>;
+pub type AdapterResult<T> = Pin<Box<dyn Future<Output = Result<T, CacheError>> + Send>>;
 
 /// TTL eviction settings.
 ///
