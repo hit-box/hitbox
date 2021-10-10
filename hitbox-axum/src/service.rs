@@ -7,6 +7,8 @@ use tower_service::Service;
 use crate::config::CacheConfig;
 use crate::CacheableRequest;
 use hitbox::cache::Cacheable;
+use hitbox::runtime::{RuntimeAdapter, AdapterResult, EvictionPolicy};
+use crate::adapter::AxumRuntimeAdapter;
 
 #[derive(Clone)]
 pub struct CacheService<S> {
@@ -48,10 +50,11 @@ where
                 request,
                 cache_config,
             };
-            let cache_key = wrapper.cache_key().unwrap_or_default();
-            println!("Cache key: {}", cache_key);
-            let res: Response<ResBody> = service.call(wrapper.into_inner()).await?;
-            Ok(res)
+            let mut runtime_adapter = AxumRuntimeAdapter::new(service);
+            // let cache_key = wrapper.cache_key().unwrap_or_default();
+            // println!("Cache key: {}", cache_key);
+            // let res: Response<ResBody> = service.call(wrapper.into_inner()).await?;
+            runtime_adapter.poll_upstream().await
         })
     }
 }
