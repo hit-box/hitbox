@@ -1,22 +1,24 @@
 use axum::http::Response;
-use hitbox::response::CacheableResponse as HitboxCacheableResponse;
+use hitbox::response::CacheableResponse;
 use hitbox::CachePolicy;
+use serde::Serialize;
 
 
-pub struct CacheableResponse<Request>(Response<Request>);
+pub struct AxumCacheableResponse<T: Serialize>(pub Response<T>);
 
-impl<Request> HitboxCacheableResponse for CacheableResponse<Request> {
-    type Cached = ();
+impl<T: Serialize> CacheableResponse for AxumCacheableResponse<T> {
+    type Cached = T;
 
     fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
-        todo!()
+        CachePolicy::Cacheable(self.0.body())
     }
 
     fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
-        todo!()
+        let (parts, body) = self.0.into_parts();
+        CachePolicy::Cacheable(body)
     }
 
     fn from_cached(cached: Self::Cached) -> Self {
-        todo!()
+        AxumCacheableResponse(Response::new(cached))
     }
 }

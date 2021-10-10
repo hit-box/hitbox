@@ -9,6 +9,7 @@ use crate::CacheableRequest;
 use hitbox::cache::Cacheable;
 use hitbox::runtime::{RuntimeAdapter, AdapterResult, EvictionPolicy};
 use crate::adapter::AxumRuntimeAdapter;
+use serde::Serialize;
 
 #[derive(Clone)]
 pub struct CacheService<S> {
@@ -29,8 +30,8 @@ impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for CacheService<S>
 where
     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
-    ReqBody: Send + 'static,
-    ResBody: Send + 'static,
+    ReqBody: Send + Serialize + 'static,
+    ResBody: Send + Serialize + 'static,
 {
     type Response = S::Response;
     type Error = S::Error;
@@ -54,7 +55,8 @@ where
             // let cache_key = wrapper.cache_key().unwrap_or_default();
             // println!("Cache key: {}", cache_key);
             // let res: Response<ResBody> = service.call(wrapper.into_inner()).await?;
-            runtime_adapter.poll_upstream().await
+            let res = runtime_adapter.poll_upstream().await;
+            Ok(res.unwrap().0)
         })
     }
 }
