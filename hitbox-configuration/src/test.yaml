@@ -72,6 +72,7 @@ endpoints:
       status: 200
       if: "cluster.items"
     group: api
+    ttl: 10min
   - path: "/cluster/{cluster_id:i32}/"
     group: api
   - path: "/sitemaps/"

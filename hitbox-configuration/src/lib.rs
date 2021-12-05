@@ -1,41 +1,53 @@
+use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+
 use crate::backend::Backend;
 use crate::cache::Cache;
 use crate::endpoint::Endpoint;
-use crate::group::Group;
 use crate::policy::Policy;
 use crate::server::Server;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 mod backend;
 mod cache;
 mod endpoint;
-mod group;
 mod policy;
 mod server;
+mod headers;
+mod query;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {
+    /// Hitbox Server network settings.
     server: Server,
+    /// All served applications with their names.
     upstreams: HashMap<String, Server>,
+    /// All used stores.
     backends: HashMap<String, Backend>,
+    /// Predefined combinations of cache policies.
     policies: HashMap<String, Policy>,
+    /// Common cache settings for the entire Application.
     cache: Cache,
-    groups: HashMap<String, Group>,
+    /// Predefined sets of backend, upstream & policy.
+    groups: HashMap<String, Cache>,
+    /// All used endpoint.
     endpoints: Vec<Endpoint>,
 }
 
 #[cfg(test)]
 mod test {
     extern crate spectral;
-    use crate::policy::{CacheStatus, Conf, InnerState, LockStatus, StaleStatus};
-    use crate::server::Protocol;
-    use crate::*;
+
     use std::env;
     use std::fs::File;
     use std::io::Read;
     use std::path::Path;
+
     use spectral::prelude::*;
+
+    use crate::*;
+    use crate::policy::{CacheStatus, Conf, InnerState, LockStatus, StaleStatus};
+    use crate::server::Protocol;
 
     fn read_test_yaml() -> Configuration {
         let path = Path::new("src/test.yaml");

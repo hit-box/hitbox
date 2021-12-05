@@ -1,5 +1,6 @@
-use crate::server::Server;
 use serde::{Deserialize, Serialize};
+
+use crate::server::Server;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Backend {

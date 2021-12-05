@@ -1,13 +1,16 @@
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
+
 use crate::backend::Backend;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cache {
-    #[serde(with = "humantime_serde")]
-    pub ttl: Option<Duration>,
-    pub prefix: Option<String>,
-    pub version: Option<String>,
-    pub backend: Option<String>,
-    pub policy: Option<String>,
+    ttl: Option<String>,
+    stale_ttl: Option<String>,
+    prefix: Option<String>,
+    version: Option<String>,
+    backend: Option<String>,
+    policy: Option<String>,
+    upstream: Option<String>,
 }
