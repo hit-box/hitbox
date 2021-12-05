@@ -1,8 +1,4 @@
-use std::time::Duration;
-
 use serde::{Deserialize, Serialize};
-
-use crate::backend::Backend;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cache {

@@ -11,10 +11,10 @@ use crate::server::Server;
 mod backend;
 mod cache;
 mod endpoint;
-mod policy;
-mod server;
 mod headers;
+mod policy;
 mod query;
+mod server;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {
@@ -43,11 +43,7 @@ mod test {
     use std::io::Read;
     use std::path::Path;
 
-    use spectral::prelude::*;
-
     use crate::*;
-    use crate::policy::{CacheStatus, Conf, InnerState, LockStatus, StaleStatus};
-    use crate::server::Protocol;
 
     fn read_test_yaml() -> Configuration {
         let path = Path::new("src/test.yaml");
@@ -56,7 +52,8 @@ mod test {
         let mut test_yaml = File::open(&path).unwrap();
         let mut s = String::new();
         test_yaml.read_to_string(&mut s);
-        serde_yaml::from_str(s.as_str()).unwrap()
+        let res = serde_yaml::from_str(s.as_str());
+        res.unwrap()
     }
 
     #[test]
