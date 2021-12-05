@@ -1,0 +1,79 @@
+---
+# hitbox server base settings
+server:
+  host: 127.0.0.1
+  port: 8080
+  proto: Http
+
+# map of applications
+upstreams:
+  api:
+    host: 127.0.0.1
+    port: 8080
+    proto: Http
+
+# map of backends
+backends:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    database: 0
+  inmemory:
+    max_size: 1Gb
+
+# map of cache policies
+policies:
+  cache_with_lock:
+    cache: Enabled
+    lock: Local
+    stale: Disabled
+  non_cacheable:
+    cache: Disabled
+
+# default settings
+cache:
+  ttl: 1min
+  prefix: api
+  version: 1
+  backend: redis
+  policies: cache_with_lock
+
+# map of groups
+groups:
+  api:
+    upstream: api
+  sitemaps:
+    upstream: api
+    backend: inmemory
+  exclude:
+    upstream: api
+    policy: non_cacheable
+
+# list of all endpoint
+endpoints:
+  - path: "/clusters/{cluster_id:i32}/comments/"
+    request:
+      query:
+        page:
+          type: i32
+        sort_by:
+          type: enum
+          variants:
+            - date
+            - clicks
+      headers:
+        x-source:
+          type: enum
+          variants:
+            - ios
+    response:
+      headers:
+        content-type: application/json
+      status: 200
+      if: "cluster.items"
+    group: api
+  - path: "/cluster/{cluster_id:i32}/"
+    group: api
+  - path: "/sitemaps/"
+    group: sitemaps
+...
