@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.8"
+humantime-serde = "1"
+
+[dev-dependencies]
+spectral = "0.6.0"

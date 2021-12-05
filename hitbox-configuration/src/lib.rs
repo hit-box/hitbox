@@ -27,6 +27,7 @@ pub struct Configuration {
 
 #[cfg(test)]
 mod test {
+    extern crate spectral;
     use crate::policy::{CacheStatus, Conf, InnerState, LockStatus, StaleStatus};
     use crate::server::Protocol;
     use crate::*;
@@ -34,6 +35,7 @@ mod test {
     use std::fs::File;
     use std::io::Read;
     use std::path::Path;
+    use spectral::prelude::*;
 
     fn read_test_yaml() -> Configuration {
         let path = Path::new("src/test.yaml");
@@ -42,24 +44,12 @@ mod test {
         let mut test_yaml = File::open(&path).unwrap();
         let mut s = String::new();
         test_yaml.read_to_string(&mut s);
-        let res: Result<Configuration, _> = serde_yaml::from_str(s.as_str());
-        res.unwrap()
+        serde_yaml::from_str(s.as_str()).unwrap()
     }
 
     #[test]
     fn test_base() {
         let configuration = read_test_yaml();
         dbg!(configuration);
-        // let policy = Policy {
-        //     cache: CacheStatus::Enabled(InnerState
-        //     {
-        //         lock: LockStatus::Local,
-        //         stale: StaleStatus::Enabled }
-        //     )
-        // };
-        // let mut conf = Conf { policies: HashMap::new() };
-        // conf.policies.insert(String::from("main"), policy);
-        // let res = serde_yaml::to_string(&conf).unwrap();
-        // println!("{}", res);
     }
 }
