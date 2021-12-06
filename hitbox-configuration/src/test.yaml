@@ -14,11 +14,11 @@ upstreams:
 
 # map of backends
 backends:
-  redis:
+  - type: Redis
     host: 127.0.0.1
     port: 6379
     database: 0
-  inmemory:
+  - type: InMemory
     max_size: 1Gb
 
 # map of cache policies

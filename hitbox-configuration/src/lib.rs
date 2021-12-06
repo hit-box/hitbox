@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::backend::Backend;
+use crate::backend::Backends;
 use crate::cache::Cache;
 use crate::endpoint::Endpoint;
 use crate::policy::Policy;
@@ -23,7 +23,7 @@ pub struct Configuration {
     /// All served applications with their names.
     upstreams: HashMap<String, Server>,
     /// All used stores.
-    backends: HashMap<String, Backend>,
+    backends: Vec<Backends>,
     /// Predefined combinations of cache policies.
     policies: HashMap<String, Policy>,
     /// Common cache settings for the entire Application.
