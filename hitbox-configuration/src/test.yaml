@@ -36,7 +36,8 @@ cache:
   prefix: api
   version: 1
   backend: redis
-  policies: cache_with_lock
+  policy: cache_with_lock
+  upstream: api
 
 # map of groups
 groups:

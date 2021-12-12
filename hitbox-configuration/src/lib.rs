@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::backend::Backends;
-use crate::cache::Cache;
+use crate::cache::{Cache, OverriddenCache};
 use crate::endpoint::Endpoint;
 use crate::policy::Policy;
 use crate::server::Server;
@@ -15,6 +15,10 @@ mod headers;
 mod policy;
 mod query;
 mod server;
+mod request;
+mod response;
+mod status_code;
+mod body;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {
@@ -29,7 +33,7 @@ pub struct Configuration {
     /// Common cache settings for the entire Application.
     cache: Cache,
     /// Predefined sets of backend, upstream & policy.
-    groups: HashMap<String, Cache>,
+    groups: HashMap<String, OverriddenCache>,
     /// All used endpoint.
     endpoints: Vec<Endpoint>,
 }
@@ -51,7 +55,7 @@ mod test {
         path_to_file.push(path);
         let mut test_yaml = File::open(&path).unwrap();
         let mut s = String::new();
-        test_yaml.read_to_string(&mut s);
+        let _ = test_yaml.read_to_string(&mut s);
         let res = serde_yaml::from_str(s.as_str());
         res.unwrap()
     }

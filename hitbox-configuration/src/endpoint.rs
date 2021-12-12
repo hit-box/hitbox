@@ -1,17 +1,14 @@
-use crate::cache::Cache;
 use serde::{Deserialize, Serialize};
+
+use crate::cache::OverriddenCache;
+use crate::request::Request;
+use crate::response::Response;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Endpoint {
     #[serde(flatten)]
-    cache: Cache,
+    cache: OverriddenCache,
     path: String,
     request: Option<Request>,
     response: Option<Response>,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Response {}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Request {}
