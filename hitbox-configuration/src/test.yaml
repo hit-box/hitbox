@@ -56,9 +56,9 @@ endpoints:
     request:
       query:
         page:
-          type: i32
+          type: Integer
         sort_by:
-          type: enum
+          type: Enum
           variants:
             - date
             - clicks

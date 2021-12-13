@@ -9,16 +9,16 @@ use crate::policy::Policy;
 use crate::server::Server;
 
 mod backend;
+mod body;
 mod cache;
 mod endpoint;
 mod headers;
 mod policy;
 mod query;
-mod server;
 mod request;
 mod response;
+mod server;
 mod status_code;
-mod body;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {

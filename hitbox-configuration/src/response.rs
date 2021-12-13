@@ -10,4 +10,3 @@ pub struct Response {
     headers: Option<Headers>,
     body: Option<Body>,
 }
-

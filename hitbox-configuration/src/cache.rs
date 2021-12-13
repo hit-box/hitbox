@@ -21,4 +21,3 @@ pub struct OverriddenCache {
     policy: Option<String>,
     upstream: Option<String>,
 }
-
