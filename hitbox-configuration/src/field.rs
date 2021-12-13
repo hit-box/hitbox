@@ -2,14 +2,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", content = "variants")]
-pub enum QueryType {
-    Integer,
+pub enum FieldType {
     String,
     Enum(Vec<String>),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Query {
+pub struct Field {
     #[serde(flatten)]
-    query_type: QueryType,
+    field_type: FieldType,
 }

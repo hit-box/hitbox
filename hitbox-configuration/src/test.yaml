@@ -56,7 +56,7 @@ endpoints:
     request:
       query:
         page:
-          type: Integer
+          type: String
         sort_by:
           type: Enum
           variants:
@@ -64,12 +64,15 @@ endpoints:
             - clicks
       headers:
         x-source:
-          type: enum
+          type: Enum
           variants:
             - ios
     response:
       headers:
-        content-type: application/json
+        content-type:
+          type: Enum
+          variants:
+            - application/json
       status: 200
       if: "cluster.items"
     group: api
