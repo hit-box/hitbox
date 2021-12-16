@@ -4,36 +4,36 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "cache")]
-pub enum CacheStatus {
+pub(crate) enum CacheStatus {
     Enabled(InnerState),
     Disabled,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct InnerState {
+pub(crate) struct InnerState {
     pub lock: LockStatus,
     pub stale: StaleStatus,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum LockStatus {
+pub(crate) enum LockStatus {
     Local,
     Distributed,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum StaleStatus {
+pub(crate) enum StaleStatus {
     Enabled,
     Disabled,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Policy {
+pub(crate) struct Policy {
     #[serde(flatten)]
     pub cache: CacheStatus,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Conf {
+pub(crate) struct Conf {
     pub policies: HashMap<String, Policy>,
 }

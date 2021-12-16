@@ -68,17 +68,19 @@ endpoints:
           variants:
             - ios
     response:
+      status_codes:
+        - 200
       headers:
         content-type:
           type: Enum
           variants:
             - application/json
-      status: 200
       if: "cluster.items"
     group: api
     ttl: 10min
   - path: "/cluster/{cluster_id:i32}/"
     group: api
+    backend: inmemory
   - path: "/sitemaps/"
     group: sitemaps
 ...

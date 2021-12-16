@@ -2,19 +2,19 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum Backends {
+pub(crate) enum Backends {
     Redis(RedisBackend),
     InMemory(InMemoryBackend),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RedisBackend {
+pub(crate) struct RedisBackend {
     host: String,
     port: u16,
     database: u8,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct InMemoryBackend {
+pub(crate) struct InMemoryBackend {
     max_size: String,
 }

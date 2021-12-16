@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Cache {
+pub(crate) struct Cache {
     backend: String,
     policy: String,
     upstream: String,
@@ -12,7 +12,7 @@ pub struct Cache {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OverriddenCache {
+pub(crate) struct OverriddenCache {
     ttl: Option<String>,
     stale_ttl: Option<String>,
     prefix: Option<String>,

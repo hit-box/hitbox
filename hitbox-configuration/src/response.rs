@@ -1,14 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-use crate::body::Body;
 use crate::field::Field;
-use crate::headers::Headers;
-use crate::status_code::StatusCode;
 use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Response {
-    status_code: Option<StatusCode>,
+pub(crate) struct Response {
+    status_codes: Option<Vec<u16>>,
     headers: Option<HashMap<String, Field>>,
-    body: Option<Body>,
+    #[serde(rename = "if")]
+    body: Option<String>,
 }
