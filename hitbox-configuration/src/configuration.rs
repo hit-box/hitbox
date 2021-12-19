@@ -9,7 +9,7 @@ use crate::policy::Policy;
 use crate::server::Server;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Configuration {
+pub struct Configuration<CacheType> {
     /// Hitbox Server network settings.
     server: Server,
     /// All served applications with their names.
@@ -21,14 +21,44 @@ pub struct Configuration {
     /// Common cache settings for the entire Application.
     cache: Cache,
     /// Predefined sets of backend, upstream & policy.
-    groups: HashMap<String, OverriddenCache>,
+    groups: HashMap<String, CacheType>,
     /// All used endpoint.
-    endpoints: Vec<Endpoint>,
+    endpoints: Vec<Endpoint<CacheType>>,
 }
 
-impl Configuration {
-    fn fill(self) -> Self {
-        self
+struct Wrapper<T>(pub T);
+
+impl Wrapper<&HashMap<String, OverriddenCache>> {
+    fn merge(&self, cache: &Cache) -> HashMap<String, Cache> {
+        self.0
+            .into_iter()
+            .map(|(key, overridden)| (key.clone(), overridden.merge(cache)))
+            .collect()
+    }
+}
+
+impl Wrapper<&Vec<Endpoint<OverriddenCache>>> {
+    fn merge(&self, cache: &Cache) -> Vec<Endpoint<Cache>> {
+        self.0
+            .into_iter()
+            .map(|endpoint| endpoint.merge(cache))
+            .collect()
+    }
+}
+
+impl From<Configuration<OverriddenCache>> for Configuration<Cache> {
+    fn from(overridden: Configuration<OverriddenCache>) -> Self {
+        let groups = Wrapper(&overridden.groups).merge(&overridden.cache);
+        let endpoints = Wrapper(&overridden.endpoints).merge(&overridden.cache);
+        Self {
+            server: overridden.server,
+            upstreams: overridden.upstreams,
+            backends: overridden.backends,
+            policies: overridden.policies,
+            cache: overridden.cache,
+            groups,
+            endpoints,
+        }
     }
 }
 
@@ -42,8 +72,9 @@ mod test {
     use std::path::Path;
 
     use crate::configuration::Configuration;
+    use crate::cache::{Cache, OverriddenCache};
 
-    fn read_test_yaml() -> Configuration {
+    fn read_test_yaml() -> Configuration<OverriddenCache> {
         let path = Path::new("src/test.yaml");
         let mut path_to_file = env::current_dir().unwrap();
         path_to_file.push(path);
@@ -56,7 +87,8 @@ mod test {
 
     #[test]
     fn test_base() {
-        let configuration = read_test_yaml().fill();
-        dbg!(configuration);
+        let configuration = read_test_yaml();
+        let merged: Configuration<Cache> = configuration.into();
+        dbg!(merged);
     }
 }
