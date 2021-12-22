@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::backend::Backends;
+use crate::backend::Backend;
 use crate::cache::{Cache, OverriddenCache};
 use crate::endpoint::Endpoint;
 use crate::policy::Policy;
@@ -13,9 +13,9 @@ pub struct Configuration<CacheType> {
     /// Hitbox Server network settings.
     server: Server,
     /// All served applications with their names.
-    upstreams: HashMap<String, Server>,
+    upstreams: HashMap<String, Server>, // upstream - enum tcp / udp / unix socket
     /// All used stores.
-    backends: Vec<Backends>,
+    backends: Vec<Backend>,
     /// Predefined combinations of cache policies.
     policies: HashMap<String, Policy>,
     /// Common cache settings for the entire Application.

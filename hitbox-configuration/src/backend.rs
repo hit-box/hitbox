@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub(crate) enum Backends {
+pub(crate) enum Backend {
     Redis(RedisBackend),
     InMemory(InMemoryBackend),
 }

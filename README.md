@@ -9,7 +9,7 @@ for distributed and for single-machine applications.
 ## Framework integrations
 - [x] [Actix](https://github.com/hit-box/hitbox/tree/master/hitbox-actix)
 - [ ] Actix-Web
-
+---
  ## Features
  - [x] Automatic cache key generation.
  - [x] Multiple cache backend implementations:

@@ -64,9 +64,12 @@ endpoints:
             - clicks
       headers:
         x-source:
-          type: Enum
           variants:
             - ios
+        x-source-2:
+          exclude:
+            - ios
+        x-source-3: All
     response:
       status_codes:
         - 200
