@@ -13,6 +13,7 @@ mod response;
 
 pub use value::CachedValue;
 pub use response::{CacheableResponse, CachePolicy};
+pub use backend::{CacheBackend, BackendResult};
 
 /// Define the behavior needed of an cache layer to work with cache backend.
 ///

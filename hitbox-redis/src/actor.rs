@@ -1,7 +1,10 @@
 //! Redis backend actor implementation.
 use crate::error::Error;
 use actix::prelude::*;
-use hitbox_backend::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
+use async_trait::async_trait;
+use hitbox_backend::{
+    Backend, BackendError, CacheBackend, Delete, DeleteStatus, Get, Lock, LockStatus, Set, BackendResult, CachedValue
+};
 use log::{debug, info};
 use redis::{aio::ConnectionManager, Client};
 
@@ -169,5 +172,20 @@ impl Handler<Lock> for RedisBackend {
                 .map_err(Error::from)
                 .map_err(BackendError::from)
         })
+    }
+}
+
+#[async_trait]
+impl CacheBackend for RedisBackend {
+    async fn get<T>(&self, key: String) -> BackendResult<CachedValue<T>> {
+        Err(BackendError::InternalError(Box::new(std::io::Error::from(std::io::ErrorKind::TimedOut))))
+    }
+
+    async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
+        Err(BackendError::InternalError(Box::new(std::io::Error::from(std::io::ErrorKind::TimedOut))))
+    }
+
+    async fn set<T: Send>(&self, key: String, value: CachedValue<T>, ttl: Option<u32>) -> BackendResult<()> {
+        Err(BackendError::InternalError(Box::new(std::io::Error::from(std::io::ErrorKind::TimedOut))))
     }
 }
