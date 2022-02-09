@@ -1,9 +1,10 @@
 //! Redis backend actor implementation.
 use crate::error::Error;
-use actix::prelude::*;
 use async_trait::async_trait;
 use hitbox_backend::{
-    Backend, BackendError, CacheBackend, Delete, DeleteStatus, Get, Lock, LockStatus, Set, BackendResult, CachedValue
+    serializer::{JsonSerializer, Serializer},
+    Backend, BackendError, BackendResult, CacheBackend, CacheableResponse, CachedValue, Delete,
+    DeleteStatus, Get, Lock, LockStatus, Set,
 };
 use log::{debug, info};
 use redis::{aio::ConnectionManager, Client};
@@ -26,7 +27,7 @@ impl RedisBackend {
     /// ```
     /// use hitbox_redis::RedisBackend;
     ///
-    /// #[actix_rt::main]
+    /// #[tokio::main]
     /// async fn main() {
     ///     let backend = RedisBackend::new().await;
     /// }
@@ -69,123 +70,91 @@ impl RedisBackendBuilder {
     }
 }
 
-impl Backend for RedisBackend {
-    type Actor = Self;
-    type Context = Context<Self>;
-}
+// /// Implementation of Actix Handler for Lock message.
+// impl Handler<Lock> for RedisBackend {
+    // type Result = ResponseFuture<Result<LockStatus, BackendError>>;
 
-/// Implementation actix Actor trait for Redis cache backend.
-impl Actor for RedisBackend {
-    type Context = Context<Self>;
-
-    fn started(&mut self, _: &mut Self::Context) {
-        info!("Cache actor started");
-    }
-}
-
-/// Implementation of Actix Handler for Get message.
-impl Handler<Get> for RedisBackend {
-    type Result = ResponseFuture<Result<Option<Vec<u8>>, BackendError>>;
-
-    fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
-        let mut con = self.connection.clone();
-        let fut = async move {
-            redis::cmd("GET")
-                .arg(msg.key)
-                .query_async(&mut con)
-                .await
-                .map_err(Error::from)
-                .map_err(BackendError::from)
-        };
-        Box::pin(fut)
-    }
-}
-
-/// Implementation of Actix Handler for Set message.
-impl Handler<Set> for RedisBackend {
-    type Result = ResponseFuture<Result<String, BackendError>>;
-
-    fn handle(&mut self, msg: Set, _: &mut Self::Context) -> Self::Result {
-        let mut con = self.connection.clone();
-        Box::pin(async move {
-            let mut request = redis::cmd("SET");
-            request.arg(msg.key).arg(msg.value);
-            if let Some(ttl) = msg.ttl {
-                request.arg("EX").arg(ttl);
-            };
-            request
-                .query_async(&mut con)
-                .await
-                .map_err(Error::from)
-                .map_err(BackendError::from)
-        })
-    }
-}
-
-/// Implementation of Actix Handler for Delete message.
-impl Handler<Delete> for RedisBackend {
-    type Result = ResponseFuture<Result<DeleteStatus, BackendError>>;
-
-    fn handle(&mut self, msg: Delete, _: &mut Self::Context) -> Self::Result {
-        let mut con = self.connection.clone();
-        Box::pin(async move {
-            redis::cmd("DEL")
-                .arg(msg.key)
-                .query_async(&mut con)
-                .await
-                .map(|res| {
-                    if res > 0 {
-                        DeleteStatus::Deleted(res)
-                    } else {
-                        DeleteStatus::Missing
-                    }
-                })
-                .map_err(Error::from)
-                .map_err(BackendError::from)
-        })
-    }
-}
-
-/// Implementation of Actix Handler for Lock message.
-impl Handler<Lock> for RedisBackend {
-    type Result = ResponseFuture<Result<LockStatus, BackendError>>;
-
-    fn handle(&mut self, msg: Lock, _: &mut Self::Context) -> Self::Result {
-        debug!("Redis Lock: {}", msg.key);
-        let mut con = self.connection.clone();
-        Box::pin(async move {
-            redis::cmd("SET")
-                .arg(format!("lock::{}", msg.key))
-                .arg("")
-                .arg("NX")
-                .arg("EX")
-                .arg(msg.ttl)
-                .query_async(&mut con)
-                .await
-                .map(|res: Option<String>| -> LockStatus {
-                    if res.is_some() {
-                        LockStatus::Acquired
-                    } else {
-                        LockStatus::Locked
-                    }
-                })
-                .map_err(Error::from)
-                .map_err(BackendError::from)
-        })
-    }
-}
+    // fn handle(&mut self, msg: Lock, _: &mut Self::Context) -> Self::Result {
+        // debug!("Redis Lock: {}", msg.key);
+        // let mut con = self.connection.clone();
+        // Box::pin(async move {
+            // redis::cmd("SET")
+                // .arg(format!("lock::{}", msg.key))
+                // .arg("")
+                // .arg("NX")
+                // .arg("EX")
+                // .arg(msg.ttl)
+                // .query_async(&mut con)
+                // .await
+                // .map(|res: Option<String>| -> LockStatus {
+                    // if res.is_some() {
+                        // LockStatus::Acquired
+                    // } else {
+                        // LockStatus::Locked
+                    // }
+                // })
+                // .map_err(Error::from)
+                // .map_err(BackendError::from)
+        // })
+    // }
+// }
 
 #[async_trait]
 impl CacheBackend for RedisBackend {
-    async fn get<T>(&self, key: String) -> BackendResult<CachedValue<T>> {
-        Err(BackendError::InternalError(Box::new(std::io::Error::from(std::io::ErrorKind::TimedOut))))
+    async fn get<T>(&self, key: String) -> BackendResult<CachedValue<T>>
+    where
+        T: CacheableResponse,
+        <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
+    {
+        let mut con = self.connection.clone();
+        let result: Vec<u8> = redis::cmd("GET")
+            .arg(key)
+            .query_async(&mut con)
+            .await
+            .map_err(Error::from)
+            .map_err(BackendError::from)?;
+        JsonSerializer::<Vec<u8>>::deserialize(result).map_err(BackendError::from)
     }
 
     async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
-        Err(BackendError::InternalError(Box::new(std::io::Error::from(std::io::ErrorKind::TimedOut))))
+        let mut con = self.connection.clone();
+        redis::cmd("DEL")
+            .arg(key)
+            .query_async(&mut con)
+            .await
+            .map(|res| {
+                if res > 0 {
+                    DeleteStatus::Deleted(res)
+                } else {
+                    DeleteStatus::Missing
+                }
+            })
+            .map_err(Error::from)
+            .map_err(BackendError::from)
     }
 
-    async fn set<T: Send>(&self, key: String, value: CachedValue<T>, ttl: Option<u32>) -> BackendResult<()> {
-        Err(BackendError::InternalError(Box::new(std::io::Error::from(std::io::ErrorKind::TimedOut))))
+    async fn set<T: Sync>(
+        &self,
+        key: String,
+        value: &CachedValue<T>,
+        ttl: Option<u32>,
+    ) -> BackendResult<()>
+    where
+        T: CacheableResponse,
+        <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
+    {
+        let mut con = self.connection.clone();
+        let mut request = redis::cmd("SET");
+        let serialized_value =
+            JsonSerializer::<Vec<u8>>::serialize(&value).map_err(BackendError::from)?;
+        request.arg(key).arg(serialized_value);
+        if let Some(ttl) = ttl {
+            request.arg("EX").arg(ttl);
+        };
+        request
+            .query_async(&mut con)
+            .await
+            .map_err(Error::from)
+            .map_err(BackendError::from)
     }
 }

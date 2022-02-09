@@ -4,16 +4,18 @@
 //! If you want implement your own backend, you in the right place.
 use actix::dev::ToEnvelope;
 use actix::prelude::*;
+use serializer::SerializerError;
 use thiserror::Error;
 
 mod value;
-mod serializer;
+pub mod serializer;
 mod backend;
 mod response;
 
-pub use value::CachedValue;
+pub use value::{CachedValue, TtlSettings, EvictionPolicy};
 pub use response::{CacheableResponse, CachePolicy};
 pub use backend::{CacheBackend, BackendResult};
+
 
 /// Define the behavior needed of an cache layer to work with cache backend.
 ///
@@ -58,6 +60,9 @@ pub enum BackendError {
     /// Network interaction error.
     #[error(transparent)]
     ConnectionError(Box<dyn std::error::Error + Send>),
+    /// Serializing\Deserializing data error.
+    #[error(transparent)]
+    SerializerError(#[from] SerializerError),
 }
 
 /// Actix message requests cache backend value by key.

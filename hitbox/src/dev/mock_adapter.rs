@@ -1,4 +1,4 @@
-use crate::error::CacheError;
+/*use crate::error::CacheError;
 use crate::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings};
 use crate::value::{CacheState, CachedValue};
 use crate::CacheableResponse;
@@ -142,4 +142,4 @@ where
             stale_ttl: 0,
         })
     }
-}
+}*/

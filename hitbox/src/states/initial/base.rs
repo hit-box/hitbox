@@ -2,7 +2,7 @@ use std::fmt;
 
 use tracing::{instrument, trace, warn};
 
-use crate::response::CacheableResponse;
+use crate::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::settings::{CacheSettings, InitialCacheSettings};
 use crate::states::cache_polled::{

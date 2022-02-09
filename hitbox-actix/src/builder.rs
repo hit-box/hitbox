@@ -2,8 +2,8 @@
 use crate::CacheActor;
 use actix::{Actor, Addr};
 use hitbox::settings::{CacheSettings, Status};
-use hitbox_backend::Backend;
-use std::marker::PhantomData;
+use hitbox_backend::{Backend, CacheBackend};
+use std::{marker::PhantomData, sync::Arc};
 
 /// Cache actor configurator.
 ///
@@ -15,8 +15,7 @@ use std::marker::PhantomData;
 /// #[actix::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let backend = RedisBackend::new()
-///         .await?
-///         .start();
+///         .await?;
 ///     let cache = Cache::builder()
 ///         .enable()
 ///         .finish(backend)
@@ -26,7 +25,7 @@ use std::marker::PhantomData;
 /// ```
 pub struct CacheBuilder<B>
 where
-    B: Backend + Actor,
+    B: CacheBackend,
 {
     settings: CacheSettings,
     _p: PhantomData<B>,
@@ -34,7 +33,7 @@ where
 
 impl<B> Default for CacheBuilder<B>
 where
-    B: Backend,
+    B: CacheBackend,
 {
     fn default() -> Self {
         CacheBuilder {
@@ -50,7 +49,7 @@ where
 
 impl<B> CacheBuilder<B>
 where
-    B: Backend,
+    B: CacheBackend,
 {
     /// Enable interaction with cache backend. (Default value).
     pub fn enable(mut self) -> Self {
@@ -111,10 +110,10 @@ where
     /// [Actor]: https://docs.rs/actix/latest/actix/prelude/trait.Actor.html
     /// [Messages]: https://docs.rs/actix/latest/actix/prelude/trait.Message.html
     /// [Handler]: https://docs.rs/actix/latest/actix/prelude/trait.Handler.html
-    pub fn finish(self, backend: Addr<B>) -> CacheActor<B> {
+    pub fn finish(self, backend: B) -> CacheActor<B> {
         CacheActor {
             settings: self.settings,
-            backend,
+            backend: Arc::new(backend),
         }
     }
 }

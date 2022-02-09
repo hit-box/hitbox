@@ -9,9 +9,10 @@ use hitbox::metrics::{
 };
 use hitbox::settings::CacheSettings;
 use hitbox::CacheError;
-use hitbox_backend::Backend;
+use hitbox_backend::{Backend, CacheBackend};
 use hitbox_redis::RedisBackend;
 use tracing::{debug, info};
+use std::sync::Arc;
 
 /// Actix actor implements cache logic.
 ///
@@ -33,25 +34,22 @@ use tracing::{debug, info};
 /// ```
 pub struct CacheActor<B>
 where
-    B: Backend,
+    B: CacheBackend,
 {
     pub(crate) settings: CacheSettings,
-    pub(crate) backend: Addr<B>,
+    pub(crate) backend: Arc<B>,
 }
 
 impl<B> CacheActor<B>
 where
-    B: Actor + Backend,
-    <B as Actor>::Context:
-        ToEnvelope<B, Get> + ToEnvelope<B, Set> + ToEnvelope<B, Lock> + ToEnvelope<B, Delete>,
+    B: CacheBackend,
 {
     /// Initialize new Cache actor with default [`hitbox_redis::RedisBackend`].
     #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> Result<CacheActor<RedisBackend>, CacheError> {
         let backend = RedisBackend::new()
             .await
-            .map_err(|err| CacheError::BackendError(err.into()))?
-            .start();
+            .map_err(|err| CacheError::BackendError(err.into()))?;
         Ok(CacheBuilder::default().finish(backend))
     }
 
@@ -63,7 +61,7 @@ where
 
 impl<B> Actor for CacheActor<B>
 where
-    B: Backend,
+    B: CacheBackend + Unpin + 'static,
 {
     type Context = Context<Self>;
 

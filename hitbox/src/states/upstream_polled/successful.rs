@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use tracing::{instrument, trace, warn};
 
-use crate::response::{CachePolicy, CacheableResponse};
+use crate::{CachePolicy, CacheableResponse};
 use crate::runtime::RuntimeAdapter;
 use crate::states::cache_policy::{
     CachePolicyCacheable, CachePolicyChecked, CachePolicyNonCacheable,

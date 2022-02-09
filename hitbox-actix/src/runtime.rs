@@ -5,12 +5,13 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tracing::warn;
 
-use hitbox::response::CacheableResponse;
 use hitbox::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings};
-use hitbox::{CacheError, CacheState, Cacheable, CachedValue};
-use hitbox_backend::{Backend, Get, Set};
+use hitbox::{CacheError, CacheState, Cacheable, CachedValue, CacheableResponse};
+use hitbox_backend::{Backend, Get, Set, CacheBackend};
 
 use crate::QueryCache;
+
+use std::sync::Arc;
 
 /// [`RuntimeAdapter`] for Actix runtime.
 pub struct ActixAdapter<A, M, B>
@@ -18,13 +19,13 @@ where
     A: Actor + Handler<M>,
     M: Message + Cacheable + Send,
     M::Result: MessageResponse<A, M> + Send,
-    B: Backend,
+    B: CacheBackend,
 {
     message: Option<QueryCache<A, M>>,
     cache_key: String,
     cache_ttl: u32,
     cache_stale_ttl: u32,
-    backend: Addr<B>,
+    backend: Arc<B>,
 }
 
 impl<A, M, B> ActixAdapter<A, M, B>
@@ -32,10 +33,10 @@ where
     A: Actor + Handler<M>,
     M: Message + Cacheable + Send,
     M::Result: MessageResponse<A, M> + Send,
-    B: Backend,
+    B: CacheBackend,
 {
     /// Creates new instance of Actix runtime adapter.
-    pub fn new(message: QueryCache<A, M>, backend: Addr<B>) -> Result<Self, CacheError> {
+    pub fn new(message: QueryCache<A, M>, backend: Arc<B>) -> Result<Self, CacheError> {
         let cache_key = message.cache_key()?;
         let cache_stale_ttl = message.message.cache_ttl();
         let cache_ttl = message.message.cache_ttl();
@@ -55,9 +56,8 @@ where
     A::Context: ToEnvelope<A, M>,
     M: Message<Result = T> + Cacheable + Send + 'static,
     M::Result: MessageResponse<A, M> + Send,
-    B: Backend,
-    <B as Actor>::Context: ToEnvelope<B, Get> + ToEnvelope<B, Set>,
-    T: CacheableResponse<Cached = U> + 'static,
+    B: CacheBackend + 'static,
+    T: CacheableResponse<Cached = U> + 'static + Sync,
     U: DeserializeOwned + Serialize,
 {
     type UpstreamResult = T;
@@ -76,28 +76,23 @@ where
         let backend = self.backend.clone();
         let cache_key = self.cache_key.clone();
         Box::pin(async move {
-            let cached_value = backend.send(Get { key: cache_key }).await??;
-            CacheState::from_bytes(cached_value.as_ref())
+            backend.get(cache_key).await
+                .map(CacheState::from)
+                .map_err(CacheError::from)
         })
     }
 
-    fn update_cache(&self, cached_value: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
-        let serialized = cached_value.serialize();
+    fn update_cache<'a>(&self, cached_value: &'a CachedValue<Self::UpstreamResult>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), CacheError>> + 'a>> {
         let ttl = self.cache_ttl;
         let backend = self.backend.clone();
         let cache_key = self.cache_key.clone();
         Box::pin(async move {
-            let serialized = serialized?;
-            let _ = backend
-                .send(Set {
-                    key: cache_key,
-                    value: serialized,
-                    ttl: Some(ttl),
-                })
+            backend.set(cache_key, cached_value, Some(ttl))
                 .await
-                .map_err(|error| warn!("Updating Cache Error {}", error))
-                .and_then(|value| value.map_err(|error| warn!("Updating Cache Error. {}", error)));
-            Ok(())
+                .map_err(|err| {
+                    warn!("Updating cache error {}", err);
+                    CacheError::from(err)
+                })
         })
     }
     fn eviction_settings(&self) -> EvictionPolicy {

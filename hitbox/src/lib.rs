@@ -77,8 +77,11 @@ pub mod value;
 
 pub use cache::Cacheable;
 pub use error::CacheError;
-pub use response::{CachePolicy, CacheableResponse};
-pub use value::{CacheState, CachedValue};
+pub use value::CacheState;
+pub use hitbox_backend::{CachedValue, CacheableResponse, CachePolicy};
+
+#[cfg(feature = "derive")]
+pub use hitbox_derive::CacheableResponse;
 
 #[cfg(feature = "derive")]
 #[doc(hidden)]

@@ -4,7 +4,7 @@ use crate::{CacheError, CachePolicy, CacheableResponse};
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-/// This struct wraps and represents cached data.
+/*/// This struct wraps and represents cached data.
 ///
 /// The expired field defines the UTC data expiration time.
 /// Used for detection of stale data.
@@ -12,20 +12,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub struct CachedValue<T> {
     data: T,
     expired: DateTime<Utc>,
-}
-
-impl<T> From<(T, EvictionPolicy)> for CachedValue<T> {
-    fn from(model: (T, EvictionPolicy)) -> Self {
-        let (data, eviction_policy) = model;
-        match eviction_policy {
-            EvictionPolicy::Ttl(settings) => {
-                let duration = chrono::Duration::seconds(settings.stale_ttl as i64);
-                let expired = chrono::Utc::now() + duration;
-                Self { data, expired }
-            }
-        }
-    }
-}
+}*/
+use crate::CachedValue;
 
 #[derive(Serialize)]
 struct CachedInnerValue<'a, U>
@@ -36,7 +24,7 @@ where
     expired: DateTime<Utc>,
 }
 
-impl<T> CachedValue<T>
+/*impl<T> CachedValue<T>
 where
     T: CacheableResponse,
     <T as CacheableResponse>::Cached: Serialize,
@@ -72,7 +60,7 @@ where
     pub fn into_inner(self) -> T {
         self.data
     }
-}
+}*/
 
 /// Represents cuurent state of cached data.
 pub enum CacheState<T> {
@@ -84,7 +72,7 @@ pub enum CacheState<T> {
     Miss,
 }
 
-impl<T, U> CacheState<T>
+/*impl<T, U> CacheState<T>
 where
     T: CacheableResponse<Cached = U>,
     U: DeserializeOwned + Serialize,
@@ -96,23 +84,26 @@ where
             .transpose()?;
         Ok(Self::from(cached_data))
     }
-}
+}*/
 
-impl<T, U> From<Option<CachedValue<U>>> for CacheState<T>
-where
-    T: CacheableResponse<Cached = U>,
-    U: Serialize,
+impl<T> From<Option<CachedValue<T>>> for CacheState<T>
 {
-    fn from(cached_value: Option<CachedValue<U>>) -> Self {
+    fn from(cached_value: Option<CachedValue<T>>) -> Self {
         match cached_value {
             Some(value) => {
                 if value.expired < Utc::now() {
-                    Self::Stale(CachedValue::from_inner(value))
+                    Self::Stale(value)
                 } else {
-                    Self::Actual(CachedValue::from_inner(value))
+                    Self::Actual(value)
                 }
             }
             None => Self::Miss,
         }
+    }
+}
+
+impl<T> From<hitbox_backend::CachedValue<T>> for CacheState<T> {
+    fn from(_cached_value: hitbox_backend::CachedValue<T>) -> Self {
+        CacheState::Miss // @TODO MOCK!!!!!!! REMOVE!!!!
     }
 }

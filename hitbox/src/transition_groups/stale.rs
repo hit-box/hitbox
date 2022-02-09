@@ -1,4 +1,4 @@
-use crate::response::CacheableResponse;
+use crate::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::cache_policy::CachePolicyChecked;
 use crate::states::cache_polled::CachePolled;

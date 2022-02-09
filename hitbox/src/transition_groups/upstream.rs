@@ -1,4 +1,4 @@
-use crate::response::CacheableResponse;
+use crate::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
 use crate::states::initial::Initial;
