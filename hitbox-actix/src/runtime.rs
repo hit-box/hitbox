@@ -6,8 +6,8 @@ use serde::Serialize;
 use tracing::warn;
 
 use hitbox::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings};
-use hitbox::{CacheError, CacheState, Cacheable, CachedValue, CacheableResponse};
-use hitbox_backend::{Backend, Get, Set, CacheBackend};
+use hitbox::{CacheError, CacheState, Cacheable, CacheableResponse, CachedValue};
+use hitbox_backend::{Backend, CacheBackend, Get, Set};
 
 use crate::QueryCache;
 
@@ -76,18 +76,24 @@ where
         let backend = self.backend.clone();
         let cache_key = self.cache_key.clone();
         Box::pin(async move {
-            backend.get(cache_key).await
+            backend
+                .get(cache_key)
+                .await
                 .map(CacheState::from)
                 .map_err(CacheError::from)
         })
     }
 
-    fn update_cache<'a>(&self, cached_value: &'a CachedValue<Self::UpstreamResult>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), CacheError>> + 'a>> {
+    fn update_cache<'a>(
+        &self,
+        cached_value: &'a CachedValue<Self::UpstreamResult>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), CacheError>> + 'a>> {
         let ttl = self.cache_ttl;
         let backend = self.backend.clone();
         let cache_key = self.cache_key.clone();
         Box::pin(async move {
-            backend.set(cache_key, cached_value, Some(ttl))
+            backend
+                .set(cache_key, cached_value, Some(ttl))
                 .await
                 .map_err(|err| {
                     warn!("Updating cache error {}", err);
