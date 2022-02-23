@@ -15,9 +15,9 @@ use serde::{de::DeserializeOwned, Serialize};
 
 impl<'a, A, M, B> Handler<QueryCache<A, M>> for CacheActor<B>
 where
-    B: CacheBackend + Unpin + 'static,
+    B: CacheBackend + Unpin + 'static + Send + Sync,
     A: Actor + Handler<M> + Send,
-    M: Message + Cacheable + Send + 'static,
+    M: Message + Cacheable + Send + 'static + Sync,
     M::Result: MessageResponse<A, M> + CacheableResponse + std::fmt::Debug + Send + Sync,
     <<M as actix::Message>::Result as CacheableResponse>::Cached: Serialize + DeserializeOwned,
     <A as Actor>::Context: ToEnvelope<A, M>,

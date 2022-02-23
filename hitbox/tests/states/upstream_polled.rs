@@ -1,4 +1,4 @@
-use hitbox::dev::MockAdapter;
+/*use hitbox::dev::MockAdapter;
 use hitbox::states::cache_policy::{CachePolicyChecked, CachePolicyNonCacheable};
 use hitbox::states::upstream_polled::UpstreamPolledSuccessful;
 
@@ -12,4 +12,4 @@ fn test_successful_check_policy_non_cacheable() {
     let _expected: CachePolicyChecked<MockAdapter<i32>, i32> =
         CachePolicyChecked::NonCacheable(CachePolicyNonCacheable { result: 42 });
     assert!(matches!(successful.check_cache_policy(), _expected));
-}
+}*/

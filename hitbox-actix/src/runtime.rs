@@ -4,6 +4,7 @@ use actix::{Actor, Addr, Handler, Message};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tracing::warn;
+use async_trait::async_trait;
 
 use hitbox::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings};
 use hitbox::{CacheError, CacheState, Cacheable, CacheableResponse, CachedValue};
@@ -17,7 +18,7 @@ use std::sync::Arc;
 pub struct ActixAdapter<A, M, B>
 where
     A: Actor + Handler<M>,
-    M: Message + Cacheable + Send,
+    M: Message + Cacheable + Send + Sync,
     M::Result: MessageResponse<A, M> + Send,
     B: CacheBackend,
 {
@@ -31,7 +32,7 @@ where
 impl<A, M, B> ActixAdapter<A, M, B>
 where
     A: Actor + Handler<M>,
-    M: Message + Cacheable + Send,
+    M: Message + Cacheable + Send + Sync,
     M::Result: MessageResponse<A, M> + Send,
     B: CacheBackend,
 {
@@ -50,57 +51,54 @@ where
     }
 }
 
+#[async_trait]
 impl<A, M, T, B, U> RuntimeAdapter for ActixAdapter<A, M, B>
 where
     A: Actor + Handler<M>,
     A::Context: ToEnvelope<A, M>,
-    M: Message<Result = T> + Cacheable + Send + 'static,
+    M: Message<Result = T> + Cacheable + Send + 'static + Sync,
     M::Result: MessageResponse<A, M> + Send,
-    B: CacheBackend + 'static,
+    B: CacheBackend + 'static + Send + Sync,
     T: CacheableResponse<Cached = U> + 'static + Sync,
     U: DeserializeOwned + Serialize,
+    Self: Send + Sync,
 {
     type UpstreamResult = T;
 
-    fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
+    async fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
         let message = self.message.take();
-        Box::pin(async move {
-            let message = message.ok_or_else(|| {
-                CacheError::CacheKeyGenerationError("Message already sent to upstream".to_owned())
-            })?;
-            Ok(message.upstream.send(message.message).await?)
-        })
+        let message = message.ok_or_else(|| {
+            CacheError::CacheKeyGenerationError("Message already sent to upstream".to_owned())
+        })?;
+        Ok(message.upstream.send(message.message).await?)
     }
 
-    fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
+    async fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
         let backend = self.backend.clone();
         let cache_key = self.cache_key.clone();
-        Box::pin(async move {
-            backend
-                .get(cache_key)
-                .await
-                .map(CacheState::from)
-                .map_err(CacheError::from)
-        })
+        backend
+            .get(cache_key)
+            .await
+            .map(CacheState::from)
+            .map_err(CacheError::from)
     }
 
-    fn update_cache<'a>(
+    async fn update_cache<'a>(
         &self,
         cached_value: &'a CachedValue<Self::UpstreamResult>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), CacheError>> + 'a>> {
+    ) -> AdapterResult<()> {
         let ttl = self.cache_ttl;
         let backend = self.backend.clone();
         let cache_key = self.cache_key.clone();
-        Box::pin(async move {
-            backend
-                .set(cache_key, cached_value, Some(ttl))
-                .await
-                .map_err(|err| {
-                    warn!("Updating cache error {}", err);
-                    CacheError::from(err)
-                })
-        })
+        backend
+            .set(cache_key, cached_value, Some(ttl))
+            .await
+            .map_err(|err| {
+                warn!("Updating cache error {}", err);
+                CacheError::from(err)
+            })
     }
+
     fn eviction_settings(&self) -> EvictionPolicy {
         let ttl_settings = TtlSettings {
             ttl: self.cache_ttl,

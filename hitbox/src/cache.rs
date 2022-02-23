@@ -1,6 +1,7 @@
 //! Cacheable trait and implementation of cache logic.
 
 use crate::CacheError;
+use hitbox_backend::CacheableResponse;
 #[cfg(feature = "derive")]
 pub use hitbox_derive::Cacheable;
 
@@ -72,11 +73,78 @@ pub trait Cacheable {
     }
 }
 
+pub enum CacheState {
+    Running,
+    Stopped,
+}
+
+pub struct Cache {
+    state: CacheState
+}
+
+use std::future::Future;
+use std::marker::PhantomData;
+use std::pin::Pin;
+
+impl Cache {
+    fn builder() -> CacheBuilder {
+        CacheBuilder
+    }
+
+    async fn start(&self) {
+
+    }
+
+    async fn process<F, Req, Res, ResFuture>(&self, upstream: F, request: Req) -> Res
+    where
+        F: Fn(Req) -> ResFuture,
+        ResFuture: Future<Output=Res>,
+    {
+        upstream(request).await
+    }
+}
+
+pub struct CacheBuilder;
+
+impl CacheBuilder {
+    fn build() -> Cache {
+        Cache { state: CacheState::Stopped }
+    }
+}
+
+pub struct FutureAdapter<In, Out, U> {
+    _response: PhantomData<Out>,
+    request: In,
+    upstream: U,
+}
+
+// impl<In, Out, U> crate::runtime::RuntimeAdapter for FutureAdapter<In, Out, U> 
+// where
+    // Out: CacheableResponse
+// {
+    // type UpstreamResult = Out; 
+    // fn update_cache<'a>(&self, cached_value: &'a hitbox_backend::CachedValue<Self::UpstreamResult>) -> Pin<Box<dyn Future<Output = Result<(), CacheError>> + 'a>> {
+        
+    // }
+
+    // fn poll_cache(&self) -> crate::runtime::AdapterResult<crate::CacheState<Self::UpstreamResult>> {
+        
+    // }
+
+    // fn poll_upstream(&mut self) -> crate::runtime::AdapterResult<Self::UpstreamResult> {
+        // Ok(self.upstream.await?)
+    // }
+
+    // fn eviction_settings(&self) -> hitbox_backend::EvictionPolicy {
+        // hitbox_backend::EvictionPolicy::Ttl(hitbox_backend::TtlSettings{ ttl: 42, stale_ttl: 24 }) 
+    // }
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    struct Message;
+    struct Message(i32);
 
     impl Cacheable for Message {
         fn cache_key(&self) -> Result<String, CacheError> {
@@ -92,7 +160,18 @@ mod tests {
 
     #[test]
     fn test_cache_stale_ttl_subtract_overflow() {
-        let a = Message;
+        let a = Message(42);
         assert_eq!(0, a.cache_stale_ttl());
+    }
+
+    async fn upstream_fn(message: Message) -> i32 {
+        message.0 
+    }
+
+    #[tokio::test]
+    async fn test_cache_process() {
+        let cache = Cache { state: CacheState::Running };
+        let response = cache.process(upstream_fn, Message(42)).await;
+        dbg!(response);
     }
 }

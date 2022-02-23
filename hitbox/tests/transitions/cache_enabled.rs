@@ -1,4 +1,4 @@
-use hitbox::dev::MockAdapter;
+/*use hitbox::dev::MockAdapter;
 use hitbox::settings::{CacheSettings, Status};
 use hitbox::states::initial::Initial;
 use hitbox::transition_groups::only_cache;
@@ -49,4 +49,4 @@ async fn test_cache_enabled_cache_miss_upstream_error() {
     let initial_state = Initial::new(settings, adapter);
     let finish = only_cache::transition(initial_state).await;
     assert!(finish.result().is_err());
-}
+}*/

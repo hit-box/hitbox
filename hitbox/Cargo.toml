@@ -22,6 +22,8 @@ thiserror = "1"
 prometheus = { version = "0.12", optional = true }
 lazy_static = { version = "1", optional = true }
 tracing = "0.1"
+tokio = { version = "1.17.0", features = ["macros"] }
+async-trait = "0.1.52"
 
 [dev-dependencies]
 actix_derive = "0.6"

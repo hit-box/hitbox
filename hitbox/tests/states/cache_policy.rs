@@ -1,4 +1,4 @@
-use hitbox::dev::MockAdapter;
+/*use hitbox::dev::MockAdapter;
 use hitbox::states::cache_policy::{CachePolicyCacheable, CachePolicyNonCacheable};
 
 #[test]
@@ -21,4 +21,4 @@ fn test_non_cacheable_debug() {
 fn test_non_cacheable_finish() {
     let non_cacheable = CachePolicyNonCacheable { result: 42 };
     assert_eq!(non_cacheable.finish().result.unwrap(), 42);
-}
+} */
