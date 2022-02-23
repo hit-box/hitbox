@@ -1,9 +1,12 @@
 //! Cacheable trait and implementation of cache logic.
 
 use crate::CacheError;
+use crate::runtime::AdapterResult;
+use crate::settings::{CacheSettings, Status};
 use hitbox_backend::CacheableResponse;
 #[cfg(feature = "derive")]
 pub use hitbox_derive::Cacheable;
+use async_trait::async_trait;
 
 /// Trait describes cache configuration per type that implements this trait.
 pub trait Cacheable {
@@ -97,10 +100,17 @@ impl Cache {
 
     async fn process<F, Req, Res, ResFuture>(&self, upstream: F, request: Req) -> Res
     where
-        F: Fn(Req) -> ResFuture,
-        ResFuture: Future<Output=Res>,
+        Req: Send + Sync,
+        F: Fn(Req) -> ResFuture + Send + Sync,
+        ResFuture: Future<Output=Res> + Send + Sync,
+        Res: Send + Sync + CacheableResponse + std::fmt::Debug,
     {
-        upstream(request).await
+        use crate::states::initial::Initial;
+        let adapter_result = FutureAdapter::new(upstream, request);
+        // let settings = self.settings.clone();
+        let settings = CacheSettings { cache: Status::Enabled, lock: Status::Disabled, stale: Status::Disabled };
+        let initial_state = Initial::new(settings, adapter_result);
+        initial_state.transitions().await.unwrap()
     }
 }
 
@@ -114,31 +124,50 @@ impl CacheBuilder {
 
 pub struct FutureAdapter<In, Out, U> {
     _response: PhantomData<Out>,
-    request: In,
+    request: Option<In>,
     upstream: U,
 }
 
-// impl<In, Out, U> crate::runtime::RuntimeAdapter for FutureAdapter<In, Out, U> 
-// where
-    // Out: CacheableResponse
-// {
-    // type UpstreamResult = Out; 
-    // fn update_cache<'a>(&self, cached_value: &'a hitbox_backend::CachedValue<Self::UpstreamResult>) -> Pin<Box<dyn Future<Output = Result<(), CacheError>> + 'a>> {
-        
-    // }
+impl<In, Out, U> FutureAdapter<In, Out, U> {
+    fn new(upstream: U, request: In) -> Self {
+        Self {
+            request: Some(request),
+            upstream,
+            _response: PhantomData::default(),
+        }
+    }
+}
 
-    // fn poll_cache(&self) -> crate::runtime::AdapterResult<crate::CacheState<Self::UpstreamResult>> {
-        
-    // }
+#[async_trait]
+impl<In, Out, U, ResFuture> crate::runtime::RuntimeAdapter for FutureAdapter<In, Out, U> 
+where
+    Out: CacheableResponse + Send + Sync,
+    U: Send + Sync + Fn(In) -> ResFuture,
+    ResFuture: Future<Output=Out> + Send,
+    In: Send + Sync,
+{
+    type UpstreamResult = Out; 
+    async fn update_cache<'a>(&self, cached_value: &'a hitbox_backend::CachedValue<Self::UpstreamResult>) -> crate::runtime::AdapterResult<()> {
+        Err(CacheError::DeserializeError)
+    }
 
-    // fn poll_upstream(&mut self) -> crate::runtime::AdapterResult<Self::UpstreamResult> {
-        // Ok(self.upstream.await?)
-    // }
+    async fn poll_cache(&self) -> crate::runtime::AdapterResult<crate::CacheState<Self::UpstreamResult>> {
+        Err(CacheError::DeserializeError)
+    }
 
-    // fn eviction_settings(&self) -> hitbox_backend::EvictionPolicy {
-        // hitbox_backend::EvictionPolicy::Ttl(hitbox_backend::TtlSettings{ ttl: 42, stale_ttl: 24 }) 
-    // }
-// }
+    async fn poll_upstream(&mut self) -> crate::runtime::AdapterResult<Self::UpstreamResult> {
+        println!("huy");
+        let request = self.request.take();
+        let request = request.ok_or_else(|| {
+            CacheError::CacheKeyGenerationError("Request already sent to upstream".to_owned())
+        })?;
+        Ok((self.upstream)(request).await)
+    }
+
+    fn eviction_settings(&self) -> hitbox_backend::EvictionPolicy {
+        hitbox_backend::EvictionPolicy::Ttl(hitbox_backend::TtlSettings{ ttl: 42, stale_ttl: 24 }) 
+    }
+}
 
 #[cfg(test)]
 mod tests {
