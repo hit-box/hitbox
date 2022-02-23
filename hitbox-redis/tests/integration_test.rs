@@ -42,10 +42,10 @@ async fn test_rw() -> Result<(), Error> {
     let key = "test_key".to_owned();
     let inner = Test::new();
     let value = CachedValue::new(inner.clone(), Utc::now());
-    let res = backend.set(key.clone(), value, None).await.unwrap();
+    let res = backend.set(key.clone(), &value, None).await.unwrap();
     assert_eq!(res, ());
-    let res: CachedValue<Test> = backend.get(key.clone()).await.unwrap();
-    assert_eq!(res.into_inner(), CachedValue::new(inner, Utc::now()).into_inner());
+    let res = backend.get::<Test>(key.clone()).await.unwrap();
+    assert_eq!(res.unwrap().into_inner(), CachedValue::new(inner, Utc::now()).into_inner());
     let res = backend.delete(key.clone()).await.unwrap();
     assert_eq!(res, DeleteStatus::Deleted(1));
     Ok(())

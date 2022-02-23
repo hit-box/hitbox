@@ -5,7 +5,7 @@ pub type BackendResult<T> = Result<T, BackendError>;
 
 #[async_trait]
 pub trait CacheBackend {
-    async fn get<T>(&self, key: String) -> BackendResult<CachedValue<T>>
+    async fn get<T>(&self, key: String) -> BackendResult<Option<CachedValue<T>>>
     where
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned;

@@ -56,6 +56,7 @@ async fn test_mock_backend() {
         .get("UpstreamActor::Ping::42".to_owned())
         .await
         .unwrap()
+        .unwrap()
         .into_inner();
     assert_eq!(res, Pong { id: 42 });
 

@@ -1,4 +1,6 @@
 //! Redis backend actor implementation.
+use std::result;
+
 use crate::error::Error;
 use async_trait::async_trait;
 use hitbox_backend::{
@@ -101,19 +103,21 @@ impl RedisBackendBuilder {
 
 #[async_trait]
 impl CacheBackend for RedisBackend {
-    async fn get<T>(&self, key: String) -> BackendResult<CachedValue<T>>
+    async fn get<T>(&self, key: String) -> BackendResult<Option<CachedValue<T>>>
     where
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
         let mut con = self.connection.clone();
-        let result: Vec<u8> = redis::cmd("GET")
+        let result: Option<Vec<u8>> = redis::cmd("GET")
             .arg(key)
             .query_async(&mut con)
             .await
             .map_err(Error::from)
             .map_err(BackendError::from)?;
-        JsonSerializer::<Vec<u8>>::deserialize(result).map_err(BackendError::from)
+        result
+            .map(|value| JsonSerializer::<Vec<u8>>::deserialize(value).map_err(BackendError::from))
+            .transpose()
     }
 
     async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {

@@ -60,7 +60,7 @@ impl Handler<Ping> for UpstreamActor {
 #[actix::main]
 async fn main() -> Result<(), CacheError> {
     env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
+        .filter_level(log::LevelFilter::Trace)
         .init();
 
     let cache = Cache::new().await?.start();

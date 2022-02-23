@@ -101,9 +101,3 @@ impl<T> From<Option<CachedValue<T>>> for CacheState<T>
         }
     }
 }
-
-impl<T> From<hitbox_backend::CachedValue<T>> for CacheState<T> {
-    fn from(_cached_value: hitbox_backend::CachedValue<T>) -> Self {
-        CacheState::Miss // @TODO MOCK!!!!!!! REMOVE!!!!
-    }
-}
