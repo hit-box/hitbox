@@ -1,4 +1,6 @@
 #![warn(missing_docs)]
+#![cfg_attr(docsrs, warn(rustdoc::broken_intra_doc_links))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 //! # Hitbox-Actix
 //!
 //! [![Build status](https://github.com/hit-box/hitbox/actions/workflows/CI.yml/badge.svg)](https://github.com/hit-box/hitbox/actions?query=workflow)
@@ -140,16 +142,19 @@ pub use messages::{IntoCache, QueryCache};
 pub use runtime::ActixAdapter;
 
 #[cfg(feature = "redis")]
+#[cfg_attr(docsrs, doc(cfg(feature = "redis")))]
 pub use hitbox_redis::RedisBackend;
 
 /// Default type alias with RedisBackend.
 /// You can disable it or define it manually in your code.
 #[cfg(feature = "redis")]
+#[cfg_attr(docsrs, doc(cfg(feature = "redis")))]
 pub type Cache = CacheActor<RedisBackend>;
 
 /// Prelude for hitbox_actix.
 pub mod prelude {
     #[cfg(feature = "redis")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "redis")))]
     pub use crate::{Cache, RedisBackend};
     pub use crate::{CacheActor, CacheBuilder, CacheError, Cacheable, IntoCache, QueryCache};
     pub use hitbox::hitbox_serializer;
