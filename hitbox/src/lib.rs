@@ -62,7 +62,6 @@
 //! [hitbox-actix]: https://docs.rs/hitbox_actix/
 //! [dogpile effect]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 #![warn(missing_docs)]
-#![cfg_attr(docsrs, warn(rustdoc::broken_intra_doc_links))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod cache;
