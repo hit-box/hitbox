@@ -2,6 +2,7 @@
 
 use crate::CacheError;
 #[cfg(feature = "derive")]
+#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use hitbox_derive::Cacheable;
 
 /// Trait describes cache configuration per type that implements this trait.
