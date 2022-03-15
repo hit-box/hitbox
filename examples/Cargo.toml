@@ -10,7 +10,7 @@ default = []
 [dev-dependencies]
 hitbox = { path = "../hitbox", features = ["derive"] }
 hitbox-actix = { path = "../hitbox-actix", features = ["redis"]}
-actix = "0.12"
+actix = "0.13"
 log = "0.4"
 actix-rt = "2"
 serde_json = "1"
