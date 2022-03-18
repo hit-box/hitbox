@@ -19,4 +19,5 @@ pub trait CacheBackend {
         T: CacheableResponse + Sync,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned;
     async fn delete(&self, key: String) -> BackendResult<DeleteStatus>;
+    async fn start(&self) -> BackendResult<()>;
 }

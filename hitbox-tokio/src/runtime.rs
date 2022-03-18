@@ -4,9 +4,11 @@ use async_trait::async_trait;
 
 use hitbox::{
     runtime::{AdapterResult, RuntimeAdapter},
-    CacheError, CacheState, CacheableResponse, settings::Status
+    settings::Status,
+    CacheError, CacheState, CacheableResponse,
 };
 use hitbox_backend::CacheBackend;
+use serde::de::DeserializeOwned;
 
 pub struct FutureAdapter<'b, In, Out, U, B> {
     _response: PhantomData<Out>,
@@ -27,9 +29,11 @@ impl<'b, In, Out, U, B> FutureAdapter<'b, In, Out, U, B> {
 }
 
 #[async_trait]
-impl<In, Out, U, ResFuture, B, 'b> crate::runtime::RuntimeAdapter for FutureAdapter<'b, In, Out, U, B>
+impl<In, Out, U, ResFuture, B, 'b> crate::runtime::RuntimeAdapter
+    for FutureAdapter<'b, In, Out, U, B>
 where
     Out: CacheableResponse + Send + Sync,
+    <Out as CacheableResponse>::Cached: DeserializeOwned,
     U: Send + Sync + Fn(In) -> ResFuture,
     ResFuture: Future<Output = Out> + Send,
     In: Send + Sync,
@@ -40,13 +44,14 @@ where
         &self,
         cached_value: &'a hitbox_backend::CachedValue<Self::UpstreamResult>,
     ) -> crate::runtime::AdapterResult<()> {
-        Err(CacheError::DeserializeError)
+        Ok(self
+            .backend
+            .set("test_key".to_owned(), cached_value, Some(42))
+            .await?)
     }
 
-    async fn poll_cache(
-        &self,
-    ) -> crate::runtime::AdapterResult<CacheState<Self::UpstreamResult>> {
-        Err(CacheError::DeserializeError)
+    async fn poll_cache(&self) -> crate::runtime::AdapterResult<CacheState<Self::UpstreamResult>> {
+        Ok(self.backend.get("test_key".to_owned()).await?.into())
     }
 
     async fn poll_upstream(&mut self) -> crate::runtime::AdapterResult<Self::UpstreamResult> {

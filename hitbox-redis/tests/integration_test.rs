@@ -3,6 +3,7 @@ use hitbox_redis::{error::Error, RedisBackend};
 use tokio::time::{sleep, Duration};
 use serde::{Serialize, Deserialize};
 use chrono::Utc;
+use test_log::test;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 struct Test {
@@ -35,10 +36,11 @@ impl Test {
     }
 }
 
-#[tokio::test]
+#[test(tokio::test)]
 async fn test_rw() -> Result<(), Error> {
     tokio::time::pause();
-    let backend = RedisBackend::new().await?;
+    let backend = RedisBackend::new().unwrap();
+    backend.start().await.unwrap();
     let key = "test_key".to_owned();
     let inner = Test::new();
     let value = CachedValue::new(inner.clone(), Utc::now());
