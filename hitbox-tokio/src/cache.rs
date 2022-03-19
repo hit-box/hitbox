@@ -3,7 +3,7 @@ use std::future::Future;
 use hitbox::{
     settings::{CacheSettings, Status},
     states::initial::Initial,
-    CacheableResponse, CacheError,
+    CacheableResponse, CacheError, Cacheable,
 };
 use hitbox_backend::{BackendError, CacheBackend};
 use hitbox_redis::RedisBackend;
@@ -39,24 +39,24 @@ where
         Ok(self.backend.start().await?)
     }
 
-    async fn process<F, Req, Res, ResFuture>(&self, upstream: F, request: Req) -> Res
+    async fn process<F, Req, Res, ResFuture>(&self, upstream: F, request: Req) -> Result<Res, CacheError>
     where
-        Req: Send + Sync,
+        Req: Cacheable + Send + Sync,
         F: Fn(Req) -> ResFuture + Send + Sync,
         ResFuture: Future<Output = Res> + Send + Sync,
         Res: Send + Sync + CacheableResponse + std::fmt::Debug,
         <Res as CacheableResponse>::Cached: DeserializeOwned,
         B: CacheBackend + Send + Sync,
     {
-        let adapter_result = FutureAdapter::new(upstream, request, &self.backend);
+        let adapter = FutureAdapter::new(upstream, request, &self.backend)?;
         // let settings = self.settings.clone();
         let settings = CacheSettings {
             cache: Status::Enabled,
             lock: Status::Disabled,
             stale: Status::Disabled,
         };
-        let initial_state = Initial::new(settings, adapter_result);
-        initial_state.transitions().await.unwrap()
+        let initial_state = Initial::new(settings, adapter);
+        Ok(initial_state.transitions().await?)
     }
 }
 
@@ -95,7 +95,7 @@ mod tests {
             "Message".to_owned()
         }
         fn cache_ttl(&self) -> u32 {
-            2
+            20
         }
     }
 

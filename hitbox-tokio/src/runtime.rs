@@ -5,26 +5,38 @@ use async_trait::async_trait;
 use hitbox::{
     runtime::{AdapterResult, RuntimeAdapter},
     settings::Status,
-    CacheError, CacheState, CacheableResponse,
+    CacheError, CacheState, CacheableResponse, Cacheable,
 };
 use hitbox_backend::CacheBackend;
 use serde::de::DeserializeOwned;
 
-pub struct FutureAdapter<'b, In, Out, U, B> {
+pub struct FutureAdapter<'b, In, Out, U, B> 
+where
+    In: Cacheable,
+{
     _response: PhantomData<Out>,
     backend: &'b B,
     request: Option<In>,
+    cache_key: String,
+    cache_ttl: u32,
+    cache_stale_ttl: u32,
     upstream: U,
 }
 
-impl<'b, In, Out, U, B> FutureAdapter<'b, In, Out, U, B> {
-    pub fn new(upstream: U, request: In, backend: &'b B) -> Self {
-        Self {
+impl<'b, In, Out, U, B> FutureAdapter<'b, In, Out, U, B> 
+where
+    In: Cacheable,
+{
+    pub fn new(upstream: U, request: In, backend: &'b B) -> Result<Self, CacheError> {
+        Ok(Self {
+            cache_key: request.cache_key()?,
+            cache_ttl: request.cache_ttl(),
+            cache_stale_ttl: request.cache_stale_ttl(),
             request: Some(request),
             upstream,
             backend,
             _response: PhantomData::default(),
-        }
+        })
     }
 }
 
@@ -36,7 +48,7 @@ where
     <Out as CacheableResponse>::Cached: DeserializeOwned,
     U: Send + Sync + Fn(In) -> ResFuture,
     ResFuture: Future<Output = Out> + Send,
-    In: Send + Sync,
+    In: Cacheable + Send + Sync,
     B: CacheBackend + Send + Sync,
 {
     type UpstreamResult = Out;
@@ -46,12 +58,12 @@ where
     ) -> crate::runtime::AdapterResult<()> {
         Ok(self
             .backend
-            .set("test_key".to_owned(), cached_value, Some(42))
+            .set(self.cache_key.clone(), cached_value, Some(self.cache_ttl))
             .await?)
     }
 
     async fn poll_cache(&self) -> crate::runtime::AdapterResult<CacheState<Self::UpstreamResult>> {
-        Ok(self.backend.get("test_key".to_owned()).await?.into())
+        Ok(self.backend.get(self.cache_key.clone()).await?.into())
     }
 
     async fn poll_upstream(&mut self) -> crate::runtime::AdapterResult<Self::UpstreamResult> {
