@@ -4,7 +4,6 @@ use async_trait::async_trait;
 
 use hitbox::{
     runtime::{AdapterResult, RuntimeAdapter},
-    settings::Status,
     CacheError, CacheState, CacheableResponse, Cacheable,
 };
 use hitbox_backend::CacheBackend;
@@ -19,6 +18,7 @@ where
     request: Option<In>,
     cache_key: String,
     cache_ttl: u32,
+    #[allow(dead_code)]
     cache_stale_ttl: u32,
     upstream: U,
 }

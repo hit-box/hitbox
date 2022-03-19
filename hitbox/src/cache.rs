@@ -1,12 +1,8 @@
 //! Cacheable trait and implementation of cache logic.
 
 use crate::CacheError;
-use crate::runtime::AdapterResult;
-use crate::settings::{CacheSettings, Status};
-use hitbox_backend::{CacheableResponse, CacheBackend};
 #[cfg(feature = "derive")]
 pub use hitbox_derive::Cacheable;
-use async_trait::async_trait;
 
 /// Trait describes cache configuration per type that implements this trait.
 pub trait Cacheable {
@@ -100,6 +96,7 @@ mod tests {
         assert_eq!(0, a.cache_stale_ttl());
     }
 
+    #[allow(dead_code)]
     async fn upstream_fn(message: Message) -> i32 {
         message.0 
     }

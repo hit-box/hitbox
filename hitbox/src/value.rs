@@ -1,8 +1,6 @@
 //! Cached data representation and wrappers.
-use crate::runtime::EvictionPolicy;
-use crate::{CacheError, CachePolicy, CacheableResponse};
 use chrono::{DateTime, Utc};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::Serialize;
 
 /*/// This struct wraps and represents cached data.
 ///

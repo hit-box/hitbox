@@ -1,6 +1,6 @@
 //! [hitbox::runtime::RuntimeAdapter] implementation for Actix runtime.
 use actix::dev::{MessageResponse, ToEnvelope};
-use actix::{Actor, Addr, Handler, Message};
+use actix::{Actor, Handler, Message};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tracing::warn;
@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use hitbox::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings};
 use hitbox::{CacheError, CacheState, Cacheable, CacheableResponse, CachedValue};
-use hitbox_backend::{Backend, CacheBackend, Get, Set};
+use hitbox_backend::CacheBackend;
 
 use crate::QueryCache;
 

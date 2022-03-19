@@ -17,7 +17,9 @@ pub enum CacheServiceState {
 }
 
 pub struct Cache<B=RedisBackend> {
+    #[allow(dead_code)]
     state: CacheServiceState,
+    #[allow(dead_code)]
     backend: B,
 }
 
@@ -25,20 +27,24 @@ impl<B> Cache<B>
 where
     B: CacheBackend
 {
+    #[allow(dead_code)]
     fn new() -> Result<Cache<RedisBackend>, BackendError> {
         Ok(<Cache>::builder()?.build())
     }
 
+    #[allow(dead_code)]
     fn builder() -> Result<CacheBuilder<RedisBackend>, BackendError> {
         Ok(CacheBuilder {
             backend: Some(RedisBackend::new()?),
         })
     }
 
+    #[allow(dead_code)]
     async fn start(&self) -> Result<(), CacheError> {
         Ok(self.backend.start().await?)
     }
 
+    #[allow(dead_code)]
     async fn process<F, Req, Res, ResFuture>(&self, upstream: F, request: Req) -> Result<Res, CacheError>
     where
         Req: Cacheable + Send + Sync,
@@ -65,6 +71,7 @@ pub struct CacheBuilder<B> {
 }
 
 impl<B> CacheBuilder<B> {
+    #[allow(dead_code)]
     fn backend(backend: B) -> CacheBuilder<B> {
         CacheBuilder {
             backend: Some(backend),
@@ -107,7 +114,7 @@ mod tests {
     async fn test_cache_process() {
         let cache = <Cache>::new().unwrap();
         cache.start().await.unwrap();
-        let response = cache.process(upstream_fn, Message(42)).await;
+        let response = cache.process(upstream_fn, Message(42)).await.unwrap();
         dbg!(response);
     }
 }

@@ -6,10 +6,7 @@ use actix::{
     prelude::*,
 };
 use hitbox::states::initial::Initial;
-use hitbox::{
-    dev::{Backend, Delete, Get, Lock, Set},
-    CacheError, Cacheable,
-};
+use hitbox::{CacheError, Cacheable};
 use hitbox_backend::{CacheBackend, CacheableResponse};
 use serde::{de::DeserializeOwned, Serialize};
 

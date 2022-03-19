@@ -1,8 +1,7 @@
 //! CacheActor builder patter implementation.
 use crate::CacheActor;
-use actix::{Actor, Addr};
 use hitbox::settings::{CacheSettings, Status};
-use hitbox_backend::{Backend, CacheBackend};
+use hitbox_backend::CacheBackend;
 use std::{marker::PhantomData, sync::Arc};
 
 /// Cache actor configurator.

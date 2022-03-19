@@ -1,6 +1,5 @@
-use hitbox_backend::{Delete, DeleteStatus, Get, Lock, LockStatus, Set, CacheBackend, CacheableResponse, CachePolicy, CachedValue};
+use hitbox_backend::{DeleteStatus, CacheBackend, CacheableResponse, CachePolicy, CachedValue};
 use hitbox_redis::{error::Error, RedisBackend};
-use tokio::time::{sleep, Duration};
 use serde::{Serialize, Deserialize};
 use chrono::Utc;
 use test_log::test;

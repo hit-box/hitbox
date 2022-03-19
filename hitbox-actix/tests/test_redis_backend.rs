@@ -1,7 +1,5 @@
 use actix::prelude::*;
-use hitbox::{
-    dev::CacheBackend, CacheError, CachePolicy, Cacheable, CacheableResponse, CachedValue,
-};
+use hitbox::{dev::CacheBackend, CacheError, CachePolicy, Cacheable, CacheableResponse};
 use hitbox_actix::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -41,7 +39,7 @@ impl Handler<Ping> for UpstreamActor {
 
 #[actix::test]
 async fn test_mock_backend() {
-    let backend = RedisBackend::new().await.unwrap();
+    let backend = RedisBackend::new().unwrap();
     let cache = CacheActor::builder().finish(backend).start();
     let upstream = UpstreamActor.start();
     let msg = Ping { id: 42 };
@@ -51,7 +49,7 @@ async fn test_mock_backend() {
         .unwrap()
         .unwrap();
 
-    let backend = RedisBackend::new().await.unwrap();
+    let backend = RedisBackend::new().unwrap();
     let res: Pong = backend
         .get("UpstreamActor::Ping::42".to_owned())
         .await

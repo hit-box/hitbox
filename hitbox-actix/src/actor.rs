@@ -1,15 +1,13 @@
 //! Cache actor and Builder.
 use crate::builder::CacheBuilder;
-use actix::dev::ToEnvelope;
 use actix::prelude::*;
-use hitbox::dev::{Delete, Get, Lock, Set};
 #[cfg(feature = "metrics")]
 use hitbox::metrics::{
     CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
 };
 use hitbox::settings::CacheSettings;
 use hitbox::CacheError;
-use hitbox_backend::{Backend, CacheBackend};
+use hitbox_backend::CacheBackend;
 use hitbox_redis::RedisBackend;
 use tracing::{debug, info};
 use std::sync::Arc;
@@ -48,7 +46,6 @@ where
     #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> Result<CacheActor<RedisBackend>, CacheError> {
         let backend = RedisBackend::new()
-            .await
             .map_err(|err| CacheError::BackendError(err.into()))?;
         Ok(CacheBuilder::default().finish(backend))
     }

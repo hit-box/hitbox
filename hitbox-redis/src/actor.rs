@@ -1,14 +1,11 @@
 //! Redis backend actor implementation.
-use std::result;
-
 use crate::error::Error;
 use async_trait::async_trait;
 use hitbox_backend::{
     serializer::{JsonSerializer, Serializer},
-    Backend, BackendError, BackendResult, CacheBackend, CacheableResponse, CachedValue, Delete,
-    DeleteStatus, Get, Lock, LockStatus, Set,
+    BackendError, BackendResult, CacheBackend, CacheableResponse, CachedValue,
+    DeleteStatus, 
 };
-use log::{debug, info};
 use redis::{aio::ConnectionManager, Client};
 use tokio::sync::OnceCell;
 use tracing::trace;
