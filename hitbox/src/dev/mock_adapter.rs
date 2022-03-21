@@ -1,4 +1,5 @@
-/*use crate::error::CacheError;
+use async_trait::async_trait;
+use crate::error::CacheError;
 use crate::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings};
 use crate::value::{CacheState, CachedValue};
 use crate::CacheableResponse;
@@ -104,36 +105,22 @@ where
     }
 }
 
+#[async_trait]
 impl<T> RuntimeAdapter for MockAdapter<T>
 where
-    T: Clone + CacheableResponse + 'static,
+    T: Clone + Send + Sync + CacheableResponse + 'static,
 {
     type UpstreamResult = T;
-    fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
-        let result = match self.clone().upstream_state {
-            MockUpstreamState::Ok(value) => Ok(value),
-            MockUpstreamState::Error => Err(CacheError::DeserializeError),
-        };
-        Box::pin(async { result })
+    async fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
+        unimplemented!()
     }
 
-    fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
-        let result = match self.clone().cache_state {
-            MockCacheState::Actual(value) => Ok(CacheState::Actual(CachedValue::new(
-                value,
-                chrono::Utc::now(),
-            ))),
-            MockCacheState::Stale(value) => {
-                Ok(CacheState::Stale(CachedValue::new(value.0, value.1)))
-            }
-            MockCacheState::Miss => Ok(CacheState::Miss),
-            MockCacheState::Error => Err(CacheError::DeserializeError),
-        };
-        Box::pin(async { result })
+    async fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
+        unimplemented!()
     }
 
-    fn update_cache(&self, _: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
-        Box::pin(async { Ok(()) })
+    async fn update_cache<'a>(&self, _: &'a CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
+        unimplemented!()
     }
 
     fn eviction_settings(&self) -> EvictionPolicy {
@@ -142,4 +129,4 @@ where
             stale_ttl: 0,
         })
     }
-}*/
+}

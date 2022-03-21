@@ -11,7 +11,7 @@ pub struct CachedValue<T> {
     data: T,
     expired: DateTime<Utc>,
 }*/
-use crate::CachedValue;
+pub use crate::CachedValue;
 
 #[derive(Serialize)]
 struct CachedInnerValue<'a, U>

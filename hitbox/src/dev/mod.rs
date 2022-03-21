@@ -5,4 +5,4 @@ pub mod mock_backend;
 pub use hitbox_backend::{
     Backend, BackendError, CacheBackend, Delete, DeleteStatus, Get, Lock, LockStatus, Set,
 };
-// pub use mock_adapter::MockAdapter;
+pub use mock_adapter::MockAdapter;
