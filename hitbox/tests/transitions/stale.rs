@@ -1,4 +1,4 @@
-/*use hitbox::dev::MockAdapter;
+use hitbox::dev::MockAdapter;
 use hitbox::settings::{CacheSettings, Status};
 use hitbox::states::initial::Initial;
 use hitbox::transition_groups::stale;
@@ -49,4 +49,4 @@ async fn test_cache_actual() {
     let initial_state = Initial::new(settings, adapter);
     let finish = stale::transition(initial_state).await;
     assert_eq!(finish.result().unwrap(), "actual cache");
-}*/
+}

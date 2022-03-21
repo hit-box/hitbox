@@ -112,15 +112,28 @@ where
 {
     type UpstreamResult = T;
     async fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
-        unimplemented!()
+        match self.clone().upstream_state {
+            MockUpstreamState::Ok(value) => Ok(value),
+            MockUpstreamState::Error => Err(CacheError::DeserializeError),
+        }
     }
 
     async fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
-        unimplemented!()
+        match self.clone().cache_state {
+            MockCacheState::Actual(value) => Ok(CacheState::Actual(CachedValue::new(
+                value,
+                chrono::Utc::now(),
+            ))),
+            MockCacheState::Stale(value) => {
+                Ok(CacheState::Stale(CachedValue::new(value.0, value.1)))
+            }
+            MockCacheState::Miss => Ok(CacheState::Miss),
+            MockCacheState::Error => Err(CacheError::DeserializeError),
+        }
     }
 
     async fn update_cache<'a>(&self, _: &'a CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
-        unimplemented!()
+        Ok(())
     }
 
     fn eviction_settings(&self) -> EvictionPolicy {
