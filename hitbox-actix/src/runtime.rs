@@ -39,7 +39,7 @@ where
     /// Creates new instance of Actix runtime adapter.
     pub fn new(message: QueryCache<A, M>, backend: Arc<B>) -> Result<Self, CacheError> {
         let cache_key = message.cache_key()?;
-        let cache_stale_ttl = message.message.cache_ttl();
+        let cache_stale_ttl = message.message.cache_stale_ttl();
         let cache_ttl = message.message.cache_ttl();
         Ok(Self {
             message: Some(message),
