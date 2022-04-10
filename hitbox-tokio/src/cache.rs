@@ -71,7 +71,6 @@ pub struct CacheBuilder<B> {
 }
 
 impl<B> CacheBuilder<B> {
-    #[allow(dead_code)]
     fn backend(backend: B) -> CacheBuilder<B> {
         CacheBuilder {
             backend: Some(backend),

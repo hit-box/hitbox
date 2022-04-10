@@ -15,12 +15,11 @@ where
 {
     _response: PhantomData<Out>,
     backend: &'b B,
+    upstream: U,
     request: Option<In>,
     cache_key: String,
     cache_ttl: u32,
-    #[allow(dead_code)]
     cache_stale_ttl: u32,
-    upstream: U,
 }
 
 impl<'b, In, Out, U, B> FutureAdapter<'b, In, Out, U, B> 
@@ -67,7 +66,6 @@ where
     }
 
     async fn poll_upstream(&mut self) -> crate::runtime::AdapterResult<Self::UpstreamResult> {
-        println!("huy");
         let request = self.request.take();
         let request = request.ok_or_else(|| {
             CacheError::CacheKeyGenerationError("Request already sent to upstream".to_owned())
@@ -76,9 +74,10 @@ where
     }
 
     fn eviction_settings(&self) -> hitbox_backend::EvictionPolicy {
-        hitbox_backend::EvictionPolicy::Ttl(hitbox_backend::TtlSettings {
-            ttl: 42,
-            stale_ttl: 24,
-        })
+        let ttl_settings = hitbox_backend::TtlSettings {
+            ttl: self.cache_ttl,
+            stale_ttl: self.cache_stale_ttl,
+        };
+        hitbox_backend::EvictionPolicy::Ttl(ttl_settings)
     }
 }

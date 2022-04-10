@@ -100,11 +100,4 @@ mod tests {
     async fn upstream_fn(message: Message) -> i32 {
         message.0 
     }
-
-    // #[tokio::test]
-    // async fn test_cache_process() {
-        // let cache = Cache { state: CacheState::Running };
-        // let response = cache.process(upstream_fn, Message(42)).await;
-        // dbg!(response);
-    // }
 }
