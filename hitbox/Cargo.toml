@@ -28,6 +28,8 @@ async-trait = "0.1.52"
 [dev-dependencies]
 actix_derive = "0.6"
 actix-web = "3"
+tokio = { version = "1", features = ["macros", "test-util"] }
+metrics-util = "0.12"
 
 [features]
 default = []
