@@ -127,5 +127,11 @@ mod tests {
         let stale_counter = counters.get(&stale_key);
         assert!(stale_counter.is_some());
         assert_eq!(stale_counter.unwrap().load(Ordering::Acquire), 1);
+
+        let hit_key = Key::from_parts(CACHE_HIT_COUNTER.as_ref(), LABELS.to_vec());
+        let counters = handler.registry.get_counter_handles();
+        let hit_counter = counters.get(&hit_key);
+        assert!(hit_counter.is_some());
+        assert_eq!(hit_counter.unwrap().load(Ordering::Acquire), 1);
     }
 }
