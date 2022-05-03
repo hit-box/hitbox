@@ -30,7 +30,7 @@ pub enum CachePolicy<T, U> {
 /// If you want decribe custom caching rules for your own types (for example Enum) you should
 /// implement `CacheableResponse` for that type:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use hitbox::{CacheableResponse, CachePolicy};
 ///
 /// enum HttpResponse {

@@ -56,7 +56,7 @@ where
 {
     fn from(value: &'a CachedValue<T>) -> Self {
         match value.data.cache_policy() {
-            CachePolicy::Cacheable(data) => Some(SerializableCachedValue::new(&data, value.expired)),
+            CachePolicy::Cacheable(data) => Some(SerializableCachedValue::new(data, value.expired)),
             CachePolicy::NonCacheable(_) => None,
         }
     }

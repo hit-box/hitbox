@@ -42,7 +42,7 @@ where
     #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> Result<CacheActor<RedisBackend>, CacheError> {
         let backend = RedisBackend::new()
-            .map_err(|err| CacheError::BackendError(err.into()))?;
+            .map_err(CacheError::BackendError)?;
         Ok(CacheBuilder::default().finish(backend))
     }
 

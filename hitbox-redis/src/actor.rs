@@ -31,7 +31,7 @@ impl RedisBackend {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let backend = RedisBackend::new().await;
+    ///     let backend = RedisBackend::new();
     /// }
     /// ```
     pub fn new() -> Result<RedisBackend, BackendError> {
@@ -43,6 +43,7 @@ impl RedisBackend {
         RedisBackendBuilder::default()
     }
 
+    /// Create lazy connection to redis via [ConnectionManager](redis::aio::ConnectionManager)
     pub async fn connection(&self) -> Result<&ConnectionManager, BackendError> {
         trace!("Get connection manager");
         let manager = self
@@ -164,7 +165,7 @@ impl CacheBackend for RedisBackend {
         let mut con = self.connection().await?.clone();
         let mut request = redis::cmd("SET");
         let serialized_value =
-            JsonSerializer::<Vec<u8>>::serialize(&value).map_err(BackendError::from)?;
+            JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
         request.arg(key).arg(serialized_value);
         if let Some(ttl) = ttl {
             request.arg("EX").arg(ttl);

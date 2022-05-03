@@ -1,5 +1,8 @@
 name: CI
 
+env:
+  rust_min: 1.55.0
+
 on:
   push:
     branches:
@@ -12,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.46.0, stable]
+        rust: [{{ env.rust_min }}, stable]
     steps:
     - uses: actions/checkout@main
     - uses: actions-rs/toolchain@v1
@@ -31,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.46.0, stable, beta]
+        rust: [{{ env.rust_min }}, stable, beta]
         redis-version: [6]
     steps:
     - uses: actions/checkout@main
