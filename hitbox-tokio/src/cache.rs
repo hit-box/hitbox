@@ -62,7 +62,7 @@ where
             stale: Status::Disabled,
         };
         let initial_state = Initial::new(settings, adapter);
-        Ok(initial_state.transitions().await?)
+        initial_state.transitions().await
     }
 }
 
@@ -71,6 +71,8 @@ pub struct CacheBuilder<B> {
 }
 
 impl<B> CacheBuilder<B> {
+    // TODO: Temporary permission. Remove after full refactoring
+    #[allow(dead_code)]
     fn backend(backend: B) -> CacheBuilder<B> {
         CacheBuilder {
             backend: Some(backend),

@@ -1,15 +1,15 @@
-use std::{future::Future, marker::PhantomData};
+use std::{borrow::Cow, future::Future, marker::PhantomData};
 
 use async_trait::async_trait;
 
 use hitbox::{
     runtime::{AdapterResult, RuntimeAdapter},
-    CacheError, CacheState, CacheableResponse, Cacheable,
+    CacheError, CacheState, Cacheable, CacheableResponse,
 };
 use hitbox_backend::CacheBackend;
 use serde::de::DeserializeOwned;
 
-pub struct FutureAdapter<'b, In, Out, U, B> 
+pub struct FutureAdapter<'b, In, Out, U, B>
 where
     In: Cacheable,
 {
@@ -22,7 +22,7 @@ where
     cache_stale_ttl: u32,
 }
 
-impl<'b, In, Out, U, B> FutureAdapter<'b, In, Out, U, B> 
+impl<'b, In, Out, U, B> FutureAdapter<'b, In, Out, U, B>
 where
     In: Cacheable,
 {
@@ -79,5 +79,13 @@ where
             stale_ttl: self.cache_stale_ttl,
         };
         hitbox_backend::EvictionPolicy::Ttl(ttl_settings)
+    }
+
+    fn upstream_name(&self) -> Cow<'static, str> {
+        std::any::type_name::<U>().into()
+    }
+
+    fn message_name(&self) -> Cow<'static, str> {
+        self.cache_key.clone().into()
     }
 }

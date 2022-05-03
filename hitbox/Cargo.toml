@@ -19,7 +19,7 @@ serde_qs = { version = "0.8", optional = true }
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
-prometheus = { version = "0.12", optional = true }
+metrics = { version = "0.18", optional = true }
 lazy_static = { version = "1", optional = true }
 tracing = "0.1"
 tokio = { version = "1.17.0", features = ["macros"] }
@@ -28,9 +28,11 @@ async-trait = "0.1.52"
 [dev-dependencies]
 actix_derive = "0.6"
 actix-web = "3"
+tokio = { version = "1", features = ["macros", "test-util"] }
+metrics-util = "0.12"
 
 [features]
 default = []
 
 derive = ["hitbox-derive", "serde_qs", "actix/macros"]
-metrics = ["prometheus", "lazy_static"]
+cache-metrics = ["metrics", "lazy_static"]
