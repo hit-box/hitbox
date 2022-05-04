@@ -26,7 +26,7 @@ pub fn impl_macro(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
         }
     };
 
-    let cache_ttl_implement = match attrs.ttl {
+    let cache_ttl_implement = match attrs.cache_ttl {
         Some(cache_ttl) => quote! {
             fn cache_ttl(&self) -> u32 {
                 #cache_ttl
@@ -35,7 +35,7 @@ pub fn impl_macro(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
         None => proc_macro2::TokenStream::new(),
     };
 
-    let cache_stale_ttl_implement = match attrs.stale_ttl {
+    let cache_stale_ttl_implement = match attrs.cache_stale_ttl {
         Some(cache_stale_ttl) => quote! {
             fn cache_stale_ttl(&self) -> u32 {
                 #cache_stale_ttl
@@ -44,7 +44,7 @@ pub fn impl_macro(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
         None => proc_macro2::TokenStream::new(),
     };
 
-    let cache_version_implement = match attrs.version {
+    let cache_version_implement = match attrs.cache_version {
         Some(cache_version) => quote! {
             fn cache_version(&self) -> u32 {
                 #cache_version

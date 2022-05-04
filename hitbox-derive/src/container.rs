@@ -1,29 +1,27 @@
+use quote::ToTokens;
+
 const CACHE_TTL: &str = "cache_ttl";
 const CACHE_STALE_TTL: &str = "cache_stale_ttl";
 const CACHE_VERSION: &str = "cache_version";
 
-use quote::ToTokens;
-
-fn get_lit_int<'a>(lit: &'a syn::Lit, attr_name: &'a str) -> Result<&'a syn::LitInt, syn::Error> {
-    if let syn::Lit::Int(lit) = lit {
+fn parse_lit_to_u32(lit: &syn::Lit, attr_name: &str) -> syn::Result<u32> {
+    let lit = if let syn::Lit::Int(lit) = lit {
         Ok(lit)
     } else {
         Err(syn::Error::new_spanned(
             lit,
             format!("Expected hitbox {} attribute should be u32", attr_name),
         ))
-    }
-}
+    }?;
 
-fn parse_u32(lit: &syn::LitInt) -> syn::Result<u32> {
     lit.base10_parse::<u32>()
         .map_err(|e| syn::Error::new_spanned(lit, e))
 }
 
 pub struct Container {
-    pub ttl: Option<u32>,
-    pub stale_ttl: Option<u32>,
-    pub version: Option<u32>,
+    pub cache_ttl: Option<u32>,
+    pub cache_stale_ttl: Option<u32>,
+    pub cache_version: Option<u32>,
 }
 
 impl Container {
@@ -54,24 +52,21 @@ impl Container {
             match &meta_item {
                 // Parse `#[hitbox(cache_ttl = 42)]`
                 syn::NestedMeta::Meta(syn::Meta::NameValue(m)) if m.path.is_ident(CACHE_TTL) => {
-                    let lit_ttl = get_lit_int(&m.lit, CACHE_TTL)?;
-                    ttl = Some(parse_u32(lit_ttl)?)
+                    ttl = Some(parse_lit_to_u32(&m.lit, CACHE_TTL)?);
                 }
 
                 // Parse `#[hitbox(cache_stale_ttl = 42)]`
                 syn::NestedMeta::Meta(syn::Meta::NameValue(m))
                     if m.path.is_ident(CACHE_STALE_TTL) =>
                 {
-                    let lit_stale_ttl = get_lit_int(&m.lit, CACHE_STALE_TTL)?;
-                    stale_ttl = Some(parse_u32(lit_stale_ttl)?)
+                    stale_ttl = Some(parse_lit_to_u32(&m.lit, CACHE_STALE_TTL)?);
                 }
 
                 // Parse `#[hitbox(cache_version = 42)]`
                 syn::NestedMeta::Meta(syn::Meta::NameValue(m))
                     if m.path.is_ident(CACHE_VERSION) =>
                 {
-                    let lit_version = get_lit_int(&m.lit, CACHE_VERSION)?;
-                    version = Some(parse_u32(lit_version)?)
+                    version = Some(parse_lit_to_u32(&m.lit, CACHE_VERSION)?);
                 }
 
                 // Throw error on unknown attribute
@@ -94,9 +89,9 @@ impl Container {
         }
 
         Ok(Container {
-            ttl,
-            stale_ttl,
-            version,
+            cache_ttl: ttl,
+            cache_stale_ttl: stale_ttl,
+            cache_version: version,
         })
     }
 }
