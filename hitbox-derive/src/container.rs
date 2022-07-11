@@ -5,17 +5,15 @@ const CACHE_STALE_TTL: &str = "cache_stale_ttl";
 const CACHE_VERSION: &str = "cache_version";
 
 fn parse_lit_to_u32(lit: &syn::Lit, attr_name: &str) -> syn::Result<u32> {
-    let lit = if let syn::Lit::Int(lit) = lit {
-        Ok(lit)
-    } else {
-        Err(syn::Error::new_spanned(
+    match lit {
+        syn::Lit::Int(lit) => lit
+            .base10_parse::<u32>()
+            .map_err(|e| syn::Error::new_spanned(lit, e)),
+        _ => Err(syn::Error::new_spanned(
             lit,
             format!("Expected hitbox {} attribute should be u32", attr_name),
-        ))
-    }?;
-
-    lit.base10_parse::<u32>()
-        .map_err(|e| syn::Error::new_spanned(lit, e))
+        )),
+    }
 }
 
 pub struct Container {
@@ -37,7 +35,6 @@ impl Container {
                 if !attr.path.is_ident("hitbox") {
                     return Ok(Vec::new());
                 }
-
                 match attr.parse_meta() {
                     Ok(syn::Meta::List(meta)) => Ok(meta.nested.into_iter().collect()),
                     Ok(other) => Err(syn::Error::new_spanned(other, "expected #[hitbox(...)]")),
