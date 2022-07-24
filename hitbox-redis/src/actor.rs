@@ -43,6 +43,7 @@ impl RedisBackend {
         RedisBackendBuilder::default()
     }
 
+    /// Create new or get already existed connection to Redis
     pub async fn connection(&self) -> Result<&ConnectionManager, BackendError> {
         trace!("Get connection manager");
         let manager = self
@@ -164,7 +165,7 @@ impl CacheBackend for RedisBackend {
         let mut con = self.connection().await?.clone();
         let mut request = redis::cmd("SET");
         let serialized_value =
-            JsonSerializer::<Vec<u8>>::serialize(&value).map_err(BackendError::from)?;
+            JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
         request.arg(key).arg(serialized_value);
         if let Some(ttl) = ttl {
             request.arg("EX").arg(ttl);
