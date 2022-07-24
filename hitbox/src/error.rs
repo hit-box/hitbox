@@ -7,9 +7,9 @@ pub enum CacheError {
     /// Error described all problems with cache backend interactions.
     #[error(transparent)]
     BackendError(#[from] hitbox_backend::BackendError),
-    /// Wrapper for upstream actor mailbox or timeout errors.
-    #[error("Actix upstream actor error")]
-    UpstreamError(#[from] actix::MailboxError),
+    /// Wrapper for upstream errors.
+    #[error("Upstream error: {0}")]
+    UpstreamError(Box<dyn std::error::Error>),
     /// Wrapper for cache data serialization problems.
     #[error("Cached data serialization error")]
     SerializeError(#[from] serde_json::Error),
