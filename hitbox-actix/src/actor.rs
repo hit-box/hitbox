@@ -41,8 +41,7 @@ where
     /// Initialize new Cache actor with default [`hitbox_redis::RedisBackend`].
     #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> Result<CacheActor<RedisBackend>, CacheError> {
-        let backend = RedisBackend::new()
-            .map_err(CacheError::BackendError)?;
+        let backend = RedisBackend::new()?;
         Ok(CacheBuilder::default().finish(backend))
     }
 

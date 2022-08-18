@@ -71,7 +71,7 @@ pub struct CacheBuilder<B> {
 }
 
 impl<B> CacheBuilder<B> {
-    // TODO: Temporary permission. Remove after full refactoring
+    // TODO: allowed temporary, remove after the implementation of the feature
     #[allow(dead_code)]
     fn backend(backend: B) -> CacheBuilder<B> {
         CacheBuilder {

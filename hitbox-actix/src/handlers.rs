@@ -10,7 +10,7 @@ use hitbox::{CacheError, Cacheable};
 use hitbox_backend::{CacheBackend, CacheableResponse};
 use serde::{de::DeserializeOwned, Serialize};
 
-impl<'a, A, M, B> Handler<QueryCache<A, M>> for CacheActor<B>
+impl<A, M, B> Handler<QueryCache<A, M>> for CacheActor<B>
 where
     B: CacheBackend + Unpin + 'static + Send + Sync,
     A: Actor + Handler<M> + Send,

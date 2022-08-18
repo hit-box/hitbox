@@ -89,7 +89,7 @@ where
     }
 }
 
-impl<'a, A, M> Message for QueryCache<A, M>
+impl<A, M> Message for QueryCache<A, M>
 where
     A: Actor,
     M: Message + Cacheable + Send,

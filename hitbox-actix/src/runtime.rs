@@ -71,7 +71,11 @@ where
         let message = message.ok_or_else(|| {
             CacheError::CacheKeyGenerationError("Message already sent to upstream".to_owned())
         })?;
-        Ok(message.upstream.send(message.message).await?)
+        message
+            .upstream
+            .send(message.message)
+            .await
+            .map_err(|err| CacheError::UpstreamError(err.into()))
     }
 
     async fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
