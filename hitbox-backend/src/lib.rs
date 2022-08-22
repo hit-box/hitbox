@@ -66,7 +66,7 @@ pub enum BackendError {
 }
 
 /// Actix message requests cache backend value by key.
-#[derive(Message, Debug, Clone, PartialEq)]
+#[derive(Message, Debug, Clone, PartialEq, Eq)]
 #[rtype(result = "Result<Option<Vec<u8>>, BackendError>")]
 pub struct Get {
     /// Key of cache backend record.
@@ -74,7 +74,7 @@ pub struct Get {
 }
 
 /// Actix message writes cache backend value by key.
-#[derive(Message, Debug, Clone, PartialEq)]
+#[derive(Message, Debug, Clone, PartialEq, Eq)]
 #[rtype(result = "Result<String, BackendError>")]
 pub struct Set {
     /// Key of cache backend record.
@@ -86,7 +86,7 @@ pub struct Set {
 }
 
 /// Status of deleting result.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DeleteStatus {
     /// Record successfully deleted.
     Deleted(u32),
@@ -95,7 +95,7 @@ pub enum DeleteStatus {
 }
 
 /// Actix message delete record in backend by key.
-#[derive(Message, Debug, Clone, PartialEq)]
+#[derive(Message, Debug, Clone, PartialEq, Eq)]
 #[rtype(result = "Result<DeleteStatus, BackendError>")]
 pub struct Delete {
     /// Key of cache backend record for deleting
@@ -103,7 +103,7 @@ pub struct Delete {
 }
 
 /// Actix message creates lock in cache backend.
-#[derive(Message, Debug, Clone, PartialEq)]
+#[derive(Message, Debug, Clone, PartialEq, Eq)]
 #[rtype(result = "Result<LockStatus, BackendError>")]
 pub struct Lock {
     /// Key of cache backend record for lock.
@@ -113,7 +113,7 @@ pub struct Lock {
 }
 
 /// Enum for representing status of Lock object in backend.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum LockStatus {
     /// Lock successfully created and acquired.
     Acquired,

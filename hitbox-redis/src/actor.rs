@@ -31,7 +31,7 @@ impl RedisBackend {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let backend = RedisBackend::new().await;
+    ///     let backend = RedisBackend::new();
     /// }
     /// ```
     pub fn new() -> Result<RedisBackend, BackendError> {
