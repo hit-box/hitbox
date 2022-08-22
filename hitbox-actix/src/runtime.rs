@@ -74,7 +74,7 @@ where
             .upstream
             .send(message.message)
             .await
-            .map_err(|err| CacheError::UpstreamError(err.into()))
+            .map_err(|err| CacheError::UpstreamError(Box::new(err)))
     }
 
     async fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {

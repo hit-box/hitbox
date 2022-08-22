@@ -13,8 +13,7 @@ use std::{marker::PhantomData, sync::Arc};
 ///
 /// #[actix::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let backend = RedisBackend::new()
-///         .await?;
+///     let backend = RedisBackend::new()?;
 ///     let cache = Cache::builder()
 ///         .enable()
 ///         .finish(backend)

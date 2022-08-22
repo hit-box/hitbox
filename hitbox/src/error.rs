@@ -9,7 +9,7 @@ pub enum CacheError {
     BackendError(#[from] hitbox_backend::BackendError),
     /// Wrapper for upstream errors.
     #[error("Upstream error: {0}")]
-    UpstreamError(Box<dyn std::error::Error>),
+    UpstreamError(Box<dyn std::error::Error + Send>),
     /// Wrapper for cache data serialization problems.
     #[error("Cached data serialization error")]
     SerializeError(#[from] serde_json::Error),
