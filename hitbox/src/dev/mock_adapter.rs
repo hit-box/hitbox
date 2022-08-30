@@ -4,6 +4,7 @@ use crate::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings}
 use crate::value::{CacheState, CachedValue};
 use crate::CacheableResponse;
 use chrono::{DateTime, Utc};
+use std::borrow::Cow;
 
 #[derive(Clone, Debug)]
 /// Settings for builder.
@@ -141,5 +142,13 @@ where
             ttl: 0,
             stale_ttl: 0,
         })
+    }
+
+    fn upstream_name(&self) -> Cow<'static, str> {
+        "MockAdapter".into()
+    }
+
+    fn message_name(&self) -> Cow<'static, str> {
+        "MockMessage".into()
     }
 }

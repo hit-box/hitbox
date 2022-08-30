@@ -43,7 +43,7 @@ impl RedisBackend {
         RedisBackendBuilder::default()
     }
 
-    /// Create new or get already existed connection to Redis
+    /// Create lazy connection to redis via [ConnectionManager](redis::aio::ConnectionManager)
     pub async fn connection(&self) -> Result<&ConnectionManager, BackendError> {
         trace!("Get connection manager");
         let manager = self

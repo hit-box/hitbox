@@ -66,7 +66,7 @@
 pub mod cache;
 pub mod dev;
 pub mod error;
-#[cfg(feature = "metrics")]
+#[cfg(feature = "cache-metrics")]
 pub mod metrics;
 pub mod response;
 pub mod runtime;

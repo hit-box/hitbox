@@ -1,10 +1,11 @@
 //! [hitbox::runtime::RuntimeAdapter] implementation for Actix runtime.
 use actix::dev::{MessageResponse, ToEnvelope};
 use actix::{Actor, Handler, Message};
+use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::borrow::Cow;
 use tracing::warn;
-use async_trait::async_trait;
 
 use hitbox::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings};
 use hitbox::{CacheError, CacheState, Cacheable, CacheableResponse, CachedValue};
@@ -109,5 +110,17 @@ where
             stale_ttl: self.cache_stale_ttl,
         };
         EvictionPolicy::Ttl(ttl_settings)
+    }
+
+    fn upstream_name(&self) -> Cow<'static, str> {
+        std::any::type_name::<A>()
+            .rsplit("::")
+            .next()
+            .unwrap_or("Unknown upstream")
+            .into()
+    }
+
+    fn message_name(&self) -> Cow<'static, str> {
+        self.cache_key.clone().into()
     }
 }

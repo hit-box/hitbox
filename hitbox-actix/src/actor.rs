@@ -1,10 +1,6 @@
 //! Cache actor and Builder.
 use crate::builder::CacheBuilder;
 use actix::prelude::*;
-#[cfg(feature = "metrics")]
-use hitbox::metrics::{
-    CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER, CACHE_UPSTREAM_HANDLING_HISTOGRAM,
-};
 use hitbox::settings::CacheSettings;
 use hitbox::CacheError;
 use hitbox_backend::CacheBackend;

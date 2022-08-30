@@ -1,5 +1,6 @@
 use crate::{CacheError, CacheState, CacheableResponse, CachedValue};
 use async_trait::async_trait;
+use std::borrow::Cow;
 pub use hitbox_backend::{EvictionPolicy, TtlSettings};
 
 /// Type alias for backend or upstream operations in runtime adapter.
@@ -31,4 +32,10 @@ where
 
     /// Returns eviction settings for current cacheable data.
     fn eviction_settings(&self) -> EvictionPolicy;
+
+    /// Return upstream name for metrics
+    fn upstream_name(&self) -> Cow<'static, str>;
+
+    /// Return name of cacheable message for metrics
+    fn message_name(&self) -> Cow<'static, str>;
 }

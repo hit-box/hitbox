@@ -1,13 +1,13 @@
-use std::fmt::Debug;
-
 use tracing::{instrument, trace, warn};
 
-use crate::CacheableResponse;
+#[cfg(feature = "cache-metrics")]
+use crate::metrics::{CACHE_HIT_COUNTER, CACHE_STALE_COUNTER};
 use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
 use crate::states::upstream_polled::{
     UpstreamPolledErrorStaleRetrieved, UpstreamPolledStaleRetrieved, UpstreamPolledSuccessful,
 };
+use crate::CacheableResponse;
 use crate::CachedValue;
 use std::fmt;
 
@@ -37,7 +37,7 @@ where
 impl<A, T> CachePolledStale<A, T>
 where
     A: RuntimeAdapter,
-    T: Debug + CacheableResponse,
+    T: fmt::Debug + CacheableResponse,
 {
     #[instrument]
     /// Poll data from upstream.
@@ -45,7 +45,20 @@ where
     where
         A: RuntimeAdapter<UpstreamResult = T>,
     {
-        match self.adapter.poll_upstream().await {
+        let upstream_response = self.adapter.poll_upstream().await;
+        #[cfg(feature = "cache-metrics")]
+        metrics::increment_counter!(
+            CACHE_HIT_COUNTER.as_ref(),
+            "upstream" => self.adapter.upstream_name(),
+            "message" => self.adapter.message_name(),
+        );
+        #[cfg(feature = "cache-metrics")]
+        metrics::increment_counter!(
+            CACHE_STALE_COUNTER.as_ref(),
+            "upstream" => self.adapter.upstream_name(),
+            "message" => self.adapter.message_name(),
+        );
+        match upstream_response {
             Ok(result) => {
                 trace!("UpstreamPolledSuccessful");
                 UpstreamPolledStaleRetrieved::Successful(UpstreamPolledSuccessful {
