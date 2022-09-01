@@ -12,8 +12,11 @@ keywords = ["cache", "async", "cache-backend", "hitbox", "redis"]
 
 [dependencies]
 hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
+actix = "0.12"
 log = "0.4"
-redis = { version = "0.20", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "0.21", features = ["tokio-comp", "connection-manager"] }
+actix_derive = "0.6"
+actix-rt = "2"
 thiserror = "1"
 async-trait = "0.1.52"
 serde = "1.0.136"

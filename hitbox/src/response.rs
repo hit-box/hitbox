@@ -4,6 +4,10 @@
 //! documentation](trait.CacheableResponse.html).
 use serde::{de::DeserializeOwned, Serialize};
 
+#[cfg(feature = "derive")]
+#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+pub use hitbox_derive::CacheableResponse;
+
 /// This trait determines which types should be cached or not.
 pub enum CachePolicy<T, U> {
     /// This variant should be stored in cache backend

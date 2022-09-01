@@ -62,11 +62,13 @@
 //! [hitbox-actix]: https://docs.rs/hitbox_actix/
 //! [dogpile effect]: https://www.sobstel.org/blog/preventing-dogpile-effect/
 #![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod cache;
 pub mod dev;
 pub mod error;
 #[cfg(feature = "cache-metrics")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cache-metrics")))]
 pub mod metrics;
 pub mod response;
 pub mod runtime;
