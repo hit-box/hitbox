@@ -1,4 +1,4 @@
-use actix::prelude::*;
+/*use actix::prelude::*;
 use actix_derive::{Message, MessageResponse};
 use hitbox_actix::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -57,4 +57,8 @@ async fn main() -> Result<(), CacheError> {
     let res = cache.send(msg.into_cache(&upstream)).await??;
     println!("{:#?}", res);
     Ok(())
+}*/
+
+fn main() {
+
 }

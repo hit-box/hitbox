@@ -4,11 +4,9 @@ pub use hitbox_backend::{Backend, BackendError, Delete, DeleteStatus, Get, Lock,
 #[doc(hidden)]
 /// Mocked backend implementation module.
 pub mod backend {
-    use super::*;
-    use actix::prelude::*;
 
-    #[derive(Debug, Clone, PartialEq)]
-    pub enum MockMessage {
+/*    #[derive(Debug, Clone, PartialEq)]
+    pub enum MockMessage {jj
         Get(Get),
         Set(Set),
         Delete(Delete),
@@ -92,4 +90,5 @@ pub mod backend {
             GetMessagesResult(self.messages.clone())
         }
     }
+    */
 }

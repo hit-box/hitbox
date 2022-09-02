@@ -1,4 +1,4 @@
-use actix::prelude::*;
+/*use actix::prelude::*;
 use hitbox::dev::{Backend, BackendError, Delete, DeleteStatus, Get, Lock, LockStatus, Set};
 use hitbox_actix::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -100,4 +100,8 @@ async fn main() -> Result<(), CacheError> {
     let _ = cache.send(msg.into_cache(&upstream)).await??;
 
     Ok(())
+}*/
+
+fn main() {
+
 }

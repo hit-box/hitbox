@@ -2,19 +2,19 @@
 name = "hitbox-examples"
 version = "0.0.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [features]
 default = []
 
 [dev-dependencies]
-hitbox = { path = "../hitbox", features = ["derive"] }
+hitbox = { path = "../hitbox", features = ["derive", "metrics"] }
 hitbox-actix = { path = "../hitbox-actix", features = ["redis"]}
-actix = "0.12"
+actix = "0.13"
 log = "0.4"
 actix-rt = "2"
 serde_json = "1"
-serde_qs = { version = "0.8" }
+serde_qs = { version = "0.10" }
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
@@ -23,4 +23,11 @@ env_logger = "0.9"
 actix_derive = "0.6"
 actix-web = "4.0"
 tracing = "0.1"
-tracing-subscriber = "0.2"
+tracing-subscriber = "0.3"
+metrics-exporter-prometheus = "0.11"
+
+hyper = { version = "0.14", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.3", features = ["full"] }
+http = "0.2"

@@ -38,10 +38,10 @@ impl<T, E> CacheableResponse<T, E> for Result<T, E> {
 struct Pong(i32);
 
 #[derive(Debug)]
-enum Error {}
+struct PongError {}
 
 #[derive(Message, Cacheable, Serialize)]
-#[rtype(result = "Result<Pong, Error>")]
+#[rtype(result = "Result<Pong, PongError>")]
 struct Ping {
     id: i32,
 }
@@ -57,16 +57,41 @@ impl Handler<Ping> for UpstreamActor {
     }
 }
 
+#[derive(Debug)]
+enum Error {
+    Actix(actix::MailboxError),
+    Cache(hitbox::CacheError),
+    Msg(PongError),
+}
+
+impl From<actix::MailboxError> for Error {
+    fn from(err: actix::MailboxError) -> Error {
+        Error::Actix(err)
+    }
+}
+
+impl From<hitbox::CacheError> for Error {
+    fn from(err: hitbox::CacheError) -> Error {
+        Error::Cache(err)
+    }
+}
+
+impl From<PongError> for Error {
+    fn from(err: PongError) -> Error {
+        Error::Msg(err)
+    }
+}
+
 #[actix::main]
-async fn main() -> Result<(), CacheError> {
+async fn main() -> Result<(), Error> {
     env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
+        .filter_level(log::LevelFilter::Trace)
         .init();
 
     let cache = Cache::new().await?.start();
     let upstream = UpstreamActor.start();
 
     let msg = Ping { id: 42 };
-    let _ = cache.send(msg.into_cache(&upstream)).await??;
+    let _ = cache.send(msg.into_cache(&upstream)).await???;
     Ok(())
 }

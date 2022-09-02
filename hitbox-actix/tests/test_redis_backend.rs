@@ -1,10 +1,5 @@
-/*use actix::prelude::*;
-use hitbox::dev::{
-    mock_backend::backend::{GetMessages, MockBackend, MockMessage},
-    Get,
-};
-use hitbox::{CacheError, Cacheable};
-use hitbox::{CachePolicy, CacheableResponse};
+use actix::prelude::*;
+use hitbox::{dev::CacheBackend, CacheError, CachePolicy, Cacheable, CacheableResponse};
 use hitbox_actix::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +9,7 @@ impl Actor for UpstreamActor {
     type Context = Context<Self>;
 }
 
-#[derive(MessageResponse, CacheableResponse, Deserialize, Serialize, Debug)]
+#[derive(MessageResponse, CacheableResponse, Deserialize, Serialize, Debug, PartialEq)]
 struct Pong {
     id: i32,
 }
@@ -44,8 +39,8 @@ impl Handler<Ping> for UpstreamActor {
 
 #[actix::test]
 async fn test_mock_backend() {
-    let backend = MockBackend::new().start();
-    let cache = CacheActor::builder().finish(backend.clone()).start();
+    let backend = RedisBackend::new().unwrap();
+    let cache = CacheActor::builder().finish(backend).start();
     let upstream = UpstreamActor.start();
     let msg = Ping { id: 42 };
     cache
@@ -53,11 +48,14 @@ async fn test_mock_backend() {
         .await
         .unwrap()
         .unwrap();
-    let messages = backend.send(GetMessages).await.unwrap().0;
-    assert_eq!(
-        messages[..1],
-        [MockMessage::Get(Get {
-            key: "UpstreamActor::Ping::42".to_owned()
-        }),]
-    );
-}*/
+
+    let backend = RedisBackend::new().unwrap();
+    let res: Pong = backend
+        .get("UpstreamActor::Ping::42".to_owned())
+        .await
+        .unwrap()
+        .unwrap()
+        .into_inner();
+    assert_eq!(res, Pong { id: 42 });
+
+}

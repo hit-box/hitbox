@@ -1,0 +1,9 @@
+[package]
+edition = "2021"
+name = "hitbox-tower"
+version = "0.1.0"
+
+[dependencies]
+tower = "0.4"
+
+

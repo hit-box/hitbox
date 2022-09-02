@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.54.0, stable]
+        rust: [1.60.0, stable]
     steps:
     - uses: actions/checkout@main
     - uses: actions-rs/toolchain@v1
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.54.0, stable, beta]
+        rust: [1.60.0, stable, beta]
         redis-version: [6]
     steps:
     - uses: actions/checkout@main
@@ -49,14 +49,14 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --workspace --all-features
+        args: --workspace --all-features -- --test-threads=1
   
     - name: Generate coverage file
       if: >
         matrix.rust == 'stable'
       run: |
         cargo install cargo-tarpaulin
-        cargo tarpaulin --out Xml --verbose --workspace --all-features --ignore-tests
+        cargo tarpaulin --out Xml --verbose --workspace --all-features --ignore-tests -- --test-threads=1
 
     - name: Upload to Codecov
       if: >

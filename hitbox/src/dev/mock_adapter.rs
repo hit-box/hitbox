@@ -1,8 +1,10 @@
+use async_trait::async_trait;
 use crate::error::CacheError;
 use crate::runtime::{AdapterResult, EvictionPolicy, RuntimeAdapter, TtlSettings};
 use crate::value::{CacheState, CachedValue};
 use crate::CacheableResponse;
 use chrono::{DateTime, Utc};
+use std::borrow::Cow;
 
 #[derive(Clone, Debug)]
 /// Settings for builder.
@@ -104,21 +106,21 @@ where
     }
 }
 
+#[async_trait]
 impl<T> RuntimeAdapter for MockAdapter<T>
 where
-    T: Clone + CacheableResponse + 'static,
+    T: Clone + Send + Sync + CacheableResponse + 'static,
 {
     type UpstreamResult = T;
-    fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
-        let result = match self.clone().upstream_state {
+    async fn poll_upstream(&mut self) -> AdapterResult<Self::UpstreamResult> {
+        match self.clone().upstream_state {
             MockUpstreamState::Ok(value) => Ok(value),
             MockUpstreamState::Error => Err(CacheError::DeserializeError),
-        };
-        Box::pin(async { result })
+        }
     }
 
-    fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
-        let result = match self.clone().cache_state {
+    async fn poll_cache(&self) -> AdapterResult<CacheState<Self::UpstreamResult>> {
+        match self.clone().cache_state {
             MockCacheState::Actual(value) => Ok(CacheState::Actual(CachedValue::new(
                 value,
                 chrono::Utc::now(),
@@ -128,12 +130,11 @@ where
             }
             MockCacheState::Miss => Ok(CacheState::Miss),
             MockCacheState::Error => Err(CacheError::DeserializeError),
-        };
-        Box::pin(async { result })
+        }
     }
 
-    fn update_cache(&self, _: &CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
-        Box::pin(async { Ok(()) })
+    async fn update_cache<'a>(&self, _: &'a CachedValue<Self::UpstreamResult>) -> AdapterResult<()> {
+        Ok(())
     }
 
     fn eviction_settings(&self) -> EvictionPolicy {
@@ -141,5 +142,13 @@ where
             ttl: 0,
             stale_ttl: 0,
         })
+    }
+
+    fn upstream_name(&self) -> Cow<'static, str> {
+        "MockAdapter".into()
+    }
+
+    fn message_name(&self) -> Cow<'static, str> {
+        "MockMessage".into()
     }
 }

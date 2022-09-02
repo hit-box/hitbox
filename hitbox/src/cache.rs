@@ -77,7 +77,7 @@ pub trait Cacheable {
 mod tests {
     use super::*;
 
-    struct Message;
+    struct Message(i32);
 
     impl Cacheable for Message {
         fn cache_key(&self) -> Result<String, CacheError> {
@@ -93,7 +93,12 @@ mod tests {
 
     #[test]
     fn test_cache_stale_ttl_subtract_overflow() {
-        let a = Message;
+        let a = Message(42);
         assert_eq!(0, a.cache_stale_ttl());
+    }
+
+    #[allow(dead_code)]
+    async fn upstream_fn(message: Message) -> i32 {
+        message.0 
     }
 }

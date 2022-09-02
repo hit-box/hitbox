@@ -13,13 +13,7 @@ use redis::RedisError;
 pub enum Error {
     /// Wrapper for all kinds redis-rs errors.
     #[error("Redis backend error: {0}")]
-    Redis(RedisError),
-}
-
-impl From<RedisError> for Error {
-    fn from(error: RedisError) -> Self {
-        Error::Redis(error)
-    }
+    Redis(#[from] RedisError),
 }
 
 impl From<Error> for BackendError {

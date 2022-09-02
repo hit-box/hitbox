@@ -3,10 +3,12 @@ use std::fmt::Debug;
 
 use tracing::{instrument, trace};
 
-use crate::response::CacheableResponse;
+use crate::CacheableResponse;
 use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
 use crate::CachedValue;
+#[cfg(feature = "metrics")]
+use crate::metrics::CACHE_HIT_COUNTER;
 
 /// This state is a variant with actual data from [CachePolled](enum.CachePolled.html).
 pub struct CachePolledActual<A, T>
@@ -40,6 +42,12 @@ where
     /// We have to return actual data.
     pub fn finish(self) -> Finish<T> {
         trace!("Finish");
+        #[cfg(feature = "metrics")]
+        metrics::increment_counter!(
+            CACHE_HIT_COUNTER.as_ref(),
+            "upstream" => self.adapter.upstream_name(),
+            "message" => self.adapter.message_name(),
+        );
         Finish {
             result: Ok(self.result.into_inner()),
         }

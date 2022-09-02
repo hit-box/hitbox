@@ -1,10 +1,21 @@
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 //! Traits and struct messages for hitbox backend interaction.
 //!
 //! If you want implement your own backend, you in the right place.
 use actix::dev::ToEnvelope;
 use actix::prelude::*;
+use serializer::SerializerError;
 use thiserror::Error;
+
+mod value;
+pub mod serializer;
+mod backend;
+mod response;
+
+pub use value::{CachedValue, TtlSettings, EvictionPolicy};
+pub use response::{CacheableResponse, CachePolicy};
+pub use backend::{CacheBackend, BackendResult};
+
 
 /// Define the behavior needed of an cache layer to work with cache backend.
 ///
@@ -49,10 +60,13 @@ pub enum BackendError {
     /// Network interaction error.
     #[error(transparent)]
     ConnectionError(Box<dyn std::error::Error + Send>),
+    /// Serializing\Deserializing data error.
+    #[error(transparent)]
+    SerializerError(#[from] SerializerError),
 }
 
 /// Actix message requests cache backend value by key.
-#[derive(Message, Debug, Clone, PartialEq)]
+#[derive(Message, Debug, Clone, PartialEq, Eq)]
 #[rtype(result = "Result<Option<Vec<u8>>, BackendError>")]
 pub struct Get {
     /// Key of cache backend record.
@@ -60,7 +74,7 @@ pub struct Get {
 }
 
 /// Actix message writes cache backend value by key.
-#[derive(Message, Debug, Clone, PartialEq)]
+#[derive(Message, Debug, Clone, PartialEq, Eq)]
 #[rtype(result = "Result<String, BackendError>")]
 pub struct Set {
     /// Key of cache backend record.
@@ -72,7 +86,7 @@ pub struct Set {
 }
 
 /// Status of deleting result.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DeleteStatus {
     /// Record successfully deleted.
     Deleted(u32),
@@ -81,7 +95,7 @@ pub enum DeleteStatus {
 }
 
 /// Actix message delete record in backend by key.
-#[derive(Message, Debug, Clone, PartialEq)]
+#[derive(Message, Debug, Clone, PartialEq, Eq)]
 #[rtype(result = "Result<DeleteStatus, BackendError>")]
 pub struct Delete {
     /// Key of cache backend record for deleting
@@ -89,7 +103,7 @@ pub struct Delete {
 }
 
 /// Actix message creates lock in cache backend.
-#[derive(Message, Debug, Clone, PartialEq)]
+#[derive(Message, Debug, Clone, PartialEq, Eq)]
 #[rtype(result = "Result<LockStatus, BackendError>")]
 pub struct Lock {
     /// Key of cache backend record for lock.
@@ -99,7 +113,7 @@ pub struct Lock {
 }
 
 /// Enum for representing status of Lock object in backend.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum LockStatus {
     /// Lock successfully created and acquired.
     Acquired,
