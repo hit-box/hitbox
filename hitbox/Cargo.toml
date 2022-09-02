@@ -35,7 +35,7 @@ metrics-util = "0.14"
 default = []
 
 derive = ["hitbox-derive", "serde_qs", "actix/macros"]
-cache-metrics = ["metrics", "lazy_static"]
+metrics = ["dep:metrics", "lazy_static"]
 
 [package.metadata.docs.rs]
 all-features = true

@@ -8,7 +8,7 @@ edition = "2021"
 default = []
 
 [dev-dependencies]
-hitbox = { path = "../hitbox", features = ["derive", "cache-metrics"] }
+hitbox = { path = "../hitbox", features = ["derive", "metrics"] }
 hitbox-actix = { path = "../hitbox-actix", features = ["redis"]}
 actix = "0.13"
 log = "0.4"

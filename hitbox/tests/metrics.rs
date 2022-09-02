@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "cache-metrics"))]
+#[cfg(all(test, feature = "metrics"))]
 mod tests {
     use hitbox::dev::MockAdapter;
     use hitbox::metrics::{CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER};

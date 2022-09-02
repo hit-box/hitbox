@@ -67,8 +67,8 @@
 pub mod cache;
 pub mod dev;
 pub mod error;
-#[cfg(feature = "cache-metrics")]
-#[cfg_attr(docsrs, doc(cfg(feature = "cache-metrics")))]
+#[cfg(feature = "metrics")]
+#[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
 pub mod metrics;
 pub mod response;
 pub mod runtime;

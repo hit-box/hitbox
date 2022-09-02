@@ -1,6 +1,6 @@
 use tracing::{instrument, trace, warn};
 
-#[cfg(feature = "cache-metrics")]
+#[cfg(feature = "metrics")]
 use crate::metrics::{CACHE_HIT_COUNTER, CACHE_STALE_COUNTER};
 use crate::runtime::RuntimeAdapter;
 use crate::states::finish::Finish;
@@ -46,13 +46,13 @@ where
         A: RuntimeAdapter<UpstreamResult = T>,
     {
         let upstream_response = self.adapter.poll_upstream().await;
-        #[cfg(feature = "cache-metrics")]
+        #[cfg(feature = "metrics")]
         metrics::increment_counter!(
             CACHE_HIT_COUNTER.as_ref(),
             "upstream" => self.adapter.upstream_name(),
             "message" => self.adapter.message_name(),
         );
-        #[cfg(feature = "cache-metrics")]
+        #[cfg(feature = "metrics")]
         metrics::increment_counter!(
             CACHE_STALE_COUNTER.as_ref(),
             "upstream" => self.adapter.upstream_name(),
