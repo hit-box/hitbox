@@ -4,7 +4,7 @@ mod tests {
     use hitbox::metrics::{CACHE_HIT_COUNTER, CACHE_MISS_COUNTER, CACHE_STALE_COUNTER};
     use hitbox::settings::Status;
     use hitbox::states::initial::Initial;
-    use metrics::{Counter, Gauge, Histogram, Key, KeyName, Label, Recorder, Unit};
+    use metrics::{Counter, Gauge, Histogram, Key, KeyName, Label, Recorder, SharedString, Unit};
     use metrics_util::registry::{AtomicStorage, Registry};
     use std::sync::{atomic::Ordering, Arc};
 
@@ -34,11 +34,11 @@ mod tests {
     }
 
     impl Recorder for MockRecorder {
-        fn describe_counter(&self, _: KeyName, _: Option<Unit>, _: &'static str) {}
+        fn describe_counter(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}
 
-        fn describe_gauge(&self, _: KeyName, _: Option<Unit>, _: &'static str) {}
+        fn describe_gauge(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}
 
-        fn describe_histogram(&self, _: KeyName, _: Option<Unit>, _: &'static str) {}
+        fn describe_histogram(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}
 
         fn register_counter(&self, key: &Key) -> Counter {
             self.registry
@@ -57,7 +57,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_hit_counter() {
-        metrics::clear_recorder();
+        unsafe { metrics::clear_recorder() };
         let recorder = MockRecorder::new();
         let handler = recorder.clone();
         metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
@@ -66,9 +66,7 @@ mod tests {
             stale: Status::Disabled,
             lock: Status::Disabled,
         };
-        let adapter = MockAdapter::build()
-            .with_cache_actual(42)
-            .finish();
+        let adapter = MockAdapter::build().with_cache_actual(42).finish();
         let initial_state = Initial::new(settings.clone(), adapter.clone());
         let _ = initial_state.transitions().await.unwrap();
 
@@ -81,7 +79,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_miss_counter() {
-        metrics::clear_recorder();
+        unsafe { metrics::clear_recorder() };
         let recorder = MockRecorder::new();
         let handler = recorder.clone();
         metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
@@ -106,7 +104,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stale_counter() {
-        metrics::clear_recorder();
+        unsafe { metrics::clear_recorder() };
         let recorder = MockRecorder::new();
         let handler = recorder.clone();
         metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
