@@ -1,0 +1,18 @@
+[package]
+name = "hitbox-http"
+version = "0.1.0"
+authors = ["Hitbox team <mail@hitbox.rs>"]
+license = "MIT"
+edition = "2021"
+description = "Cacheable HTTP Request and Response"
+readme = "README.md"
+repository = "https://github.com/hit-box/hitbox/"
+categories = ["caching", "asynchronous", "http"]
+keywords = ["cache", "actix", "async", "http", "hitbox"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+http = "0.2"
+hitbox = { path = "../hitbox", version = "0.1" }
+serde = "1.0.144"
