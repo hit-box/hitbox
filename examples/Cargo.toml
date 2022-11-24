@@ -19,7 +19,7 @@ serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
 prometheus = { version = "0.13" }
-env_logger = "0.9"
+env_logger = "0.10"
 actix_derive = "0.6"
 actix-web = "4.0"
 tracing = "0.1"

@@ -25,7 +25,7 @@ default = []
 derive = ["hitbox-derive"]
 
 [dev-dependencies]
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 test-log = { version = "0.2.8", features = ["trace"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
 # metrics = ["prometheus", "lazy_static"]
