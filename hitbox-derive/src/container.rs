@@ -11,7 +11,7 @@ fn parse_lit_to_u32(lit: &syn::Lit, attr_name: &str) -> syn::Result<u32> {
             .map_err(|e| syn::Error::new_spanned(lit, e)),
         _ => Err(syn::Error::new_spanned(
             lit,
-            format!("Expected hitbox {} attribute should be u32", attr_name),
+            format!("Expected hitbox {attr_name} attribute should be u32"),
         )),
     }
 }
@@ -71,7 +71,7 @@ impl Container {
                     let path = m.path().into_token_stream().to_string().replace(' ', "");
                     return Err(syn::Error::new_spanned(
                         m.path(),
-                        format!("Unknown hitbox container attribute `{}`", path),
+                        format!("Unknown hitbox container attribute `{path}`"),
                     ));
                 }
 

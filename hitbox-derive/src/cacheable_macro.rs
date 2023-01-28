@@ -9,7 +9,7 @@ use crate::container::Container;
 /// are used if macros of the same name are not used.
 pub fn impl_macro(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
     let name = &ast.ident;
-    let message_type = format!("{}", name);
+    let message_type = format!("{name}");
     let attrs = Container::from_ast(ast)?;
 
     let cache_key_implement = quote! {
