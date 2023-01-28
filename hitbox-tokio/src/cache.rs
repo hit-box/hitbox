@@ -48,7 +48,7 @@ where
     async fn process<F, Req, Res, ResFuture>(&self, upstream: F, request: Req) -> Result<Res, CacheError>
     where
         Req: Cacheable + Send + Sync,
-        F: Fn(Req) -> ResFuture + Send + Sync,
+        F: Fn(Req) -> ResFuture + Send + Sync + Clone,
         ResFuture: Future<Output = Res> + Send + Sync,
         Res: Send + Sync + CacheableResponse + std::fmt::Debug,
         <Res as CacheableResponse>::Cached: DeserializeOwned,

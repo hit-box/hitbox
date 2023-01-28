@@ -45,7 +45,7 @@ impl<In, Out, U, ResFuture, B, 'b> crate::runtime::RuntimeAdapter
 where
     Out: CacheableResponse + Send + Sync,
     <Out as CacheableResponse>::Cached: DeserializeOwned,
-    U: Send + Sync + Fn(In) -> ResFuture,
+    U: Send + Sync + FnMut(In) -> ResFuture,
     ResFuture: Future<Output = Out> + Send,
     In: Cacheable + Send + Sync,
     B: CacheBackend + Send + Sync,

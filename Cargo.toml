@@ -6,6 +6,7 @@ members = [
     "hitbox-actix",
     "hitbox-backend",
     "hitbox-derive",
+    "hitbox-http",
     "hitbox-redis",
     "hitbox-tower",
     "examples",
