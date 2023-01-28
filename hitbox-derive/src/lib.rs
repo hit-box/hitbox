@@ -8,9 +8,7 @@
 //! use serde::Serialize;
 //!
 //! #[derive(Cacheable, Serialize)]
-//! #[cache_ttl(120)]
-//! #[cache_stale_ttl(100)]
-//! #[cache_version(100)]
+//! #[hitbox(cache_ttl=120, cache_stale_ttl=100, cache_version=100)]
 //! struct Message {
 //!     field: i32,
 //! };
@@ -33,18 +31,20 @@ use proc_macro::TokenStream;
 
 mod cacheable_macro;
 mod cacheable_response_macro;
-mod macro_attributes;
+mod container;
 
 /// Derive Cacheable macro implementation.
-#[proc_macro_derive(Cacheable, attributes(cache_ttl, cache_stale_ttl, cache_version))]
+#[proc_macro_derive(Cacheable, attributes(hitbox))]
 pub fn cacheable_macro_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
+    let ast = syn::parse_macro_input!(input as syn::DeriveInput);
     cacheable_macro::impl_macro(&ast)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
 }
 
 /// Derive CacheableResponse macro implementation.
 #[proc_macro_derive(CacheableResponse)]
 pub fn cacheable_response_macro_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
+    let ast = syn::parse_macro_input!(input as syn::DeriveInput);
     cacheable_response_macro::impl_macro(&ast)
 }
