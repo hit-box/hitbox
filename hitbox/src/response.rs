@@ -16,7 +16,7 @@ pub enum CachePolicy<T, U> {
     NonCacheable(U),
 }
 
-/// Thit is one of the basic trait which determines should data store in cache backend or not.
+/// This is one of the basic trait which determines should data store in cache backend or not.
 ///
 /// For primitive types and for user-defined types (with derive macro)
 /// cache_policy returns CachePolicy::Cached variant.
