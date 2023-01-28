@@ -11,6 +11,7 @@ default = []
 hitbox = { path = "../hitbox", features = ["derive", "metrics"] }
 hitbox-actix = { path = "../hitbox-actix", features = ["redis"]}
 hitbox-tower = { path = "../hitbox-tower" }
+hitbox-redis = { path = "../hitbox-redis" }
 actix = "0.13"
 axum = "0.6"
 log = "0.4"
