@@ -1,17 +1,22 @@
-use std::{
-    fmt::Debug,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::{fmt::Debug, sync::Arc};
 
-use hitbox::dev::CacheBackend;
-use hitbox_redis::RedisBackend;
+use futures::Future;
+use hitbox::Cacheable;
+use hitbox_http::CacheableRequest;
 use http::Request;
-use tower::{Layer, Service};
+use tower::Service;
+
+use crate::state::FutureResponse;
 
 pub struct CacheService<S, B> {
     upstream: S,
     backend: Arc<B>,
+}
+
+impl<S, B> CacheService<S, B> {
+    pub fn new(upstream: S, backend: Arc<B>) -> Self {
+        CacheService { upstream, backend }
+    }
 }
 
 impl<S, B> Clone for CacheService<S, B>
@@ -26,82 +31,30 @@ where
     }
 }
 
-impl<S, T, B> Service<Request<T>> for CacheService<S, B>
+impl<Req, S, B, PollUpstream> Service<Request<Req>> for CacheService<S, B>
 where
-    S: Service<Request<T>>,
-    Request<T>: Debug,
-    B: CacheBackend,
+    S: Service<Request<Req>, Future = PollUpstream>,
+    PollUpstream: Future<Output = Result<S::Response, S::Error>>,
+    PollUpstream::Output: Debug,
+
+    Request<Req>: Debug,
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = S::Future;
+    type Future = FutureResponse<PollUpstream, B>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
         self.upstream.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<T>) -> Self::Future {
-        let a = self.backend.clone();
-        drop(a);
+    fn call(&mut self, req: Request<Req>) -> Self::Future {
         dbg!(&req);
-        self.upstream.call(req)
-    }
-}
-
-pub struct Cache<B> {
-    backend: Arc<B>,
-}
-
-impl<B> Clone for Cache<B> {
-    fn clone(&self) -> Self {
-        Self {
-            backend: Arc::clone(&self.backend),
-        }
-    }
-}
-
-impl<S, B> Layer<S> for Cache<B> {
-    type Service = CacheService<S, B>;
-
-    fn layer(&self, upstream: S) -> Self::Service {
-        CacheService {
-            upstream,
-            backend: self.backend.clone(),
-        }
-    }
-}
-
-impl<B> Cache<B>
-where
-    B: CacheBackend,
-{
-    pub fn builder() -> CacheBuilder<RedisBackend> {
-        CacheBuilder::default()
-    }
-}
-
-pub struct CacheBuilder<B> {
-    backend: Option<B>,
-}
-
-impl<B> CacheBuilder<B>
-where
-    B: CacheBackend,
-{
-    pub fn backend(mut self, backend: B) -> Self {
-        self.backend = Some(backend);
-        self
-    }
-
-    pub fn build(self) -> Cache<B> {
-        Cache {
-            backend: Arc::new(self.backend.unwrap()),
-        }
-    }
-}
-
-impl<B> Default for CacheBuilder<B> {
-    fn default() -> Self {
-        Self { backend: None }
+        let cacheable_request = CacheableRequest::from_request(&req);
+        let cache_key = cacheable_request.cache_key().unwrap();
+        dbg!(cache_key);
+        FutureResponse::new(self.upstream.call(req), self.backend.clone())
     }
 }

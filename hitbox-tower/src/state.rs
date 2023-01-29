@@ -1,35 +1,12 @@
 use std::{
     fmt::Debug,
-    marker::PhantomData,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
 
 use futures::{ready, Future};
-use hitbox::dev::CacheBackend;
-use hitbox_redis::RedisBackend;
-use hitbox_tokio::FutureAdapter;
-use http::Request;
 use pin_project_lite::pin_project;
-use tower::{Layer, Service};
-
-pub struct CacheService<S, B> {
-    upstream: S,
-    backend: Arc<B>,
-}
-
-impl<S, B> Clone for CacheService<S, B>
-where
-    S: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            upstream: self.upstream.clone(),
-            backend: Arc::clone(&self.backend),
-        }
-    }
-}
 
 pin_project! {
     #[project = StateProj]
@@ -45,12 +22,13 @@ pin_project! {
 }
 
 pin_project! {
-    pub struct FutureResponse<PollUpstream>
+    pub struct FutureResponse<PollUpstream, B>
     where
         PollUpstream: Future,
     {
         #[pin]
         state: State<PollUpstream::Output, PollUpstream>,
+        backend: Arc<B>,
     }
 }
 
@@ -63,18 +41,19 @@ impl<Res, PollUpstream> Debug for State<Res, PollUpstream> {
     }
 }
 
-impl<PollUpstream> FutureResponse<PollUpstream>
+impl<PollUpstream, B> FutureResponse<PollUpstream, B>
 where
     PollUpstream: Future,
 {
-    fn new(poll_upstream: PollUpstream) -> Self {
+    pub fn new(poll_upstream: PollUpstream, backend: Arc<B>) -> Self {
         FutureResponse {
             state: State::Inital { poll_upstream },
+            backend,
         }
     }
 }
 
-impl<PollUpstream> Future for FutureResponse<PollUpstream>
+impl<PollUpstream, B> Future for FutureResponse<PollUpstream, B>
 where
     PollUpstream: Future,
     PollUpstream::Output: Debug,
@@ -97,65 +76,6 @@ where
                     return Poll::Ready(upstream_result.take().unwrap());
                 }
             }
-        }
-    }
-}
-
-impl<Req, S, B, PollUpstream> Service<Request<Req>> for CacheService<S, B>
-where
-    S: Service<Request<Req>, Future = PollUpstream>,
-    PollUpstream: Future<Output = Result<S::Response, S::Error>>,
-    PollUpstream::Output: Debug,
-
-    Request<Req>: Debug,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = FutureResponse<PollUpstream>;
-
-    fn poll_ready(
-        &mut self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        self.upstream.poll_ready(cx)
-    }
-
-    fn call(&mut self, req: Request<Req>) -> Self::Future {
-        dbg!(&req);
-        FutureResponse::new(self.upstream.call(req))
-    }
-}
-
-pub struct Cache<B> {
-    backend: Arc<B>,
-}
-
-impl<B> Clone for Cache<B> {
-    fn clone(&self) -> Self {
-        Self {
-            backend: Arc::clone(&self.backend),
-        }
-    }
-}
-
-impl<S, B> Layer<S> for Cache<B> {
-    type Service = CacheService<S, B>;
-
-    fn layer(&self, upstream: S) -> Self::Service {
-        CacheService {
-            upstream,
-            backend: self.backend.clone(),
-        }
-    }
-}
-
-impl<B> Cache<B>
-where
-    B: CacheBackend,
-{
-    pub fn new() -> Cache<RedisBackend> {
-        Cache {
-            backend: Arc::new(RedisBackend::new().unwrap()),
         }
     }
 }

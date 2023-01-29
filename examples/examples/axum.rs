@@ -1,6 +1,6 @@
 use axum::{routing::get, Router};
-use hitbox_tower::state::Cache;
-use hitbox_redis::actor::RedisBackend;
+use hitbox_actix::RedisBackend;
+use hitbox_tower::Cache;
 use tower::ServiceBuilder;
 
 #[tokio::main]
@@ -9,13 +9,16 @@ async fn main() {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let cache = Cache::<RedisBackend>::new();
-    let layer = ServiceBuilder::new().layer(cache);
-
     // build our application with a single route
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
-        .layer(layer);
+        .layer(
+            ServiceBuilder::new().layer(
+                Cache::builder()
+                    .backend(RedisBackend::new().unwrap())
+                    .build(),
+            ),
+        );
 
     // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
