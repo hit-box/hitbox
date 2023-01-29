@@ -45,8 +45,8 @@ impl<In, Out, U, ResFuture, B, 'b> crate::runtime::RuntimeAdapter
 where
     Out: CacheableResponse + Send + Sync,
     <Out as CacheableResponse>::Cached: DeserializeOwned,
-    U: Send + Sync + FnMut(In) -> ResFuture,
-    ResFuture: Future<Output = Out> + Send,
+    U: Send + Sync + FnOnce(In) -> ResFuture + Clone,
+    ResFuture: Future<Output = Out> + Send + Sync,
     In: Cacheable + Send + Sync,
     B: CacheBackend + Send + Sync,
 {
@@ -70,7 +70,7 @@ where
         let request = request.ok_or_else(|| {
             CacheError::CacheKeyGenerationError("Request already sent to upstream".to_owned())
         })?;
-        Ok((self.upstream)(request).await)
+        Ok((self.upstream.clone())(request).await)
     }
 
     fn eviction_settings(&self) -> hitbox_backend::EvictionPolicy {

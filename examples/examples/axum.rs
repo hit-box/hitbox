@@ -1,5 +1,5 @@
 use axum::{routing::get, Router};
-use hitbox_tower::service::Cache;
+use hitbox_tower::state::Cache;
 use hitbox_redis::actor::RedisBackend;
 use tower::ServiceBuilder;
 
@@ -9,8 +9,7 @@ async fn main() {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let redis = RedisBackend::new().unwrap();
-    let cache = Cache::<RedisBackend>::builder().backend(redis).build();
+    let cache = Cache::<RedisBackend>::new();
     let layer = ServiceBuilder::new().layer(cache);
 
     // build our application with a single route
