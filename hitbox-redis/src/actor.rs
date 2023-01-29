@@ -166,6 +166,7 @@ impl CacheBackend for RedisBackend {
         let mut request = redis::cmd("SET");
         let serialized_value =
             JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
+        dbg!(&serialized_value);
         request.arg(key).arg(serialized_value);
         if let Some(ttl) = ttl {
             request.arg("EX").arg(ttl);

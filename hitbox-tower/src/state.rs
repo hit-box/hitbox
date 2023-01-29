@@ -22,13 +22,12 @@ pin_project! {
 }
 
 pin_project! {
-    pub struct FutureResponse<PollUpstream, B>
+    pub struct FutureResponse<F>
     where
-        PollUpstream: Future,
+        F: Future,
     {
         #[pin]
-        state: State<PollUpstream::Output, PollUpstream>,
-        backend: Arc<B>,
+        transitions: F,
     }
 }
 
@@ -41,41 +40,42 @@ impl<Res, PollUpstream> Debug for State<Res, PollUpstream> {
     }
 }
 
-impl<PollUpstream, B> FutureResponse<PollUpstream, B>
+impl<F> FutureResponse<F>
 where
-    PollUpstream: Future,
+    F: Future,
 {
-    pub fn new(poll_upstream: PollUpstream, backend: Arc<B>) -> Self {
+    pub fn new(transitions: F) -> Self {
         FutureResponse {
-            state: State::Inital { poll_upstream },
-            backend,
+            transitions
         }
     }
 }
 
-impl<PollUpstream, B> Future for FutureResponse<PollUpstream, B>
+impl<F> Future for FutureResponse<F>
 where
-    PollUpstream: Future,
-    PollUpstream::Output: Debug,
+    F: Future,
+    F::Output: Debug,
 {
-    type Output = PollUpstream::Output;
+    type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
 
-        loop {
-            dbg!(&this.state.as_ref());
-            match this.state.as_mut().project() {
-                StateProj::Inital { poll_upstream } => {
-                    let upstream_result = ready!(poll_upstream.poll(cx));
-                    this.state.set(State::UpstreamPolled {
-                        upstream_result: Some(upstream_result),
-                    });
-                }
-                StateProj::UpstreamPolled { upstream_result } => {
-                    return Poll::Ready(upstream_result.take().unwrap());
-                }
-            }
-        }
+        this.transitions.poll(cx)
+
+        // loop {
+            // dbg!(&this.state.as_ref());
+            // match this.state.as_mut().project() {
+                // StateProj::Inital { poll_upstream } => {
+                    // let upstream_result = ready!(poll_upstream.poll(cx));
+                    // this.state.set(State::UpstreamPolled {
+                        // upstream_result: Some(upstream_result),
+                    // });
+                // }
+                // StateProj::UpstreamPolled { upstream_result } => {
+                    // return Poll::Ready(upstream_result.take().unwrap());
+                // }
+            // }
+        // }
     }
 }
