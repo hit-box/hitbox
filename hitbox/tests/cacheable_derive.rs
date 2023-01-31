@@ -106,9 +106,7 @@ fn test_tuple_returns_error() {
 }
 
 #[derive(Cacheable, Serialize)]
-#[cache_ttl(42)]
-#[cache_stale_ttl(30)]
-#[cache_version(1)]
+#[hitbox(cache_ttl=42, cache_stale_ttl=30, cache_version=1)]
 struct MacroHelpersMessage {
     message_type: i32,
 }
