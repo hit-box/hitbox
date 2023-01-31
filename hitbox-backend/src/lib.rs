@@ -9,7 +9,7 @@ use thiserror::Error;
 
 mod value;
 pub mod serializer;
-mod backend;
+pub mod backend;
 mod response;
 
 pub use value::{CachedValue, TtlSettings, EvictionPolicy};

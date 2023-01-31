@@ -1,81 +1,131 @@
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Write},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
 
-use futures::{ready, Future};
+use futures::{future::BoxFuture, ready, Future};
+use hitbox::{
+    dev::{BackendError, CacheBackend},
+    CacheableResponse, CachedValue,
+};
+use hitbox_backend::backend::Backend;
+use http::{Request, Response};
 use pin_project_lite::pin_project;
+use serde::Deserialize;
+use tower::Service;
+
+pub type CacheResult<R, E> =
+    Result<Option<CachedValue<hitbox_http::CacheableResponse<R, E>>>, BackendError>;
+pub type PollCache<R, E> = BoxFuture<'static, CacheResult<R, E>>;
+pub type PollCache2<R, E> = Pin<Box<dyn Future<Output = CacheResult<R, E>> + Send>>;
 
 pin_project! {
     #[project = StateProj]
-    pub enum State<Res, PollUpstream> {
-        Inital {
+    pub enum State<PU, Res, E, Req, PC> 
+    where
+        PC: 'static,
+    {
+        Initial {
+            req: Option<Request<Req>>,
+        },
+        PollCache {
+            // #[pin]
+            poll_cache: PC,
+        },
+        CachePolled,
+        PollUpstream {
             #[pin]
-            poll_upstream: PollUpstream
+            poll_upstream: PU,
         },
-        UpstreamPolled {
-            upstream_result: Option<Res>,
-        },
+        UpstreamPolled,
+        Reponse {
+            #[pin]
+            response: Result<Res, E>,
+        }
+    }
+}
+
+impl<PU, Res, E, Req, PC> Debug for State<PU, Res, E, Req, PC> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            State::Initial { req: _ } => f.write_str("State::Initial"),
+            State::PollCache { poll_cache: _ } => f.write_str("State::PollCache"),
+            State::CachePolled => f.write_str("State::CachePolled"),
+            State::PollUpstream { poll_upstream: _ } => f.write_str("State::PollUpstream"),
+            State::UpstreamPolled => f.write_str("State::UpstreamPolled"),
+            State::Reponse { response: _ } => f.write_str("State::Response"),
+        }
     }
 }
 
 pin_project! {
-    pub struct FutureResponse<F>
+    pub struct FutureResponse<S, R, B>
     where
-        F: Future,
+        // PollUpstream: Future<Output = Result<Response<R>, E>>,
+        B: Backend,
+        S: Service<Request<R>>,
+        S::Error: 'static,
+        S::Response: 'static,
     {
         #[pin]
-        transitions: F,
+        state: State<S::Future, S::Response, S::Error, R, PollCache2<S::Response, S::Error>>,
+        service: S,
+        backend: B,
     }
 }
 
-impl<Res, PollUpstream> Debug for State<Res, PollUpstream> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            State::Inital { poll_upstream: _ } => f.write_str("State::Initial"),
-            State::UpstreamPolled { upstream_result: _ } => f.write_str("State::UpstreamPolled"),
-        }
-    }
-}
-
-impl<F> FutureResponse<F>
+impl<S, R, B> FutureResponse<S, R, B>
 where
-    F: Future,
+    // PollUpstream: Future<Output = Result<Response<R>, E>>,
+    // PollUpstream: Future + Send + 'static,
+    B: Backend + Send + Sync + 'static,
+    S: Service<Request<R>>,
 {
-    pub fn new(transitions: F) -> Self {
+    pub fn new(service: S, backend: B, req: Request<R>) -> Self {
         FutureResponse {
-            transitions
+            state: State::Initial { req: Some(req) },
+            service,
+            backend,
         }
     }
 }
 
-impl<F> Future for FutureResponse<F>
+impl<S, R, B> Future for FutureResponse<S, R, B>
 where
-    F: Future,
-    F::Output: Debug,
+    // PollUpstream: Future<Output = Result<Response<R>, E>> + Send + 'static,
+    B: Backend + Send + Sync + 'static,
+    S: Service<Request<R>>,
+    S::Error: Debug,
 {
-    type Output = F::Output;
+    type Output = Result<S::Response, S::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
-
-        this.transitions.poll(cx)
-
-        // loop {
-            // dbg!(&this.state.as_ref());
-            // match this.state.as_mut().project() {
-                // StateProj::Inital { poll_upstream } => {
-                    // let upstream_result = ready!(poll_upstream.poll(cx));
-                    // this.state.set(State::UpstreamPolled {
-                        // upstream_result: Some(upstream_result),
-                    // });
-                // }
-                // StateProj::UpstreamPolled { upstream_result } => {
-                    // return Poll::Ready(upstream_result.take().unwrap());
-                // }
-            // }
-        // }
+        loop {
+            dbg!(&this.state.as_ref());
+            match this.state.as_mut().project() {
+                StateProj::Initial { req: _ } => {
+                    // let poll_upstream = this
+                        // .service
+                        // .call(req.take().expect("future polled after resolving"));
+                    // let next = State::PollUpstream { poll_upstream };
+                    let poll_cache = this
+                        .backend
+                        .get("test".to_owned());
+                    let next = State::PollCache { poll_cache };
+                    this.state.set(next);
+                }
+                StateProj::PollCache { poll_cache } => {
+                    let cached = ready!(Pin::new(poll_cache).poll(cx));
+                }
+                StateProj::PollUpstream { poll_upstream } => {
+                    return Poll::Ready(ready!(poll_upstream.poll(cx)))
+                }
+                _ => unimplemented!(),
+            };
+            // this.state.set(new_state);
+        }
     }
 }

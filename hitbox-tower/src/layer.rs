@@ -6,19 +6,15 @@ use tower::Layer;
 
 use crate::service::CacheService;
 
+#[derive(Clone)]
 pub struct Cache<B = RedisBackend> {
-    backend: Arc<B>,
+    backend: B,
 }
 
-impl<B> Clone for Cache<B> {
-    fn clone(&self) -> Self {
-        Self {
-            backend: Arc::clone(&self.backend),
-        }
-    }
-}
-
-impl<S, B> Layer<S> for Cache<B> {
+impl<S, B> Layer<S> for Cache<B> 
+where
+    B: Clone,
+{
     type Service = CacheService<S, B>;
 
     fn layer(&self, upstream: S) -> Self::Service {
@@ -47,7 +43,7 @@ where
 
     pub fn build(self) -> Cache<B> {
         Cache {
-            backend: Arc::new(self.backend.expect("Please add some cache backend")),
+            backend: self.backend.expect("Please add some cache backend"),
         }
     }
 }

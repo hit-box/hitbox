@@ -17,6 +17,7 @@ use tracing::trace;
 ///
 /// [MultiplexedConnection]: redis::aio::MultiplexedConnection
 /// [Backend]: hitbox_backend::Backend
+#[derive(Clone)]
 pub struct RedisBackend {
     client: Client,
     connection: OnceCell<ConnectionManager>,
@@ -123,16 +124,20 @@ impl CacheBackend for RedisBackend {
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
-        let mut con = self.connection().await?.clone();
-        let result: Option<Vec<u8>> = redis::cmd("GET")
-            .arg(key)
-            .query_async(&mut con)
-            .await
-            .map_err(Error::from)
-            .map_err(BackendError::from)?;
-        result
-            .map(|value| JsonSerializer::<Vec<u8>>::deserialize(value).map_err(BackendError::from))
-            .transpose()
+        // let mut con = self.connection().await?.clone();
+        let client = self.client.clone();
+        async move {
+            let mut con = client.get_tokio_connection_manager().await.unwrap();
+            let result: Option<Vec<u8>> = redis::cmd("GET")
+                .arg(key)
+                .query_async(&mut con)
+                .await
+                .map_err(Error::from)
+                .map_err(BackendError::from)?;
+            result
+                .map(|value| JsonSerializer::<Vec<u8>>::deserialize(value).map_err(BackendError::from))
+                .transpose()
+        }.await
     }
 
     async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
@@ -166,7 +171,6 @@ impl CacheBackend for RedisBackend {
         let mut request = redis::cmd("SET");
         let serialized_value =
             JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
-        dbg!(&serialized_value);
         request.arg(key).arg(serialized_value);
         if let Some(ttl) = ttl {
             request.arg("EX").arg(ttl);
@@ -181,5 +185,27 @@ impl CacheBackend for RedisBackend {
     async fn start(&self) -> BackendResult<()> {
         self.connection().await?;
         Ok(())
+    }
+}
+
+impl hitbox_backend::backend::Backend for RedisBackend {
+    fn get<'a, T>(&'a self, key: String) -> hitbox_backend::backend::BackendFuture<Option<CachedValue<T>>>
+    where
+        T: CacheableResponse + 'a,
+        <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
+    {
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut con = client.get_tokio_connection_manager().await.unwrap();
+            let result: Option<Vec<u8>> = redis::cmd("GET")
+                .arg(key)
+                .query_async(&mut con)
+                .await
+                .map_err(Error::from)
+                .map_err(BackendError::from)?;
+            result
+                .map(|value| JsonSerializer::<Vec<u8>>::deserialize(value).map_err(BackendError::from))
+                .transpose()
+        })
     }
 }
