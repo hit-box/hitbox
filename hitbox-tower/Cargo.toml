@@ -20,5 +20,5 @@ hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
 http = "0.2"
 serde = "1"
 futures = "0.3"
-pin-project-lite = "0.2"
+pin-project = "1"
 chrono = "0.4"

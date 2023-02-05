@@ -75,30 +75,55 @@ where
 }
 
 // There are several CacheableResponse implementations for the most common types.
-
-/// Implementation `CacheableResponse` for `Result` type.
-/// We store to cache only `Ok` variant.
 impl<I, E> CacheableResponse for Result<I, E>
 where
-    I: Serialize + DeserializeOwned,
+    I: CacheableResponse,
 {
-    type Cached = I;
+    type Cached = I::Cached;
     fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
         match self {
-            Ok(value) => CachePolicy::Cacheable(value),
+            Ok(value) => match value.into_cache_policy() {
+                CachePolicy::Cacheable(value) => CachePolicy::Cacheable(value),
+                CachePolicy::NonCacheable(value) => CachePolicy::NonCacheable(Ok(value)),
+            }
             Err(_) => CachePolicy::NonCacheable(self),
         }
     }
     fn from_cached(cached: Self::Cached) -> Self {
-        Ok(cached)
+        unimplemented!()
     }
     fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
-        match self {
-            Ok(value) => CachePolicy::Cacheable(value),
-            Err(_) => CachePolicy::NonCacheable(()),
-        }
+        unimplemented!()
+        // match self {
+            // Ok(value) => CachePolicy::Cacheable(value),
+            // Err(_) => CachePolicy::NonCacheable(()),
+        // }
     }
 }
+
+/// Implementation `CacheableResponse` for `Result` type.
+/// We store to cache only `Ok` variant.
+// impl<I, E> CacheableResponse for Result<I, E>
+// where
+    // I: Serialize + DeserializeOwned,
+// {
+    // type Cached = I;
+    // fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
+        // match self {
+            // Ok(value) => CachePolicy::Cacheable(value),
+            // Err(_) => CachePolicy::NonCacheable(self),
+        // }
+    // }
+    // fn from_cached(cached: Self::Cached) -> Self {
+        // Ok(cached)
+    // }
+    // fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
+        // match self {
+            // Ok(value) => CachePolicy::Cacheable(value),
+            // Err(_) => CachePolicy::NonCacheable(()),
+        // }
+    // }
+// }
 
 /// Implementation `CacheableResponse` for `Option` type.
 /// We store to cache only `Some` variant.

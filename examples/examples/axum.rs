@@ -1,7 +1,14 @@
+use std::sync::Arc;
+
 use axum::{routing::get, Router};
 use hitbox_actix::RedisBackend;
 use hitbox_tower::Cache;
+use lazy_static::lazy_static;
 use tower::ServiceBuilder;
+
+lazy_static! {
+    static ref BACKEND: Arc<RedisBackend> = Arc::new(RedisBackend::new().unwrap());
+}
 
 #[tokio::main]
 async fn main() {
@@ -9,13 +16,14 @@ async fn main() {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
+    let backend = Arc::new(RedisBackend::new().unwrap());
     // build our application with a single route
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .layer(
             ServiceBuilder::new().layer(
                 Cache::builder()
-                    .backend(RedisBackend::new().unwrap())
+                    .backend(&BACKEND)
                     .build(),
             ),
         );

@@ -1,27 +1,33 @@
-use std::{fmt::Debug, sync::Arc, pin::Pin};
+use std::{fmt::Debug, pin::Pin, sync::Arc};
 
-use chrono::{Utc, Duration};
-use futures::{Future, future::BoxFuture};
-use hitbox::{Cacheable, dev::{CacheBackend, BackendError}, CachedValue};
+use chrono::{Duration, Utc};
+use futures::{future::{BoxFuture, Map}, Future};
+use hitbox::{
+    dev::{BackendError, CacheBackend},
+    Cacheable, CachedValue,
+};
 use hitbox_backend::backend::Backend;
 use hitbox_http::{CacheableRequest, CacheableResponse};
 use http::{Request, Response};
 use tower::Service;
 
-use crate::state::{FutureResponse, CacheResult};
+use crate::state::CacheFuture;
 
-pub struct CacheService<S, B> {
+pub struct CacheService<'back, S, B> {
     upstream: S,
-    backend: B,
+    backend: &'back B,
 }
 
-impl<S, B> CacheService<S, B> {
-    pub fn new(upstream: S, backend: B) -> Self {
-        CacheService { upstream, backend }
+impl<'back, S, B> CacheService<'back, S, B> {
+    pub fn new(upstream: S, backend: &'back B) -> Self {
+        CacheService {
+            upstream,
+            backend: backend,
+        }
     }
 }
 
-impl<S, B> Clone for CacheService<S, B>
+impl<'back, S, B> Clone for CacheService<'back, S, B>
 where
     S: Clone,
     B: Clone,
@@ -29,98 +35,24 @@ where
     fn clone(&self) -> Self {
         Self {
             upstream: self.upstream.clone(),
-            backend: self.backend.clone(),
+            backend: self.backend,
         }
     }
 }
 
-async fn transitions<F, B, Res, E>(
-    poll_upstream: F,
-    backend: Arc<B>,
-    cache_key: String,
-) -> F::Output
+impl<'back, S, Body, B, Res> Service<Request<Body>> for CacheService<'back, S, B>
 where
-    F: Future<Output = Result<Response<Res>, E>> + Send + 'static,
-    B: CacheBackend + Send + Sync + 'static,
-
-    Res: Send + 'static,
-    E: Send + 'static + Debug,
-    F::Output: From<hitbox_http::CacheableResponse<Res, E>>,
-{
-    let cached: Option<CachedValue<hitbox_http::CacheableResponse<Res, E>>> = backend.get(cache_key.clone()).await.unwrap();
-    dbg!(&cached);
-    let upstream_result = match cached {
-        Some(res) => {
-            return res.data.into_response()
-        },
-        None => poll_upstream.await,
-    };
-    let cr = CacheableResponse::from_response(upstream_result);
-    let cv = CachedValue::new(cr, Utc::now() + Duration::seconds(10));
-    dbg!(backend.set(cache_key, &cv, None).await);
-    cv.data.into_response()
-}
-
-async fn transitions2<S, Req, B, Body>(
-    upstream: &mut S,
-    backend: Arc<B>,
-    cache_key: String,
-    req: Request<Req>,
-) -> Result<S::Response, S::Error>
-where
-    S: Service<Request<Req>, Response = Response<Body>> + Send + 'static,
-    B: CacheBackend + Send + Sync + 'static,
-
-    S::Response: Send + 'static,
-    S::Error: Send + 'static + Debug,
-    Body: 'static,
-    // F::Output: From<hitbox_http::CacheableResponse<S::Response, S::Error>>,
-{
-    let cached: Option<CachedValue<hitbox_http::CacheableResponse<Body, S::Error>>> = backend.get(cache_key.clone()).await.unwrap();
-    dbg!(&cached);
-    let upstream_result = match cached {
-        Some(res) => {
-            return res.data.into_response()
-        },
-        None => upstream.call(req).await,
-    };
-    let cr = CacheableResponse::from_response(upstream_result);
-    let cv = CachedValue::new(cr, Utc::now() + Duration::seconds(10));
-    dbg!(backend.set(cache_key, &cv, None).await);
-    cv.data.into_response()
-}
-
-// impl<Req, S, B, PollUpstream, Body> Service<Request<Req>> for CacheService<S, B>
-impl<S, Req, B, Res> Service<Request<Req>> for CacheService<S, B>
-where
-    S: Service<Request<Req>, Response = Response<Res>> + Send + Clone + 'static,
-    // PollUpstream: Future<Output = Result<S::Response, S::Error>> + Send + 'static,
-    // PollUpstream::Output: Debug,
-    B: Backend + Clone + Send + Sync + 'static,
-    // PC: Future<Output = CacheResult<Res, S::Error>>,
-
-    // PollUpstream: Future<Output = Result<S::Response, S::Error>> + Send + 'static,
-    // PollUpstream::Output: Debug,
-
-    S::Future: Send + 'static,
-    S::Error: Send + Sync + 'static + Debug,
-    S::Response: Send + 'static,
-    // Body: Send + 'static,
-    Req: Send + 'static,
-    Res: Send + 'static,
-    
-    Request<Req>: Debug,
-    // <S::Future as Future>::Output: From<hitbox_http::CacheableResponse<S::Response, S::Error>>,
+    S: Service<Request<Body>, Response = Response<Res>>,
+    B: CacheBackend + Send + Sync + Clone,
+    S::Future: Send,
+    S::Error: Send + Debug + 'back,
+    Body: Send,
+    Res: Send + 'back,
+    Request<Body>: Debug,
 {
     type Response = Response<Res>;
     type Error = S::Error;
-    // type Future = FutureResponse<PollUpstream, BoxFuture<'static, Result<CachedValue<hitbox_http::CacheableResponse<Body>>, S::Error>>>;
-    // type Future = BoxFuture<'static, Result<S::Response, S::Error>>;
-    // type Future = FutureResponse<
-        // PollUpstream, 
-        // BoxFuture<'static, Result<Option<CachedValue<hitbox_http::CacheableResponse<Body, S::Error>>>, BackendError>>
-    // >;
-    type Future = FutureResponse<S, Req, B>;
+    type Future = CacheFuture<'back, S::Future, B>;
 
     fn poll_ready(
         &mut self,
@@ -129,41 +61,21 @@ where
         self.upstream.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<Req>) -> Self::Future {
+    fn call(&mut self, req: Request<Body>) -> Self::Future {
         dbg!(&req);
         let cacheable_request = CacheableRequest::from_request(&req);
         let cache_key = cacheable_request.cache_key().unwrap();
         dbg!(&cache_key);
 
-        // transitions with future
-        let backend = self.backend.clone();
-        // let poll_upstream = self.upstream.call(req);
-        // let t = transitions(poll_upstream, self.backend.clone(), cache_key);
+        use futures::FutureExt;
 
-        // transitions with &mut service
-        // let t2 = transitions2(&mut self.upstream, backend, cache_key, req);
-        // Box::pin(async move {
-            // transition with future
-            // Ok(t.await?)
-
-            // transitions with &mut service
-            // Ok(t2.await?)
-
-            // Inline transitions
-            // // let cached: Option<CachedValue<hitbox_http::CacheableResponse<Body, S::Error>>> = backend.get(cache_key.clone()).await.unwrap();
-            // // dbg!(&cached);
-            // // let upstream_result = match cached {
-                // // Some(res) => {
-                    // // return res.data.into_response()
-                // // },
-                // // None => poll_upstream.await,
-            // // };
-            // // let cr = CacheableResponse::from_response(upstream_result);
-            // // let cv = CachedValue::new(cr, Utc::now() + Duration::seconds(10));
-            // // dbg!(backend.set(cache_key, &cv, None).await);
-            // // cv.data.into_response()
-        // })
-        // FutureResponse::new(transitions(self.upstream.call(req), self.backend.clone(), cache_key))
-        FutureResponse::new(self.upstream.clone(), backend, req)
+        let upstream = self
+            .upstream
+            .call(req);
+            // .map(CacheableResponse::from_response);
+        // Box::pin(CacheFuture::new(upstream, self.backend.clone(), cache_key).map(|res| res.into_response()))
+        // CacheFutureWrapper::new(upstream, backend, cache_key)
+        // new(upstream, backend, cache_key)
+        CacheFuture::new(upstream, self.backend, cache_key)
     }
 }

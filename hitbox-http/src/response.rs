@@ -4,21 +4,19 @@ use hitbox::CachePolicy;
 use http::Response;
 use serde::{Deserialize, Deserializer, Serialize};
 
-pub struct CacheableResponse<Body, E> {
-    response: Result<Response<Body>, E>,
+pub struct CacheableResponse<Body> {
+    response: Response<Body>,
     ser: SerializableResponse,
 }
 
-unsafe impl<Body, E> Sync for CacheableResponse<Body, E> {}
+unsafe impl<Body> Sync for CacheableResponse<Body> {}
 
-impl<Body, E: Debug> CacheableResponse<Body, E> {
-    pub fn from_response(response: Result<Response<Body>, E>) -> Self {
+impl<Body> CacheableResponse<Body> {
+    pub fn from_response(response: Response<Body>) -> Self {
         CacheableResponse {
             ser: SerializableResponse {
-                method: response.as_ref().unwrap().status().to_string(),
+                method: response.status().to_string(),
                 headers: response
-                    .as_ref()
-                    .unwrap()
                     .headers()
                     .iter()
                     .map(|(h, v)| (h.to_string(), v.to_str().unwrap().to_string()))
@@ -32,7 +30,7 @@ impl<Body, E: Debug> CacheableResponse<Body, E> {
         &self.ser
     }
 
-    pub fn into_response(self) -> Result<Response<Body>, E> {
+    pub fn into_response(self) -> Response<Body> {
         self.response
     }
 }
@@ -43,13 +41,13 @@ pub struct SerializableResponse {
     headers: HashMap<String, String>,
 }
 
-impl<Body, E> From<CacheableResponse<Body, E>> for Result<Response<Body>, E> {
-    fn from(value: CacheableResponse<Body, E>) -> Self {
+impl<Body> From<CacheableResponse<Body>> for Response<Body> {
+    fn from(value: CacheableResponse<Body>) -> Self {
         value.response
     }
 }
 
-impl<Body, E> From<Response<Body>> for CacheableResponse<Body, E> {
+impl<Body> From<Response<Body>> for CacheableResponse<Body> {
     fn from(response: Response<Body>) -> Self {
         CacheableResponse {
             ser: SerializableResponse {
@@ -60,19 +58,19 @@ impl<Body, E> From<Response<Body>> for CacheableResponse<Body, E> {
                     .map(|(h, v)| (h.to_string(), v.to_str().unwrap().to_string()))
                     .collect(),
             },
-            response: Ok(response),
+            response,
         }
     }
 }
 
-impl<Body, E> From<SerializableResponse> for CacheableResponse<Body, E> {
+impl<Body> From<SerializableResponse> for CacheableResponse<Body> {
     fn from(value: SerializableResponse) -> Self {
         dbg!(value);
         unimplemented!()
     }
 }
 
-impl<Body, E: Debug> hitbox::CacheableResponse for CacheableResponse<Body, E> {
+impl<Body> hitbox::CacheableResponse for CacheableResponse<Body> {
     type Cached = SerializableResponse;
 
     fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {

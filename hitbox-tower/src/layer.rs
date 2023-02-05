@@ -7,48 +7,51 @@ use tower::Layer;
 use crate::service::CacheService;
 
 #[derive(Clone)]
-pub struct Cache<B = RedisBackend> {
-    backend: B,
+pub struct Cache<'a, B = RedisBackend> {
+    backend: &'a B,
 }
 
-impl<S, B> Layer<S> for Cache<B> 
+impl<'a, S, B> Layer<S> for Cache<'a, B>
 where
-    B: Clone,
+    B: Clone + 'a,
 {
-    type Service = CacheService<S, B>;
+    type Service = CacheService<'a, S, B>;
 
     fn layer(&self, upstream: S) -> Self::Service {
-        CacheService::new(upstream, self.backend.clone())
+        CacheService::new(upstream, self.backend)
     }
 }
 
-impl Cache<RedisBackend> {
-    pub fn builder() -> CacheBuilder<RedisBackend> {
+impl<'a> Cache<'a, RedisBackend> {
+    pub fn builder() -> CacheBuilder<'a, RedisBackend> {
         CacheBuilder::<RedisBackend>::default()
     }
 }
 
-pub struct CacheBuilder<B> {
-    backend: Option<B>,
+pub struct CacheBuilder<'a, B> {
+    backend: Option<&'a B>,
 }
 
-impl<B> CacheBuilder<B>
+impl<'a, B> CacheBuilder<'a, B>
 where
     B: CacheBackend,
 {
-    pub fn backend(mut self, backend: B) -> Self {
+    pub fn backend(mut self, backend: &'a B) -> Self {
         self.backend = Some(backend);
         self
     }
 
-    pub fn build(self) -> Cache<B> {
+    pub fn build(self) -> Cache<'a, B> {
         Cache {
-            backend: self.backend.expect("Please add some cache backend"),
+            backend: self
+                .backend
+                .as_ref()
+                .expect("Please add some cache backend"),
         }
     }
 }
 
-impl<B> Default for CacheBuilder<B> {
+impl<'a, B> Default for CacheBuilder<'a, B> {
     fn default() -> Self {
         Self { backend: None }
     }
