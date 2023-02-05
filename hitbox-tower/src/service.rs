@@ -1,4 +1,4 @@
-use std::{fmt::Debug, pin::Pin, sync::Arc};
+use std::{fmt::Debug, pin::Pin, sync::Arc, marker::PhantomData};
 
 use chrono::{Duration, Utc};
 use futures::{future::{BoxFuture, Map}, Future};
@@ -13,13 +13,13 @@ use tower::Service;
 
 use crate::state::CacheFuture;
 
-pub struct CacheService<'back, S, B> {
+pub struct CacheService<S, B> {
     upstream: S,
-    backend: &'back B,
+    backend: Arc<B>,
 }
 
-impl<'back, S, B> CacheService<'back, S, B> {
-    pub fn new(upstream: S, backend: &'back B) -> Self {
+impl<S, B> CacheService<S, B> {
+    pub fn new(upstream: S, backend: Arc<B>) -> Self {
         CacheService {
             upstream,
             backend: backend,
@@ -27,7 +27,7 @@ impl<'back, S, B> CacheService<'back, S, B> {
     }
 }
 
-impl<'back, S, B> Clone for CacheService<'back, S, B>
+impl<S, B> Clone for CacheService<S, B>
 where
     S: Clone,
     B: Clone,
@@ -35,24 +35,24 @@ where
     fn clone(&self) -> Self {
         Self {
             upstream: self.upstream.clone(),
-            backend: self.backend,
+            backend: Arc::clone(&self.backend),
         }
     }
 }
 
-impl<'back, S, Body, B, Res> Service<Request<Body>> for CacheService<'back, S, B>
+impl<S, Body, B, Res> Service<Request<Body>> for CacheService<S, B>
 where
     S: Service<Request<Body>, Response = Response<Res>>,
-    B: CacheBackend + Send + Sync + Clone,
+    B: CacheBackend + Send + Sync + Clone + 'static,
     S::Future: Send,
-    S::Error: Send + Debug + 'back,
+    S::Error: Send + Debug + 'static,
     Body: Send,
-    Res: Send + 'back,
+    Res: Send + 'static,
     Request<Body>: Debug,
 {
     type Response = Response<Res>;
     type Error = S::Error;
-    type Future = CacheFuture<'back, S::Future, B>;
+    type Future = CacheFuture<S::Future, B>;
 
     fn poll_ready(
         &mut self,
@@ -67,8 +67,6 @@ where
         let cache_key = cacheable_request.cache_key().unwrap();
         dbg!(&cache_key);
 
-        use futures::FutureExt;
-
         let upstream = self
             .upstream
             .call(req);
@@ -76,6 +74,6 @@ where
         // Box::pin(CacheFuture::new(upstream, self.backend.clone(), cache_key).map(|res| res.into_response()))
         // CacheFutureWrapper::new(upstream, backend, cache_key)
         // new(upstream, backend, cache_key)
-        CacheFuture::new(upstream, self.backend, cache_key)
+        CacheFuture::new(upstream, self.backend.clone(), cache_key)
     }
 }

@@ -7,9 +7,7 @@ pub type BackendResult<T> = Result<T, BackendError>;
 pub type BackendFuture<T> = Pin<Box<dyn Future<Output = BackendResult<T>> + Send>>;
 
 #[async_trait]
-pub trait CacheBackend 
-where
-    Self: 'static,
+pub trait CacheBackend
 {
     async fn get<T>(&self, key: String) -> BackendResult<Option<CachedValue<T>>>
     where
@@ -35,32 +33,32 @@ pub trait Backend {
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned;
 }
 
-#[async_trait]
-impl<B> CacheBackend for Arc<B> 
-where
-    B: CacheBackend + Send + Sync,
-{
-    async fn get<T>(&self, key: String) -> BackendResult<Option<CachedValue<T>>>
-    where
-        T: CacheableResponse,
-        <T as CacheableResponse>::Cached: serde::de::DeserializeOwned {
-            self.get(key).await
-        }
-    async fn set<T>(
-        &self,
-        key: String,
-        value: &CachedValue<T>,
-        ttl: Option<u32>,
-    ) -> BackendResult<()>
-    where
-        T: CacheableResponse + Sync,
-        <T as CacheableResponse>::Cached: serde::de::DeserializeOwned {
-            self.set(key, value, ttl).await
-        }
-    async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
-        self.delete(key).await
-    }
-    async fn start(&self) -> BackendResult<()> {
-        self.start().await
-    }
-}
+// #[async_trait]
+// impl<B> CacheBackend for Arc<B> 
+// where
+    // B: CacheBackend + Send + Sync,
+// {
+    // async fn get<T>(&self, key: String) -> BackendResult<Option<CachedValue<T>>>
+    // where
+        // T: CacheableResponse,
+        // <T as CacheableResponse>::Cached: serde::de::DeserializeOwned {
+            // self.get(key).await
+        // }
+    // async fn set<T>(
+        // &self,
+        // key: String,
+        // value: &CachedValue<T>,
+        // ttl: Option<u32>,
+    // ) -> BackendResult<()>
+    // where
+        // T: CacheableResponse + Sync,
+        // <T as CacheableResponse>::Cached: serde::de::DeserializeOwned {
+            // self.set(key, value, ttl).await
+        // }
+    // async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
+        // self.delete(key).await
+    // }
+    // async fn start(&self) -> BackendResult<()> {
+        // self.start().await
+    // }
+// }

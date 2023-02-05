@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, marker::PhantomData};
 
 use hitbox::dev::CacheBackend;
 use hitbox_redis::RedisBackend;
@@ -7,51 +7,56 @@ use tower::Layer;
 use crate::service::CacheService;
 
 #[derive(Clone)]
-pub struct Cache<'a, B = RedisBackend> {
-    backend: &'a B,
+pub struct Cache<B> {
+    pub backend: Arc<B>,
 }
 
-impl<'a, S, B> Layer<S> for Cache<'a, B>
-where
-    B: Clone + 'a,
-{
-    type Service = CacheService<'a, S, B>;
-
-    fn layer(&self, upstream: S) -> Self::Service {
-        CacheService::new(upstream, self.backend)
-    }
-}
-
-impl<'a> Cache<'a, RedisBackend> {
-    pub fn builder() -> CacheBuilder<'a, RedisBackend> {
-        CacheBuilder::<RedisBackend>::default()
-    }
-}
-
-pub struct CacheBuilder<'a, B> {
-    backend: Option<&'a B>,
-}
-
-impl<'a, B> CacheBuilder<'a, B>
-where
-    B: CacheBackend,
-{
-    pub fn backend(mut self, backend: &'a B) -> Self {
-        self.backend = Some(backend);
-        self
-    }
-
-    pub fn build(self) -> Cache<'a, B> {
+impl<B> Cache<B> {
+    pub fn new(backend: B) -> Cache<B> {
         Cache {
-            backend: self
-                .backend
-                .as_ref()
-                .expect("Please add some cache backend"),
+            backend: Arc::new(backend),
         }
     }
 }
 
-impl<'a, B> Default for CacheBuilder<'a, B> {
+impl<S, B> Layer<S> for Cache<B> 
+{
+    type Service = CacheService<S, B>;
+
+    fn layer(&self, upstream: S) -> Self::Service {
+        CacheService::new(upstream, Arc::clone(&self.backend))
+    }
+}
+
+impl Cache<RedisBackend> {
+    pub fn builder() -> CacheBuilder<RedisBackend> {
+        CacheBuilder::<RedisBackend>::default()
+    }
+}
+
+pub struct CacheBuilder<B> {
+    backend: Option<B>,
+}
+
+impl<B> CacheBuilder<B>
+where
+    B: CacheBackend,
+{
+    pub fn backend(mut self, backend: B) -> Self {
+        self.backend = Some(backend);
+        self
+    }
+
+    pub fn build(self) -> Cache<B> {
+        Cache {
+            backend: Arc::new(self
+                .backend
+                .expect("Please add some cache backend")),
+        }
+    }
+}
+
+impl<B> Default for CacheBuilder<B> {
     fn default() -> Self {
         Self { backend: None }
     }

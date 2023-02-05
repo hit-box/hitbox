@@ -2,7 +2,7 @@ use std::{
     fmt::{Debug, Write},
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{Context, Poll}, marker::PhantomData,
 };
 
 use futures::{future::BoxFuture, ready, Future, FutureExt};
@@ -67,8 +67,8 @@ pub type PollCache<'a, R> = BoxFuture<'a, CacheResult<R>>;
 enum State<U, C> {
     Initial,
     PollCache {
-        // #[pin]
-        // poll_cache: PollCache<C>,
+        #[pin]
+        poll_cache: PollCache<'static, C>,
     },
     CachePolled {
         cache_result: CacheResult<C>,
@@ -96,7 +96,7 @@ impl<U, C> Debug for State<U, C> {
 }
 
 #[pin_project]
-pub struct CacheFuture<'back, U, B>
+pub struct CacheFuture<U, B>
 where
     B: CacheBackend,
     U: Future,
@@ -105,19 +105,19 @@ where
 {
     #[pin]
     upstream: U,
-    backend: &'back B,
+    backend: Arc<B>,
     cache_key: String,
     #[pin]
     state: State<U::Output, <U::Output as IntoCacheable>::Cacheable>,
 
     #[pin]
-    poll_cache: Option<PollCache<'back, <U::Output as IntoCacheable>::Cacheable>>,
+    poll_cache: Option<PollCache<'static, <U::Output as IntoCacheable>::Cacheable>>,
     // poll_cache: Option<
         // Pin<Box<dyn Future<Output = CacheResult<<U::Output as IntoCacheable>::Cacheable>> + Send>>,
     // >,
 }
 
-impl<'back, U, B> CacheFuture<'back, U, B>
+impl<U, B> CacheFuture<U, B>
 where
     B: CacheBackend,
     U: Future,
@@ -125,7 +125,7 @@ where
     // <U::Output as CacheableResponse>::Cached: DeserializeOwned,
     U::Output: IntoCacheable,
 {
-    pub fn new(upstream: U, backend: &'back B, cache_key: String) -> Self {
+    pub fn new(upstream: U, backend: Arc<B>, cache_key: String) -> Self {
         CacheFuture {
             upstream,
             backend,
@@ -136,12 +136,12 @@ where
     }
 }
 
-impl<'back, U, B, C> Future for CacheFuture<'back, U, B>
+impl<U, B, C> Future for CacheFuture<U, B>
 where
-    B: CacheBackend + Send,
+    B: CacheBackend + Send + Sync + 'static,
     U: Future + Send,
     U::Output: IntoCacheable<Cacheable = C> + Send,
-    C: CacheableResponse + Send + 'back,
+    C: CacheableResponse + Send + 'static,
     C::Cached: DeserializeOwned,
 {
     type Output = U::Output;
@@ -152,18 +152,16 @@ where
             dbg!(&this.state);
             let state = match this.state.as_mut().project() {
                 StateProj::Initial => {
-                    let poll_cache = this.backend.get("test".to_owned());
-                    this.poll_cache.set(Some(poll_cache));
-                    State::PollCache {}
+                    let backend = this.backend.clone();
+                    let poll_cache = Box::pin(async move {
+                        backend.get("test".to_owned()).await
+                    });
+                    // this.poll_cache.set(Some(poll_cache));
+                    State::PollCache { poll_cache }
                 }
-                StateProj::PollCache {} => {
+                StateProj::PollCache { poll_cache } => {
                     // let cached = ready!(poll_cache.poll(cx));
-                    let cached = ready!(this
-                        .poll_cache
-                        .as_mut()
-                        .as_pin_mut()
-                        .expect(POLL_AFTER_READY_ERROR)
-                        .poll(cx));
+                    let cached = ready!(poll_cache.poll(cx));
                     dbg!(cached);
                     State::PollUpstream
                 }

@@ -23,7 +23,8 @@ async fn main() {
         .layer(
             ServiceBuilder::new().layer(
                 Cache::builder()
-                    .backend(&BACKEND)
+                    // .backend(&BACKEND)
+                    .backend(&backend)
                     .build(),
             ),
         );
