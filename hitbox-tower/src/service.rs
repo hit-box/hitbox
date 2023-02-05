@@ -22,7 +22,7 @@ impl<S, B> CacheService<S, B> {
     pub fn new(upstream: S, backend: Arc<B>) -> Self {
         CacheService {
             upstream,
-            backend: backend,
+            backend,
         }
     }
 }

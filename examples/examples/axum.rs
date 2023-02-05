@@ -16,7 +16,7 @@ async fn main() {
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let backend = Arc::new(RedisBackend::new().unwrap());
+    let backend = RedisBackend::new().unwrap();
     // build our application with a single route
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
@@ -24,7 +24,7 @@ async fn main() {
             ServiceBuilder::new().layer(
                 Cache::builder()
                     // .backend(&BACKEND)
-                    .backend(&backend)
+                    .backend(backend)
                     .build(),
             ),
         );
