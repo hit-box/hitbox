@@ -29,5 +29,5 @@ metrics-exporter-prometheus = "0.11"
 hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
 tower = { version = "0.4", features = ["full"] }
-tower-http = { version = "0.3", features = ["full"] }
+tower-http = { version = "0.4", features = ["full"] }
 http = "0.2"
