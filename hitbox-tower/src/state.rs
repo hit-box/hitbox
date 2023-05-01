@@ -11,8 +11,10 @@ use hitbox::{
     dev::{BackendError, CacheBackend},
     CachedValue,
 };
-use hitbox_backend::{response2::CacheableResponse, Backend};
-use hitbox_http::Cacheable;
+use hitbox_backend::{
+    response2::{CachePolicy, CacheableResponse},
+    Backend,
+};
 use http::{Request, Response};
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -67,14 +69,17 @@ pub type PollCache<R> = BoxFuture<'static, CacheResult<R>>;
 pub type UpdateCache = BoxFuture<'static, Result<(), BackendError>>;
 
 #[pin_project(project = StateProj)]
-enum State<U, C> {
+enum State<U, C>
+where
+    C: CacheableResponse,
+{
     Initial,
     PollCache {
         #[pin]
-        poll_cache: PollCache<C>,
+        poll_cache: PollCache<C::Cached>,
     },
     CachePolled {
-        cache_result: CacheResult<C>,
+        cache_result: CacheResult<C::Cached>,
     },
     PollUpstream,
     UpstreamPolled {
@@ -83,14 +88,17 @@ enum State<U, C> {
     UpdateCache {
         #[pin]
         update_cache: UpdateCache,
-        upstream_result: Option<U>,
+        upstream_result: Option<C>,
     },
     Response {
-        response: Option<U>,
+        response: Option<C>,
     },
 }
 
-impl<U, C> Debug for State<U, C> {
+impl<U, C> Debug for State<U, C>
+where
+    C: CacheableResponse,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             State::Initial => f.write_str("State::Initial"),
@@ -107,11 +115,11 @@ impl<U, C> Debug for State<U, C> {
 #[pin_project]
 pub struct CacheFuture<U, B, C>
 where
-    B: CacheBackend,
     U: Future,
-    U::Output: CacheableResponse<Cached = C>,
+    B: CacheBackend,
+    // U::Output: CacheableResponse<Cached = C>,
     // U::Output: IntoCacheable,
-    C: From<U::Output>,
+    C: From<U::Output> + CacheableResponse,
 {
     #[pin]
     upstream: U,
@@ -131,9 +139,8 @@ impl<U, B, C> CacheFuture<U, B, C>
 where
     B: CacheBackend,
     U: Future,
-    U::Output: CacheableResponse<Cached = C>,
     // <U::Output as CacheableResponse>::Cached: DeserializeOwned,
-    C: From<U::Output>,
+    C: From<U::Output> + CacheableResponse,
 {
     pub fn new(upstream: U, backend: Arc<B>, cache_key: String) -> Self {
         CacheFuture {
@@ -150,10 +157,11 @@ impl<U, B, C> Future for CacheFuture<U, B, C>
 where
     B: CacheBackend + Send + Sync + 'static,
     U: Future + Send,
-    U::Output: CacheableResponse<Cached = C> + Send,
+    U::Output: From<C>,
     // C: CacheableResponse + Send + 'static,
     // C::Cached: DeserializeOwned,
-    C: From<U::Output> + Send + 'static + DeserializeOwned,
+    C: From<U::Output> + CacheableResponse + Send + 'static,
+    C::Cached: for<'a> From<&'a C> + Send + DeserializeOwned + Serialize,
 {
     type Output = U::Output;
 
@@ -165,7 +173,7 @@ where
                 StateProj::Initial => {
                     let backend = this.backend.clone();
                     let cache_key = this.cache_key.clone();
-                    let poll_cache = Box::pin(async move { backend.get(cache_key).await });
+                    let poll_cache = Box::pin(async move { backend.get::<C>(cache_key).await });
                     // this.poll_cache.set(Some(poll_cache));
                     State::PollCache { poll_cache }
                 }
@@ -183,14 +191,20 @@ where
                 StateProj::UpstreamPolled { upstream_result } => {
                     let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
                     // State::Response { response: Some(response) }
-                    let cacheable = upstream_result.to_cacheable();
+                    let cacheable: C = upstream_result.into();
                     let backend = this.backend.clone();
                     let cache_key = this.cache_key.clone();
+                    let cached_value = match cacheable.cache_policy() {
+                        CachePolicy::Cacheable(cached_value) => cached_value,
+                        _ => unimplemented!(),
+                    };
                     let update_cache =
-                        Box::pin(async move { backend.set(cache_key, cacheable, None).await });
+                        Box::pin(
+                            async move { backend.set::<C>(cache_key, cached_value, None).await },
+                        );
                     State::UpdateCache {
                         update_cache,
-                        upstream_result: Some(upstream_result),
+                        upstream_result: Some(cacheable),
                     }
                 }
                 StateProj::UpdateCache {
@@ -201,7 +215,7 @@ where
                 },
                 StateProj::Response { response } => {
                     let response = response.take().expect(POLL_AFTER_READY_ERROR);
-                    return Poll::Ready(response);
+                    return Poll::Ready(response.into());
                 }
                 _ => unimplemented!(),
             };

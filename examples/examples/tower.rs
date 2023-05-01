@@ -32,8 +32,8 @@ async fn main() {
         .service_fn(handle);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    Server::bind(&addr)
-        .serve(Shared::new(service))
-        .await
-        .expect("server error");
+    let server = Server::bind(&addr).serve(Shared::new(service));
+    if let Err(e) = server.await {
+        eprintln!("server error: {}", e);
+    }
 }

@@ -14,8 +14,10 @@ keywords = ["cache", "async", "http", "hitbox"]
 
 [dependencies]
 http = "0.2"
+http-body = "0.4"
 hitbox = { path = "../hitbox", version = "0.1" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
 serde = "1.0.144"
 bytes = "1"
 chrono = "0.4"
+hyper = "0.14"

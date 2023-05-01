@@ -47,14 +47,15 @@ where
     B: CacheBackend + Send + Sync + Clone + 'static,
     S::Future: Send,
     S::Error: Send + Sync + Debug + 'static,
+    S::Response: From<HttpResponse<Res>>,
     Body: Send,
     Res: Send + Debug + 'static,
     Request<Body>: Debug,
-    HttpResponse<Body>: From<<S::Future as Future>::Output> + CacheableResponse,
+    // HttpResponse<Body>: From<<S::Future as Future>::Output> + CacheableResponse,
 {
     type Response = Response<Res>;
     type Error = S::Error;
-    type Future = CacheFuture<S::Future, B, HttpResponse<Body>>;
+    type Future = CacheFuture<S::Future, B, HttpResponse<Res>>;
 
     fn poll_ready(
         &mut self,
@@ -74,6 +75,6 @@ where
         // Box::pin(CacheFuture::new(upstream, self.backend.clone(), cache_key).map(|res| res.into_response()))
         // CacheFutureWrapper::new(upstream, backend, cache_key)
         // new(upstream, backend, cache_key)
-        CacheFuture::new(upstream, self.backend.clone(), cache_key).map(|res| Ok(res.inner))
+        CacheFuture::new(upstream, self.backend.clone(), cache_key)
     }
 }

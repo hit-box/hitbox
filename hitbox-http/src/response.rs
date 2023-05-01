@@ -4,6 +4,7 @@ use chrono::Utc;
 use hitbox::CachedValue;
 use hitbox_backend::response2::CacheableResponse;
 use http::{Response, StatusCode};
+use http_body::Body;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -23,6 +24,12 @@ impl<Body, E: Debug> From<Result<Response<Body>, E>> for HttpResponse<Body> {
     }
 }
 
+impl<Body, E: Debug> From<HttpResponse<Body>> for Result<Response<Body>, E> {
+    fn from(value: HttpResponse<Body>) -> Self {
+        Ok(value.inner)
+    }
+}
+
 pub enum CachePolicy<Cached> {
     Cacheable(Cached),
     NonCacheable,
@@ -35,49 +42,22 @@ pub enum CacheState<Cached> {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct SerializableHttpResponse<Body> {
+pub struct SerializableHttpResponse {
     status: u16,
     version: String,
     headers: HashMap<String, String>,
-    body: Body,
-}
-
-pub trait Cacheable: Sized {
-    type Cached;
-
-    fn cache_policy<'a>(&'a self) -> CachePolicy<CachedValue<Self::Cached>>
-    where
-        Self::Cached: From<&'a Self>,
-    {
-        if self.is_cacheable() {
-            let cached = self.into();
-            let cached_value = CachedValue::new(cached, Utc::now());
-            CachePolicy::Cacheable(cached_value)
-        } else {
-            CachePolicy::NonCacheable
-        }
-    }
-
-    fn from_cached(cached: CachedValue<Self::Cached>) -> CacheState<Self>
-    where
-        Self: From<Self::Cached>,
-    {
-        // TODO: check stale state
-        CacheState::Actual(Self::from(cached.into_inner()))
-    }
-
-    fn is_cacheable(&self) -> bool;
+    // body: Vec<u8>,
 }
 
 impl<Body> CacheableResponse for HttpResponse<Body> {
-    type Cached = SerializableHttpResponse<Body>;
+    type Cached = SerializableHttpResponse;
 
     fn is_cacheable(&self) -> bool {
         self.inner.status() == StatusCode::OK
     }
 }
 
-impl<'a, Body: Clone> From<&'a HttpResponse<Body>> for SerializableHttpResponse<Body> {
+impl<'a, Body> From<&'a HttpResponse<Body>> for SerializableHttpResponse {
     fn from(response: &'a HttpResponse<Body>) -> Self {
         let body = response.inner.body().clone();
         SerializableHttpResponse {
@@ -89,25 +69,28 @@ impl<'a, Body: Clone> From<&'a HttpResponse<Body>> for SerializableHttpResponse<
                 .iter()
                 .map(|(h, v)| (h.to_string(), v.to_str().unwrap().to_string()))
                 .collect(),
-            body,
+            // body,
         }
     }
 }
 
-impl<Body> From<SerializableHttpResponse<Body>> for HttpResponse<Body>
-where
-    Body: TryFrom<Body>,
-{
-    fn from(serializable: SerializableHttpResponse<Body>) -> Self {
-        let body = match serializable.body.try_into() {
-            Ok(res) => res,
-            Err(_) => unimplemented!(),
-        };
+impl From<HttpResponse<hyper::Body>> for Response<hyper::Body> {
+    fn from(value: HttpResponse<hyper::Body>) -> Self {
+        unimplemented!()
+    }
+}
+
+impl From<SerializableHttpResponse> for HttpResponse<()> {
+    fn from(serializable: SerializableHttpResponse) -> Self {
+        // let body = match serializable.body.try_into() {
+        //     Ok(res) => res,
+        //     Err(_) => unimplemented!(),
+        // };
         let mut inner = Response::builder();
         for (key, value) in serializable.headers.into_iter() {
             inner = inner.header(key, value)
         }
-        let inner = inner.status(200).body(body).unwrap();
+        let inner = inner.status(200).body(()).unwrap();
         Self { inner }
     }
 }
