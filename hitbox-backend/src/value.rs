@@ -3,15 +3,10 @@ use std::fmt::Debug;
 use chrono::{DateTime, Utc};
 
 #[cfg_attr(test, derive(Clone, PartialEq, Eq))]
+#[derive(Debug)]
 pub struct CachedValue<T> {
     pub data: T,
     pub expired: DateTime<Utc>,
-}
-
-impl<T> Debug for CachedValue<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("CachedValue<T>")
-    } 
 }
 
 impl<T> CachedValue<T> {

@@ -15,10 +15,10 @@ tower = "0.4"
 hitbox = { path = "../hitbox", version = "0.1" }
 hitbox-http = { path = "../hitbox-http", version = "0.1" }
 hitbox-redis = { path = "../hitbox-redis", version = "0.1" }
-hitbox-tokio = { path = "../hitbox-tokio", version = "0.1" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
 http = "0.2"
 serde = "1"
 futures = "0.3"
 pin-project = "1"
 chrono = "0.4"
+bytes = "1"

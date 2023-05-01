@@ -60,7 +60,7 @@ where
     }
 }*/
 
-/// Represents cuurent state of cached data.
+/// Represents current state of cached data.
 pub enum CacheState<T> {
     /// Cached data is exists and actual.
     Actual(CachedValue<T>),
@@ -84,8 +84,7 @@ where
     }
 }*/
 
-impl<T> From<Option<CachedValue<T>>> for CacheState<T>
-{
+impl<T> From<Option<CachedValue<T>>> for CacheState<T> {
     fn from(cached_value: Option<CachedValue<T>>) -> Self {
         match cached_value {
             Some(value) => {

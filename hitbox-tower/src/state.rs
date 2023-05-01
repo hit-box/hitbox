@@ -1,19 +1,21 @@
 use std::{
     fmt::{Debug, Write},
+    marker::PhantomData,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll}, marker::PhantomData,
+    task::{Context, Poll},
 };
 
 use futures::{future::BoxFuture, ready, Future, FutureExt};
 use hitbox::{
     dev::{BackendError, CacheBackend},
-    CacheableResponse, CachedValue,
+    CachedValue,
 };
-use hitbox_backend::backend::Backend;
+use hitbox_backend::{response2::CacheableResponse, Backend};
+use hitbox_http::Cacheable;
 use http::{Request, Response};
 use pin_project::pin_project;
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tower::Service;
 
 // pub type CacheResult<R, E> =
@@ -39,7 +41,7 @@ where
         poll_upstream: PU,
     },
     UpstreamPolled,
-    Reponse {
+    Response {
         #[pin]
         response: Result<Res, E>,
     },
@@ -53,7 +55,7 @@ impl<PU, Res, E, Req, PC> Debug for CacheState<PU, Res, E, Req, PC> {
             CacheState::CachePolled => f.write_str("State::CachePolled"),
             CacheState::PollUpstream { poll_upstream: _ } => f.write_str("State::PollUpstream"),
             CacheState::UpstreamPolled => f.write_str("State::UpstreamPolled"),
-            CacheState::Reponse { response: _ } => f.write_str("State::Response"),
+            CacheState::Response { response: _ } => f.write_str("State::Response"),
         }
     }
 }
@@ -61,20 +63,26 @@ impl<PU, Res, E, Req, PC> Debug for CacheState<PU, Res, E, Req, PC> {
 const POLL_AFTER_READY_ERROR: &str = "CacheFuture can't be polled after finishing";
 
 pub type CacheResult<R> = Result<Option<CachedValue<R>>, BackendError>;
-pub type PollCache<'a, R> = BoxFuture<'a, CacheResult<R>>;
+pub type PollCache<R> = BoxFuture<'static, CacheResult<R>>;
+pub type UpdateCache = BoxFuture<'static, Result<(), BackendError>>;
 
 #[pin_project(project = StateProj)]
 enum State<U, C> {
     Initial,
     PollCache {
         #[pin]
-        poll_cache: PollCache<'static, C>,
+        poll_cache: PollCache<C>,
     },
     CachePolled {
         cache_result: CacheResult<C>,
     },
     PollUpstream,
     UpstreamPolled {
+        upstream_result: Option<U>,
+    },
+    UpdateCache {
+        #[pin]
+        update_cache: UpdateCache,
         upstream_result: Option<U>,
     },
     Response {
@@ -90,40 +98,42 @@ impl<U, C> Debug for State<U, C> {
             State::CachePolled { .. } => f.write_str("State::PollCache"),
             State::PollUpstream { .. } => f.write_str("State::PollUpstream"),
             State::UpstreamPolled { .. } => f.write_str("State::UpstreamPolled"),
+            State::UpdateCache { .. } => f.write_str("State::UpdateCache"),
             State::Response { .. } => f.write_str("State::Response"),
         }
     }
 }
 
 #[pin_project]
-pub struct CacheFuture<U, B>
+pub struct CacheFuture<U, B, C>
 where
     B: CacheBackend,
     U: Future,
-    // U::Output: CacheableResponse,
-    U::Output: IntoCacheable,
+    U::Output: CacheableResponse<Cached = C>,
+    // U::Output: IntoCacheable,
+    C: From<U::Output>,
 {
     #[pin]
     upstream: U,
     backend: Arc<B>,
     cache_key: String,
     #[pin]
-    state: State<U::Output, <U::Output as IntoCacheable>::Cacheable>,
+    state: State<U::Output, C>,
 
     #[pin]
-    poll_cache: Option<PollCache<'static, <U::Output as IntoCacheable>::Cacheable>>,
+    poll_cache: Option<PollCache<C>>,
     // poll_cache: Option<
-        // Pin<Box<dyn Future<Output = CacheResult<<U::Output as IntoCacheable>::Cacheable>> + Send>>,
+    // Pin<Box<dyn Future<Output = CacheResult<<U::Output as IntoCacheable>::Cacheable>> + Send>>,
     // >,
 }
 
-impl<U, B> CacheFuture<U, B>
+impl<U, B, C> CacheFuture<U, B, C>
 where
     B: CacheBackend,
     U: Future,
-    // U::Output: CacheableResponse,
+    U::Output: CacheableResponse<Cached = C>,
     // <U::Output as CacheableResponse>::Cached: DeserializeOwned,
-    U::Output: IntoCacheable,
+    C: From<U::Output>,
 {
     pub fn new(upstream: U, backend: Arc<B>, cache_key: String) -> Self {
         CacheFuture {
@@ -136,13 +146,14 @@ where
     }
 }
 
-impl<U, B, C> Future for CacheFuture<U, B>
+impl<U, B, C> Future for CacheFuture<U, B, C>
 where
     B: CacheBackend + Send + Sync + 'static,
     U: Future + Send,
-    U::Output: IntoCacheable<Cacheable = C> + Send,
-    C: CacheableResponse + Send + 'static,
-    C::Cached: DeserializeOwned,
+    U::Output: CacheableResponse<Cached = C> + Send,
+    // C: CacheableResponse + Send + 'static,
+    // C::Cached: DeserializeOwned,
+    C: From<U::Output> + Send + 'static + DeserializeOwned,
 {
     type Output = U::Output;
 
@@ -153,29 +164,41 @@ where
             let state = match this.state.as_mut().project() {
                 StateProj::Initial => {
                     let backend = this.backend.clone();
-                    let poll_cache = Box::pin(async move {
-                        backend.get("test".to_owned()).await
-                    });
+                    let cache_key = this.cache_key.clone();
+                    let poll_cache = Box::pin(async move { backend.get(cache_key).await });
                     // this.poll_cache.set(Some(poll_cache));
                     State::PollCache { poll_cache }
                 }
                 StateProj::PollCache { poll_cache } => {
                     // let cached = ready!(poll_cache.poll(cx));
-                    let cached = ready!(poll_cache.poll(cx));
-                    dbg!(cached);
+                    // dbg!(cached);
                     State::PollUpstream
                 }
                 StateProj::PollUpstream => {
-                    // let res = ready!(upstream.poll(cx));
                     let res = ready!(this.upstream.as_mut().poll(cx));
                     State::UpstreamPolled {
                         upstream_result: Some(res),
                     }
                 }
                 StateProj::UpstreamPolled { upstream_result } => {
-                    let response = Some(upstream_result.take().expect(POLL_AFTER_READY_ERROR));
-                    State::Response { response }
+                    let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
+                    // State::Response { response: Some(response) }
+                    let cacheable = upstream_result.to_cacheable();
+                    let backend = this.backend.clone();
+                    let cache_key = this.cache_key.clone();
+                    let update_cache =
+                        Box::pin(async move { backend.set(cache_key, cacheable, None).await });
+                    State::UpdateCache {
+                        update_cache,
+                        upstream_result: Some(upstream_result),
+                    }
                 }
+                StateProj::UpdateCache {
+                    update_cache,
+                    upstream_result,
+                } => State::Response {
+                    response: Some(upstream_result.take().expect(POLL_AFTER_READY_ERROR)),
+                },
                 StateProj::Response { response } => {
                     let response = response.take().expect(POLL_AFTER_READY_ERROR);
                     return Poll::Ready(response);
@@ -187,22 +210,34 @@ where
     }
 }
 
-pub trait IntoCacheable {
-    type Cacheable: CacheableResponse;
-    fn into_cacheable(self) -> Self::Cacheable;
-    fn from_cacheable(cached: Self::Cacheable) -> Self;
-}
-
-impl<T, E> IntoCacheable for Result<Response<T>, E> {
-    type Cacheable = Result<hitbox_http::CacheableResponse<T>, E>;
-    fn from_cacheable(cached: Self::Cacheable) -> Self {
-        unimplemented!()
-    }
-
-    fn into_cacheable(self) -> Self::Cacheable {
-        unimplemented!()
-    }
-}
+// pub trait IntoCacheable {
+//     type Cacheable: CacheableResponse;
+//     fn to_cacheable(&self) -> CachedValue<Self::Cacheable>;
+//     fn from_cacheable(cached: Self::Cacheable) -> Self;
+// }
+//
+// impl<T, E> IntoCacheable for Result<Response<T>, E> {
+//     type Cacheable = Result<hitbox_http::CacheableResponse, E>;
+//     fn from_cacheable(cached: Self::Cacheable) -> Self {
+//         unimplemented!()
+//     }
+//
+//     fn to_cacheable(&self) -> CachedValue<Self::Cacheable> {
+//         let cacheable = self.map(hitbox_http::CacheableResponse::from_response);
+//     }
+// }
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+// =========================================================================
 
 // impl<R, E> IntoCacheable for Result<Response<R>, E>
 // where

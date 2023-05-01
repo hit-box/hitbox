@@ -1,4 +1,4 @@
-use std::{sync::Arc, marker::PhantomData};
+use std::{marker::PhantomData, sync::Arc};
 
 use hitbox::dev::CacheBackend;
 use hitbox_redis::RedisBackend;
@@ -19,8 +19,7 @@ impl<B> Cache<B> {
     }
 }
 
-impl<S, B> Layer<S> for Cache<B> 
-{
+impl<S, B> Layer<S> for Cache<B> {
     type Service = CacheService<S, B>;
 
     fn layer(&self, upstream: S) -> Self::Service {
@@ -49,9 +48,7 @@ where
 
     pub fn build(self) -> Cache<B> {
         Cache {
-            backend: Arc::new(self
-                .backend
-                .expect("Please add some cache backend")),
+            backend: Arc::new(self.backend.expect("Please add some cache backend")),
         }
     }
 }

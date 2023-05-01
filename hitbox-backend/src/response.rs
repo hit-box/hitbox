@@ -15,7 +15,7 @@ pub enum CachePolicy<T, U> {
     NonCacheable(U),
 }
 
-/// Thit is one of the basic trait which determines should data store in cache backend or not.
+/// This is one of the basic trait which determines should data store in cache backend or not.
 ///
 /// For primitive types and for user-defined types (with derive macro)
 /// cache_policy returns CachePolicy::Cached variant.
@@ -27,7 +27,7 @@ pub enum CachePolicy<T, U> {
 /// `NonCacheable` by default.
 ///
 /// ## User defined types:
-/// If you want decribe custom caching rules for your own types (for example Enum) you should
+/// If you want describe custom caching rules for your own types (for example Enum) you should
 /// implement `CacheableResponse` for that type:
 ///
 /// ```rust,ignore
@@ -85,19 +85,21 @@ where
             Ok(value) => match value.into_cache_policy() {
                 CachePolicy::Cacheable(value) => CachePolicy::Cacheable(value),
                 CachePolicy::NonCacheable(value) => CachePolicy::NonCacheable(Ok(value)),
-            }
+            },
             Err(_) => CachePolicy::NonCacheable(self),
         }
     }
     fn from_cached(cached: Self::Cached) -> Self {
-        unimplemented!()
+        Ok(I::from_cached(cached))
     }
     fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
-        unimplemented!()
-        // match self {
-            // Ok(value) => CachePolicy::Cacheable(value),
-            // Err(_) => CachePolicy::NonCacheable(()),
-        // }
+        match self {
+            Ok(value) => match value.cache_policy() {
+                CachePolicy::Cacheable(value) => CachePolicy::Cacheable(value),
+                CachePolicy::NonCacheable(_) => CachePolicy::NonCacheable(()),
+            },
+            Err(_) => CachePolicy::NonCacheable(()),
+        }
     }
 }
 
@@ -105,24 +107,24 @@ where
 /// We store to cache only `Ok` variant.
 // impl<I, E> CacheableResponse for Result<I, E>
 // where
-    // I: Serialize + DeserializeOwned,
+// I: Serialize + DeserializeOwned,
 // {
-    // type Cached = I;
-    // fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
-        // match self {
-            // Ok(value) => CachePolicy::Cacheable(value),
-            // Err(_) => CachePolicy::NonCacheable(self),
-        // }
-    // }
-    // fn from_cached(cached: Self::Cached) -> Self {
-        // Ok(cached)
-    // }
-    // fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
-        // match self {
-            // Ok(value) => CachePolicy::Cacheable(value),
-            // Err(_) => CachePolicy::NonCacheable(()),
-        // }
-    // }
+// type Cached = I;
+// fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
+// match self {
+// Ok(value) => CachePolicy::Cacheable(value),
+// Err(_) => CachePolicy::NonCacheable(self),
+// }
+// }
+// fn from_cached(cached: Self::Cached) -> Self {
+// Ok(cached)
+// }
+// fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
+// match self {
+// Ok(value) => CachePolicy::Cacheable(value),
+// Err(_) => CachePolicy::NonCacheable(()),
+// }
+// }
 // }
 
 /// Implementation `CacheableResponse` for `Option` type.
