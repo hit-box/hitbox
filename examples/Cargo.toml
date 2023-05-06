@@ -9,8 +9,10 @@ default = []
 
 [dev-dependencies]
 hitbox = { path = "../hitbox", features = ["derive", "metrics"] }
+hitbox-backend = { path = "../hitbox-backend" }
 hitbox-tower = { path = "../hitbox-tower" }
 hitbox-redis = { path = "../hitbox-redis" }
+stretto = { version = "0.8", features = ["async"] }
 actix = "0.13"
 axum = "0.6"
 log = "0.4"

@@ -41,9 +41,10 @@ impl<B> CacheBuilder<B>
 where
     B: CacheBackend,
 {
-    pub fn backend(mut self, backend: B) -> Self {
-        self.backend = Some(backend);
-        self
+    pub fn backend<NB: CacheBackend>(self, backend: NB) -> CacheBuilder<NB> {
+        CacheBuilder {
+            backend: Some(backend),
+        }
     }
 
     pub fn build(self) -> Cache<B> {
