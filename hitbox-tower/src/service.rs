@@ -9,8 +9,11 @@ use hitbox::{
     dev::{BackendError, CacheBackend},
     Cacheable, CachedValue,
 };
-use hitbox_backend::{response2::CacheableResponse, Backend};
-use hitbox_http::{CacheableRequest, HttpResponse};
+use hitbox_backend::{
+    response2::{CacheableResponse, CacheableWrapper},
+    Backend,
+};
+use hitbox_http::{CacheableRequest, HttpResponse, SerializableHttpResponse};
 use http::{Request, Response};
 use serde::{de::DeserializeOwned, Serialize};
 use tower::Service;
@@ -41,17 +44,18 @@ where
     }
 }
 
-impl<S, Body, B, Res> Service<Request<Body>> for CacheService<S, B>
+impl<S, Body, B, Res, C> Service<Request<Body>> for CacheService<S, B>
 where
     S: Service<Request<Body>, Response = Response<Res>>,
     B: CacheBackend + Send + Sync + Clone + 'static,
     S::Future: Send,
     S::Error: Send + Sync + Debug + 'static,
-    S::Response: From<HttpResponse<Res>>,
     Body: Send,
     Res: Send + Debug + 'static,
     Request<Body>: Debug,
-    // HttpResponse<Body>: From<<S::Future as Future>::Output> + CacheableResponse,
+    HttpResponse<Res>:
+        CacheableWrapper<Source = <S::Future as Future>::Output> + CacheableResponse<Cached = C>,
+    C: Debug + Serialize + DeserializeOwned + Send + Clone,
 {
     type Response = Response<Res>;
     type Error = S::Error;

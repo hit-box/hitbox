@@ -1,11 +1,14 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, convert::Infallible, fmt::Debug};
 
+use async_trait::async_trait;
 use chrono::Utc;
 use hitbox::CachedValue;
-use hitbox_backend::response2::CacheableResponse;
+use hitbox_backend::response2::{CacheableResponse, CacheableWrapper};
 use http::{Response, StatusCode};
 use http_body::Body;
+use hyper::body::to_bytes;
 use serde::{Deserialize, Serialize};
+use serde_bytes::Bytes;
 
 #[derive(Debug)]
 pub struct HttpResponse<Body> {
@@ -17,6 +20,63 @@ impl<Body> HttpResponse<Body> {
         HttpResponse { inner }
     }
 }
+
+#[async_trait]
+impl CacheableWrapper for HttpResponse<hyper::Body> {
+    type Source = Result<Response<hyper::Body>, Infallible>;
+    type Serializable = SerializableHttpResponse;
+    type Error = hyper::Error;
+
+    fn from_source(source: Self::Source) -> Self {
+        HttpResponse::new(source.unwrap())
+    }
+
+    fn into_source(self) -> Self::Source {
+        Ok(self.inner)
+    }
+
+    fn from_serializable(serializable: Self::Serializable) -> Self {
+        let mut inner = Response::builder();
+        for (key, value) in serializable.headers.into_iter() {
+            inner = inner.header(key, value)
+        }
+        let body = serializable.body.into();
+        let inner = inner.status(serializable.status).body(body).unwrap();
+        Self { inner }
+    }
+
+    async fn into_serializable(self) -> Result<Self::Serializable, Self::Error> {
+        let source = self.inner;
+        Ok(SerializableHttpResponse {
+            status: source.status().as_u16(),
+            version: format!("{:?}", source.version()),
+            headers: source
+                .headers()
+                .iter()
+                .map(|(h, v)| (h.to_string(), v.to_str().unwrap().to_string()))
+                .collect(),
+            body: to_bytes(source.into_body()).await?.to_vec(),
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SerializableHttpResponse {
+    status: u16,
+    version: String,
+    #[serde(with = "serde_bytes")]
+    body: Vec<u8>,
+    headers: HashMap<String, String>,
+}
+
+impl CacheableResponse for HttpResponse<hyper::Body> {
+    type Cached = SerializableHttpResponse;
+
+    fn is_cacheable(&self) -> bool {
+        self.inner.status() == StatusCode::OK
+    }
+}
+/*
 
 impl<Body, E: Debug> From<Result<Response<Body>, E>> for HttpResponse<Body> {
     fn from(result: Result<Response<Body>, E>) -> Self {
@@ -30,53 +90,26 @@ impl<Body, E: Debug> From<HttpResponse<Body>> for Result<Response<Body>, E> {
     }
 }
 
-pub enum CachePolicy<Cached> {
-    Cacheable(Cached),
-    NonCacheable,
-}
-
-#[derive(Debug)]
-pub enum CacheState<Cached> {
-    Stale(Cached),
-    Actual(Cached),
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct SerializableHttpResponse {
-    status: u16,
-    version: String,
-    headers: HashMap<String, String>,
-    // body: Vec<u8>,
-}
-
-impl<Body> CacheableResponse for HttpResponse<Body> {
-    type Cached = SerializableHttpResponse;
-
-    fn is_cacheable(&self) -> bool {
-        self.inner.status() == StatusCode::OK
-    }
-}
-
-impl<'a, Body> From<&'a HttpResponse<Body>> for SerializableHttpResponse {
-    fn from(response: &'a HttpResponse<Body>) -> Self {
-        let body = response.inner.body().clone();
-        SerializableHttpResponse {
-            status: response.inner.status().as_u16(),
-            version: format!("{:?}", response.inner.version()),
-            headers: response
-                .inner
-                .headers()
-                .iter()
-                .map(|(h, v)| (h.to_string(), v.to_str().unwrap().to_string()))
-                .collect(),
-            // body,
-        }
-    }
-}
+// impl<'a, Body> From<&'a HttpResponse<Body>> for SerializableHttpResponse {
+//     fn from(response: &'a HttpResponse<Body>) -> Self {
+//         let body = response.inner.body().clone();
+//         SerializableHttpResponse {
+//             status: response.inner.status().as_u16(),
+//             version: format!("{:?}", response.inner.version()),
+//             headers: response
+//                 .inner
+//                 .headers()
+//                 .iter()
+//                 .map(|(h, v)| (h.to_string(), v.to_str().unwrap().to_string()))
+//                 .collect(),
+//             // body,
+//         }
+//     }
+// }
 
 impl From<HttpResponse<hyper::Body>> for Response<hyper::Body> {
     fn from(value: HttpResponse<hyper::Body>) -> Self {
-        unimplemented!()
+        value.inner
     }
 }
 
@@ -91,6 +124,21 @@ impl From<SerializableHttpResponse> for HttpResponse<()> {
             inner = inner.header(key, value)
         }
         let inner = inner.status(200).body(()).unwrap();
+        Self { inner }
+    }
+}
+
+impl From<SerializableHttpResponse> for HttpResponse<hyper::Body> {
+    fn from(serializable: SerializableHttpResponse) -> Self {
+        // let body = match serializable.body.try_into() {
+        //     Ok(res) => res,
+        //     Err(_) => unimplemented!(),
+        // };
+        let mut inner = Response::builder();
+        for (key, value) in serializable.headers.into_iter() {
+            inner = inner.header(key, value)
+        }
+        let inner = inner.status(200).body(hyper::Body::empty()).unwrap();
         Self { inner }
     }
 }
@@ -134,7 +182,7 @@ mod test {
             _ => unimplemented!(),
         };
     }
-}
+} */
 
 // =====================================================
 /*use std::{collections::HashMap, fmt::Debug};

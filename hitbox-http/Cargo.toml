@@ -13,6 +13,8 @@ keywords = ["cache", "async", "http", "hitbox"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+serde_bytes = "0.11"
+async-trait = "0.1"
 http = "0.2"
 http-body = "0.4"
 hitbox = { path = "../hitbox", version = "0.1" }

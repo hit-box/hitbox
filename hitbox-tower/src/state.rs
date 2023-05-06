@@ -12,7 +12,7 @@ use hitbox::{
     CachedValue,
 };
 use hitbox_backend::{
-    response2::{CachePolicy, CacheableResponse},
+    response2::{CachePolicy, CacheableResponse, CacheableWrapper},
     Backend,
 };
 use http::{Request, Response};
@@ -85,6 +85,10 @@ where
     UpstreamPolled {
         upstream_result: Option<U>,
     },
+    CheckCachePolicy {
+        #[pin]
+        cache_policy: BoxFuture<'static, CachePolicy<CachedValue<C::Cached>>>,
+    },
     UpdateCache {
         #[pin]
         update_cache: UpdateCache,
@@ -104,6 +108,7 @@ where
             State::Initial => f.write_str("State::Initial"),
             State::PollCache { .. } => f.write_str("State::PollCache"),
             State::CachePolled { .. } => f.write_str("State::PollCache"),
+            State::CheckCachePolicy { .. } => f.write_str("State::CheckCachePolicy"),
             State::PollUpstream { .. } => f.write_str("State::PollUpstream"),
             State::UpstreamPolled { .. } => f.write_str("State::UpstreamPolled"),
             State::UpdateCache { .. } => f.write_str("State::UpdateCache"),
@@ -119,7 +124,7 @@ where
     B: CacheBackend,
     // U::Output: CacheableResponse<Cached = C>,
     // U::Output: IntoCacheable,
-    C: From<U::Output> + CacheableResponse,
+    C: CacheableResponse,
 {
     #[pin]
     upstream: U,
@@ -140,7 +145,7 @@ where
     B: CacheBackend,
     U: Future,
     // <U::Output as CacheableResponse>::Cached: DeserializeOwned,
-    C: From<U::Output> + CacheableResponse,
+    C: CacheableResponse,
 {
     pub fn new(upstream: U, backend: Arc<B>, cache_key: String) -> Self {
         CacheFuture {
@@ -157,11 +162,12 @@ impl<U, B, C> Future for CacheFuture<U, B, C>
 where
     B: CacheBackend + Send + Sync + 'static,
     U: Future + Send,
-    U::Output: From<C>,
+    C: CacheableWrapper<Source = U::Output> + CacheableResponse + Send + 'static,
+    C::Cached: Send + DeserializeOwned + Serialize + Debug + Clone,
+    // U::Output: From<C>,
     // C: CacheableResponse + Send + 'static,
     // C::Cached: DeserializeOwned,
-    C: From<U::Output> + CacheableResponse + Send + 'static,
-    C::Cached: for<'a> From<&'a C> + Send + DeserializeOwned + Serialize,
+    // C: From<U::Output> + CacheableResponse + Send + 'static + From<C::Cached>,
 {
     type Output = U::Output;
 
@@ -178,9 +184,19 @@ where
                     State::PollCache { poll_cache }
                 }
                 StateProj::PollCache { poll_cache } => {
-                    // let cached = ready!(poll_cache.poll(cx));
-                    // dbg!(cached);
-                    State::PollUpstream
+                    let cached = ready!(poll_cache.poll(cx)).unwrap();
+                    dbg!(&cached);
+                    match cached {
+                        Some(cached_value) => match C::from_cached(cached_value) {
+                            hitbox_backend::response2::CacheState::Actual(value) => {
+                                State::Response {
+                                    response: Some(value),
+                                }
+                            }
+                            _ => State::PollUpstream,
+                        },
+                        None => State::PollUpstream,
+                    }
                 }
                 StateProj::PollUpstream => {
                     let res = ready!(this.upstream.as_mut().poll(cx));
@@ -190,18 +206,24 @@ where
                 }
                 StateProj::UpstreamPolled { upstream_result } => {
                     let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
-                    // State::Response { response: Some(response) }
-                    let cacheable: C = upstream_result.into();
-                    let backend = this.backend.clone();
-                    let cache_key = this.cache_key.clone();
-                    let cached_value = match cacheable.cache_policy() {
+                    let cacheable = C::from_source(upstream_result);
+                    let cache_policy = Box::pin(async move { cacheable.cache_policy().await });
+                    State::CheckCachePolicy { cache_policy }
+                }
+                StateProj::CheckCachePolicy { cache_policy } => {
+                    let cached_value = match ready!(cache_policy.poll(cx)) {
                         CachePolicy::Cacheable(cached_value) => cached_value,
                         _ => unimplemented!(),
                     };
+                    let backend = this.backend.clone();
+                    let cache_key = this.cache_key.clone();
+                    let cached = cached_value.clone();
                     let update_cache =
-                        Box::pin(
-                            async move { backend.set::<C>(cache_key, cached_value, None).await },
-                        );
+                        Box::pin(async move { backend.set::<C>(cache_key, cached, None).await });
+                    let cacheable = match C::from_cached(cached_value) {
+                        hitbox_backend::response2::CacheState::Actual(cacheable) => cacheable,
+                        _ => unimplemented!(),
+                    };
                     State::UpdateCache {
                         update_cache,
                         upstream_result: Some(cacheable),
@@ -210,12 +232,15 @@ where
                 StateProj::UpdateCache {
                     update_cache,
                     upstream_result,
-                } => State::Response {
-                    response: Some(upstream_result.take().expect(POLL_AFTER_READY_ERROR)),
-                },
+                } => {
+                    ready!(update_cache.poll(cx));
+                    State::Response {
+                        response: Some(upstream_result.take().expect(POLL_AFTER_READY_ERROR)),
+                    }
+                }
                 StateProj::Response { response } => {
                     let response = response.take().expect(POLL_AFTER_READY_ERROR);
-                    return Poll::Ready(response.into());
+                    return Poll::Ready(response.into_source());
                 }
                 _ => unimplemented!(),
             };
