@@ -1,13 +1,26 @@
 use std::sync::Arc;
 
-use axum::{routing::get, Router};
-use hitbox_actix::RedisBackend;
+use axum::{
+    extract::{Path, Query},
+    routing::get,
+    Router,
+};
+use hitbox_redis::RedisBackend;
 use hitbox_tower::Cache;
+use http::StatusCode;
 use lazy_static::lazy_static;
 use tower::ServiceBuilder;
 
 lazy_static! {
     static ref BACKEND: Arc<RedisBackend> = Arc::new(RedisBackend::new().unwrap());
+}
+
+enum Error {
+    NotFound,
+}
+
+async fn handler(Path(name): Path<String>) -> Result<String, StatusCode> {
+    Ok(format!("Hello, {name}"))
 }
 
 #[tokio::main]
@@ -18,16 +31,14 @@ async fn main() {
 
     let backend = RedisBackend::new().unwrap();
     // build our application with a single route
-    let app = Router::new()
-        .route("/", get(|| async { "Hello, World!" }))
-        .layer(
-            ServiceBuilder::new().layer(
-                Cache::builder()
-                    // .backend(&BACKEND)
-                    .backend(backend)
-                    .build(),
-            ),
-        );
+    let app = Router::new().route("/:name", get(handler)).layer(
+        ServiceBuilder::new().layer(
+            Cache::builder()
+                // .backend(&BACKEND)
+                .backend(backend)
+                .build(),
+        ),
+    );
 
     // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
