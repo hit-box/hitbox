@@ -135,6 +135,7 @@ where
 
     #[pin]
     poll_cache: Option<PollCache<C>>,
+    config: String,
     // poll_cache: Option<
     // Pin<Box<dyn Future<Output = CacheResult<<U::Output as IntoCacheable>::Cacheable>> + Send>>,
     // >,
@@ -147,13 +148,14 @@ where
     // <U::Output as CacheableResponse>::Cached: DeserializeOwned,
     C: CacheableResponse,
 {
-    pub fn new(upstream: U, backend: Arc<B>, cache_key: String) -> Self {
+    pub fn new(upstream: U, backend: Arc<B>, cache_key: String, config: String) -> Self {
         CacheFuture {
             upstream,
             backend,
             cache_key,
             state: State::Initial,
             poll_cache: None,
+            config,
         }
     }
 }

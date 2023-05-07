@@ -9,12 +9,14 @@ use crate::service::CacheService;
 #[derive(Clone)]
 pub struct Cache<B> {
     pub backend: Arc<B>,
+    pub config: String,
 }
 
 impl<B> Cache<B> {
     pub fn new(backend: B) -> Cache<B> {
         Cache {
             backend: Arc::new(backend),
+            config: "Config".to_string(),
         }
     }
 }
