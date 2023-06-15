@@ -93,12 +93,14 @@ async fn main() {
     let inmemory = InMemoryBackend::new();
     // build our application with a single route
     let app = Router::new().route("/:name", get(handler)).layer(
-        ServiceBuilder::new().layer(
-            Cache::builder()
-                // .backend(&BACKEND)
-                .backend(inmemory)
-                .build(),
-        ),
+        ServiceBuilder::new()
+            .layer(Cache::builder().backend(backend).build())
+            .layer(
+                Cache::builder()
+                    // .backend(&BACKEND)
+                    .backend(inmemory)
+                    .build(),
+            ),
     );
 
     // run it with hyper on localhost:3000
