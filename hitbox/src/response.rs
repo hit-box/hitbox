@@ -1,4 +1,4 @@
-//! Trait and datatypes that describes which data should be store in cache.
+//! Trait and types that describes which data should be store in cache.
 //!
 //! For more detailed information and examples please see [CacheableResponse
 //! documentation](trait.CacheableResponse.html).
@@ -28,7 +28,7 @@ pub enum CachePolicy<T, U> {
 /// `NonCacheable` by default.
 ///
 /// ## User defined types:
-/// If you want decribe custom caching rules for your own types (for example Enum) you should
+/// If you want describe custom caching rules for your own types (for example Enum) you should
 /// implement `CacheableResponse` for that type:
 ///
 /// ```rust
@@ -59,7 +59,7 @@ pub enum CachePolicy<T, U> {
 /// }
 /// ```
 /// In that case only `HttpResponse::Ok` variant will be saved into the cache backend.
-/// And all `String`s from the cache backend will be treated as `HttpReponse::Ok(String)` variant.
+/// And all `String`s from the cache backend will be treated as `HttpResponse::Ok(String)` variant.
 pub trait CacheableResponse
 where
     Self: Sized,

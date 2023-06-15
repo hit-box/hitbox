@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 
-#[cfg_attr(test, derive(Clone, PartialEq, Eq, Debug))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[derive(Debug, Clone)]
 pub struct CachedValue<T> {
     pub data: T,
     pub expired: DateTime<Utc>,

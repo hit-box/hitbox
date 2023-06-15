@@ -1,160 +1,54 @@
-//! Trait and datatypes that describes which data should be store in cache.
-//!
-//! For more detailed information and examples please see [CacheableResponse
-//! documentation](trait.CacheableResponse.html).
-use serde::{de::DeserializeOwned, Serialize};
+use std::fmt::Debug;
 
-#[cfg(feature = "derive")]
-pub use hitbox_derive::CacheableResponse;
+use async_trait::async_trait;
+use chrono::Utc;
 
-/// This trait determines which types should be cached or not.
-pub enum CachePolicy<T, U> {
-    /// This variant should be stored in cache backend
-    Cacheable(T),
-    /// This variant shouldn't be stored in the cache backend.
-    NonCacheable(U),
+use crate::CachedValue;
+
+pub enum CachePolicy<Cached> {
+    Cacheable(Cached),
+    NonCacheable,
 }
 
-/// Thit is one of the basic trait which determines should data store in cache backend or not.
-///
-/// For primitive types and for user-defined types (with derive macro)
-/// cache_policy returns CachePolicy::Cached variant.
-///
-/// For `Result<T, E>` cache_policy method return `CachePolicy::Cacheable(T)` only for data included into
-/// `Ok(T)` variant.
-///
-/// `Option<T>` is the same with Result: for `Some(T)` returns `CachedPolicy::Cacheable(T)`. `None` are
-/// `NonCacheable` by default.
-///
-/// ## User defined types:
-/// If you want decribe custom caching rules for your own types (for example Enum) you should
-/// implement `CacheableResponse` for that type:
-///
-/// ```rust,ignore
-/// use hitbox::{CacheableResponse, CachePolicy};
-///
-/// enum HttpResponse {
-///     Ok(String),
-///     Unauthorized(i32),
-/// }
-///
-/// impl CacheableResponse for HttpResponse {
-///     type Cached = String;
-///     fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
-///         match self {
-///             HttpResponse::Ok(body) => CachePolicy::Cacheable(body),
-///             _ => CachePolicy::NonCacheable(()),
-///         }
-///     }
-///     fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
-///         match self {
-///             HttpResponse::Ok(body) => CachePolicy::Cacheable(body),
-///             _ => CachePolicy::NonCacheable(self),
-///         }
-///     }
-///     fn from_cached(cached: Self::Cached) -> Self {
-///         HttpResponse::Ok(cached)
-///     }
-/// }
-/// ```
-/// In that case only `HttpResponse::Ok` variant will be saved into the cache backend.
-/// And all `String`s from the cache backend will be treated as `HttpReponse::Ok(String)` variant.
-pub trait CacheableResponse
+#[derive(Debug, PartialEq, Eq)]
+pub enum CacheState<Cached> {
+    Stale(Cached),
+    Actual(Cached),
+}
+
+#[async_trait]
+pub trait CacheableResponseWrapper {
+    type Source;
+    type Serializable;
+    type Error: Debug;
+
+    fn from_source(source: Self::Source) -> Self;
+    fn into_source(self) -> Self::Source;
+    fn from_serializable(serializable: Self::Serializable) -> Self;
+    async fn into_serializable(self) -> Result<Self::Serializable, Self::Error>;
+}
+
+#[async_trait]
+pub trait CacheableResponse: Sized + CacheableResponseWrapper
 where
-    Self: Sized,
-    Self::Cached: Serialize,
+    Self: CacheableResponseWrapper<Serializable = Self::Cached> + Send,
 {
-    /// Describes what type will be stored into the cache backend.
     type Cached;
-    /// Returns cache policy for current type with borrowed data.
-    fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()>;
-    /// Returns cache policy for current type with owned data.
-    fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self>;
-    /// Describes how previously cached data will be transformed into the original type.
-    fn from_cached(cached: Self::Cached) -> Self;
+
+    async fn cache_policy(self) -> CachePolicy<CachedValue<Self::Cached>> {
+        if self.is_cacheable() {
+            let cached = self.into_serializable().await.unwrap();
+            let cached_value = CachedValue::new(cached, Utc::now());
+            CachePolicy::Cacheable(cached_value)
+        } else {
+            CachePolicy::NonCacheable
+        }
+    }
+
+    fn from_cached(cached: CachedValue<Self::Cached>) -> CacheState<Self> {
+        // TODO: check stale state
+        CacheState::Actual(Self::from_serializable(cached.into_inner()))
+    }
+
+    fn is_cacheable(&self) -> bool;
 }
-
-// There are several CacheableResponse implementations for the most common types.
-
-/// Implementation `CacheableResponse` for `Result` type.
-/// We store to cache only `Ok` variant.
-impl<I, E> CacheableResponse for Result<I, E>
-where
-    I: Serialize + DeserializeOwned,
-{
-    type Cached = I;
-    fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
-        match self {
-            Ok(value) => CachePolicy::Cacheable(value),
-            Err(_) => CachePolicy::NonCacheable(self),
-        }
-    }
-    fn from_cached(cached: Self::Cached) -> Self {
-        Ok(cached)
-    }
-    fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
-        match self {
-            Ok(value) => CachePolicy::Cacheable(value),
-            Err(_) => CachePolicy::NonCacheable(()),
-        }
-    }
-}
-
-/// Implementation `CacheableResponse` for `Option` type.
-/// We store to cache only `Some` variant.
-impl<I> CacheableResponse for Option<I>
-where
-    I: Serialize + DeserializeOwned,
-{
-    type Cached = I;
-    fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
-        match self {
-            Some(value) => CachePolicy::Cacheable(value),
-            None => CachePolicy::NonCacheable(self),
-        }
-    }
-    fn from_cached(cached: Self::Cached) -> Self {
-        Some(cached)
-    }
-    fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
-        match self {
-            Some(value) => CachePolicy::Cacheable(value),
-            None => CachePolicy::NonCacheable(()),
-        }
-    }
-}
-
-/// Implementation `CacheableResponse` for primitive types.
-macro_rules! CACHEABLE_RESPONSE_IMPL {
-    ($type:ty) => {
-        impl CacheableResponse for $type {
-            type Cached = $type;
-            fn into_cache_policy(self) -> CachePolicy<Self::Cached, Self> {
-                CachePolicy::Cacheable(self)
-            }
-            fn from_cached(cached: Self::Cached) -> Self {
-                cached
-            }
-            fn cache_policy(&self) -> CachePolicy<&Self::Cached, ()> {
-                CachePolicy::Cacheable(self)
-            }
-        }
-    };
-}
-
-CACHEABLE_RESPONSE_IMPL!(());
-CACHEABLE_RESPONSE_IMPL!(u8);
-CACHEABLE_RESPONSE_IMPL!(u16);
-CACHEABLE_RESPONSE_IMPL!(u32);
-CACHEABLE_RESPONSE_IMPL!(u64);
-CACHEABLE_RESPONSE_IMPL!(usize);
-CACHEABLE_RESPONSE_IMPL!(i8);
-CACHEABLE_RESPONSE_IMPL!(i16);
-CACHEABLE_RESPONSE_IMPL!(i32);
-CACHEABLE_RESPONSE_IMPL!(i64);
-CACHEABLE_RESPONSE_IMPL!(isize);
-CACHEABLE_RESPONSE_IMPL!(f32);
-CACHEABLE_RESPONSE_IMPL!(f64);
-CACHEABLE_RESPONSE_IMPL!(String);
-CACHEABLE_RESPONSE_IMPL!(&'static str);
-CACHEABLE_RESPONSE_IMPL!(bool);

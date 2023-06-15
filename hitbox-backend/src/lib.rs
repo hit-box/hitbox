@@ -7,15 +7,14 @@ use actix::prelude::*;
 use serializer::SerializerError;
 use thiserror::Error;
 
-mod value;
-pub mod serializer;
 mod backend;
 mod response;
+pub mod serializer;
+mod value;
 
-pub use value::{CachedValue, TtlSettings, EvictionPolicy};
-pub use response::{CacheableResponse, CachePolicy};
-pub use backend::{CacheBackend, BackendResult};
-
+pub use backend::{BackendResult, CacheBackend};
+pub use response::{CachePolicy, CacheState, CacheableResponse, CacheableResponseWrapper};
+pub use value::{CachedValue, EvictionPolicy, TtlSettings};
 
 /// Define the behavior needed of an cache layer to work with cache backend.
 ///
@@ -79,7 +78,7 @@ pub struct Get {
 pub struct Set {
     /// Key of cache backend record.
     pub key: String,
-    /// Data for sorage by cache key.
+    /// Data for storage by cache key.
     pub value: Vec<u8>,
     /// Optional value of time-to-live for cache record.
     pub ttl: Option<u32>,
