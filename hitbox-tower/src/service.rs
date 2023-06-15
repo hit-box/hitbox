@@ -23,11 +23,12 @@ use crate::state::CacheFuture;
 pub struct CacheService<S, B> {
     upstream: S,
     backend: Arc<B>,
+    config: String,
 }
 
 impl<S, B> CacheService<S, B> {
-    pub fn new(upstream: S, backend: Arc<B>) -> Self {
-        CacheService { upstream, backend }
+    pub fn new(upstream: S, backend: Arc<B>, config: String) -> Self {
+        CacheService { upstream, backend, config }
     }
 }
 
@@ -79,6 +80,6 @@ where
         // Box::pin(CacheFuture::new(upstream, self.backend.clone(), cache_key).map(|res| res.into_response()))
         // CacheFutureWrapper::new(upstream, backend, cache_key)
         // new(upstream, backend, cache_key)
-        CacheFuture::new(upstream, self.backend.clone(), cache_key)
+        CacheFuture::new(upstream, self.backend.clone(), cache_key, self.config)
     }
 }
