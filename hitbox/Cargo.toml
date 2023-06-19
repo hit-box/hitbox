@@ -12,8 +12,6 @@ keywords = ["cache", "async", "cache-backend", "hitbox", "tokio"]
 
 [dependencies]
 hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
-serde_json = "1"
-serde_qs = { version = "0.12", optional = true }
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
@@ -23,7 +21,6 @@ tracing = "0.1"
 tokio = { version = "1.17.0", features = ["macros"] }
 async-trait = "0.1.52"
 pin-project = "1"
-http = "0.2"
 futures = { version = "0.3", futures = ["alloc"] }
 
 [dev-dependencies]

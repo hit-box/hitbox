@@ -1,3 +1,4 @@
+pub mod predicates;
 mod request;
 mod response;
 

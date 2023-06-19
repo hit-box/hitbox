@@ -84,7 +84,7 @@ async fn handler(Path(name): Path<String>) -> Result<String, StatusCode> {
 #[tokio::main]
 async fn main() {
     env_logger::builder()
-        .filter_level(log::LevelFilter::Trace)
+        .filter_level(log::LevelFilter::Debug)
         .init();
 
     let backend = RedisBackend::new().unwrap();
@@ -92,7 +92,7 @@ async fn main() {
     // build our application with a single route
     let app = Router::new().route("/:name", get(handler)).layer(
         ServiceBuilder::new()
-            .layer(Cache::builder().backend(backend).build())
+            // .layer(Cache::builder().backend(backend).build())
             .layer(
                 Cache::builder()
                     // .backend(&BACKEND)

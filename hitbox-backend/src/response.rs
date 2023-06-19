@@ -5,8 +5,11 @@ use chrono::Utc;
 
 use crate::CachedValue;
 
+/// This trait determines which types should be cached or not.
 pub enum CachePolicy<Cached> {
+    /// This variant should be stored in cache backend
     Cacheable(Cached),
+    /// This variant shouldn't be stored in the cache backend.
     NonCacheable,
 }
 

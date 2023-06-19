@@ -1,11 +1,14 @@
 //! Cacheable trait and implementation of cache logic.
 
-use crate::CacheError;
+use crate::{predicates::Predicate, CacheError};
+use async_trait::async_trait;
+use hitbox_backend::CachePolicy;
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use hitbox_derive::Cacheable;
 
 /// Trait describes cache configuration per type that implements this trait.
+#[async_trait]
 pub trait Cacheable {
     /// Method should return unique identifier for struct object.
     ///
@@ -36,7 +39,7 @@ pub trait Cacheable {
     /// let query = QueryNothing { id: None };
     /// assert_eq!(query.cache_key().unwrap(), "database::QueryNothing::id::None");
     /// ```
-    fn cache_key(&self) -> Result<String, CacheError>;
+    async fn cache_key(&self) -> Result<String, CacheError>;
 
     /// Method return cache key prefix based on message type.
     fn cache_key_prefix(&self) -> String;
@@ -73,6 +76,26 @@ pub trait Cacheable {
     }
 }
 
+pub struct CacheKey {
+    key: String,
+    version: u32,
+    prefix: String,
+}
+
+#[async_trait]
+pub trait CacheableRequest: Sized {
+    async fn cache_policy<P>(&self, predicates: &[P]) -> CachePolicy<CacheKey>
+    where
+        P: Predicate<Self> + Send + Sync,
+    {
+        CachePolicy::Cacheable(CacheKey {
+            key: "key".to_owned(),
+            version: 42,
+            prefix: "fake".to_owned(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,6 +122,6 @@ mod tests {
 
     #[allow(dead_code)]
     async fn upstream_fn(message: Message) -> i32 {
-        message.0 
+        message.0
     }
 }

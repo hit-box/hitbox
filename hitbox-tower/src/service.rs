@@ -9,16 +9,16 @@ use hitbox::{
     backend::{BackendError, CacheBackend},
     Cacheable, CachedValue,
 };
-use hitbox_backend::{
-    CacheableResponse, CacheableResponseWrapper,
-    Backend,
-};
+use hitbox_backend::{CacheableResponse, CacheableResponseWrapper};
 use hitbox_http::{CacheableRequest, HttpResponse, SerializableHttpResponse};
 use http::{Request, Response};
+use hyper::Body;
 use serde::{de::DeserializeOwned, Serialize};
 use tower::Service;
 
 use hitbox::fsm::CacheFuture;
+
+use crate::future::CacheFutureAdapter;
 
 pub struct CacheService<S, B> {
     upstream: S,
@@ -44,22 +44,23 @@ where
     }
 }
 
-impl<S, Body, B, Res, C> Service<Request<Body>> for CacheService<S, B>
+impl<S, B, Res, C> Service<Request<Body>> for CacheService<S, B>
 where
-    S: Service<Request<Body>, Response = Response<Res>>,
+    S: Service<Request<Body>, Response = Response<Res>> + Clone,
     B: CacheBackend + Send + Sync + Clone + 'static,
     S::Future: Send,
     S::Error: Send + Sync + Debug + 'static,
     Body: Send,
     Res: Send + Debug + 'static,
     Request<Body>: Debug,
-    HttpResponse<Res>:
-        CacheableResponseWrapper<Source = <S::Future as Future>::Output> + CacheableResponse<Cached = C>,
+    HttpResponse<Res>: CacheableResponseWrapper<Source = <S::Future as Future>::Output>
+        + CacheableResponse<Cached = C>,
     C: Debug + Serialize + DeserializeOwned + Send + Clone,
 {
     type Response = Response<Res>;
     type Error = S::Error;
-    type Future = CacheFuture<S::Future, B, HttpResponse<Res>>;
+    // type Future = CacheFuture<S::Future, B, HttpResponse<Res>, CacheableRequest<Body>>;
+    type Future = CacheFutureAdapter<S::Future, S>;
 
     fn poll_ready(
         &mut self,
@@ -70,15 +71,15 @@ where
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         dbg!(&req);
-        let cacheable_request = CacheableRequest::from_request(&req);
-        let cache_key = cacheable_request.cache_key().unwrap();
-        dbg!(&cache_key);
+        // let upstream = async move {
+        //     let cacheable_request = CacheableRequest::from_request(req);
+        //     let policy = cacheable_request.cache_key().await;
+        //     self.upstream.call(cacheable_request.into_origin())
+        // };
+        // let cache_key = cacheable_request.cache_key().unwrap();
+        // dbg!(&cache_key);
 
-        let upstream = self.upstream.call(req);
-        // .map(Box::new(|res| HttpResponse::new(res.unwrap())));
-        // Box::pin(CacheFuture::new(upstream, self.backend.clone(), cache_key).map(|res| res.into_response()))
-        // CacheFutureWrapper::new(upstream, backend, cache_key)
-        // new(upstream, backend, cache_key)
-        CacheFuture::new(upstream, self.backend.clone(), cache_key)
+        // CacheFuture::new(upstream, self.backend.clone(), cacheable_request)
+        CacheFutureAdapter::new(&mut self.upstream, req)
     }
 }

@@ -23,4 +23,5 @@ hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
 serde = "1.0.144"
 bytes = "1"
 chrono = "0.4"
-hyper = "0.14"
+hyper = { version = "0.14", features = ["stream"] }
+futures = { version = "0.3", default-features = false }

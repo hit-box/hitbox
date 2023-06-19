@@ -110,13 +110,40 @@ impl Serializer for JsonSerializer<String> {
 
 #[cfg(test)]
 mod test {
+    use std::convert::Infallible;
+
+    use async_trait::async_trait;
+
     use super::*;
-    use crate::response::CacheableResponse;
+    use crate::{response::CacheableResponse, CacheableResponseWrapper};
 
     #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
     struct Test {
         a: i32,
         b: String,
+    }
+
+    #[async_trait]
+    impl CacheableResponseWrapper for Test {
+        type Source = Self;
+        type Serializable = Self;
+        type Error = Infallible;
+
+        fn from_serializable(serializable: Self::Serializable) -> Self {
+            serializable
+        }
+
+        fn from_source(source: Self::Source) -> Self {
+            source
+        }
+
+        fn into_source(self) -> Self::Source {
+            self
+        }
+
+        async fn into_serializable(self) -> Result<Self::Serializable, Self::Error> {
+            Ok(self)
+        }
     }
 
     impl CacheableResponse for Test {

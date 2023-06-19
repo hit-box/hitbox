@@ -10,12 +10,6 @@ pub enum CacheError {
     /// Wrapper for upstream errors.
     #[error("Upstream error: {0}")]
     UpstreamError(Box<dyn std::error::Error + Send>),
-    /// Wrapper for cache data serialization problems.
-    #[error("Cached data serialization error")]
-    SerializeError(#[from] serde_json::Error),
-    /// Wrapper for cache data deserialization problems.
-    #[error("Cached data deserialization error")]
-    DeserializeError,
     /// Wrapper error for problems with cache key generation.
     #[error("Cache key generation error")]
     CacheKeyGenerationError(String),

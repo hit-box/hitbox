@@ -2,9 +2,8 @@
 use crate::error::Error;
 use async_trait::async_trait;
 use hitbox_backend::{
-    CacheableResponse,
     serializer::{JsonSerializer, Serializer},
-    BackendError, BackendResult, CacheBackend, CachedValue, DeleteStatus,
+    BackendError, BackendResult, CacheBackend, CacheableResponse, CachedValue, DeleteStatus,
 };
 use redis::{aio::ConnectionManager, Client};
 use tokio::sync::OnceCell;
@@ -12,7 +11,7 @@ use tracing::trace;
 
 /// Redis cache backend based on redis-rs crate.
 ///
-/// This actor provides redis as storage [Backend] for hitbox.
+/// This struct provides redis as storage [Backend] for hitbox.
 /// Its use one [MultiplexedConnection] for asynchronous network interaction.
 ///
 /// [MultiplexedConnection]: redis::aio::MultiplexedConnection
@@ -88,35 +87,6 @@ impl RedisBackendBuilder {
     }
 }
 
-// /// Implementation of Actix Handler for Lock message.
-// impl Handler<Lock> for RedisBackend {
-// type Result = ResponseFuture<Result<LockStatus, BackendError>>;
-
-// fn handle(&mut self, msg: Lock, _: &mut Self::Context) -> Self::Result {
-// debug!("Redis Lock: {}", msg.key);
-// let mut con = self.connection.clone();
-// Box::pin(async move {
-// redis::cmd("SET")
-// .arg(format!("lock::{}", msg.key))
-// .arg("")
-// .arg("NX")
-// .arg("EX")
-// .arg(msg.ttl)
-// .query_async(&mut con)
-// .await
-// .map(|res: Option<String>| -> LockStatus {
-// if res.is_some() {
-// LockStatus::Acquired
-// } else {
-// LockStatus::Locked
-// }
-// })
-// .map_err(Error::from)
-// .map_err(BackendError::from)
-// })
-// }
-// }
-
 #[async_trait]
 impl CacheBackend for RedisBackend {
     async fn get<T>(&self, key: String) -> BackendResult<Option<CachedValue<T::Cached>>>
@@ -124,7 +94,6 @@ impl CacheBackend for RedisBackend {
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
-        // let mut con = self.connection().await?.clone();
         let client = self.client.clone();
         async move {
             let mut con = client.get_tokio_connection_manager().await.unwrap();

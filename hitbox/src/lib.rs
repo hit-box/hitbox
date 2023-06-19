@@ -71,25 +71,15 @@ pub mod fsm;
 #[cfg(feature = "metrics")]
 #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
 pub mod metrics;
-pub mod response;
-pub mod settings;
-pub mod value;
+pub mod predicates;
 
 pub use cache::Cacheable;
 pub use error::CacheError;
-pub use hitbox_backend::{CachePolicy, CacheableResponse, CachedValue};
-pub use value::CacheState;
-
-#[cfg(feature = "derive")]
-pub use hitbox_derive::CacheableResponse;
-
-#[cfg(feature = "derive")]
-#[doc(hidden)]
-pub use serde_qs as hitbox_serializer;
+pub use hitbox_backend::{
+    CachePolicy, CacheState, CacheableResponse, CacheableResponseWrapper, CachedValue,
+};
 
 /// The `hitbox` prelude.
 pub mod prelude {
-    #[cfg(feature = "derive")]
-    pub use crate::hitbox_serializer;
     pub use crate::{CacheError, Cacheable, CacheableResponse};
 }

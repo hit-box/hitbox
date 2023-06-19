@@ -14,51 +14,54 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::{
     backend::CacheBackend,
     fsm::{states::StateProj, PollCache, State},
+    Cacheable,
 };
 
 const POLL_AFTER_READY_ERROR: &str = "CacheFuture can't be polled after finishing";
 
 #[pin_project]
-pub struct CacheFuture<U, B, C>
+pub struct CacheFuture<U, B, C, R>
 where
     U: Future,
     B: CacheBackend,
     C: CacheableResponse,
+    R: Cacheable,
 {
     #[pin]
     upstream: U,
     backend: Arc<B>,
-    cache_key: String,
+    request: R,
     #[pin]
     state: State<U::Output, C>,
-
     #[pin]
     poll_cache: Option<PollCache<C>>,
 }
 
-impl<U, B, C> CacheFuture<U, B, C>
+impl<U, B, C, R> CacheFuture<U, B, C, R>
 where
     B: CacheBackend,
     U: Future,
     C: CacheableResponse,
+    R: Cacheable,
 {
-    pub fn new(upstream: U, backend: Arc<B>, cache_key: String) -> Self {
+    pub fn new(upstream: U, backend: Arc<B>, request: R) -> Self {
         CacheFuture {
             upstream,
             backend,
-            cache_key,
+            request,
             state: State::Initial,
             poll_cache: None,
         }
     }
 }
 
-impl<U, B, C> Future for CacheFuture<U, B, C>
+impl<U, B, C, R> Future for CacheFuture<U, B, C, R>
 where
     B: CacheBackend + Send + Sync + 'static,
     U: Future + Send,
     C: CacheableResponseWrapper<Source = U::Output> + CacheableResponse + Send + 'static,
     C::Cached: Send + DeserializeOwned + Serialize + Debug + Clone,
+    R: Cacheable,
 {
     type Output = U::Output;
 
@@ -69,7 +72,8 @@ where
             let state = match this.state.as_mut().project() {
                 StateProj::Initial => {
                     let backend = this.backend.clone();
-                    let cache_key = this.cache_key.clone();
+                    // let cache_key = this.cache_key.clone();
+                    let cache_key = "fake::key".to_owned();
                     let poll_cache = Box::pin(async move { backend.get::<C>(cache_key).await });
                     // this.poll_cache.set(Some(poll_cache));
                     State::PollCache { poll_cache }
@@ -97,15 +101,16 @@ where
                     let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
                     let cacheable = C::from_source(upstream_result);
                     let cache_policy = Box::pin(async move { cacheable.cache_policy().await });
-                    State::CheckCachePolicy { cache_policy }
+                    State::CheckResponseCachePolicy { cache_policy }
                 }
-                StateProj::CheckCachePolicy { cache_policy } => {
+                StateProj::CheckResponseCachePolicy { cache_policy } => {
                     let cached_value = match ready!(cache_policy.poll(cx)) {
                         CachePolicy::Cacheable(cached_value) => cached_value,
                         _ => unimplemented!(),
                     };
                     let backend = this.backend.clone();
-                    let cache_key = this.cache_key.clone();
+                    // let cache_key = this.cache_key.clone();
+                    let cache_key = "fake::key".to_owned();
                     let cached = cached_value.clone();
                     let update_cache =
                         Box::pin(async move { backend.set::<C>(cache_key, cached, None).await });

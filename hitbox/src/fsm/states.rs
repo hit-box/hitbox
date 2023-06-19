@@ -4,16 +4,23 @@ use futures::future::BoxFuture;
 use hitbox_backend::{BackendError, CachePolicy, CacheableResponse, CachedValue};
 use pin_project::pin_project;
 
+use crate::cache::CacheKey;
+
 pub type CacheResult<R> = Result<Option<CachedValue<R>>, BackendError>;
 pub type PollCache<R> = BoxFuture<'static, CacheResult<R>>;
 pub type UpdateCache = BoxFuture<'static, Result<(), BackendError>>;
 
+#[allow(missing_docs)]
 #[pin_project(project = StateProj)]
 pub enum State<U, C>
 where
     C: CacheableResponse,
 {
     Initial,
+    CheckRequestCachePolicy {
+        #[pin]
+        cache_policy: BoxFuture<'static, CachePolicy<CacheKey>>,
+    },
     PollCache {
         #[pin]
         poll_cache: PollCache<C::Cached>,
@@ -25,7 +32,7 @@ where
     UpstreamPolled {
         upstream_result: Option<U>,
     },
-    CheckCachePolicy {
+    CheckResponseCachePolicy {
         #[pin]
         cache_policy: BoxFuture<'static, CachePolicy<CachedValue<C::Cached>>>,
     },
@@ -46,9 +53,12 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             State::Initial => f.write_str("State::Initial"),
+            State::CheckRequestCachePolicy { .. } => f.write_str("State::CheckRequestCachePolicy"),
             State::PollCache { .. } => f.write_str("State::PollCache"),
             State::CachePolled { .. } => f.write_str("State::PollCache"),
-            State::CheckCachePolicy { .. } => f.write_str("State::CheckCachePolicy"),
+            State::CheckResponseCachePolicy { .. } => {
+                f.write_str("State::CheckResponseCachePolicy")
+            }
             State::PollUpstream { .. } => f.write_str("State::PollUpstream"),
             State::UpstreamPolled { .. } => f.write_str("State::UpstreamPolled"),
             State::UpdateCache { .. } => f.write_str("State::UpdateCache"),

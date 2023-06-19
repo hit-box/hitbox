@@ -1,4 +1,4 @@
-//! Error decplaration and transformation into [BackendError].
+//! Error declaration and transformation into [BackendError].
 //!
 //! [BackendError]: hitbox_backend::BackendError
 use hitbox_backend::BackendError;
