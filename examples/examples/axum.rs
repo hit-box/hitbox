@@ -92,7 +92,7 @@ async fn main() {
     // build our application with a single route
     let app = Router::new().route("/:name", get(handler)).layer(
         ServiceBuilder::new()
-            // .layer(Cache::builder().backend(backend).build())
+            .layer(Cache::builder().backend(backend).build())
             .layer(
                 Cache::builder()
                     // .backend(&BACKEND)

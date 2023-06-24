@@ -6,21 +6,241 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::ready;
+use futures::{future::BoxFuture, ready};
 use hitbox_backend::{CachePolicy, CacheState, CacheableResponse, CacheableResponseWrapper};
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     backend::CacheBackend,
+    cache::CacheableRequest,
     fsm::{states::StateProj, PollCache, State},
+    predicates::Predicate,
     Cacheable,
 };
 
 const POLL_AFTER_READY_ERROR: &str = "CacheFuture can't be polled after finishing";
 
 #[pin_project]
-pub struct CacheFuture<U, B, C, R>
+pub struct CacheFuture<U, /*B, */ Req, Res, F>
+where
+    U: FnMut(Req) -> F,
+    F: Future<Output = Res> + Send,
+    // U: FnMut(Req) -> Pin<Box<dyn Future<Output = Res> + Send>>,
+    // B: CacheBackend,
+    Req: CacheableRequest,
+{
+    // backend: Arc<B>,
+    request: Option<Req>,
+    upstream: Option<U>,
+    #[pin]
+    upstream_future: Option<F>,
+}
+
+impl<U, Req, Res, F> CacheFuture<U, Req, Res, F>
+where
+    // U: FnMut(Req) -> Pin<Box<dyn Future<Output = Res> + Send>>,
+    U: FnMut(Req) -> F,
+    F: Future<Output = Res> + Send,
+    // B: CacheBackend,
+    Req: CacheableRequest,
+{
+    pub fn new(request: Req, /*backend: Arc<B>, */ upstream: U) -> Self {
+        CacheFuture {
+            request: Some(request),
+            // backend,
+            upstream: Some(upstream),
+            upstream_future: None,
+        }
+    }
+}
+
+impl<U, Req, Res, F> Future for CacheFuture<U, Req, Res, F>
+where
+    U: FnMut(Req) -> F,
+    F: Future<Output = Res> + Send,
+    // U: FnMut(Req) -> Pin<Box<dyn Future<Output = Res> + Send>>,
+    // B: CacheBackend,
+    Req: CacheableRequest,
+{
+    type Output = Res;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+        if this.upstream_future.is_none() {
+            let req = this.request.take().unwrap();
+            let upstream_future = (this.upstream.take().unwrap())(req);
+            this.upstream_future.set(Some(upstream_future));
+        }
+        Poll::Ready(ready!(this
+            .upstream_future
+            .as_pin_mut()
+            .take()
+            .unwrap()
+            .poll(cx)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{convert::Infallible, time::Duration};
+
+    use super::*;
+
+    use async_trait::async_trait;
+    use futures::FutureExt;
+    use hitbox_backend::CachePolicy;
+
+    use crate::{
+        cache::{CacheKey, CacheableRequest},
+        predicates::Predicate,
+    };
+
+    #[tokio::test]
+    pub async fn test_cache_future() {
+        pub struct Req {}
+        pub struct CacheableReq {}
+
+        impl CacheableReq {
+            pub fn from_req(req: Req) -> Self {
+                Self {}
+            }
+
+            pub fn into_req(self) -> Req {
+                Req {}
+            }
+        }
+
+        #[async_trait]
+        impl CacheableRequest for CacheableReq {
+            async fn cache_policy<P>(self, predicates: &[P]) -> (CachePolicy<CacheKey>, Self)
+            where
+                P: Predicate<Self> + Send + Sync,
+            {
+                (
+                    CachePolicy::Cacheable(CacheKey {
+                        key: "key".to_owned(),
+                        version: 42,
+                        prefix: "".to_owned(),
+                    }),
+                    self,
+                )
+            }
+        }
+
+        pub struct Res {}
+        pub struct CacheableRes {}
+
+        impl CacheableRes {
+            pub fn from_res(res: Res) -> Self {
+                Self {}
+            }
+            pub fn into_res(self) -> Res {
+                Res {}
+            }
+        }
+
+        #[async_trait]
+        impl CacheableResponseWrapper for CacheableRes {
+            type Source = CacheableRes;
+            type Serializable = CacheableRes;
+            type Error = Infallible;
+
+            fn from_source(source: Self::Source) -> Self {
+                source
+            }
+            fn into_source(self) -> Self::Source {
+                self
+            }
+            fn from_serializable(serializable: Self::Serializable) -> Self {
+                serializable
+            }
+            async fn into_serializable(self) -> Result<Self::Serializable, Self::Error> {
+                Ok(self)
+            }
+        }
+
+        #[async_trait]
+        impl CacheableResponse for CacheableRes {
+            type Cached = CacheableRes;
+
+            fn is_cacheable(&self) -> bool {
+                true
+            }
+        }
+
+        #[derive(Clone)]
+        pub struct Service {
+            counter: u32,
+        }
+
+        impl Service {
+            pub fn new() -> Self {
+                Self { counter: 0 }
+            }
+
+            async fn call(&mut self, req: Req) -> Res {
+                self.counter += 1;
+                tokio::time::sleep(Duration::from_secs(3)).await;
+                Res {}
+            }
+        }
+
+        #[pin_project]
+        pub struct UpstreamFuture {
+            inner_future: BoxFuture<'static, CacheableRes>,
+        }
+
+        impl UpstreamFuture {
+            pub fn new(inner: &Service, req: CacheableReq) -> Self {
+                let mut inner_service = inner.clone();
+                let f = Box::pin(async move {
+                    inner_service
+                        .call(req.into_req())
+                        .map(CacheableRes::from_res)
+                        .await
+                });
+                UpstreamFuture { inner_future: f }
+            }
+        }
+
+        impl Future for UpstreamFuture {
+            type Output = CacheableRes;
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let this = self.project();
+                this.inner_future.as_mut().poll(cx)
+            }
+        }
+
+        let req = CacheableReq {};
+        let service = Service::new();
+        // let upstream = move |req| {
+        //     let mut s = service.clone();
+        //     Box::pin(s.call(req).map(|res| Res {})) as Pin<Box<dyn Future<Output = Res> + Send>>
+        // };
+        // let fsm = CacheFuture::new(req, upstream);
+
+        let upstream = |req| UpstreamFuture::new(&service, req);
+        let fsm = CacheFuture::new(req, upstream);
+        fsm.await;
+    }
+}
+
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
+#[pin_project]
+pub struct CacheFuture2<U, B, C, R>
 where
     U: Future,
     B: CacheBackend,
@@ -37,7 +257,7 @@ where
     poll_cache: Option<PollCache<C>>,
 }
 
-impl<U, B, C, R> CacheFuture<U, B, C, R>
+impl<U, B, C, R> CacheFuture2<U, B, C, R>
 where
     B: CacheBackend,
     U: Future,
@@ -45,7 +265,7 @@ where
     R: Cacheable,
 {
     pub fn new(upstream: U, backend: Arc<B>, request: R) -> Self {
-        CacheFuture {
+        CacheFuture2 {
             upstream,
             backend,
             request,
@@ -55,7 +275,7 @@ where
     }
 }
 
-impl<U, B, C, R> Future for CacheFuture<U, B, C, R>
+impl<U, B, C, R> Future for CacheFuture2<U, B, C, R>
 where
     B: CacheBackend + Send + Sync + 'static,
     U: Future + Send,

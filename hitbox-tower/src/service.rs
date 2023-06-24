@@ -10,13 +10,14 @@ use hitbox::{
     Cacheable, CachedValue,
 };
 use hitbox_backend::{CacheableResponse, CacheableResponseWrapper};
-use hitbox_http::{CacheableRequest, HttpResponse, SerializableHttpResponse};
+use hitbox_http::{CacheableHttpRequest, HttpResponse, SerializableHttpResponse};
 use http::{Request, Response};
 use hyper::Body;
 use serde::{de::DeserializeOwned, Serialize};
 use tower::Service;
 
 use hitbox::fsm::CacheFuture;
+use tracing::log::warn;
 
 use crate::future::CacheFutureAdapter;
 

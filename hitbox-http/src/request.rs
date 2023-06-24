@@ -2,31 +2,50 @@ use std::any::type_name;
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use hitbox::Cacheable;
+use hitbox::{
+    cache::{CacheKey, CacheableRequest},
+    predicates::Predicate,
+    Cacheable,
+};
+use hitbox_backend::CachePolicy;
 use http::Request;
+use hyper::Body;
 
-pub struct CacheableRequest<Body> {
+pub struct CacheableHttpRequest {
     request: Request<Body>,
 }
 
-impl CacheableRequest<hyper::Body> {
-    pub fn from_request(request: Request<hyper::Body>) -> Self {
+impl CacheableHttpRequest {
+    pub fn from_request(request: Request<Body>) -> Self {
         Self { request }
     }
 
-    pub fn into_origin(self) -> Request<hyper::Body> {
+    pub fn into_request(self) -> Request<Body> {
         let uri = self.request.uri().clone();
         let body = self.request.into_body();
         let stream = body.map(|v| v);
         Request::builder()
             .uri(uri)
-            .body(hyper::Body::wrap_stream(stream))
+            .body(Body::wrap_stream(stream))
             .unwrap()
     }
 }
 
 #[async_trait]
-impl Cacheable for CacheableRequest<hyper::Body> {
+impl CacheableRequest for CacheableHttpRequest {
+    async fn cache_policy<P>(
+        self,
+        predicates: &[P],
+    ) -> (CachePolicy<CacheKey>, CacheableHttpRequest)
+    where
+        P: Predicate<Self> + Send + Sync,
+    {
+        unimplemented!()
+    }
+}
+
+#[async_trait]
+impl Cacheable for CacheableHttpRequest {
     async fn cache_key(&self) -> Result<String, hitbox::CacheError> {
         let body = self.request.body();
         Ok(format!(

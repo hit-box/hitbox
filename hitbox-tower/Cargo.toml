@@ -17,6 +17,7 @@ hitbox-http = { path = "../hitbox-http", version = "0.1" }
 hitbox-redis = { path = "../hitbox-redis", version = "0.1" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
 hyper = { version = "0.14", default-features = false }
+tracing = { version = "0.1" }
 http = "0.2"
 serde = "1"
 futures = "0.3"
