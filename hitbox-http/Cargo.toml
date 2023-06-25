@@ -25,3 +25,9 @@ bytes = "1"
 chrono = "0.4"
 hyper = { version = "0.14", features = ["stream"] }
 futures = { version = "0.3", default-features = false }
+actix-router = "0.5"
+serde_qs = "0.12"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util"], default-features = false }
+
