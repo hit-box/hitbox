@@ -75,9 +75,7 @@ pub mod predicates;
 
 pub use cache::Cacheable;
 pub use error::CacheError;
-pub use hitbox_backend::{
-    CachePolicy, CacheState, CacheableResponse, CacheableResponseWrapper, CachedValue,
-};
+pub use hitbox_backend::{CachePolicy, CacheState, CacheableResponse, CachedValue};
 
 /// The `hitbox` prelude.
 pub mod prelude {

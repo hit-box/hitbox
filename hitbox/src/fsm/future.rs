@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::{future::BoxFuture, ready};
-use hitbox_backend::{CachePolicy, CacheState, CacheableResponse, CacheableResponseWrapper};
+use hitbox_backend::{CachePolicy, CacheState, CacheableResponse};
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -24,11 +24,7 @@ const POLL_AFTER_READY_ERROR: &str = "CacheFuture can't be polled after finishin
 #[pin_project]
 pub struct CacheFuture<U, /*B, */ Req, Res, F>
 where
-    U: FnMut(Req) -> F,
     F: Future<Output = Res> + Send,
-    // U: FnMut(Req) -> Pin<Box<dyn Future<Output = Res> + Send>>,
-    // B: CacheBackend,
-    Req: CacheableRequest,
 {
     // backend: Arc<B>,
     request: Option<Req>,
@@ -45,7 +41,7 @@ where
     // B: CacheBackend,
     Req: CacheableRequest,
 {
-    pub fn new(request: Req, /*backend: Arc<B>, */ upstream: U) -> Self {
+    pub fn new(request: Req, upstream: U) -> Self {
         CacheFuture {
             request: Some(request),
             // backend,
@@ -113,22 +109,16 @@ mod tests {
 
         #[async_trait]
         impl CacheableRequest for CacheableReq {
-            async fn cache_policy<P>(self, predicates: &[P]) -> (CachePolicy<CacheKey>, Self)
+            async fn cache_policy<P>(self, predicates: &[P]) -> crate::cache::CachePolicy<Self>
             where
                 P: Predicate<Self> + Send + Sync,
             {
-                (
-                    CachePolicy::Cacheable(CacheKey {
-                        key: "key".to_owned(),
-                        version: 42,
-                        prefix: "".to_owned(),
-                    }),
-                    self,
-                )
+                crate::cache::CachePolicy::Cacheable(self)
             }
         }
 
         pub struct Res {}
+        #[derive(Clone)]
         pub struct CacheableRes {}
 
         impl CacheableRes {
@@ -141,31 +131,15 @@ mod tests {
         }
 
         #[async_trait]
-        impl CacheableResponseWrapper for CacheableRes {
-            type Source = CacheableRes;
-            type Serializable = CacheableRes;
-            type Error = Infallible;
-
-            fn from_source(source: Self::Source) -> Self {
-                source
-            }
-            fn into_source(self) -> Self::Source {
-                self
-            }
-            fn from_serializable(serializable: Self::Serializable) -> Self {
-                serializable
-            }
-            async fn into_serializable(self) -> Result<Self::Serializable, Self::Error> {
-                Ok(self)
-            }
-        }
-
-        #[async_trait]
         impl CacheableResponse for CacheableRes {
             type Cached = CacheableRes;
 
-            fn is_cacheable(&self) -> bool {
-                true
+            async fn into_cached(self) -> Self::Cached {
+                self
+            }
+
+            async fn from_cached(cached: Self::Cached) -> Self {
+                cached
             }
         }
 
@@ -274,7 +248,7 @@ where
         }
     }
 }
-
+/*
 impl<U, B, C, R> Future for CacheFuture2<U, B, C, R>
 where
     B: CacheBackend + Send + Sync + 'static,
@@ -361,4 +335,4 @@ where
             this.state.set(state);
         }
     }
-}
+}*/

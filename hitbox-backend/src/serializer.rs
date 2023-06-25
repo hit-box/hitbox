@@ -115,7 +115,7 @@ mod test {
     use async_trait::async_trait;
 
     use super::*;
-    use crate::{response::CacheableResponse, CacheableResponseWrapper};
+    use crate::response::CacheableResponse;
 
     #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
     struct Test {
@@ -124,33 +124,14 @@ mod test {
     }
 
     #[async_trait]
-    impl CacheableResponseWrapper for Test {
-        type Source = Self;
-        type Serializable = Self;
-        type Error = Infallible;
-
-        fn from_serializable(serializable: Self::Serializable) -> Self {
-            serializable
-        }
-
-        fn from_source(source: Self::Source) -> Self {
-            source
-        }
-
-        fn into_source(self) -> Self::Source {
-            self
-        }
-
-        async fn into_serializable(self) -> Result<Self::Serializable, Self::Error> {
-            Ok(self)
-        }
-    }
-
     impl CacheableResponse for Test {
         type Cached = Self;
 
-        fn is_cacheable(&self) -> bool {
-            true
+        async fn into_cached(self) -> Self::Cached {
+            self
+        }
+        async fn from_cached(cached: Self::Cached) -> Self {
+            cached
         }
     }
 

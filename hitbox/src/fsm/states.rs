@@ -19,7 +19,7 @@ where
     Initial,
     CheckRequestCachePolicy {
         #[pin]
-        cache_policy: BoxFuture<'static, CachePolicy<CacheKey>>,
+        cache_policy: BoxFuture<'static, crate::cache::CachePolicy<CacheKey>>,
     },
     PollCache {
         #[pin]
@@ -34,7 +34,7 @@ where
     },
     CheckResponseCachePolicy {
         #[pin]
-        cache_policy: BoxFuture<'static, CachePolicy<CachedValue<C::Cached>>>,
+        cache_policy: BoxFuture<'static, CachePolicy<C>>,
     },
     UpdateCache {
         #[pin]

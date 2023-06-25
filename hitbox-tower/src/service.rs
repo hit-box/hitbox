@@ -10,7 +10,7 @@ use hitbox::{
     Cacheable, CachedValue,
 };
 use hitbox_backend::{CacheableResponse, CacheableResponseWrapper};
-use hitbox_http::{CacheableHttpRequest, HttpResponse, SerializableHttpResponse};
+use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, SerializableHttpResponse};
 use http::{Request, Response};
 use hyper::Body;
 use serde::{de::DeserializeOwned, Serialize};
@@ -54,7 +54,7 @@ where
     Body: Send,
     Res: Send + Debug + 'static,
     Request<Body>: Debug,
-    HttpResponse<Res>: CacheableResponseWrapper<Source = <S::Future as Future>::Output>
+    CacheableHttpResponse<Res>: CacheableResponseWrapper<Source = <S::Future as Future>::Output>
         + CacheableResponse<Cached = C>,
     C: Debug + Serialize + DeserializeOwned + Send + Clone,
 {

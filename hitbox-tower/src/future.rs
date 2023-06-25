@@ -3,7 +3,7 @@ use std::task::Poll;
 use futures::{future::BoxFuture, ready, Future};
 use hitbox::{cache::CacheableRequest, fsm::CacheFuture};
 use hitbox_backend::CachePolicy;
-use hitbox_http::HttpResponse;
+use hitbox_http::CacheableHttpResponse;
 use http::Request;
 use hyper::{body::to_bytes, Body};
 use pin_project::pin_project;
@@ -47,7 +47,10 @@ where
     }
 }
 
-pub fn wrap_upstream_call<S, U>(cacheable_request: CacheableHttpRequest, service: &mut S) -> impl Future<Output=U> 
+pub fn wrap_upstream_call<S, U>(
+    cacheable_request: CacheableHttpRequest,
+    service: &mut S,
+) -> impl Future<Output = U>
 where
     S: Service,
     S::Future: Future<Output = U>,

@@ -1,8 +1,8 @@
-use std::{convert::Infallible, net::SocketAddr};
 use hyper::{Body, Server};
+use std::{convert::Infallible, net::SocketAddr};
 
-use tower::make::Shared;
 use http::{Request, Response};
+use tower::make::Shared;
 
 async fn handle(_: Request<Body>) -> Result<Response<Body>, Infallible> {
     Ok(Response::new("Hello, World!".into()))
@@ -20,4 +20,3 @@ async fn main() {
         .await
         .expect("server error");
 }
-

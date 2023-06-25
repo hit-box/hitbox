@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
 
+use crate::{CacheState, CacheableResponse};
+
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[derive(Debug, Clone)]
 pub struct CachedValue<T> {
@@ -14,6 +16,13 @@ impl<T> CachedValue<T> {
 
     pub fn into_inner(self) -> T {
         self.data
+    }
+}
+
+impl<T> CachedValue<T> {
+    pub fn cache_state<C: CacheableResponse<Cached = T>>(self) -> CacheState<C> {
+        CacheState::Actual(C::from_cached(self.into_inner()));
+        unimplemented!()
     }
 }
 

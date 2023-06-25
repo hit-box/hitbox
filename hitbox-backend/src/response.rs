@@ -2,15 +2,22 @@ use std::fmt::Debug;
 
 use async_trait::async_trait;
 use chrono::Utc;
+use futures::{stream, StreamExt};
 
-use crate::CachedValue;
+use crate::{
+    predicates::{Predicate, PredicateResult},
+    CachedValue,
+};
 
 /// This trait determines which types should be cached or not.
-pub enum CachePolicy<Cached> {
+pub enum CachePolicy<C>
+where
+    C: CacheableResponse,
+{
     /// This variant should be stored in cache backend
-    Cacheable(Cached),
+    Cacheable(CachedValue<C::Cached>),
     /// This variant shouldn't be stored in the cache backend.
-    NonCacheable,
+    NonCacheable(C),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -20,38 +27,29 @@ pub enum CacheState<Cached> {
 }
 
 #[async_trait]
-pub trait CacheableResponseWrapper {
-    type Source;
-    type Serializable;
-    type Error: Debug;
-
-    fn from_source(source: Self::Source) -> Self;
-    fn into_source(self) -> Self::Source;
-    fn from_serializable(serializable: Self::Serializable) -> Self;
-    async fn into_serializable(self) -> Result<Self::Serializable, Self::Error>;
-}
-
-#[async_trait]
-pub trait CacheableResponse: Sized + CacheableResponseWrapper
+pub trait CacheableResponse
 where
-    Self: CacheableResponseWrapper<Serializable = Self::Cached> + Send,
+    Self: Sized + Send,
+    Self::Cached: Clone,
 {
     type Cached;
 
-    async fn cache_policy(self) -> CachePolicy<CachedValue<Self::Cached>> {
-        if self.is_cacheable() {
-            let cached = self.into_serializable().await.unwrap();
-            let cached_value = CachedValue::new(cached, Utc::now());
-            CachePolicy::Cacheable(cached_value)
-        } else {
-            CachePolicy::NonCacheable
+    async fn cache_policy<P>(self, predicates: &[P]) -> CachePolicy<Self>
+    where
+        P: Predicate<Self> + Sync,
+    {
+        let predicates_result = stream::iter(predicates)
+            .fold(PredicateResult::NonCacheable(self), PredicateResult::chain)
+            .await;
+        match predicates_result {
+            PredicateResult::Cacheable(res) => {
+                CachePolicy::Cacheable(CachedValue::new(res.into_cached().await, Utc::now()))
+            }
+            PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
         }
     }
 
-    fn from_cached(cached: CachedValue<Self::Cached>) -> CacheState<Self> {
-        // TODO: check stale state
-        CacheState::Actual(Self::from_serializable(cached.into_inner()))
-    }
+    async fn into_cached(self) -> Self::Cached;
 
-    fn is_cacheable(&self) -> bool;
+    async fn from_cached(cached: Self::Cached) -> Self;
 }

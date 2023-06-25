@@ -33,10 +33,7 @@ impl CacheableHttpRequest {
 
 #[async_trait]
 impl CacheableRequest for CacheableHttpRequest {
-    async fn cache_policy<P>(
-        self,
-        predicates: &[P],
-    ) -> (CachePolicy<CacheKey>, CacheableHttpRequest)
+    async fn cache_policy<P>(self, predicates: &[P]) -> hitbox::cache::CachePolicy<Self>
     where
         P: Predicate<Self> + Send + Sync,
     {

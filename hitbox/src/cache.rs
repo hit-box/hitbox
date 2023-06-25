@@ -2,10 +2,11 @@
 
 use crate::{predicates::Predicate, CacheError};
 use async_trait::async_trait;
-use hitbox_backend::CachePolicy;
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use hitbox_derive::Cacheable;
+
+pub use hitbox_backend::CacheableResponse;
 
 /// Trait describes cache configuration per type that implements this trait.
 #[async_trait]
@@ -76,6 +77,11 @@ pub trait Cacheable {
     }
 }
 
+pub enum CachePolicy<T> {
+    Cacheable(T),
+    NonCacheable(T),
+}
+
 pub struct CacheKey {
     pub key: String,
     pub version: u32,
@@ -84,7 +90,7 @@ pub struct CacheKey {
 
 #[async_trait]
 pub trait CacheableRequest: Sized {
-    async fn cache_policy<P>(self, predicates: &[P]) -> (CachePolicy<CacheKey>, Self)
+    async fn cache_policy<P>(self, predicates: &[P]) -> CachePolicy<Self>
     where
         P: Predicate<Self> + Send + Sync;
 }
