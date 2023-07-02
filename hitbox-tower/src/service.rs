@@ -33,10 +33,6 @@ impl<S, B> CacheService<S, B> {
     }
 }
 
-fn upstream_transformer(request: CacheableHttpRequest) -> UpstreamFuture {
-    unimplemented!()
-}
-
 impl<S, B> Clone for CacheService<S, B>
 where
     S: Clone,
@@ -50,19 +46,24 @@ where
     }
 }
 
-fn response_transformer<E>(res: CacheableHttpResponse) -> Result<Response<Body>, E> {
-    unimplemented!()
-}
-
-impl<S, B> Service<Request<Body>> for CacheService<S, B>
+impl<S, B, ReqBody> Service<Request<ReqBody>> for CacheService<S, B>
 where
-    S: Service<Request<Body>, Response = Response<Body>> + Clone + Send + 'static,
+    S: Service<Request<ReqBody>, Response = Response<Body>> + Clone + Send + 'static,
     B: CacheBackend + Clone,
     S::Future: Send,
+
+    // debug bounds
+    ReqBody: Debug + hyper::body::HttpBody + Send + 'static,
+    Body: From<ReqBody>,
 {
     type Response = Response<Body>;
     type Error = S::Error;
-    type Future = CacheFuture<B, CacheableHttpRequest, CacheableHttpResponse, Transformer<S>>;
+    type Future = CacheFuture<
+        B,
+        CacheableHttpRequest<ReqBody>,
+        CacheableHttpResponse,
+        Transformer<S, ReqBody>,
+    >;
 
     fn poll_ready(
         &mut self,
@@ -71,7 +72,7 @@ where
         self.upstream.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<Body>) -> Self::Future {
+    fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
         dbg!(&req);
 
         let transformer = Transformer::new(self.upstream.clone());

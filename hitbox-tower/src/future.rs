@@ -1,4 +1,5 @@
 use std::{
+    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -11,25 +12,31 @@ use hyper::Body;
 use pin_project::pin_project;
 use tower::Service;
 
-pub struct Transformer<S> {
+pub struct Transformer<S, ReqBody> {
     inner: S,
+    _req: PhantomData<ReqBody>,
 }
 
-impl<S> Transformer<S> {
+impl<S, ReqBody> Transformer<S, ReqBody> {
     pub fn new(inner: S) -> Self {
-        Transformer { inner }
+        Transformer {
+            inner,
+            _req: PhantomData::default(),
+        }
     }
 }
 
-impl<S> Transform<CacheableHttpRequest, CacheableHttpResponse> for Transformer<S>
+impl<S, ReqBody> Transform<CacheableHttpRequest<ReqBody>, CacheableHttpResponse>
+    for Transformer<S, ReqBody>
 where
-    S: Service<Request<Body>, Response = Response<Body>> + Clone + Send + 'static,
+    S: Service<Request<ReqBody>, Response = Response<Body>> + Clone + Send + 'static,
     S::Future: Send,
+    ReqBody: Send + 'static,
 {
     type Future = UpstreamFuture;
     type Response = Result<Response<Body>, S::Error>;
 
-    fn upstream_transform(&self, req: CacheableHttpRequest) -> Self::Future {
+    fn upstream_transform(&self, req: CacheableHttpRequest<ReqBody>) -> Self::Future {
         UpstreamFuture::new(self.inner.clone(), req)
     }
 
@@ -44,10 +51,11 @@ pub struct UpstreamFuture {
 }
 
 impl UpstreamFuture {
-    pub fn new<S>(mut inner_service: S, req: CacheableHttpRequest) -> Self
+    pub fn new<S, ReqBody>(mut inner_service: S, req: CacheableHttpRequest<ReqBody>) -> Self
     where
-        S: Service<Request<Body>, Response = Response<Body>> + Send + 'static,
+        S: Service<Request<ReqBody>, Response = Response<Body>> + Send + 'static,
         S::Future: Send,
+        ReqBody: Send + 'static,
     {
         let inner_future = Box::pin(async move {
             let res = inner_service.call(req.into_request()).await;
