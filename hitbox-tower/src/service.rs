@@ -7,19 +7,20 @@ use futures::{
 };
 use hitbox::{
     backend::{BackendError, CacheBackend},
+    fsm::{CacheFuture, Transform},
     Cacheable, CachedValue,
 };
-use hitbox_backend::{CacheableResponse, CacheableResponseWrapper};
+use hitbox_backend::CacheableResponse;
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, SerializableHttpResponse};
 use http::{Request, Response};
 use hyper::Body;
 use serde::{de::DeserializeOwned, Serialize};
 use tower::Service;
 
-use hitbox::fsm::CacheFuture;
+use hitbox::fsm::CacheFuture3;
 use tracing::log::warn;
 
-use crate::future::CacheFutureAdapter;
+use crate::future::{Transformer, UpstreamFuture};
 
 pub struct CacheService<S, B> {
     upstream: S,
@@ -30,6 +31,10 @@ impl<S, B> CacheService<S, B> {
     pub fn new(upstream: S, backend: Arc<B>) -> Self {
         CacheService { upstream, backend }
     }
+}
+
+fn upstream_transformer(request: CacheableHttpRequest) -> UpstreamFuture {
+    unimplemented!()
 }
 
 impl<S, B> Clone for CacheService<S, B>
@@ -45,23 +50,19 @@ where
     }
 }
 
-impl<S, B, Res, C> Service<Request<Body>> for CacheService<S, B>
+fn response_transformer<E>(res: CacheableHttpResponse) -> Result<Response<Body>, E> {
+    unimplemented!()
+}
+
+impl<S, B> Service<Request<Body>> for CacheService<S, B>
 where
-    S: Service<Request<Body>, Response = Response<Res>> + Clone,
-    B: CacheBackend + Send + Sync + Clone + 'static,
+    S: Service<Request<Body>, Response = Response<Body>> + Clone + Send + 'static,
+    B: CacheBackend + Clone,
     S::Future: Send,
-    S::Error: Send + Sync + Debug + 'static,
-    Body: Send,
-    Res: Send + Debug + 'static,
-    Request<Body>: Debug,
-    CacheableHttpResponse<Res>: CacheableResponseWrapper<Source = <S::Future as Future>::Output>
-        + CacheableResponse<Cached = C>,
-    C: Debug + Serialize + DeserializeOwned + Send + Clone,
 {
-    type Response = Response<Res>;
+    type Response = Response<Body>;
     type Error = S::Error;
-    // type Future = CacheFuture<S::Future, B, HttpResponse<Res>, CacheableRequest<Body>>;
-    type Future = CacheFutureAdapter<S::Future, S>;
+    type Future = CacheFuture<B, CacheableHttpRequest, CacheableHttpResponse, Transformer<S>>;
 
     fn poll_ready(
         &mut self,
@@ -72,15 +73,12 @@ where
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         dbg!(&req);
-        // let upstream = async move {
-        //     let cacheable_request = CacheableRequest::from_request(req);
-        //     let policy = cacheable_request.cache_key().await;
-        //     self.upstream.call(cacheable_request.into_origin())
-        // };
-        // let cache_key = cacheable_request.cache_key().unwrap();
-        // dbg!(&cache_key);
 
-        // CacheFuture::new(upstream, self.backend.clone(), cacheable_request)
-        CacheFutureAdapter::new(&mut self.upstream, req)
+        let transformer = Transformer::new(self.upstream.clone());
+        CacheFuture::new(
+            self.backend.clone(),
+            CacheableHttpRequest::from_request(req),
+            transformer,
+        )
     }
 }

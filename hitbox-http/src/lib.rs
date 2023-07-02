@@ -4,4 +4,4 @@ mod response;
 
 pub use request::CacheableHttpRequest;
 // pub use response::{CacheableResponse, SerializableResponse};
-pub use response::CacheableHttpResponse;
+pub use response::{CacheableHttpResponse, SerializableHttpResponse};

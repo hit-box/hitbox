@@ -1,20 +1,46 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use hitbox::cache::CacheableResponse;
 use http::{response::Parts, Response};
+use http_body::Full;
 use hyper::{body::to_bytes, Body};
 use serde::{Deserialize, Serialize};
 
+pub enum ResponseBody {
+    Pending(Body),
+    Complete(Bytes),
+}
+
+impl ResponseBody {
+    pub fn into_inner_body(self) -> Body {
+        match self {
+            ResponseBody::Pending(body) => body,
+            ResponseBody::Complete(body) => Body::from(body),
+        }
+    }
+}
+
 pub struct CacheableHttpResponse {
     parts: Parts,
-    body: Body,
+    body: ResponseBody,
 }
 
 impl CacheableHttpResponse {
-    pub fn new(response: Response<Body>) -> Self {
+    pub fn from_response(response: Response<Body>) -> Self {
         let (parts, body) = response.into_parts();
-        CacheableHttpResponse { parts, body }
+        CacheableHttpResponse {
+            parts,
+            body: ResponseBody::Pending(body),
+        }
+    }
+
+    pub fn into_response(self) -> Response<Body> {
+        match self.body {
+            ResponseBody::Pending(body) => Response::from_parts(self.parts, body),
+            ResponseBody::Complete(body) => Response::from_parts(self.parts, body.into()),
+        }
     }
 }
 
@@ -35,7 +61,10 @@ impl CacheableResponse for CacheableHttpResponse {
         SerializableHttpResponse {
             status: 200,
             version: "HTTP/1.1".to_owned(),
-            body: to_bytes(self.body).await.unwrap().to_vec(),
+            body: to_bytes(self.body.into_inner_body())
+                .await
+                .unwrap()
+                .to_vec(),
             headers: self
                 .parts
                 .headers
@@ -52,6 +81,6 @@ impl CacheableResponse for CacheableHttpResponse {
         }
         let body = cached.body.into();
         let inner = inner.status(cached.status).body(body).unwrap();
-        CacheableHttpResponse::new(inner)
+        CacheableHttpResponse::from_response(inner)
     }
 }

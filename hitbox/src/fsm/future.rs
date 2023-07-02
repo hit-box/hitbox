@@ -21,62 +21,6 @@ use crate::{
 
 const POLL_AFTER_READY_ERROR: &str = "CacheFuture can't be polled after finishing";
 
-#[pin_project]
-pub struct CacheFuture<U, /*B, */ Req, Res, F>
-where
-    F: Future<Output = Res> + Send,
-{
-    // backend: Arc<B>,
-    request: Option<Req>,
-    upstream: Option<U>,
-    #[pin]
-    upstream_future: Option<F>,
-}
-
-impl<U, Req, Res, F> CacheFuture<U, Req, Res, F>
-where
-    // U: FnMut(Req) -> Pin<Box<dyn Future<Output = Res> + Send>>,
-    U: FnMut(Req) -> F,
-    F: Future<Output = Res> + Send,
-    // B: CacheBackend,
-    Req: CacheableRequest,
-{
-    pub fn new(request: Req, upstream: U) -> Self {
-        CacheFuture {
-            request: Some(request),
-            // backend,
-            upstream: Some(upstream),
-            upstream_future: None,
-        }
-    }
-}
-
-impl<U, Req, Res, F> Future for CacheFuture<U, Req, Res, F>
-where
-    U: FnMut(Req) -> F,
-    F: Future<Output = Res> + Send,
-    // U: FnMut(Req) -> Pin<Box<dyn Future<Output = Res> + Send>>,
-    // B: CacheBackend,
-    Req: CacheableRequest,
-{
-    type Output = Res;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
-        if this.upstream_future.is_none() {
-            let req = this.request.take().unwrap();
-            let upstream_future = (this.upstream.take().unwrap())(req);
-            this.upstream_future.set(Some(upstream_future));
-        }
-        Poll::Ready(ready!(this
-            .upstream_future
-            .as_pin_mut()
-            .take()
-            .unwrap()
-            .poll(cx)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{convert::Infallible, time::Duration};
@@ -195,7 +139,7 @@ mod tests {
         // let fsm = CacheFuture::new(req, upstream);
 
         let upstream = |req| UpstreamFuture::new(&service, req);
-        let fsm = CacheFuture::new(req, upstream);
+        let fsm = CacheFuture3::new(req, upstream);
         fsm.await;
     }
 }
@@ -212,42 +156,147 @@ mod tests {
 //
 //
 //
+//
 
 #[pin_project]
-pub struct CacheFuture2<U, B, C, R>
+pub struct CacheFuture3<U, /*B, */ Req, Res, F>
 where
-    U: Future,
-    B: CacheBackend,
-    C: CacheableResponse,
-    R: Cacheable,
+    F: Future<Output = Res> + Send,
 {
+    // backend: Arc<B>,
+    request: Option<Req>,
+    upstream: Option<U>,
     #[pin]
-    upstream: U,
-    backend: Arc<B>,
-    request: R,
-    #[pin]
-    state: State<U::Output, C>,
-    #[pin]
-    poll_cache: Option<PollCache<C>>,
+    upstream_future: Option<F>,
 }
 
-impl<U, B, C, R> CacheFuture2<U, B, C, R>
+impl<U, Req, Res, F> CacheFuture3<U, Req, Res, F>
 where
-    B: CacheBackend,
-    U: Future,
-    C: CacheableResponse,
-    R: Cacheable,
+    // U: FnMut(Req) -> Pin<Box<dyn Future<Output = Res> + Send>>,
+    U: FnMut(Req) -> F,
+    F: Future<Output = Res> + Send,
+    // B: CacheBackend,
+    Req: CacheableRequest,
 {
-    pub fn new(upstream: U, backend: Arc<B>, request: R) -> Self {
-        CacheFuture2 {
-            upstream,
+    pub fn new(request: Req, upstream: U) -> Self {
+        CacheFuture3 {
+            request: Some(request),
+            // backend,
+            upstream: Some(upstream),
+            upstream_future: None,
+        }
+    }
+}
+
+impl<U, Req, Res, F> Future for CacheFuture3<U, Req, Res, F>
+where
+    U: FnMut(Req) -> F,
+    F: Future<Output = Res> + Send,
+    // U: FnMut(Req) -> Pin<Box<dyn Future<Output = Res> + Send>>,
+    // B: CacheBackend,
+    Req: CacheableRequest,
+{
+    type Output = Res;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+        if this.upstream_future.is_none() {
+            let req = this.request.take().unwrap();
+            let upstream_future = (this.upstream.take().unwrap())(req);
+            this.upstream_future.set(Some(upstream_future));
+        }
+        Poll::Ready(ready!(this
+            .upstream_future
+            .as_pin_mut()
+            .take()
+            .unwrap()
+            .poll(cx)))
+    }
+}
+
+pub trait Transform<Req, Res> {
+    type Future;
+    type Response;
+
+    fn upstream_transform(&self, req: Req) -> Self::Future;
+    fn response_transform(&self, res: Res) -> Self::Response;
+}
+
+#[pin_project]
+pub struct CacheFuture<B, Req, Res, T>
+where
+    T: Transform<Req, Res>,
+    T::Future: Future<Output = Res> + Send,
+    B: CacheBackend,
+    Res: CacheableResponse,
+    Req: CacheableRequest,
+{
+    transformer: T,
+    #[pin]
+    upstream_future: T::Future,
+    backend: Arc<B>,
+    request: Option<Req>,
+    #[pin]
+    state: State<<T::Future as Future>::Output, Res>,
+    #[pin]
+    poll_cache: Option<PollCache<Res>>,
+}
+
+impl<B, Req, Res, T> CacheFuture<B, Req, Res, T>
+where
+    T: Transform<Req, Res>,
+    T::Future: Future<Output = Res> + Send,
+    B: CacheBackend,
+    Res: CacheableResponse,
+    Req: CacheableRequest,
+{
+    pub fn new(backend: Arc<B>, request: Req, transformer: T) -> Self {
+        let uf = transformer.upstream_transform(request);
+        CacheFuture {
+            transformer,
+            upstream_future: uf,
             backend,
-            request,
+            request: None,
             state: State::Initial,
             poll_cache: None,
         }
     }
 }
+
+impl<B, Req, Res, T> Future for CacheFuture<B, Req, Res, T>
+where
+    T: Transform<Req, Res>,
+    T::Future: Future<Output = Res> + Send,
+    B: CacheBackend,
+    Res: CacheableResponse,
+    Req: CacheableRequest,
+{
+    type Output = T::Response;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+
+        loop {
+            dbg!(&this.state);
+            let state = match this.state.as_mut().project() {
+                StateProj::Initial => State::PollUpstream,
+                StateProj::PollUpstream => {
+                    let res = ready!(this.upstream_future.as_mut().poll(cx));
+                    State::UpstreamPolled {
+                        upstream_result: Some(res),
+                    }
+                }
+                StateProj::UpstreamPolled { upstream_result } => {
+                    let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
+                    return Poll::Ready(this.transformer.response_transform(upstream_result));
+                }
+                _ => unimplemented!(),
+            };
+            this.state.set(state);
+        }
+    }
+}
+
 /*
 impl<U, B, C, R> Future for CacheFuture2<U, B, C, R>
 where
