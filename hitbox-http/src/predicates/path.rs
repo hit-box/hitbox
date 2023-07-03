@@ -12,8 +12,14 @@ impl Path {
 }
 
 #[async_trait]
-impl Predicate<CacheableHttpRequest> for Path {
-    async fn check(&self, request: CacheableHttpRequest) -> PredicateResult<CacheableHttpRequest> {
+impl<ReqBody> Predicate<CacheableHttpRequest<ReqBody>> for Path
+where
+    ReqBody: Send + 'static,
+{
+    async fn check(
+        &self,
+        request: CacheableHttpRequest<ReqBody>,
+    ) -> PredicateResult<CacheableHttpRequest<ReqBody>> {
         if self.0.is_match(request.parts().uri.path()) {
             PredicateResult::Cacheable(request)
         } else {

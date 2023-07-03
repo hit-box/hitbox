@@ -19,6 +19,17 @@ pub trait Predicate<S> {
     async fn check(&self, subject: S) -> PredicateResult<S>;
 }
 
+#[async_trait]
+impl<S, T> Predicate<S> for Box<T>
+where
+    T: Predicate<S> + Sync,
+    S: Send + 'static,
+{
+    async fn check(&self, subject: S) -> PredicateResult<S> {
+        self.as_ref().check(subject).await
+    }
+}
+
 pub enum Operation {
     Eq,
     In,

@@ -22,8 +22,14 @@ fn parse_query(value: &str) -> HashMap<String, QsValue> {
 }
 
 #[async_trait]
-impl Predicate<CacheableHttpRequest> for Query {
-    async fn check(&self, request: CacheableHttpRequest) -> PredicateResult<CacheableHttpRequest> {
+impl<ReqBody> Predicate<CacheableHttpRequest<ReqBody>> for Query
+where
+    ReqBody: Send + 'static,
+{
+    async fn check(
+        &self,
+        request: CacheableHttpRequest<ReqBody>,
+    ) -> PredicateResult<CacheableHttpRequest<ReqBody>> {
         let op = match self.operation {
             Operation::Eq => QsValue::eq,
             Operation::In => unimplemented!(),

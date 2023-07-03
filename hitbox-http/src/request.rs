@@ -36,6 +36,10 @@ impl<ReqBody> CacheableHttpRequest<ReqBody> {
     pub fn parts(&self) -> &Parts {
         &self.parts
     }
+
+    pub fn into_parts(self) -> (Parts, ReqBody) {
+        (self.parts, self.body)
+    }
 }
 
 #[async_trait]
