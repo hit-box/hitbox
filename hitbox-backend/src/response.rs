@@ -29,15 +29,12 @@ pub enum CacheState<Cached> {
 #[async_trait]
 pub trait CacheableResponse
 where
-    Self: Sized + Send,
+    Self: Sized + Send + 'static,
     Self::Cached: Clone,
 {
     type Cached;
 
-    async fn cache_policy<P>(self, predicates: &[P]) -> CachePolicy<Self>
-    where
-        P: Predicate<Self> + Sync,
-    {
+    async fn cache_policy(self, predicates: &[Box<dyn Predicate<Self>>]) -> CachePolicy<Self> {
         let predicates_result = stream::iter(predicates)
             .fold(PredicateResult::NonCacheable(self), PredicateResult::chain)
             .await;

@@ -1,34 +1,42 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use hitbox::cache::CacheableResponse;
 use http::{response::Parts, Response};
 use http_body::Full;
-use hyper::{body::to_bytes, Body};
+use hyper::body::{to_bytes, HttpBody};
 use serde::{Deserialize, Serialize};
 
-pub enum ResponseBody {
-    Pending(Body),
+use crate::body::FromBytes;
+
+pub enum ResponseBody<ResBody> {
+    Pending(ResBody),
     Complete(Bytes),
 }
 
-impl ResponseBody {
-    pub fn into_inner_body(self) -> Body {
+impl<ResBody> ResponseBody<ResBody>
+where
+    ResBody: FromBytes,
+{
+    pub fn into_inner_body(self) -> ResBody {
         match self {
             ResponseBody::Pending(body) => body,
-            ResponseBody::Complete(body) => Body::from(body),
+            ResponseBody::Complete(body) => ResBody::from_bytes(body),
         }
     }
 }
 
-pub struct CacheableHttpResponse {
+pub struct CacheableHttpResponse<ResBody> {
     parts: Parts,
-    body: ResponseBody,
+    body: ResponseBody<ResBody>,
 }
 
-impl CacheableHttpResponse {
-    pub fn from_response(response: Response<Body>) -> Self {
+impl<ResBody> CacheableHttpResponse<ResBody>
+where
+    ResBody: FromBytes,
+{
+    pub fn from_response(response: Response<ResBody>) -> Self {
         let (parts, body) = response.into_parts();
         CacheableHttpResponse {
             parts,
@@ -36,10 +44,12 @@ impl CacheableHttpResponse {
         }
     }
 
-    pub fn into_response(self) -> Response<Body> {
+    pub fn into_response(self) -> Response<ResBody> {
         match self.body {
             ResponseBody::Pending(body) => Response::from_parts(self.parts, body),
-            ResponseBody::Complete(body) => Response::from_parts(self.parts, body.into()),
+            ResponseBody::Complete(body) => {
+                Response::from_parts(self.parts, ResBody::from_bytes(body))
+            }
         }
     }
 }
@@ -54,7 +64,13 @@ pub struct SerializableHttpResponse {
 }
 
 #[async_trait]
-impl CacheableResponse for CacheableHttpResponse {
+impl<ResBody> CacheableResponse for CacheableHttpResponse<ResBody>
+where
+    ResBody: HttpBody + FromBytes + Send + 'static,
+    // debug bounds
+    ResBody::Error: Debug,
+    ResBody::Data: Send,
+{
     type Cached = SerializableHttpResponse;
 
     async fn into_cached(self) -> Self::Cached {
@@ -79,7 +95,7 @@ impl CacheableResponse for CacheableHttpResponse {
         for (key, value) in cached.headers.into_iter() {
             inner = inner.header(key, value)
         }
-        let body = cached.body.into();
+        let body = ResBody::from_bytes(Bytes::from(cached.body));
         let inner = inner.status(cached.status).body(body).unwrap();
         CacheableHttpResponse::from_response(inner)
     }

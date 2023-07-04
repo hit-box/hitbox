@@ -17,6 +17,7 @@ where
         &self,
         request: CacheableHttpRequest<ReqBody>,
     ) -> PredicateResult<CacheableHttpRequest<ReqBody>> {
+        dbg!("HeaderPredicate::check");
         match self.operation {
             Operation::Eq => match request.parts().headers.get(self.name.as_str()) {
                 Some(header_value) => {

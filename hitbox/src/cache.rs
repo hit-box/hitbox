@@ -90,9 +90,7 @@ pub struct CacheKey {
 
 #[async_trait]
 pub trait CacheableRequest: Sized {
-    async fn cache_policy<P>(self, predicates: &[P]) -> CachePolicy<Self>
-    where
-        P: Predicate<Self> + Send + Sync;
+    async fn cache_policy(self, predicates: &[Box<dyn Predicate<Self>>]) -> CachePolicy<Self>;
 }
 
 // #[cfg(test)]

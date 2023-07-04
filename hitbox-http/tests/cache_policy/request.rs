@@ -16,11 +16,11 @@ async fn test_cache_policy() {
         .body(hyper::Body::empty())
         .unwrap();
     let cacheable = CacheableHttpRequest::from_request(request);
-    let predicates = vec![Header {
+    let predicates: Vec<Box<dyn Predicate<_>>> = vec![Box::new(Header {
         name: "header-key".to_owned(),
         value: "header-value".to_owned(),
         operation: Operation::Eq,
-    }];
+    })];
     let policy = cacheable.cache_policy(&predicates).await;
     assert!(matches!(policy, CachePolicy::Cacheable(_)));
 }
@@ -33,15 +33,16 @@ async fn test_body_cache_policy() {
         .body(hyper::Body::wrap_stream(stream::iter(stream)))
         .unwrap();
     let cacheable = CacheableHttpRequest::from_request(request);
-    let predicates = vec![
-        // Box::new(Header {
-        //     name: "header-key".to_owned(),
-        //     value: "header-value".to_owned(),
-        //     operation: Operation::Eq,
-        // }),
-        Box::new(Body),
-    ];
-    let policy = cacheable.cache_policy(&predicates).await;
+    let policy = cacheable
+        .cache_policy(&[
+            Box::new(Header {
+                name: "header-key".to_owned(),
+                value: "header-value".to_owned(),
+                operation: Operation::Eq,
+            }),
+            Box::new(Body),
+        ])
+        .await;
     match &policy {
         CachePolicy::Cacheable(_) => println!("CachePolicy::Cacheable"),
         CachePolicy::NonCacheable(_) => println!("CachePolicy::NonCacheable"),

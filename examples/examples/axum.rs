@@ -77,7 +77,7 @@ impl CacheBackend for InMemoryBackend {
 }
 
 async fn handler(Path(name): Path<String>) -> Result<String, StatusCode> {
-    println!("++++++++++++++++++++++++++++++++++++++");
+    dbg!("++++++++++++++++++++++++++++++++++++++");
     Ok(format!("Hello, {name}"))
 }
 
@@ -92,7 +92,7 @@ async fn main() {
     // build our application with a single route
     let app = Router::new().route("/:name", get(handler)).layer(
         ServiceBuilder::new()
-            .layer(Cache::builder().backend(backend).build())
+            // .layer(Cache::builder().backend(backend).build())
             .layer(
                 Cache::builder()
                     // .backend(&BACKEND)

@@ -53,10 +53,10 @@ mod tests {
 
         #[async_trait]
         impl CacheableRequest for CacheableReq {
-            async fn cache_policy<P>(self, predicates: &[P]) -> crate::cache::CachePolicy<Self>
-            where
-                P: Predicate<Self> + Send + Sync,
-            {
+            async fn cache_policy(
+                self,
+                predicates: &[Box<dyn Predicate<Self>>],
+            ) -> crate::cache::CachePolicy<Self> {
                 crate::cache::CachePolicy::Cacheable(self)
             }
         }

@@ -1,5 +1,6 @@
 use std::{fmt::Debug, marker::PhantomData, pin::Pin, sync::Arc};
 
+use bytes::Bytes;
 use chrono::{Duration, Utc};
 use futures::{
     future::{BoxFuture, Map},
@@ -11,9 +12,11 @@ use hitbox::{
     Cacheable, CachedValue,
 };
 use hitbox_backend::CacheableResponse;
-use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, SerializableHttpResponse};
+use hitbox_http::{
+    CacheableHttpRequest, CacheableHttpResponse, FromBytes, SerializableHttpResponse,
+};
 use http::{Request, Response};
-use hyper::Body;
+use hyper::body::{Body, HttpBody};
 use serde::{de::DeserializeOwned, Serialize};
 use tower::Service;
 
@@ -46,22 +49,25 @@ where
     }
 }
 
-impl<S, B, ReqBody> Service<Request<ReqBody>> for CacheService<S, B>
+impl<S, B, ReqBody, ResBody> Service<Request<ReqBody>> for CacheService<S, B>
 where
-    S: Service<Request<ReqBody>, Response = Response<Body>> + Clone + Send + 'static,
+    S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
     B: CacheBackend + Clone,
     S::Future: Send,
 
     // debug bounds
-    ReqBody: Debug + hyper::body::HttpBody + Send + 'static,
+    ReqBody: Debug + HttpBody + Send + 'static,
     Body: From<ReqBody>,
+    ResBody: FromBytes + HttpBody + Send + 'static,
+    ResBody::Error: Debug,
+    ResBody::Data: Send,
 {
-    type Response = Response<Body>;
+    type Response = Response<ResBody>;
     type Error = S::Error;
     type Future = CacheFuture<
         B,
         CacheableHttpRequest<ReqBody>,
-        CacheableHttpResponse,
+        CacheableHttpResponse<ResBody>,
         Transformer<S, ReqBody>,
     >;
 

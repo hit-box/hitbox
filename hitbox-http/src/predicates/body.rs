@@ -1,12 +1,11 @@
 use std::fmt::Debug;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use hitbox::predicates::{Predicate, PredicateResult};
 use http::Request;
 use hyper::body::{to_bytes, HttpBody};
 
-use crate::CacheableHttpRequest;
+use crate::{CacheableHttpRequest, FromBytes};
 
 /// Test version of Body predicate.
 /// FIX: Only for testing request's body consuming.
@@ -20,7 +19,7 @@ where
     // debug bounds
     ReqBody::Error: Debug,
     ReqBody::Data: Send,
-    ReqBody: From<Bytes>,
+    ReqBody: FromBytes,
 {
     async fn check(
         &self,
@@ -28,11 +27,13 @@ where
     ) -> PredicateResult<CacheableHttpRequest<ReqBody>> {
         let (parts, body) = request.into_parts();
         let payload = to_bytes(body).await.unwrap();
+        dbg!("BodyPredicate::check");
+        dbg!(&payload);
         if payload.len() <= 4 {
-            let request = Request::from_parts(parts, ReqBody::from(payload));
+            let request = Request::from_parts(parts, ReqBody::from_bytes(payload));
             return PredicateResult::Cacheable(CacheableHttpRequest::from_request(request));
         } else {
-            let request = Request::from_parts(parts, ReqBody::from(payload));
+            let request = Request::from_parts(parts, ReqBody::from_bytes(payload));
             return PredicateResult::NonCacheable(CacheableHttpRequest::from_request(request));
         }
     }

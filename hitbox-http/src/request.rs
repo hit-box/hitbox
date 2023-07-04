@@ -1,5 +1,3 @@
-use std::any::type_name;
-
 use async_trait::async_trait;
 use futures::{stream, StreamExt};
 use hitbox::{
@@ -25,12 +23,7 @@ impl<ReqBody> CacheableHttpRequest<ReqBody> {
     }
 
     pub fn into_request(self) -> Request<ReqBody> {
-        let uri = self.parts.uri.clone();
-        Request::builder()
-            .uri(uri)
-            // .body(Body::wrap_stream(stream))
-            .body(self.body)
-            .unwrap()
+        Request::from_parts(self.parts, self.body)
     }
 
     pub fn parts(&self) -> &Parts {
@@ -45,12 +38,13 @@ impl<ReqBody> CacheableHttpRequest<ReqBody> {
 #[async_trait]
 impl<ReqBody> CacheableRequest for CacheableHttpRequest<ReqBody>
 where
-    ReqBody: Send,
+    ReqBody: Send + 'static,
 {
-    async fn cache_policy<P>(self, predicates: &[P]) -> hitbox::cache::CachePolicy<Self>
-    where
-        P: Predicate<Self> + Send + Sync,
-    {
+    async fn cache_policy(
+        self,
+        predicates: &[Box<dyn Predicate<Self>>],
+    ) -> hitbox::cache::CachePolicy<Self> {
+        dbg!("CacheableHttpRequest::cache_policy");
         let predicate_result = stream::iter(predicates)
             .fold(PredicateResult::NonCacheable(self), PredicateResult::chain)
             .await;
