@@ -8,7 +8,7 @@ use crate::cache::CacheKey;
 
 pub type CacheResult<R> = Result<Option<CachedValue<R>>, BackendError>;
 pub type PollCache<R> = BoxFuture<'static, CacheResult<R>>;
-pub type UpdateCache = BoxFuture<'static, Result<(), BackendError>>;
+pub type UpdateCache<R> = BoxFuture<'static, (Result<(), BackendError>, R)>;
 
 #[allow(missing_docs)]
 #[pin_project(project = StateProj)]
@@ -44,8 +44,7 @@ where
     },
     UpdateCache {
         #[pin]
-        update_cache_future: UpdateCache,
-        upstream_result_future: BoxFuture<'static, C>,
+        update_cache_future: UpdateCache<C>,
     },
     Response {
         response: Option<C>,

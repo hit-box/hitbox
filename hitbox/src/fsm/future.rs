@@ -373,15 +373,15 @@ where
                     let cache_key = "fake::key".to_owned();
                     match policy {
                         CachePolicy::Cacheable(cache_value) => {
-                            let cached_value = cache_value.clone();
                             let update_cache_future = Box::pin(async move {
-                                backend.set::<Res>(cache_key, &cached_value, None).await
+                                let update_cache_result =
+                                    backend.set::<Res>(cache_key, &cache_value, None).await;
+                                let upstream_result =
+                                    Res::from_cached(cache_value.into_inner()).await;
+                                (update_cache_result, upstream_result)
                             });
                             State::UpdateCache {
                                 update_cache_future,
-                                upstream_result_future: Box::pin(Res::from_cached(
-                                    cache_value.into_inner(),
-                                )),
                             }
                         }
                         CachePolicy::NonCacheable(response) => State::Response {
@@ -391,12 +391,11 @@ where
                 }
                 StateProj::UpdateCache {
                     update_cache_future,
-                    upstream_result_future,
                 } => {
-                    ready!(update_cache_future.poll(cx));
-                    let response = ready!(upstream_result_future.as_mut().poll(cx));
+                    // TODO: check backend result
+                    let (backend_result, upstream_result) = ready!(update_cache_future.poll(cx));
                     State::Response {
-                        response: Some(response),
+                        response: Some(upstream_result),
                     }
                 }
                 StateProj::Response { response } => {
