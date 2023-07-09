@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::ops::Deref;
 
 use chrono::{DateTime, Utc};
 use hitbox_core::CachedValue;
@@ -38,7 +39,8 @@ impl<U> SerializableCachedValue<U> {
     }
 }
 
-#[derive(Default)]
+// TODO: remove clone
+#[derive(Default, Clone)]
 pub struct JsonSerializer<Raw = Vec<u8>> {
     _raw: PhantomData<Raw>,
 }
@@ -122,6 +124,33 @@ impl Serializer for BinSerializer<Vec<u8>> {
             expired: value.expired,
         };
         bincode::serialize(&serializable_value)
+            .map_err(|err| SerializerError::Serialize(Box::new(err)))
+    }
+}
+
+impl Serializer for bytes::Bytes {
+    type Raw = bytes::Bytes;
+
+    fn deserialize<T>(data: Self::Raw) -> Result<CachedValue<T>, SerializerError>
+    where
+        T: DeserializeOwned,
+    {
+        let deserialized = bincode::deserialize::<SerializableCachedValue<T>>(data.deref())
+            .map_err(|err| SerializerError::Deserialize(Box::new(err)))?;
+        let cached_value = deserialized.into_cached_value();
+        Ok(CachedValue::new(cached_value.data, cached_value.expired))
+    }
+
+    fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, SerializerError>
+    where
+        T: Serialize,
+    {
+        let serializable_value = SerializableCachedValue {
+            data: &value.data,
+            expired: value.expired,
+        };
+        bincode::serialize(&serializable_value)
+            .map(Into::into)
             .map_err(|err| SerializerError::Serialize(Box::new(err)))
     }
 }

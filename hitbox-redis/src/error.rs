@@ -2,18 +2,14 @@
 //!
 //! [BackendError]: hitbox_backend::BackendError
 use hitbox_backend::BackendError;
-use redis::RedisError;
-
-/// Redis backend error declaration.
-///
-/// Simply, it's just a wrapper for [redis::RedisError].
-///
-/// [redis::RedisError]: redis::RedisError
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// Wrapper for all kinds redis-rs errors.
     #[error("Redis backend error: {0}")]
-    Redis(#[from] RedisError),
+    Redis(#[from] fred::error::RedisError),
+    #[error("Builder error: {0}")]
+    Builder(String),
+    #[error(transparent)]
+    Tokio(#[from] tokio::task::JoinError),
 }
 
 impl From<Error> for BackendError {
