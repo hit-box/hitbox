@@ -117,12 +117,7 @@ async fn main() {
             get(handler_json), // .layer(Cache::builder().backend(inmemory.clone()).build()),
         )
         .layer(
-            ServiceBuilder::new().layer(Cache::builder().backend(backend).build()), // .layer(
-                                                                                    //     Cache::builder()
-                                                                                    //         // .backend(&BACKEND)
-                                                                                    //         .backend(inmemory)
-                                                                                    //         .build(),
-                                                                                    // ),
+            ServiceBuilder::new().layer(Cache::builder().backend(inmemory).build()), // .layer(Cache::builder().backend(backend).build()),
         );
 
     // run it with hyper on localhost:3000
