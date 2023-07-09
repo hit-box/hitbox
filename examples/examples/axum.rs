@@ -54,15 +54,14 @@ impl CacheBackend for InMemoryBackend {
     async fn set<T>(
         &self,
         key: String,
-        value: CachedValue<T::Cached>,
+        value: &CachedValue<T::Cached>,
         ttl: Option<u32>,
     ) -> BackendResult<()>
     where
         T: CacheableResponse + Send,
-        <T as CacheableResponse>::Cached: serde::Serialize + Send,
+        T::Cached: serde::Serialize + Send + Sync,
     {
-        let serialized =
-            JsonSerializer::<Vec<u8>>::serialize(&value).map_err(BackendError::from)?;
+        let serialized = JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
         self.cache.insert(key, serialized, 42).await;
         Ok(())
     }
@@ -117,7 +116,9 @@ async fn main() {
             get(handler_json), // .layer(Cache::builder().backend(inmemory.clone()).build()),
         )
         .layer(
-            ServiceBuilder::new().layer(Cache::builder().backend(inmemory).build()), // .layer(Cache::builder().backend(backend).build()),
+            ServiceBuilder::new()
+                .layer(Cache::builder().backend(inmemory).build())
+                .layer(Cache::builder().backend(backend).build()),
         );
 
     // run it with hyper on localhost:3000

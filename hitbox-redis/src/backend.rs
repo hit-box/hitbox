@@ -132,12 +132,12 @@ impl CacheBackend for RedisBackend {
     async fn set<T>(
         &self,
         key: String,
-        value: CachedValue<T::Cached>,
+        value: &CachedValue<T::Cached>,
         ttl: Option<u32>,
     ) -> BackendResult<()>
     where
         T: CacheableResponse + Send,
-        <T as CacheableResponse>::Cached: serde::Serialize + Send,
+        T::Cached: serde::Serialize + Send + Sync,
     {
         let mut con = self.connection().await?.clone();
         let mut request = redis::cmd("SET");

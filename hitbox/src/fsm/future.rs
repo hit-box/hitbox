@@ -269,7 +269,7 @@ where
     T::Future: Future<Output = Res> + Send + 'static,
     B: CacheBackend + Send + Sync + 'static,
     Res: CacheableResponse,
-    Res::Cached: Serialize + DeserializeOwned + Send,
+    Res::Cached: Serialize + DeserializeOwned + Send + Sync,
     Req: CacheableRequest + Send + 'static,
 
     // Debug bounds
@@ -375,7 +375,7 @@ where
                         CachePolicy::Cacheable(cache_value) => {
                             let cached_value = cache_value.clone();
                             let update_cache_future = Box::pin(async move {
-                                backend.set::<Res>(cache_key, cached_value, None).await
+                                backend.set::<Res>(cache_key, &cached_value, None).await
                             });
                             State::UpdateCache {
                                 update_cache_future,

@@ -13,12 +13,12 @@ pub trait CacheBackend {
     async fn set<T>(
         &self,
         key: String,
-        value: CachedValue<T::Cached>,
+        value: &CachedValue<T::Cached>,
         ttl: Option<u32>,
     ) -> BackendResult<()>
     where
         T: CacheableResponse + Send,
-        <T as CacheableResponse>::Cached: serde::Serialize + Send;
+        T::Cached: serde::Serialize + Send + Sync;
 
     async fn delete(&self, key: String) -> BackendResult<DeleteStatus>;
 
