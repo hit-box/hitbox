@@ -4,7 +4,7 @@ use axum::{
     async_trait,
     extract::{Path, Query},
     routing::get,
-    Router,
+    Json, Router,
 };
 use hitbox_backend::{
     serializer::{JsonSerializer, Serializer},
@@ -76,9 +76,28 @@ impl CacheBackend for InMemoryBackend {
     }
 }
 
-async fn handler(Path(name): Path<String>) -> Result<String, StatusCode> {
-    dbg!("++++++++++++++++++++++++++++++++++++++");
+async fn handler_result(Path(name): Path<String>) -> Result<String, StatusCode> {
+    dbg!("axum::handler_result");
     Ok(format!("Hello, {name}"))
+}
+
+async fn handler() -> String {
+    dbg!("axum::handler");
+    format!("root")
+}
+
+#[derive(serde::Serialize)]
+struct Greet {
+    name: String,
+    answer: u32,
+}
+
+async fn handler_json() -> Json<Greet> {
+    dbg!("axum::handler");
+    Json(Greet {
+        name: "root".to_owned(),
+        answer: 42,
+    })
 }
 
 #[tokio::main]
@@ -90,16 +109,21 @@ async fn main() {
     let backend = RedisBackend::new().unwrap();
     let inmemory = InMemoryBackend::new();
     // build our application with a single route
-    let app = Router::new().route("/:name", get(handler)).layer(
-        ServiceBuilder::new()
-            // .layer(Cache::builder().backend(backend).build())
-            .layer(
-                Cache::builder()
-                    // .backend(&BACKEND)
-                    .backend(inmemory)
-                    .build(),
-            ),
-    );
+    let app = Router::new()
+        .route("/greet/:name/", get(handler_result))
+        .route("/", get(handler))
+        .route(
+            "/json/",
+            get(handler_json), // .layer(Cache::builder().backend(inmemory.clone()).build()),
+        )
+        .layer(
+            ServiceBuilder::new().layer(Cache::builder().backend(backend).build()), // .layer(
+                                                                                    //     Cache::builder()
+                                                                                    //         // .backend(&BACKEND)
+                                                                                    //         .backend(inmemory)
+                                                                                    //         .build(),
+                                                                                    // ),
+        );
 
     // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())

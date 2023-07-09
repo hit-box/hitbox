@@ -52,7 +52,7 @@ where
 impl<S, B, ReqBody, ResBody> Service<Request<ReqBody>> for CacheService<S, B>
 where
     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
-    B: CacheBackend + Clone,
+    B: CacheBackend + Clone + Send + Sync + 'static,
     S::Future: Send,
 
     // debug bounds

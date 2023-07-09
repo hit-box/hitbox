@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use futures::future::BoxFuture;
-use hitbox_backend::{BackendError, CachePolicy, CacheableResponse, CachedValue};
+use hitbox_backend::{BackendError, CachePolicy, CacheState, CacheableResponse, CachedValue};
 use pin_project::pin_project;
 
 use crate::cache::CacheKey;
@@ -12,23 +12,29 @@ pub type UpdateCache = BoxFuture<'static, Result<(), BackendError>>;
 
 #[allow(missing_docs)]
 #[pin_project(project = StateProj)]
-pub enum State<U, C>
+pub enum State<U, C, R>
 where
     C: CacheableResponse,
 {
     Initial,
     CheckRequestCachePolicy {
         #[pin]
-        cache_policy: BoxFuture<'static, crate::cache::CachePolicy<CacheKey>>,
+        cache_policy_future: BoxFuture<'static, crate::cache::CachePolicy<R>>,
     },
     PollCache {
         #[pin]
         poll_cache: PollCache<C::Cached>,
+        request: Option<R>,
     },
-    CachePolled {
-        cache_result: CacheResult<C::Cached>,
+    // CachePolled {
+    //     cache_result: CacheResult<C::Cached>,
+    // },
+    CheckCacheState {
+        cache_state: BoxFuture<'static, CacheState<C>>,
     },
-    PollUpstream,
+    PollUpstream {
+        upstream_future: BoxFuture<'static, C>,
+    },
     UpstreamPolled {
         upstream_result: Option<U>,
     },
@@ -38,15 +44,15 @@ where
     },
     UpdateCache {
         #[pin]
-        update_cache: UpdateCache,
-        upstream_result: Option<C>,
+        update_cache_future: UpdateCache,
+        upstream_result_future: BoxFuture<'static, C>,
     },
     Response {
         response: Option<C>,
     },
 }
 
-impl<U, C> Debug for State<U, C>
+impl<U, C, R> Debug for State<U, C, R>
 where
     C: CacheableResponse,
 {
@@ -55,7 +61,8 @@ where
             State::Initial => f.write_str("State::Initial"),
             State::CheckRequestCachePolicy { .. } => f.write_str("State::CheckRequestCachePolicy"),
             State::PollCache { .. } => f.write_str("State::PollCache"),
-            State::CachePolled { .. } => f.write_str("State::PollCache"),
+            // State::CachePolled { .. } => f.write_str("State::PollCache"),
+            State::CheckCacheState { .. } => f.write_str("State::CheckCacheState"),
             State::CheckResponseCachePolicy { .. } => {
                 f.write_str("State::CheckResponseCachePolicy")
             }

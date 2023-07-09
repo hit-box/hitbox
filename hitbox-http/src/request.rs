@@ -42,11 +42,11 @@ where
 {
     async fn cache_policy(
         self,
-        predicates: &[Box<dyn Predicate<Self>>],
+        predicates: &[Box<dyn Predicate<Self> + Send>],
     ) -> hitbox::cache::CachePolicy<Self> {
         dbg!("CacheableHttpRequest::cache_policy");
         let predicate_result = stream::iter(predicates)
-            .fold(PredicateResult::NonCacheable(self), PredicateResult::chain)
+            .fold(PredicateResult::Cacheable(self), PredicateResult::chain)
             .await;
         match predicate_result {
             PredicateResult::Cacheable(request) => CachePolicy::Cacheable(request),

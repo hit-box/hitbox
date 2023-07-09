@@ -34,9 +34,12 @@ where
 {
     type Cached;
 
-    async fn cache_policy(self, predicates: &[Box<dyn Predicate<Self>>]) -> CachePolicy<Self> {
+    async fn cache_policy(
+        self,
+        predicates: &[Box<dyn Predicate<Self> + Send>],
+    ) -> CachePolicy<Self> {
         let predicates_result = stream::iter(predicates)
-            .fold(PredicateResult::NonCacheable(self), PredicateResult::chain)
+            .fold(PredicateResult::Cacheable(self), PredicateResult::chain)
             .await;
         match predicates_result {
             PredicateResult::Cacheable(res) => {
@@ -49,4 +52,22 @@ where
     async fn into_cached(self) -> Self::Cached;
 
     async fn from_cached(cached: Self::Cached) -> Self;
+}
+
+#[async_trait]
+impl<T, E> CacheableResponse for Result<T, E>
+where
+    T: CacheableResponse + 'static,
+    E: Send + 'static,
+    T::Cached: Send,
+{
+    type Cached = <T as CacheableResponse>::Cached;
+
+    async fn into_cached(self) -> Self::Cached {
+        unimplemented!()
+    }
+
+    async fn from_cached(cached: Self::Cached) -> Self {
+        unimplemented!()
+    }
 }

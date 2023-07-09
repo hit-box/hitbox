@@ -20,9 +20,9 @@ impl<T> CachedValue<T> {
 }
 
 impl<T> CachedValue<T> {
-    pub fn cache_state<C: CacheableResponse<Cached = T>>(self) -> CacheState<C> {
-        CacheState::Actual(C::from_cached(self.into_inner()));
-        unimplemented!()
+    pub async fn cache_state<C: CacheableResponse<Cached = T>>(self) -> CacheState<C> {
+        let origin = C::from_cached(self.data).await;
+        CacheState::Actual(origin)
     }
 }
 
