@@ -1,1 +1,1 @@
-pub use hitbox_backend::predicates::{Predicate, Operation, PredicateResult};
+pub use hitbox_backend::predicates::{Operation, Predicate, PredicateResult};

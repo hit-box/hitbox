@@ -1,18 +1,22 @@
 [package]
-name = "hitbox-examples"
-version = "0.0.0"
-publish = false
+name = "hitbox-stretto"
+version = "0.1.0"
+authors = ["Belousov Max <mail@singulared.space>", "Andrey Ermilov <andrerm@ya.ru>"]
+license = "MIT"
 edition = "2021"
+description = "Hitbox in-memory backend based on Stretto lib."
+readme = "README.md"
+repository = "https://github.com/hit-box/hitbox/"
+categories = ["caching", "asynchronous"]
+keywords = ["cache", "async", "cache-backend", "hitbox", "redis"]
 
-[features]
-default = []
-
-[dev-dependencies]
+[dependencies]
 hitbox = { path = "../hitbox", features = ["metrics"] }
 hitbox-backend = { path = "../hitbox-backend" }
 hitbox-tower = { path = "../hitbox-tower" }
 hitbox-redis = { path = "../hitbox-redis" }
-hitbox-stretto = { path = "../hitbox-stretto" }
+thiserror = "1"
+stretto = { version = "0.8", features = ["async"] }
 actix = "0.13"
 axum = "0.6"
 log = "0.4"
