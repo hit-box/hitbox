@@ -19,8 +19,26 @@ where
 }
 
 #[async_trait]
-pub trait Predicate<S>: Sync {
+pub trait Predicate<S>: Send {
     async fn check(&self, subject: S) -> PredicateResult<S>;
+}
+
+pub struct NeutralPredicate;
+
+impl NeutralPredicate {
+    pub fn new() -> Self {
+        NeutralPredicate
+    }
+}
+
+#[async_trait]
+impl<S> Predicate<S> for NeutralPredicate
+where
+    S: Send + 'static,
+{
+    async fn check(&self, subject: S) -> PredicateResult<S> {
+        PredicateResult::Cacheable(subject)
+    }
 }
 
 #[async_trait]

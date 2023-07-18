@@ -88,11 +88,22 @@ pub struct CacheKey {
     pub prefix: String,
 }
 
+pub struct SelectorPart<T: Sized>(T, String);
+
+#[async_trait]
+pub trait Selector
+where
+    Self: Sized,
+{
+    async fn part(&self, subject: Self) -> SelectorPart<Self>;
+}
+
 #[async_trait]
 pub trait CacheableRequest: Sized {
     async fn cache_policy(
         self,
-        predicates: &[Box<dyn Predicate<Self> + Send>],
+        predicates: Box<dyn Predicate<Self> + Sync>,
+        // key_selectors: impl Selector,
     ) -> CachePolicy<Self>;
 }
 

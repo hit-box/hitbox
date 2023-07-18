@@ -31,9 +31,11 @@ async fn handler_json() -> Json<Greet> {
 
 #[tokio::main]
 async fn main() {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
-        .init();
+    let subscriber = tracing_subscriber::fmt()
+        .pretty()
+        .with_env_filter("debug,hitbox=trace")
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let backend = RedisBackend::new().unwrap();
     let inmemory = hitbox_stretto::StrettoBackendBuilder::new(12960, 1e6 as i64)
