@@ -81,17 +81,13 @@ impl CacheBackend for TarantoolBackend {
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
         let client = self.client.clone();
-
-        // TODO
         let response = client
-            .prepare_fn_call("test")
-            .bind_ref(&("aa", "aa"))
-            .unwrap()
-            .bind(1)
-            .unwrap()
+            .prepare_fn_call("box.space.hitbox_cache:get")
+            .bind_ref(&(key))
+            .map_err(|err| BackendError::InternalError(Box::new(err)))?
             .execute()
             .await
-            .unwrap();
+            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
         response
             .decode::<String>()
             .map(|value| {
@@ -105,7 +101,20 @@ impl CacheBackend for TarantoolBackend {
     }
 
     async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
-        todo!()
+        let client = self.client.clone();
+        let response = client
+            .prepare_fn_call("box.space.hitbox_cache:delete")
+            .bind_ref(&(key))
+            .map_err(|err| BackendError::InternalError(Box::new(err)))?
+            .execute()
+            .await
+            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
+        let result = response
+            .decode::<(String, Option<u32>, String)>()
+            .map(|_| Some(DeleteStatus::Deleted(1)))
+            .map_err(|err| BackendError::InternalError(Box::new(err)))?
+            .unwrap_or(DeleteStatus::Missing);
+        Ok(result)
     }
 
     async fn set<T>(
@@ -118,10 +127,54 @@ impl CacheBackend for TarantoolBackend {
         T: CacheableResponse + Send,
         <T as CacheableResponse>::Cached: serde::Serialize + Send,
     {
-        todo!()
+        let client = self.client.clone();
+        let serialized_value =
+            JsonSerializer::<Vec<u8>>::serialize(&value).map_err(BackendError::from)?;
+        client
+            .prepare_fn_call("box.space.hitbox_cache:replace")
+            .bind_ref(&(key, ttl, serialized_value))
+            .map_err(|err| BackendError::InternalError(Box::new(err)))?
+            .execute()
+            .await
+            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
+        Ok(())
     }
 
     async fn start(&self) -> BackendResult<()> {
+        let client = self.client.clone();
+        client
+            .eval(
+                "
+                    box.schema.space.create('hitbox_cache', { if_not_exists = true })
+                    box.space.hitbox_cache:create_index('primary', { if_not_exists = true })
+
+                    if not _G.__hitbox_cache_fiber then
+                        _G.__hitbox_cache_fiber = require('fiber').create(local function()
+                            local fiber = require('fiber')
+                            fiber.name('hitbox_cache_fiber')
+                            while true do
+                                local ok, res = pcall(function()
+                                    for _, t in box.space.hitbox_cache:pairs() do
+                                        if t[2] <= fiber.time() then
+                                            box.space.hitbox_cache:delete(t[1])
+                                        end
+                                    end
+                                end)
+
+                                if not ok then
+                                    require('log').error(err)
+                                end
+
+                                fiber.testcancel()
+                                fiber.sleep(1)
+                            end
+                        end)
+                    end
+                ",
+                &(),
+            )
+            .await
+            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
         Ok(())
     }
 }
