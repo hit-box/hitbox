@@ -11,20 +11,20 @@ pub enum QsValue {
     Array(Vec<String>),
 }
 
-pub struct Query<P: ?Sized> {
+pub struct Query<P> {
     pub name: String,
     pub value: QsValue,
     pub operation: Operation,
     inner: P,
 }
 
-pub trait QueryPredicate<T> {
+pub trait QueryPredicate: Sized {
     fn query(self, name: String, value: String) -> Query<Self>;
 }
 
-impl<P, T> QueryPredicate<T> for P
+impl<P> QueryPredicate for P
 where
-    P: Predicate<T>,
+    P: Predicate,
 {
     fn query(self, name: String, value: String) -> Query<P> {
         Query {
@@ -41,15 +41,14 @@ fn parse_query(value: &str) -> HashMap<String, QsValue> {
 }
 
 #[async_trait]
-impl<ReqBody, P> Predicate<CacheableHttpRequest<ReqBody>> for Query<P>
+impl<ReqBody, P> Predicate for Query<P>
 where
-    P: Predicate<CacheableHttpRequest<ReqBody>> + Send + Sync,
+    P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
     ReqBody: Send + 'static,
 {
-    async fn check(
-        &self,
-        request: CacheableHttpRequest<ReqBody>,
-    ) -> PredicateResult<CacheableHttpRequest<ReqBody>> {
+    type Subject = P::Subject;
+
+    async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
                 let op = match self.operation {

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 
 pub enum PredicateResult<S> {
@@ -5,49 +7,47 @@ pub enum PredicateResult<S> {
     NonCacheable(S),
 }
 
-impl<S> PredicateResult<S>
+// impl<S> PredicateResult<S>
+// where
+//     S: Send + 'static,
+// {
+//     pub async fn chain<P: Predicate + ?Sized>(self, predicate: &Box<P>) -> PredicateResult<S> {
+//         dbg!("PredicateResult::chain");
+//         match self {
+//             PredicateResult::NonCacheable(subject) => predicate.check(subject).await,
+//             PredicateResult::Cacheable(subject) => PredicateResult::Cacheable(subject),
+//         }
+//     }
+// }
+
+#[async_trait]
+pub trait Predicate {
+    type Subject;
+    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject>;
+}
+
+#[async_trait]
+impl<T> Predicate for Box<T>
 where
-    S: Send + 'static,
+    T: Predicate + ?Sized + Sync,
+    T::Subject: Send,
 {
-    pub async fn chain<P: Predicate<S> + ?Sized>(self, predicate: &Box<P>) -> PredicateResult<S> {
-        dbg!("PredicateResult::chain");
-        match self {
-            PredicateResult::NonCacheable(subject) => predicate.check(subject).await,
-            PredicateResult::Cacheable(subject) => PredicateResult::Cacheable(subject),
-        }
+    type Subject = T::Subject;
+
+    async fn check(&self, subject: T::Subject) -> PredicateResult<T::Subject> {
+        self.as_ref().check(subject).await
     }
 }
 
 #[async_trait]
-pub trait Predicate<S>: Send {
-    async fn check(&self, subject: S) -> PredicateResult<S>;
-}
-
-pub struct NeutralPredicate;
-
-impl NeutralPredicate {
-    pub fn new() -> Self {
-        NeutralPredicate
-    }
-}
-
-#[async_trait]
-impl<S> Predicate<S> for NeutralPredicate
+impl<T> Predicate for Arc<T>
 where
-    S: Send + 'static,
+    T: Predicate + Send + Sync + ?Sized,
+    T::Subject: Send,
 {
-    async fn check(&self, subject: S) -> PredicateResult<S> {
-        PredicateResult::Cacheable(subject)
-    }
-}
+    type Subject = T::Subject;
 
-#[async_trait]
-impl<S, T> Predicate<S> for Box<T>
-where
-    T: Predicate<S> + Sync,
-    S: Send + 'static,
-{
-    async fn check(&self, subject: S) -> PredicateResult<S> {
+    async fn check(&self, subject: T::Subject) -> PredicateResult<T::Subject> {
         self.as_ref().check(subject).await
     }
 }

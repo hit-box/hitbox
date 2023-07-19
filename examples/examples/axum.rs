@@ -51,7 +51,7 @@ async fn main() {
         )
         .layer(
             ServiceBuilder::new()
-                .layer(Cache::builder().backend(inmemory).build())
+                // .layer(Cache::builder().backend(inmemory).build())
                 .layer(Cache::builder().backend(backend).build()),
         );
 

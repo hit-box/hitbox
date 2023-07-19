@@ -12,6 +12,12 @@ async fn handle(_: Request<Body>) -> Result<Response<Body>, Infallible> {
 
 #[tokio::main]
 async fn main() {
+    let subscriber = tracing_subscriber::fmt()
+        .pretty()
+        .with_env_filter("debug,hitbox=trace")
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     let inmemory = StrettoBackendBuilder::new(12960, 1e6 as i64)
         .finalize()
         .unwrap();

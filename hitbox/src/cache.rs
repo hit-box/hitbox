@@ -77,6 +77,7 @@ pub trait Cacheable {
     }
 }
 
+#[derive(Debug)]
 pub enum CachePolicy<T> {
     Cacheable(T),
     NonCacheable(T),
@@ -99,12 +100,17 @@ where
 }
 
 #[async_trait]
-pub trait CacheableRequest: Sized {
-    async fn cache_policy(
+pub trait CacheableRequest
+where
+    Self: Sized,
+{
+    async fn cache_policy<P>(
         self,
-        predicates: Box<dyn Predicate<Self> + Sync>,
+        predicates: P,
         // key_selectors: impl Selector,
-    ) -> CachePolicy<Self>;
+    ) -> CachePolicy<Self>
+    where
+        P: Predicate<Subject = Self> + Send + Sync;
 }
 
 // #[cfg(test)]

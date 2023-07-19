@@ -240,8 +240,8 @@ where
     state: State<<T::Future as Future>::Output, Res, Req>,
     #[pin]
     poll_cache: Option<PollCache<Res>>,
-    request_predicates: Arc<Vec<Box<dyn Predicate<Req> + Send>>>,
-    response_predicates: Arc<Vec<Box<dyn Predicate<Res> + Send>>>,
+    request_predicates: Arc<dyn Predicate<Subject = Req> + Send + Sync>,
+    response_predicates: Arc<dyn Predicate<Subject = Res> + Send + Sync>,
 }
 
 impl<B, Req, Res, T> CacheFuture<B, Req, Res, T>
@@ -252,15 +252,21 @@ where
     Res: CacheableResponse,
     Req: CacheableRequest,
 {
-    pub fn new(backend: Arc<B>, request: Req, transformer: T) -> Self {
+    pub fn new(
+        backend: Arc<B>,
+        request: Req,
+        transformer: T,
+        request_predicates: Arc<dyn Predicate<Subject = Req> + Send + Sync>,
+        response_predicates: Arc<dyn Predicate<Subject = Res> + Send + Sync>,
+    ) -> Self {
         CacheFuture {
             transformer,
             backend,
             request: Some(request),
             state: State::Initial,
             poll_cache: None,
-            request_predicates: Arc::new(Vec::new()),
-            response_predicates: Arc::new(Vec::new()),
+            request_predicates,
+            response_predicates,
         }
     }
 }
@@ -275,6 +281,7 @@ where
     Req: CacheableRequest + Send + 'static,
 
     // Debug bounds
+    Req: Debug,
     Res::Cached: Debug,
 {
     type Output = T::Response;
@@ -282,129 +289,127 @@ where
     #[instrument(skip(self, cx), fields(state = ?self.state, request = type_name::<T::Response>(), backend = type_name::<B>()))]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
-        trace!("test trace");
-        unimplemented!();
 
-        // loop {
-        //     let state = match this.state.as_mut().project() {
-        //         StateProj::Initial => {
-        //             let request = this.request.take().expect(POLL_AFTER_READY_ERROR);
-        //             let predicates = this.request_predicates.clone();
-        //             let cache_policy_future =
-        //                 Box::pin(async move { request.cache_policy(predicates.as_slice()).await });
-        //             State::CheckRequestCachePolicy {
-        //                 cache_policy_future,
-        //             }
-        //         }
-        //         StateProj::CheckRequestCachePolicy {
-        //             cache_policy_future,
-        //         } => {
-        //             let policy = ready!(cache_policy_future.poll(cx));
-        //             match policy {
-        //                 crate::cache::CachePolicy::Cacheable(request) => {
-        //                     let backend = this.backend.clone();
-        //                     let cache_key = "fake::key".to_owned();
-        //                     let poll_cache =
-        //                         Box::pin(async move { backend.get::<Res>(cache_key).await });
-        //                     State::PollCache {
-        //                         poll_cache,
-        //                         request: Some(request),
-        //                     }
-        //                 }
-        //                 crate::cache::CachePolicy::NonCacheable(request) => {
-        //                     let upstream_future =
-        //                         Box::pin(this.transformer.upstream_transform(request));
-        //                     State::PollUpstream { upstream_future }
-        //                 }
-        //             }
-        //         }
-        //         StateProj::PollCache {
-        //             poll_cache,
-        //             request,
-        //         } => {
-        //             let cached = ready!(poll_cache.poll(cx)).unwrap_or_else(|err| {
-        //                 println!("cache backend error: {err}");
-        //                 None
-        //             });
-        //             match cached {
-        //                 Some(cached_value) => State::CheckCacheState {
-        //                     cache_state: Box::pin(cached_value.cache_state()),
-        //                 },
-        //                 None => {
-        //                     let upstream_future =
-        //                         Box::pin(this.transformer.upstream_transform(
-        //                             request.take().expect(POLL_AFTER_READY_ERROR),
-        //                         ));
-        //                     State::PollUpstream { upstream_future }
-        //                 }
-        //             }
-        //         }
-        //         StateProj::CheckCacheState { cache_state } => {
-        //             let state = ready!(cache_state.as_mut().poll(cx));
-        //             match state {
-        //                 CacheState::Actual(response) => State::Response {
-        //                     response: Some(response),
-        //                 },
-        //                 CacheState::Stale(response) => State::Response {
-        //                     response: Some(response),
-        //                 },
-        //             }
-        //         }
-        //         StateProj::PollUpstream { upstream_future } => {
-        //             let res = ready!(upstream_future.as_mut().poll(cx));
-        //             State::UpstreamPolled {
-        //                 upstream_result: Some(res),
-        //             }
-        //         }
-        //         StateProj::UpstreamPolled { upstream_result } => {
-        //             let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
-        //             let predicates = this.response_predicates.clone();
-        //             let cache_policy = Box::pin(async move {
-        //                 upstream_result.cache_policy(predicates.as_slice()).await
-        //             });
-        //             State::CheckResponseCachePolicy { cache_policy }
-        //             // return Poll::Ready(this.transformer.response_transform(upstream_result));
-        //         }
-        //         StateProj::CheckResponseCachePolicy { cache_policy } => {
-        //             let policy = ready!(cache_policy.poll(cx));
-        //             let backend = this.backend.clone();
-        //             let cache_key = "fake::key".to_owned();
-        //             match policy {
-        //                 CachePolicy::Cacheable(cache_value) => {
-        //                     let update_cache_future = Box::pin(async move {
-        //                         let update_cache_result =
-        //                             backend.set::<Res>(cache_key, &cache_value, None).await;
-        //                         let upstream_result =
-        //                             Res::from_cached(cache_value.into_inner()).await;
-        //                         (update_cache_result, upstream_result)
-        //                     });
-        //                     State::UpdateCache {
-        //                         update_cache_future,
-        //                     }
-        //                 }
-        //                 CachePolicy::NonCacheable(response) => State::Response {
-        //                     response: Some(response),
-        //                 },
-        //             }
-        //         }
-        //         StateProj::UpdateCache {
-        //             update_cache_future,
-        //         } => {
-        //             // TODO: check backend result
-        //             let (backend_result, upstream_result) = ready!(update_cache_future.poll(cx));
-        //             State::Response {
-        //                 response: Some(upstream_result),
-        //             }
-        //         }
-        //         StateProj::Response { response } => {
-        //             let response = this
-        //                 .transformer
-        //                 .response_transform(response.take().expect(POLL_AFTER_READY_ERROR));
-        //             return Poll::Ready(response);
-        //         }
-        //     };
-        //     this.state.set(state);
-        // }
+        loop {
+            let state = match this.state.as_mut().project() {
+                StateProj::Initial => {
+                    let request = this.request.take().expect(POLL_AFTER_READY_ERROR);
+                    let predicates = this.request_predicates.clone();
+                    let cache_policy_future =
+                        Box::pin(async move { request.cache_policy(predicates).await });
+                    State::CheckRequestCachePolicy {
+                        cache_policy_future,
+                    }
+                }
+                StateProj::CheckRequestCachePolicy {
+                    cache_policy_future,
+                } => {
+                    let policy = ready!(cache_policy_future.poll(cx));
+                    trace!("{policy:?}");
+                    match policy {
+                        crate::cache::CachePolicy::Cacheable(request) => {
+                            let backend = this.backend.clone();
+                            let cache_key = "fake::key".to_owned();
+                            let poll_cache =
+                                Box::pin(async move { backend.get::<Res>(cache_key).await });
+                            State::PollCache {
+                                poll_cache,
+                                request: Some(request),
+                            }
+                        }
+                        crate::cache::CachePolicy::NonCacheable(request) => {
+                            let upstream_future =
+                                Box::pin(this.transformer.upstream_transform(request));
+                            State::PollUpstream { upstream_future }
+                        }
+                    }
+                }
+                StateProj::PollCache {
+                    poll_cache,
+                    request,
+                } => {
+                    let cached = ready!(poll_cache.poll(cx)).unwrap_or_else(|err| {
+                        println!("cache backend error: {err}");
+                        None
+                    });
+                    match cached {
+                        Some(cached_value) => State::CheckCacheState {
+                            cache_state: Box::pin(cached_value.cache_state()),
+                        },
+                        None => {
+                            let upstream_future =
+                                Box::pin(this.transformer.upstream_transform(
+                                    request.take().expect(POLL_AFTER_READY_ERROR),
+                                ));
+                            State::PollUpstream { upstream_future }
+                        }
+                    }
+                }
+                StateProj::CheckCacheState { cache_state } => {
+                    let state = ready!(cache_state.as_mut().poll(cx));
+                    match state {
+                        CacheState::Actual(response) => State::Response {
+                            response: Some(response),
+                        },
+                        CacheState::Stale(response) => State::Response {
+                            response: Some(response),
+                        },
+                    }
+                }
+                StateProj::PollUpstream { upstream_future } => {
+                    let res = ready!(upstream_future.as_mut().poll(cx));
+                    State::UpstreamPolled {
+                        upstream_result: Some(res),
+                    }
+                }
+                StateProj::UpstreamPolled { upstream_result } => {
+                    let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
+                    let predicates = this.response_predicates.clone();
+                    let cache_policy =
+                        Box::pin(async move { upstream_result.cache_policy(predicates).await });
+                    State::CheckResponseCachePolicy { cache_policy }
+                    // return Poll::Ready(this.transformer.response_transform(upstream_result));
+                }
+                StateProj::CheckResponseCachePolicy { cache_policy } => {
+                    let policy = ready!(cache_policy.poll(cx));
+                    let backend = this.backend.clone();
+                    let cache_key = "fake::key".to_owned();
+                    match policy {
+                        CachePolicy::Cacheable(cache_value) => {
+                            let update_cache_future = Box::pin(async move {
+                                let update_cache_result =
+                                    backend.set::<Res>(cache_key, &cache_value, None).await;
+                                let upstream_result =
+                                    Res::from_cached(cache_value.into_inner()).await;
+                                (update_cache_result, upstream_result)
+                            });
+                            State::UpdateCache {
+                                update_cache_future,
+                            }
+                        }
+                        CachePolicy::NonCacheable(response) => State::Response {
+                            response: Some(response),
+                        },
+                    }
+                }
+                StateProj::UpdateCache {
+                    update_cache_future,
+                } => {
+                    // TODO: check backend result
+                    let (backend_result, upstream_result) = ready!(update_cache_future.poll(cx));
+                    State::Response {
+                        response: Some(upstream_result),
+                    }
+                }
+                StateProj::Response { response } => {
+                    let response = this
+                        .transformer
+                        .response_transform(response.take().expect(POLL_AFTER_READY_ERROR));
+                    return Poll::Ready(response);
+                }
+            };
+            this.state.set(state);
+        }
     }
 }
 

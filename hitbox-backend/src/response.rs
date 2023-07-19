@@ -34,17 +34,16 @@ where
 {
     type Cached;
 
-    async fn cache_policy(self, predicates: impl Predicate<Self> + Send) -> CachePolicy<Self> {
-        unimplemented!();
-        // let predicates_result = stream::iter(predicates)
-        //     .fold(PredicateResult::Cacheable(self), PredicateResult::chain)
-        //     .await;
-        // match predicates_result {
-        //     PredicateResult::Cacheable(res) => {
-        //         CachePolicy::Cacheable(CachedValue::new(res.into_cached().await, Utc::now()))
-        //     }
-        //     PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
-        // }
+    async fn cache_policy<P>(self, predicates: P) -> CachePolicy<Self>
+    where
+        P: Predicate<Subject = Self> + Send + Sync,
+    {
+        match predicates.check(self).await {
+            PredicateResult::Cacheable(res) => {
+                CachePolicy::Cacheable(CachedValue::new(res.into_cached().await, Utc::now()))
+            }
+            PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
+        }
     }
 
     async fn into_cached(self) -> Self::Cached;

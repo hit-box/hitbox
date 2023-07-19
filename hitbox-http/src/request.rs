@@ -41,19 +41,11 @@ impl<ReqBody> CacheableRequest for CacheableHttpRequest<ReqBody>
 where
     ReqBody: Send + 'static,
 {
-    async fn cache_policy(
-        self,
-        // key_selectors: impl Selector,
-        predicates: Box<dyn Predicate<Self> + Sync>,
-    ) -> hitbox::cache::CachePolicy<Self> {
+    async fn cache_policy<P>(self, predicates: P) -> hitbox::cache::CachePolicy<Self>
+    where
+        P: Predicate<Subject = Self> + Send + Sync,
+    {
         dbg!("CacheableHttpRequest::cache_policy");
-        // let predicate_result = stream::iter(predicates)
-        //     .fold(PredicateResult::Cacheable(self), PredicateResult::chain)
-        //     .await;
-        // match predicate_result {
-        //     PredicateResult::Cacheable(request) => CachePolicy::Cacheable(request),
-        //     PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),
-        // }
         match predicates.check(self).await {
             PredicateResult::Cacheable(request) => CachePolicy::Cacheable(request),
             PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),

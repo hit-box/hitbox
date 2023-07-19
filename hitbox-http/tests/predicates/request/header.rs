@@ -1,5 +1,6 @@
 use hitbox::predicates::{Operation, Predicate};
-use hitbox_http::predicates::header::Header;
+use hitbox_http::predicates::header::HeaderPredicate;
+use hitbox_http::predicates::NeutralPredicate;
 use hitbox_http::CacheableHttpRequest;
 use http::Request;
 use hyper::Body;
@@ -11,11 +12,7 @@ async fn test_request_header_predicates_positive() {
         .body(Body::empty())
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
-    let predicate = Header {
-        name: "x-test".to_owned(),
-        value: "test-value".to_owned(),
-        operation: Operation::Eq,
-    };
+    let predicate = NeutralPredicate::new().header("x-test".to_owned(), "test-value".to_owned());
     let prediction = predicate.check(request).await;
     assert!(matches!(
         prediction,
@@ -30,11 +27,7 @@ async fn test_request_header_predicates_negative_by_key() {
         .body(Body::empty())
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
-    let predicate = Header {
-        name: "missing".to_owned(),
-        value: "test-value".to_owned(),
-        operation: Operation::Eq,
-    };
+    let predicate = NeutralPredicate::new().header("missing".to_owned(), "test-value".to_owned());
     let prediction = predicate.check(request).await;
     assert!(matches!(
         prediction,
@@ -49,11 +42,7 @@ async fn test_request_header_predicates_negative_by_value() {
         .body(Body::empty())
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
-    let predicate = Header {
-        name: "x-test".to_owned(),
-        value: "missing".to_owned(),
-        operation: Operation::Eq,
-    };
+    let predicate = NeutralPredicate::new().header("x-test".to_owned(), "missing".to_owned());
     let prediction = predicate.check(request).await;
     assert!(matches!(
         prediction,

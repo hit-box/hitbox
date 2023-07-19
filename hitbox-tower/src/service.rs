@@ -13,6 +13,7 @@ use hitbox::{
 };
 use hitbox_backend::CacheableResponse;
 use hitbox_http::{
+    predicates::{query::QueryPredicate, NeutralPredicate, NeutralResponsePredicate},
     CacheableHttpRequest, CacheableHttpResponse, FromBytes, SerializableHttpResponse,
 };
 use http::{Request, Response};
@@ -86,6 +87,8 @@ where
             self.backend.clone(),
             CacheableHttpRequest::from_request(req),
             transformer,
+            Arc::new(NeutralPredicate::new().query("cache".to_owned(), "true".to_owned())),
+            Arc::new(NeutralResponsePredicate::new()),
         )
     }
 }

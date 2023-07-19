@@ -10,19 +10,13 @@ pub struct Path<P> {
     inner: P,
 }
 
-// impl<P, ReqBody> Path<P, ReqBody> {
-//     pub fn new(value: String) -> Self {
-//         Self(ResourceDef::new(value))
-//     }
-// }
-
-pub trait PathPredicate<ReqBody>: Sized {
+pub trait PathPredicate: Sized {
     fn path(self, resource: ResourceDef) -> Path<Self>;
 }
 
-impl<P, ReqBody> PathPredicate<ReqBody> for P
+impl<P> PathPredicate for P
 where
-    P: Predicate<CacheableHttpRequest<ReqBody>>,
+    P: Predicate,
 {
     fn path(self, resource: ResourceDef) -> Path<Self> {
         Path {
@@ -33,23 +27,25 @@ where
 }
 
 #[async_trait]
-impl<P, ReqBody> Predicate<CacheableHttpRequest<ReqBody>> for Path<P>
+impl<P, ReqBody> Predicate for Path<P>
 where
-    P: Predicate<CacheableHttpRequest<ReqBody>> + Sync,
+    P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
     ReqBody: Send + 'static,
 {
-    async fn check(
-        &self,
-        request: CacheableHttpRequest<ReqBody>,
-    ) -> PredicateResult<CacheableHttpRequest<ReqBody>> {
+    type Subject = P::Subject;
+
+    async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
         match self.inner.check(request).await {
-            PredicateResult::Cacheable(request) => {
-                if self.resource.is_match(request.parts().uri.path()) {
-                    PredicateResult::Cacheable(request)
-                } else {
-                    PredicateResult::NonCacheable(request)
+            PredicateResult::Cacheable(request) => match self.inner.check(request).await {
+                PredicateResult::Cacheable(request) => {
+                    if self.resource.is_match(request.parts().uri.path()) {
+                        PredicateResult::Cacheable(request)
+                    } else {
+                        PredicateResult::NonCacheable(request)
+                    }
                 }
-            }
+                PredicateResult::NonCacheable(request) => PredicateResult::NonCacheable(request),
+            },
             PredicateResult::NonCacheable(request) => PredicateResult::NonCacheable(request),
         }
     }

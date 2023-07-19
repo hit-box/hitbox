@@ -13,13 +13,13 @@ pub struct Body<P> {
     inner: P,
 }
 
-pub trait BodyPredicate<ReqBody>: Sized {
+pub trait BodyPredicate: Sized {
     fn body(self) -> Body<Self>;
 }
 
-impl<P, ReqBody> BodyPredicate<ReqBody> for P
+impl<P> BodyPredicate for P
 where
-    P: Predicate<CacheableHttpRequest<ReqBody>>,
+    P: Predicate,
 {
     fn body(self) -> Body<Self> {
         Body { inner: self }
@@ -27,20 +27,19 @@ where
 }
 
 #[async_trait]
-impl<P, ReqBody> Predicate<CacheableHttpRequest<ReqBody>> for Body<P>
+impl<P, ReqBody> Predicate for Body<P>
 where
     ReqBody: HttpBody + Send + 'static,
-    P: Predicate<CacheableHttpRequest<ReqBody>> + Send + Sync,
+    P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
 
     // debug bounds
     ReqBody::Error: Debug,
     ReqBody::Data: Send,
     ReqBody: FromBytes,
 {
-    async fn check(
-        &self,
-        request: CacheableHttpRequest<ReqBody>,
-    ) -> PredicateResult<CacheableHttpRequest<ReqBody>> {
+    type Subject = P::Subject;
+
+    async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
                 let (parts, body) = request.into_parts();

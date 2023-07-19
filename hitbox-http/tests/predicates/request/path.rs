@@ -1,5 +1,6 @@
 use hitbox::predicates::{Operation, Predicate};
-use hitbox_http::predicates::path::Path;
+use hitbox_http::predicates::path::PathPredicate;
+use hitbox_http::predicates::NeutralPredicate;
 use hitbox_http::CacheableHttpRequest;
 use http::Request;
 use hyper::Body;
@@ -11,7 +12,7 @@ async fn test_request_path_predicates_full_match() {
     let request = CacheableHttpRequest::from_request(
         Request::builder().uri(path).body(Body::empty()).unwrap(),
     );
-    let predicate = Path::new(expression.to_string());
+    let predicate = NeutralPredicate::new().path(expression.into());
     let prediction = predicate.check(request).await;
     assert!(matches!(
         prediction,
@@ -26,7 +27,7 @@ async fn test_request_path_predicates_use_expression() {
     let request = CacheableHttpRequest::from_request(
         Request::builder().uri(path).body(Body::empty()).unwrap(),
     );
-    let predicate = Path::new(expression.to_string());
+    let predicate = NeutralPredicate::new().path(expression.into());
     let prediction = predicate.check(request).await;
     assert!(matches!(
         prediction,
@@ -41,7 +42,7 @@ async fn test_request_path_predicates_non_match() {
     let request = CacheableHttpRequest::from_request(
         Request::builder().uri(path).body(Body::empty()).unwrap(),
     );
-    let predicate = Path::new(expression.to_string());
+    let predicate = NeutralPredicate::new().path(expression.into());
     let prediction = predicate.check(request).await;
     assert!(matches!(
         prediction,

@@ -1,5 +1,6 @@
 use hitbox::predicates::{Operation, Predicate};
-use hitbox_http::predicates::query::{QsValue, Query};
+use hitbox_http::predicates::query::{QsValue, QueryPredicate};
+use hitbox_http::predicates::NeutralPredicate;
 use hitbox_http::CacheableHttpRequest;
 use http::Request;
 use hyper::Body;
@@ -10,11 +11,7 @@ async fn test_request_query_predicates_positive() {
     let request = CacheableHttpRequest::from_request(
         Request::builder().uri(path).body(Body::empty()).unwrap(),
     );
-    let predicate = Query {
-        name: String::from("name"),
-        value: QsValue::Scalar(String::from("value")),
-        operation: Operation::Eq,
-    };
+    let predicate = NeutralPredicate::new().query("name".to_owned(), "value".to_owned());
     let prediction = predicate.check(request).await;
     assert!(matches!(
         prediction,
@@ -28,11 +25,7 @@ async fn test_request_query_predicates_multiple() {
     let request = CacheableHttpRequest::from_request(
         Request::builder().uri(path).body(Body::empty()).unwrap(),
     );
-    let predicate = Query {
-        name: String::from("name"),
-        value: QsValue::Scalar(String::from("value")),
-        operation: Operation::Eq,
-    };
+    let predicate = NeutralPredicate::new().query("name".to_owned(), "value".to_owned());
     let prediction = predicate.check(request).await;
     assert!(matches!(
         prediction,
@@ -46,11 +39,7 @@ async fn test_request_query_predicates_negative() {
     let request = CacheableHttpRequest::from_request(
         Request::builder().uri(path).body(Body::empty()).unwrap(),
     );
-    let predicate = Query {
-        name: String::from("name"),
-        value: QsValue::Scalar(String::from("value")),
-        operation: Operation::Eq,
-    };
+    let predicate = NeutralPredicate::new().query("name".to_owned(), "value".to_owned());
     let prediction = predicate.check(request).await;
     assert!(matches!(
         prediction,
