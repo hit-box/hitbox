@@ -7,4 +7,4 @@
 - [ ] Logs
 - [ ] Remove unwraps
 - [ ] Add readme
-- [ ] Remove TODO
+- [ ] Remove TODO (or move it into issue)
