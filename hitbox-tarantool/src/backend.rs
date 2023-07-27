@@ -145,18 +145,19 @@ impl CacheBackend for TarantoolBackend {
         client
             .eval(
                 "
-                    box.schema.space.create('hitbox_cache', { if_not_exists = true })
-                    box.space.hitbox_cache:create_index('primary', { if_not_exists = true })
+                    local space_name = ...
+                    box.schema.space.create(space_name, { if_not_exists = true })
+                    box.space[space_name]:create_index('primary', { if_not_exists = true })
 
                     if not _G.__hitbox_cache_fiber then
-                        _G.__hitbox_cache_fiber = require('fiber').create(local function()
+                        _G.__hitbox_cache_fiber = require('fiber').create(function()
                             local fiber = require('fiber')
                             fiber.name('hitbox_cache_fiber')
                             while true do
                                 local ok, res = pcall(function()
-                                    for _, t in box.space.hitbox_cache:pairs() do
+                                    for _, t in box.space[space_name]:pairs() do
                                         if t[2] <= fiber.time() then
-                                            box.space.hitbox_cache:delete(t[1])
+                                            box.space[space_name]:delete(t[1])
                                         end
                                     end
                                 end)
@@ -166,12 +167,12 @@ impl CacheBackend for TarantoolBackend {
                                 end
 
                                 fiber.testcancel()
-                                fiber.sleep(1)
+                                fiber.sleep(10)
                             end
                         end)
                     end
                 ",
-                &(),
+                &("hitbox_cache".to_string(),),
             )
             .await
             .map_err(|err| BackendError::InternalError(Box::new(err)))?;
