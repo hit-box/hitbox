@@ -19,3 +19,12 @@ hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
 async-trait = "0.1"
 serde = "1"
 rusty_tarantool = "0.3.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = [
+    "time",
+    "macros",
+    "test-util",
+    "rt-multi-thread",
+] }
+testcontainers = "0.14"
