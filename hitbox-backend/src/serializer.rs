@@ -108,6 +108,40 @@ impl Serializer for JsonSerializer<String> {
     }
 }
 
+#[derive(Default)]
+pub struct BinSerializer<Raw = Vec<u8>> {
+    _raw: PhantomData<Raw>,
+}
+
+impl Serializer for BinSerializer<Vec<u8>> {
+    type Raw = Vec<u8>;
+
+    fn deserialize<T>(data: Self::Raw) -> Result<CachedValue<T>, SerializerError>
+    where
+        T: DeserializeOwned,
+    {
+        let deserialized: SerializableCachedValue<T> = bincode::deserialize(&data)
+            .map_err(|err| SerializerError::Deserialize(Box::new(err)))?;
+        let cached_value = deserialized.into_cached_value();
+        Ok(CachedValue::new(
+            cached_value.data.into(),
+            cached_value.expired,
+        ))
+    }
+
+    fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, SerializerError>
+    where
+        T: Serialize,
+    {
+        let serializable_value: SerializableCachedValue<&T> = SerializableCachedValue {
+            data: &value.data,
+            expired: value.expired,
+        };
+        Ok(bincode::serialize(&serializable_value)
+            .map_err(|err| SerializerError::Serialize(Box::new(err)))?)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::convert::Infallible;
@@ -155,7 +189,15 @@ mod test {
     fn test_json_string_serializer() {
         let value = CachedValue::new(Test::new(), Utc::now());
         let raw = JsonSerializer::<String>::serialize(&value).unwrap();
-        dbg!(&raw);
+        assert_eq!(raw.len(), 71);
         assert_eq!(value, JsonSerializer::<String>::deserialize(raw).unwrap());
+    }
+
+    #[test]
+    fn test_bincode_serializer() {
+        let value = CachedValue::new(Test::new(), Utc::now());
+        let raw = <BinSerializer>::serialize(&value).unwrap();
+        assert_eq!(raw.len(), 54);
+        assert_eq!(value, BinSerializer::<Vec<u8>>::deserialize(raw).unwrap());
     }
 }

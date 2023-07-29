@@ -1,21 +1,20 @@
+use crate::builder::StrettoBackendBuilder;
 use axum::async_trait;
 use hitbox_backend::{
-    serializer::{JsonSerializer, Serializer},
+    serializer::{BinSerializer, Serializer},
     BackendError, BackendResult, CacheBackend, CacheableResponse, CachedValue, DeleteStatus,
 };
 use std::time::Duration;
 use stretto::AsyncCache;
 
-const COST: i64 = 0;
-
 #[derive(Clone)]
 pub struct StrettoBackend {
-    cache: AsyncCache<String, Vec<u8>>,
+    pub(crate) cache: AsyncCache<String, Vec<u8>>,
 }
 
 impl StrettoBackend {
-    pub fn new(cache: AsyncCache<String, Vec<u8>>) -> Self {
-        Self { cache }
+    pub fn builder(max_size: i64) -> StrettoBackendBuilder {
+        StrettoBackendBuilder::new(max_size)
     }
 }
 
@@ -26,12 +25,18 @@ impl CacheBackend for StrettoBackend {
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
+        let () = self
+            .cache
+            .wait()
+            .await
+            .map_err(crate::error::Error::from)
+            .map_err(BackendError::from)?;
+
         match self.cache.get(&key).await {
-            Some(cached) => Ok(Some(
-                JsonSerializer::<Vec<u8>>::deserialize(cached.value().to_owned())
-                    .map_err(BackendError::from)
-                    .unwrap(),
-            )),
+            Some(cached) => BinSerializer::<Vec<u8>>::deserialize(cached.value().to_owned())
+                .map_err(BackendError::from)
+                .map(Some),
+
             None => Ok(None),
         }
     }
@@ -46,15 +51,20 @@ impl CacheBackend for StrettoBackend {
         T: CacheableResponse + Send,
         T::Cached: serde::Serialize + Send + Sync,
     {
-        let serialized =
-            JsonSerializer::<Vec<u8>>::serialize(&value).map_err(BackendError::from)?;
+        let serialized = BinSerializer::<Vec<u8>>::serialize(&value).map_err(BackendError::from)?;
+        let cost = serialized.len();
         let inserted = match ttl {
             Some(ttl) => {
                 self.cache
-                    .insert_with_ttl(key, serialized, COST, Duration::from_secs(ttl as u64))
+                    .insert_with_ttl(
+                        key,
+                        serialized,
+                        cost as i64,
+                        Duration::from_secs(ttl as u64),
+                    )
                     .await
             }
-            None => self.cache.insert(key, serialized, COST).await,
+            None => self.cache.insert(key, serialized, cost as i64).await,
         };
         if inserted {
             Ok(())
@@ -65,7 +75,7 @@ impl CacheBackend for StrettoBackend {
 
     async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
         self.cache.remove(&key).await;
-        Ok(DeleteStatus::Deleted(0))
+        Ok(DeleteStatus::Deleted(1))
     }
 
     async fn start(&self) -> BackendResult<()> {
@@ -73,24 +83,55 @@ impl CacheBackend for StrettoBackend {
     }
 }
 
-#[tokio::test]
-async fn test() {
-    let c: AsyncCache<String, String> = AsyncCache::new(1000, 100, tokio::spawn).unwrap();
+#[cfg(test)]
+mod test {
+    use axum::async_trait;
+    use chrono::Utc;
+    use serde::{Deserialize, Serialize};
 
-    for i in 0..100 {
-        let key = format!("key-{}", i);
-        let r = c.insert(key, "value".to_string(), 1).await;
-        dbg!(r);
+    use super::*;
+    use hitbox_backend::CacheableResponse;
+
+    #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+    struct Test {
+        a: i32,
+        b: String,
     }
 
-    c.wait().await.unwrap();
+    #[async_trait]
+    impl CacheableResponse for Test {
+        type Cached = Self;
 
-    for i in 0..100 {
-        let key = format!("key-{}", i);
-        let value = c.get(&key).await;
-        match value {
-            Some(v) => dbg!(v.to_string()),
-            None => dbg!("None".to_string()),
-        };
+        async fn into_cached(self) -> Self::Cached {
+            self
+        }
+        async fn from_cached(cached: Self::Cached) -> Self {
+            cached
+        }
+    }
+
+    impl Test {
+        pub fn new() -> Self {
+            Self {
+                a: 42,
+                b: "nope".to_owned(),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_and_get() {
+        let cache = crate::StrettoBackend::builder(100).finalize().unwrap();
+        let value = CachedValue::new(Test::new(), Utc::now());
+        let res = cache.set::<Test>("key-1".to_string(), &value, None).await;
+        assert!(res.is_ok());
+        let value = cache
+            .get::<Test>("key-1".to_string())
+            .await
+            .unwrap()
+            .unwrap()
+            .into_inner();
+        assert_eq!(value.a, 42);
+        assert_eq!(value.b, "nope".to_owned());
     }
 }
