@@ -1,8 +1,10 @@
-use std::{collections::HashMap, vec};
-
-use hitbox_backend::CacheBackend;
+use async_trait::async_trait;
+use chrono::Utc;
+use hitbox_backend::{CacheBackend, CacheableResponse, CachedValue};
 use hitbox_tarantool::TarantoolBackendBuilder;
-use rusty_tarantool::tarantool::ClientConfig;
+use rusty_tarantool::tarantool::{ClientConfig, ExecWithParamaters};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use testcontainers::{clients, core::WaitFor, Image};
 
 #[derive(Debug)]
@@ -79,4 +81,61 @@ async fn test_start() {
         .decode()
         .unwrap();
     assert!(fiber_exists.0);
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+struct Test {
+    a: i32,
+    b: String,
+}
+
+#[async_trait]
+impl CacheableResponse for Test {
+    type Cached = Self;
+
+    async fn into_cached(self) -> Self::Cached {
+        self
+    }
+    async fn from_cached(cached: Self::Cached) -> Self {
+        cached
+    }
+}
+
+impl Test {
+    pub fn new() -> Self {
+        Self {
+            a: 42,
+            b: "nope".to_owned(),
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_set() {
+    let docker = clients::Cli::default();
+    let container = docker.run(Tarantool::default());
+    let port = container
+        .ports()
+        .map_to_host_port_ipv4(3301)
+        .unwrap()
+        .to_string();
+    let backend = TarantoolBackendBuilder::default()
+        .port(port.clone())
+        .build();
+    backend.start().await.unwrap();
+
+    let key = "test_key".to_owned();
+    let value = CachedValue::new(Test::new(), Utc::now());
+    backend.set::<Test>(key.clone(), value, None).await.unwrap();
+
+    let tarantool =
+        ClientConfig::new(format!("{}:{}", "127.0.0.1", port), "hitbox", "hitbox").build();
+
+    tarantool
+        .prepare_fn_call("box.space.hitbox_cache:get")
+        .bind_ref(&("test_key",))
+        .unwrap()
+        .execute()
+        .await
+        .unwrap();
 }
