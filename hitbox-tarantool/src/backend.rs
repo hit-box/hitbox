@@ -147,7 +147,10 @@ impl CacheBackend for TarantoolBackend {
                 "
                     local space_name = ...
                     box.schema.space.create(space_name, { if_not_exists = true })
-                    box.space[space_name]:create_index('primary', { if_not_exists = true })
+                    box.space[space_name]:create_index('primary', {
+                        parts = { { 1, 'string' } },
+                        if_not_exists = true,
+                    })
 
                     if not _G.__hitbox_cache_fiber then
                         _G.__hitbox_cache_fiber = require('fiber').create(function()
