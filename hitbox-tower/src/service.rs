@@ -87,7 +87,9 @@ where
             self.backend.clone(),
             CacheableHttpRequest::from_request(req),
             transformer,
-            Arc::new(NeutralPredicate::new().query("cache".to_owned(), "true".to_owned())),
+            Arc::new(Box::new(
+                NeutralPredicate::new().query("cache".to_owned(), "true".to_owned()),
+            )),
             Arc::new(NeutralResponsePredicate::new()),
         )
     }
