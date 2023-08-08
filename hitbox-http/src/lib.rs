@@ -1,4 +1,5 @@
 mod body;
+pub mod extractors;
 pub mod predicates;
 mod request;
 mod response;

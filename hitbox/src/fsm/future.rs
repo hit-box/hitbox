@@ -15,7 +15,7 @@ use tracing::{instrument, trace, warn};
 
 use crate::{
     backend::CacheBackend,
-    cache::CacheableRequest,
+    cache::{CacheKey, CacheableRequest, Extractor},
     fsm::{states::StateProj, PollCache, State},
     predicates::Predicate,
     Cacheable,
@@ -236,12 +236,14 @@ where
     transformer: T,
     backend: Arc<B>,
     request: Option<Req>,
+    cache_key: Option<CacheKey>,
     #[pin]
     state: State<<T::Future as Future>::Output, Res, Req>,
     #[pin]
     poll_cache: Option<PollCache<Res>>,
     request_predicates: Arc<dyn Predicate<Subject = Req> + Send + Sync>,
     response_predicates: Arc<dyn Predicate<Subject = Res> + Send + Sync>,
+    key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
 }
 
 impl<B, Req, Res, T> CacheFuture<B, Req, Res, T>
@@ -258,15 +260,18 @@ where
         transformer: T,
         request_predicates: Arc<dyn Predicate<Subject = Req> + Send + Sync>,
         response_predicates: Arc<dyn Predicate<Subject = Res> + Send + Sync>,
+        key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
     ) -> Self {
         CacheFuture {
             transformer,
             backend,
+            cache_key: None,
             request: Some(request),
             state: State::Initial,
             poll_cache: None,
             request_predicates,
             response_predicates,
+            key_extractors,
         }
     }
 }
@@ -286,7 +291,7 @@ where
 {
     type Output = T::Response;
 
-    #[instrument(skip(self, cx), fields(state = ?self.state, request = type_name::<T::Response>(), backend = type_name::<B>()))]
+    // #[instrument(skip(self, cx), fields(state = ?self.state, request = type_name::<T::Response>(), backend = type_name::<B>()))]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
 
@@ -295,8 +300,9 @@ where
                 StateProj::Initial => {
                     let request = this.request.take().expect(POLL_AFTER_READY_ERROR);
                     let predicates = this.request_predicates.clone();
+                    let extractors = this.key_extractors.clone();
                     let cache_policy_future =
-                        Box::pin(async move { request.cache_policy(predicates).await });
+                        Box::pin(async move { request.cache_policy(predicates, extractors).await });
                     State::CheckRequestCachePolicy {
                         cache_policy_future,
                     }
@@ -307,9 +313,10 @@ where
                     let policy = ready!(cache_policy_future.poll(cx));
                     trace!("{policy:?}");
                     match policy {
-                        crate::cache::CachePolicy::Cacheable(request) => {
+                        crate::cache::CachePolicy::Cacheable { key, request } => {
                             let backend = this.backend.clone();
-                            let cache_key = "fake::key".to_owned();
+                            let cache_key = key.serialize();
+                            this.cache_key.insert(key);
                             let poll_cache =
                                 Box::pin(async move { backend.get::<Res>(cache_key).await });
                             State::PollCache {
@@ -373,12 +380,13 @@ where
                 StateProj::CheckResponseCachePolicy { cache_policy } => {
                     let policy = ready!(cache_policy.poll(cx));
                     let backend = this.backend.clone();
-                    let cache_key = "fake::key".to_owned();
+                    let cache_key = this.cache_key.take().expect("CacheKey not found");
                     match policy {
                         CachePolicy::Cacheable(cache_value) => {
                             let update_cache_future = Box::pin(async move {
-                                let update_cache_result =
-                                    backend.set::<Res>(cache_key, &cache_value, None).await;
+                                let update_cache_result = backend
+                                    .set::<Res>(cache_key.serialize(), &cache_value, None)
+                                    .await;
                                 let upstream_result =
                                     Res::from_cached(cache_value.into_inner()).await;
                                 (update_cache_result, upstream_result)

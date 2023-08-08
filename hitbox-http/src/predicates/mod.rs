@@ -36,7 +36,7 @@ where
 }
 
 pub struct NeutralResponsePredicate<ResBody> {
-    _res: PhantomData<fn() -> ResBody>, // FIX: HEHE
+    _res: PhantomData<fn(ResBody) -> ResBody>, // FIX: HEHE
 }
 
 impl<ResBody> NeutralResponsePredicate<ResBody> {

@@ -13,6 +13,8 @@ use hitbox::{
 };
 use hitbox_backend::CacheableResponse;
 use hitbox_http::{
+    extractors::NeutralExtractor,
+    extractors::{method::MethodExtractor, path::PathExtractor},
     predicates::{query::QueryPredicate, NeutralPredicate, NeutralResponsePredicate},
     CacheableHttpRequest, CacheableHttpResponse, FromBytes, SerializableHttpResponse,
 };
@@ -91,6 +93,7 @@ where
                 NeutralPredicate::new().query("cache".to_owned(), "true".to_owned()),
             )),
             Arc::new(NeutralResponsePredicate::new()),
+            Arc::new(NeutralExtractor::new().method().path("/{path}*")),
         )
     }
 }
