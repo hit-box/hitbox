@@ -89,10 +89,10 @@ impl CacheBackend for TarantoolBackend {
             .await
             .map_err(|err| BackendError::InternalError(Box::new(err)))?;
         response
-            .decode::<String>()
+            .decode_result_set::<(String, Option<u32>, String)>()
             .map(|value| {
                 Some(
-                    JsonSerializer::<Vec<u8>>::deserialize(value.into())
+                    JsonSerializer::<String>::deserialize(value.first().unwrap().2.clone())
                         .map_err(BackendError::from)
                         .unwrap(),
                 )
@@ -110,7 +110,7 @@ impl CacheBackend for TarantoolBackend {
             .await
             .map_err(|err| BackendError::InternalError(Box::new(err)))?;
         let result = response
-            .decode::<(String, Option<u32>, String)>()
+            .decode_result_set::<(String, Option<u32>, String)>()
             .map(|_| Some(DeleteStatus::Deleted(1)))
             .map_err(|err| BackendError::InternalError(Box::new(err)))?
             .unwrap_or(DeleteStatus::Missing);
@@ -129,7 +129,7 @@ impl CacheBackend for TarantoolBackend {
     {
         let client = self.client.clone();
         let serialized_value =
-            JsonSerializer::<Vec<u8>>::serialize(&value).map_err(BackendError::from)?;
+            JsonSerializer::<String>::serialize(&value).map_err(BackendError::from)?;
         client
             .prepare_fn_call("box.space.hitbox_cache:replace")
             .bind_ref(&(key, ttl, serialized_value))

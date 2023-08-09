@@ -1,10 +1,10 @@
 use async_trait::async_trait;
-use chrono::Utc;
-use hitbox_backend::{CacheBackend, CacheableResponse, CachedValue};
+use chrono::{DateTime, Utc};
+use hitbox_backend::{CacheBackend, CacheableResponse, CachedValue, DeleteStatus};
 use hitbox_tarantool::TarantoolBackendBuilder;
 use rusty_tarantool::tarantool::{ClientConfig, ExecWithParamaters};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use testcontainers::{clients, core::WaitFor, Image};
 
 #[derive(Debug)]
@@ -110,6 +110,13 @@ impl Test {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct TarantoolTuple {
+    key: String,
+    ttl: Option<u32>,
+    value: String,
+}
+
 #[tokio::test]
 async fn test_set() {
     let docker = clients::Cli::default();
@@ -125,17 +132,115 @@ async fn test_set() {
     backend.start().await.unwrap();
 
     let key = "test_key".to_owned();
-    let value = CachedValue::new(Test::new(), Utc::now());
-    backend.set::<Test>(key.clone(), value, None).await.unwrap();
+    let dt = "2012-12-12T12:12:12Z".to_string();
+    let ttl = 42;
+    let value = CachedValue::new(Test::new(), DateTime::from_str(&dt).unwrap());
+    backend
+        .set::<Test>(key.clone(), value, Some(ttl))
+        .await
+        .unwrap();
+
+    let tarantool =
+        ClientConfig::new(format!("{}:{}", "127.0.0.1", port), "hitbox", "hitbox").build();
+
+    let response = tarantool
+        .prepare_fn_call("box.space.hitbox_cache:get")
+        .bind_ref(&("test_key"))
+        .unwrap()
+        .execute()
+        .await
+        .unwrap()
+        .decode_result_set::<TarantoolTuple>()
+        .unwrap();
+
+    assert_eq!(
+        response.first().unwrap(),
+        &TarantoolTuple {
+            key,
+            ttl: Some(ttl),
+            value: r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string()
+        }
+    );
+}
+
+#[tokio::test]
+async fn test_delete() {
+    let docker = clients::Cli::default();
+    let container = docker.run(Tarantool::default());
+    let port = container
+        .ports()
+        .map_to_host_port_ipv4(3301)
+        .unwrap()
+        .to_string();
+    let backend = TarantoolBackendBuilder::default()
+        .port(port.clone())
+        .build();
+    backend.start().await.unwrap();
+
+    let key = "test_key".to_owned();
+    let value = r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string();
+    let ttl = 42;
 
     let tarantool =
         ClientConfig::new(format!("{}:{}", "127.0.0.1", port), "hitbox", "hitbox").build();
 
     tarantool
-        .prepare_fn_call("box.space.hitbox_cache:get")
-        .bind_ref(&("test_key",))
+        .prepare_fn_call("box.space.hitbox_cache:replace")
+        .bind_ref(&(key.clone(), ttl, value))
         .unwrap()
         .execute()
         .await
         .unwrap();
+
+    let status = backend.delete(key.clone()).await.unwrap();
+
+    assert_eq!(status, DeleteStatus::Deleted(1));
+
+    let response = tarantool
+        .prepare_fn_call("box.space.hitbox_cache:get")
+        .bind_ref(&("test_key"))
+        .unwrap()
+        .execute()
+        .await
+        .unwrap()
+        .decode_result_set::<TarantoolTuple>()
+        .unwrap();
+
+    assert_eq!(response.len(), 0)
+}
+
+#[tokio::test]
+async fn test_get() {
+    let docker = clients::Cli::default();
+    let container = docker.run(Tarantool::default());
+    let port = container
+        .ports()
+        .map_to_host_port_ipv4(3301)
+        .unwrap()
+        .to_string();
+    let backend = TarantoolBackendBuilder::default()
+        .port(port.clone())
+        .build();
+    backend.start().await.unwrap();
+
+    let key = "test_key".to_owned();
+    let value = r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string();
+    let ttl = 42;
+
+    let tarantool =
+        ClientConfig::new(format!("{}:{}", "127.0.0.1", port), "hitbox", "hitbox").build();
+
+    tarantool
+        .prepare_fn_call("box.space.hitbox_cache:replace")
+        .bind_ref(&(key.clone(), ttl, value))
+        .unwrap()
+        .execute()
+        .await
+        .unwrap();
+
+    let data = backend.get::<Test>(key.clone()).await.unwrap().unwrap();
+    let dt: DateTime<Utc> = DateTime::from_str(&"2012-12-12T12:12:12Z").unwrap();
+
+    assert_eq!(data.data, Test::new());
+    assert_eq!(data.expired, dt);
 }
