@@ -8,6 +8,7 @@ use crate::CacheableHttpRequest;
 pub mod header;
 pub mod method;
 pub mod path;
+pub mod query;
 
 pub struct NeutralExtractor<ReqBody> {
     _res: PhantomData<fn(ReqBody) -> ReqBody>,

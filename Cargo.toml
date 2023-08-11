@@ -6,5 +6,6 @@ members = [
     "hitbox-redis",
 		"hitbox-stretto",
     "hitbox-tower",
+    "hitbox-qs",
     "examples",
 ]
