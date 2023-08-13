@@ -136,7 +136,7 @@ async fn test_set() {
     let ttl = 42;
     let value = CachedValue::new(Test::new(), DateTime::from_str(&dt).unwrap());
     backend
-        .set::<Test>(key.clone(), value, Some(ttl))
+        .set::<Test>(key.clone(), &value, Some(ttl))
         .await
         .unwrap();
 
