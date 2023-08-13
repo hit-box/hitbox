@@ -1,6 +1,7 @@
 use axum::{extract::Path, routing::get, Json, Router};
 
 use hitbox_redis::RedisBackend;
+use hitbox_stretto::StrettoBackend;
 use hitbox_tower::Cache;
 use http::StatusCode;
 use tower::ServiceBuilder;
@@ -38,20 +39,17 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let backend = RedisBackend::new().unwrap();
-    let inmemory = hitbox_stretto::StrettoBackendBuilder::new(12960, 1e6 as i64)
+    let inmemory = StrettoBackend::builder(2 ^ 16)
         .finalize()
         .unwrap();
     // build our application with a single route
     let app = Router::new()
         .route("/greet/:name/", get(handler_result))
         .route("/", get(handler))
-        .route(
-            "/json/",
-            get(handler_json), // .layer(Cache::builder().backend(inmemory.clone()).build()),
-        )
+        .route("/json/", get(handler_json))
         .layer(
             ServiceBuilder::new()
-                // .layer(Cache::builder().backend(inmemory).build())
+                .layer(Cache::builder().backend(inmemory).build())
                 .layer(Cache::builder().backend(backend).build()),
         );
 

@@ -7,8 +7,9 @@ type Cache = AsyncCacheBuilder<String, Vec<u8>>;
 pub struct StrettoBackendBuilder(Cache);
 
 impl StrettoBackendBuilder {
-    pub fn new(num_counters: usize, max_cost: i64) -> Self {
-        Self(AsyncCacheBuilder::new(num_counters, max_cost))
+    pub fn new(max_size: i64) -> Self {
+        let num_counters = max_size * 10;
+        Self(AsyncCacheBuilder::new(num_counters as usize, max_size))
     }
 
     pub fn set_buffer_size(self, sz: usize) -> Self {
@@ -19,18 +20,15 @@ impl StrettoBackendBuilder {
         Self(self.0.set_buffer_items(sz))
     }
 
-    pub fn set_ingore_internal_cost(self, val: bool) -> Self {
-        Self(self.0.set_ignore_internal_cost(val))
-    }
-
     pub fn set_cleanup_duration(self, d: Duration) -> Self {
         Self(self.0.set_cleanup_duration(d))
     }
 
     pub fn finalize(self) -> Result<crate::backend::StrettoBackend, Error> {
         self.0
+            .set_ignore_internal_cost(true)
             .finalize(tokio::spawn)
-            .map(crate::backend::StrettoBackend::new)
+            .map(|cache| crate::backend::StrettoBackend { cache })
             .map_err(Error::from)
     }
 }

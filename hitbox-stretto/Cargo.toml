@@ -30,3 +30,6 @@ tower = { version = "0.4", features = ["full"] }
 tower-http = { version = "0.4", features = ["full"] }
 http = "0.2"
 lazy_static = "1"
+
+[dev-dependencies]
+chrono = { version = "0.4", features = ["serde"] }
