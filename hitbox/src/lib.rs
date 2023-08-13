@@ -72,10 +72,10 @@ pub mod fsm;
 #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
 pub mod metrics;
 pub mod predicates;
-
 pub use cache::Cacheable;
 pub use error::CacheError;
 pub use hitbox_backend::{CachePolicy, CacheState, CacheableResponse, CachedValue};
+pub use cache::Extractor;
 
 /// The `hitbox` prelude.
 pub mod prelude {
