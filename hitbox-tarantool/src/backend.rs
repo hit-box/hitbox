@@ -21,6 +21,50 @@ impl TarantoolBackend {
     }
 }
 
+impl TarantoolBackend {
+    pub async fn init(&self) -> BackendResult<()> {
+        let client = self.client.clone();
+        client
+            .eval(
+                "
+                    local space_name = ...
+                    box.schema.space.create(space_name, { if_not_exists = true })
+                    box.space[space_name]:create_index('primary', {
+                        parts = { { 1, 'string' } },
+                        if_not_exists = true,
+                    })
+
+                    if not _G.__hitbox_cache_fiber then
+                        _G.__hitbox_cache_fiber = require('fiber').create(function()
+                            local fiber = require('fiber')
+                            fiber.name('hitbox_cache_fiber')
+                            while true do
+                                local ok, res = pcall(function()
+                                    for _, t in box.space[space_name]:pairs() do
+                                        if t[2] <= fiber.time() then
+                                            box.space[space_name]:delete(t[1])
+                                        end
+                                    end
+                                end)
+
+                                if not ok then
+                                    require('log').error(err)
+                                end
+
+                                fiber.testcancel()
+                                fiber.sleep(1)
+                            end
+                        end)
+                    end
+                ",
+                &("hitbox_cache".to_string(),),
+            )
+            .await
+            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
+        Ok(())
+    }
+}
+
 /// Part of builder pattern implementation for TarantoolBackend actor.
 pub struct TarantoolBackendBuilder {
     user: String,
@@ -141,44 +185,6 @@ impl CacheBackend for TarantoolBackend {
     }
 
     async fn start(&self) -> BackendResult<()> {
-        let client = self.client.clone();
-        client
-            .eval(
-                "
-                    local space_name = ...
-                    box.schema.space.create(space_name, { if_not_exists = true })
-                    box.space[space_name]:create_index('primary', {
-                        parts = { { 1, 'string' } },
-                        if_not_exists = true,
-                    })
-
-                    if not _G.__hitbox_cache_fiber then
-                        _G.__hitbox_cache_fiber = require('fiber').create(function()
-                            local fiber = require('fiber')
-                            fiber.name('hitbox_cache_fiber')
-                            while true do
-                                local ok, res = pcall(function()
-                                    for _, t in box.space[space_name]:pairs() do
-                                        if t[2] <= fiber.time() then
-                                            box.space[space_name]:delete(t[1])
-                                        end
-                                    end
-                                end)
-
-                                if not ok then
-                                    require('log').error(err)
-                                end
-
-                                fiber.testcancel()
-                                fiber.sleep(10)
-                            end
-                        end)
-                    end
-                ",
-                &("hitbox_cache".to_string(),),
-            )
-            .await
-            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
         Ok(())
     }
 }

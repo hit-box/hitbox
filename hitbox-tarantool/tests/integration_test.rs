@@ -8,7 +8,7 @@ use std::{collections::HashMap, str::FromStr};
 use testcontainers::{clients, core::WaitFor, Image};
 
 #[derive(Debug)]
-pub struct Tarantool {
+struct Tarantool {
     env_vars: HashMap<String, String>,
 }
 
@@ -47,7 +47,7 @@ impl Image for Tarantool {
 }
 
 #[tokio::test]
-async fn test_start() {
+async fn test_init() {
     let docker = clients::Cli::default();
     let container = docker.run(Tarantool::default());
     let port = container
@@ -58,7 +58,7 @@ async fn test_start() {
     let backend = TarantoolBackendBuilder::default()
         .port(port.clone())
         .build();
-    backend.start().await.unwrap();
+    backend.init().await.unwrap();
     let tarantool =
         ClientConfig::new(format!("{}:{}", "127.0.0.1", port), "hitbox", "hitbox").build();
     let space_exists: (bool,) = tarantool
@@ -129,7 +129,7 @@ async fn test_set() {
     let backend = TarantoolBackendBuilder::default()
         .port(port.clone())
         .build();
-    backend.start().await.unwrap();
+    backend.init().await.unwrap();
 
     let key = "test_key".to_owned();
     let dt = "2012-12-12T12:12:12Z".to_string();
@@ -164,6 +164,9 @@ async fn test_set() {
 }
 
 #[tokio::test]
+async fn test_expire() {}
+
+#[tokio::test]
 async fn test_delete() {
     let docker = clients::Cli::default();
     let container = docker.run(Tarantool::default());
@@ -175,7 +178,7 @@ async fn test_delete() {
     let backend = TarantoolBackendBuilder::default()
         .port(port.clone())
         .build();
-    backend.start().await.unwrap();
+    backend.init().await.unwrap();
 
     let key = "test_key".to_owned();
     let value = r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string();
@@ -221,7 +224,7 @@ async fn test_get() {
     let backend = TarantoolBackendBuilder::default()
         .port(port.clone())
         .build();
-    backend.start().await.unwrap();
+    backend.init().await.unwrap();
 
     let key = "test_key".to_owned();
     let value = r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string();
