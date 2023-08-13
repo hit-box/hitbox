@@ -34,16 +34,17 @@ where
             .parts()
             .uri
             .query()
-            .map(hitbox_qs::parse)
-            .map(|m| m.get(&self.name).map(hitbox_qs::Value::inner))
+            .map(crate::query::parse)
+            .map(|m| m.get(&self.name).map(crate::query::Value::inner))
             .flatten()
             .unwrap_or_default();
         let mut parts = self.inner.get(subject).await;
         for value in values {
-        parts.push(KeyPart {
-            key: self.name.clone(),
-            value: Some(value),
-        });}
+            parts.push(KeyPart {
+                key: self.name.clone(),
+                value: Some(value),
+            });
+        }
         parts
     }
 }

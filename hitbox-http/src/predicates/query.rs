@@ -1,11 +1,10 @@
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
 use hitbox::predicates::{Operation, Predicate, PredicateResult};
-use hitbox_qs::Value;
 
 pub struct Query<P> {
     pub name: String,
-    pub value: Value,
+    pub value: crate::query::Value,
     pub operation: Operation,
     inner: P,
 }
@@ -21,7 +20,7 @@ where
     fn query(self, name: String, value: String) -> Query<P> {
         Query {
             name,
-            value: Value::Scalar(value),
+            value: crate::query::Value::Scalar(value),
             operation: Operation::Eq,
             inner: self,
         }
@@ -40,11 +39,11 @@ where
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
                 let op = match self.operation {
-                    Operation::Eq => Value::eq,
+                    Operation::Eq => crate::query::Value::eq,
                     Operation::In => unimplemented!(),
                 };
                 match request.parts().uri.query() {
-                    Some(query_string) => match hitbox_qs::parse(query_string).get(&self.name) {
+                    Some(query_string) => match crate::query::parse(query_string).get(&self.name) {
                         Some(value) if op(value, &self.value) => {
                             PredicateResult::Cacheable(request)
                         }
