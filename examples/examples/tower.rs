@@ -1,4 +1,6 @@
 use hitbox_stretto::StrettoBackend;
+use hitbox_redis::RedisBackend;
+use hitbox_stretto::builder::StrettoBackendBuilder;
 use hitbox_tower::Cache;
 use hyper::{Body, Server};
 use std::{convert::Infallible, net::SocketAddr};
@@ -18,10 +20,12 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let inmemory = StrettoBackend::builder(2 ^ 16).finalize().unwrap();
+    let inmemory = StrettoBackend::builder(10_000_000).finalize().unwrap();
+    let redis = RedisBackend::builder().build().unwrap();
+
     let service = tower::ServiceBuilder::new()
-        .layer(tower_http::trace::TraceLayer::new_for_http())
         .layer(Cache::builder().backend(inmemory).build())
+        .layer(Cache::builder().backend(redis).build())
         .service_fn(handle);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

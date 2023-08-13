@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use futures::{stream, StreamExt};
 use hitbox::{
-    cache::{CacheKey, CachePolicy, CacheableRequest, Selector},
+    cache::{CacheKey, CachePolicy, CacheableRequest, Extractor},
     predicates::{Predicate, PredicateResult},
     Cacheable,
 };
@@ -41,13 +41,20 @@ impl<ReqBody> CacheableRequest for CacheableHttpRequest<ReqBody>
 where
     ReqBody: Send + 'static,
 {
-    async fn cache_policy<P>(self, predicates: P) -> hitbox::cache::CachePolicy<Self>
+    async fn cache_policy<P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> hitbox::cache::CachePolicy<Self>
     where
         P: Predicate<Subject = Self> + Send + Sync,
+        E: Extractor<Subject = Self> + Send + Sync,
     {
         dbg!("CacheableHttpRequest::cache_policy");
-        match predicates.check(self).await {
-            PredicateResult::Cacheable(request) => CachePolicy::Cacheable(request),
+        let (request, key) = extractors.get(self).await.into_cache_key();
+
+        match predicates.check(request).await {
+            PredicateResult::Cacheable(request) => CachePolicy::Cacheable { key, request },
             PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),
         }
     }

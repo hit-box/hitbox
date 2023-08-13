@@ -1,5 +1,7 @@
 //! Cacheable trait and implementation of cache logic.
 
+use std::sync::Arc;
+
 use crate::{predicates::Predicate, CacheError};
 use async_trait::async_trait;
 #[cfg(feature = "derive")]
@@ -79,24 +81,96 @@ pub trait Cacheable {
 
 #[derive(Debug)]
 pub enum CachePolicy<T> {
-    Cacheable(T),
+    Cacheable { key: CacheKey, request: T },
     NonCacheable(T),
 }
 
+#[derive(Debug)]
 pub struct CacheKey {
-    pub key: String,
+    pub parts: Vec<KeyPart>,
     pub version: u32,
     pub prefix: String,
 }
 
-pub struct SelectorPart<T: Sized>(T, String);
+impl CacheKey {
+    pub fn serialize(&self) -> String {
+        self.parts
+            .iter()
+            .map(|part| {
+                format!(
+                    "{}:{}",
+                    part.key,
+                    part.value.clone().unwrap_or("None".to_owned())
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("::")
+    }
+}
+
+#[derive(Debug)]
+pub struct KeyPart {
+    pub key: String,
+    pub value: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct KeyParts<T: Sized> {
+    pub subject: T,
+    pub parts: Vec<KeyPart>,
+}
+
+impl<T> KeyParts<T> {
+    pub fn push(&mut self, part: KeyPart) {
+        self.parts.push(part)
+    }
+
+    pub fn append(&mut self, parts: &mut Vec<KeyPart>) {
+        self.parts.append(parts)
+    }
+
+    pub fn into_cache_key(self) -> (T, CacheKey) {
+        (
+            self.subject,
+            CacheKey {
+                version: 0,
+                prefix: String::new(),
+                parts: self.parts,
+            },
+        )
+    }
+}
 
 #[async_trait]
-pub trait Selector
+pub trait Extractor {
+    type Subject;
+    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject>;
+}
+
+#[async_trait]
+impl<T> Extractor for Box<T>
 where
-    Self: Sized,
+    T: Extractor + ?Sized + Sync,
+    T::Subject: Send,
 {
-    async fn part(&self, subject: Self) -> SelectorPart<Self>;
+    type Subject = T::Subject;
+
+    async fn get(&self, subject: T::Subject) -> KeyParts<T::Subject> {
+        self.as_ref().get(subject).await
+    }
+}
+
+#[async_trait]
+impl<T> Extractor for Arc<T>
+where
+    T: Extractor + Send + Sync + ?Sized,
+    T::Subject: Send,
+{
+    type Subject = T::Subject;
+
+    async fn get(&self, subject: T::Subject) -> KeyParts<T::Subject> {
+        self.as_ref().get(subject).await
+    }
 }
 
 #[async_trait]
@@ -104,13 +178,10 @@ pub trait CacheableRequest
 where
     Self: Sized,
 {
-    async fn cache_policy<P>(
-        self,
-        predicates: P,
-        // key_selectors: impl Selector,
-    ) -> CachePolicy<Self>
+    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> CachePolicy<Self>
     where
-        P: Predicate<Subject = Self> + Send + Sync;
+        P: Predicate<Subject = Self> + Send + Sync,
+        E: Extractor<Subject = Self> + Send + Sync;
 }
 
 // #[cfg(test)]
