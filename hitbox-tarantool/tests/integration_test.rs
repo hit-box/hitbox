@@ -2,14 +2,67 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use hitbox_backend::{CacheBackend, CacheableResponse, CachedValue, DeleteStatus};
 use hitbox_tarantool::TarantoolBackendBuilder;
-use rusty_tarantool::tarantool::{ClientConfig, ExecWithParamaters};
+use once_cell::sync::Lazy;
+use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
-use testcontainers::{clients, core::WaitFor, Image};
+use testcontainers::{clients, core::WaitFor, Container, Image};
+
+static DOCKER: Lazy<clients::Cli> = Lazy::new(|| clients::Cli::default());
 
 #[derive(Debug)]
 struct Tarantool {
     env_vars: HashMap<String, String>,
+}
+
+impl<'a> Tarantool {
+    fn start() -> StartedTarantool<'a> {
+        let container = DOCKER.run(Tarantool::default());
+        let port = &container.ports().map_to_host_port_ipv4(3301).unwrap();
+        let client =
+            ClientConfig::new(format!("{}:{}", "127.0.0.1", &port), "hitbox", "hitbox").build();
+        StartedTarantool {
+            _container: container,
+            client,
+            port: port.to_string(),
+        }
+    }
+}
+
+struct StartedTarantool<'a> {
+    _container: Container<'a, Tarantool>,
+    client: Client,
+    port: String,
+}
+
+impl<'a> StartedTarantool<'a> {
+    async fn eval<T, R>(&self, cmd: &str, params: &T) -> R
+    where
+        T: Serialize,
+        R: Deserialize<'a>,
+    {
+        self.client
+            .eval(cmd, params)
+            .await
+            .unwrap()
+            .decode()
+            .unwrap()
+    }
+    async fn call<T, R>(&self, cmd: &str, params: &T) -> Vec<R>
+    where
+        T: Serialize,
+        R: Deserialize<'a>,
+    {
+        self.client
+            .prepare_fn_call(cmd)
+            .bind_ref(params)
+            .unwrap()
+            .execute()
+            .await
+            .unwrap()
+            .decode_result_set()
+            .unwrap()
+    }
 }
 
 impl Default for Tarantool {
@@ -48,38 +101,24 @@ impl Image for Tarantool {
 
 #[tokio::test]
 async fn test_init() {
-    let docker = clients::Cli::default();
-    let container = docker.run(Tarantool::default());
-    let port = container
-        .ports()
-        .map_to_host_port_ipv4(3301)
-        .unwrap()
-        .to_string();
+    let c = Tarantool::start();
     let backend = TarantoolBackendBuilder::default()
-        .port(port.clone())
+        .port(c.port.clone())
         .build();
     backend.init().await.unwrap();
-    let tarantool =
-        ClientConfig::new(format!("{}:{}", "127.0.0.1", port), "hitbox", "hitbox").build();
-    let space_exists: (bool,) = tarantool
+    let space_exists: (bool,) = c
         .eval(
             "return box.space[...] and true or false",
             &("hitbox_cache".to_string(),),
         )
-        .await
-        .unwrap()
-        .decode()
-        .unwrap();
+        .await;
     assert!(space_exists.0);
-    let fiber_exists: (bool,) = tarantool
+    let fiber_exists: (bool,) = c
         .eval(
             "return _G[...] and true or false",
             &("__hitbox_cache_fiber".to_string(),),
         )
-        .await
-        .unwrap()
-        .decode()
-        .unwrap();
+        .await;
     assert!(fiber_exists.0);
 }
 
@@ -119,15 +158,9 @@ struct TarantoolTuple {
 
 #[tokio::test]
 async fn test_set() {
-    let docker = clients::Cli::default();
-    let container = docker.run(Tarantool::default());
-    let port = container
-        .ports()
-        .map_to_host_port_ipv4(3301)
-        .unwrap()
-        .to_string();
+    let c = Tarantool::start();
     let backend = TarantoolBackendBuilder::default()
-        .port(port.clone())
+        .port(c.port.clone())
         .build();
     backend.init().await.unwrap();
 
@@ -140,21 +173,10 @@ async fn test_set() {
         .await
         .unwrap();
 
-    let tarantool =
-        ClientConfig::new(format!("{}:{}", "127.0.0.1", port), "hitbox", "hitbox").build();
-
-    let response = tarantool
-        .prepare_fn_call("box.space.hitbox_cache:get")
-        .bind_ref(&("test_key"))
-        .unwrap()
-        .execute()
-        .await
-        .unwrap()
-        .decode_result_set::<TarantoolTuple>()
-        .unwrap();
+    let result: Vec<TarantoolTuple> = c.call("box.space.hitbox_cache:get", &(key.clone())).await;
 
     assert_eq!(
-        response.first().unwrap(),
+        result.first().unwrap(),
         &TarantoolTuple {
             key,
             ttl: Some(ttl),
@@ -164,19 +186,10 @@ async fn test_set() {
 }
 
 #[tokio::test]
-async fn test_expire() {}
-
-#[tokio::test]
 async fn test_delete() {
-    let docker = clients::Cli::default();
-    let container = docker.run(Tarantool::default());
-    let port = container
-        .ports()
-        .map_to_host_port_ipv4(3301)
-        .unwrap()
-        .to_string();
+    let c = Tarantool::start();
     let backend = TarantoolBackendBuilder::default()
-        .port(port.clone())
+        .port(c.port.clone())
         .build();
     backend.init().await.unwrap();
 
@@ -184,64 +197,41 @@ async fn test_delete() {
     let value = r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string();
     let ttl = 42;
 
-    let tarantool =
-        ClientConfig::new(format!("{}:{}", "127.0.0.1", port), "hitbox", "hitbox").build();
-
-    tarantool
-        .prepare_fn_call("box.space.hitbox_cache:replace")
-        .bind_ref(&(key.clone(), ttl, value))
-        .unwrap()
-        .execute()
-        .await
-        .unwrap();
+    c.call::<_, (String, Option<u32>, String)>(
+        "box.space.hitbox_cache:replace",
+        &("test_key".to_string(), ttl, value),
+    )
+    .await;
 
     let status = backend.delete(key.clone()).await.unwrap();
 
     assert_eq!(status, DeleteStatus::Deleted(1));
 
-    let response = tarantool
-        .prepare_fn_call("box.space.hitbox_cache:get")
-        .bind_ref(&("test_key"))
-        .unwrap()
-        .execute()
-        .await
-        .unwrap()
-        .decode_result_set::<TarantoolTuple>()
-        .unwrap();
+    let result: Vec<(String, Option<u32>, String)> = c
+        .call("box.space.hitbox_cache:get", &("test_key".to_string()))
+        .await;
 
-    assert_eq!(response.len(), 0)
+    assert_eq!(result.len(), 0)
 }
 
 #[tokio::test]
 async fn test_get() {
-    let docker = clients::Cli::default();
-    let container = docker.run(Tarantool::default());
-    let port = container
-        .ports()
-        .map_to_host_port_ipv4(3301)
-        .unwrap()
-        .to_string();
+    let c = Tarantool::start();
     let backend = TarantoolBackendBuilder::default()
-        .port(port.clone())
+        .port(c.port.clone())
         .build();
     backend.init().await.unwrap();
 
     let key = "test_key".to_owned();
     let value = r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string();
-    let ttl = 42;
 
-    let tarantool =
-        ClientConfig::new(format!("{}:{}", "127.0.0.1", port), "hitbox", "hitbox").build();
+    c.call::<_, (String, Option<u32>, String)>(
+        "box.space.hitbox_cache:replace",
+        &(key.clone(), 42, value)
+    )
+    .await;
 
-    tarantool
-        .prepare_fn_call("box.space.hitbox_cache:replace")
-        .bind_ref(&(key.clone(), ttl, value))
-        .unwrap()
-        .execute()
-        .await
-        .unwrap();
-
-    let data = backend.get::<Test>(key.clone()).await.unwrap().unwrap();
+    let data = backend.get::<Test>(key).await.unwrap().unwrap();
     let dt: DateTime<Utc> = DateTime::from_str(&"2012-12-12T12:12:12Z").unwrap();
 
     assert_eq!(data.data, Test::new());
