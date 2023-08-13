@@ -1,10 +1,9 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 use hitbox::backend::CacheBackend;
-use hitbox_redis::RedisBackend;
 use tower::Layer;
 
-use crate::service::CacheService;
+use crate::{service::CacheService, dummy::DummyBackend};
 
 #[derive(Clone)]
 pub struct Cache<B> {
@@ -27,9 +26,9 @@ impl<S, B> Layer<S> for Cache<B> {
     }
 }
 
-impl Cache<RedisBackend> {
-    pub fn builder() -> CacheBuilder<RedisBackend> {
-        CacheBuilder::<RedisBackend>::default()
+impl Cache<DummyBackend> {
+    pub fn builder() -> CacheBuilder<DummyBackend> {
+        CacheBuilder::<DummyBackend>::default()
     }
 }
 

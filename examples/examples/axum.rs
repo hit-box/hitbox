@@ -42,7 +42,6 @@ async fn main() {
     let inmemory = StrettoBackend::builder(2 ^ 16)
         .finalize()
         .unwrap();
-    // build our application with a single route
     let app = Router::new()
         .route("/greet/:name/", get(handler_result))
         .route("/", get(handler))

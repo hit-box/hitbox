@@ -1,32 +1,17 @@
-use std::{fmt::Debug, marker::PhantomData, pin::Pin, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
-use bytes::Bytes;
-use chrono::{Duration, Utc};
-use futures::{
-    future::{BoxFuture, Map},
-    Future, FutureExt,
-};
-use hitbox::{
-    backend::{BackendError, CacheBackend},
-    fsm::{CacheFuture, Transform},
-    Cacheable, CachedValue,
-};
-use hitbox_backend::CacheableResponse;
+use hitbox::{backend::CacheBackend, fsm::CacheFuture};
 use hitbox_http::{
     extractors::NeutralExtractor,
     extractors::{method::MethodExtractor, path::PathExtractor},
     predicates::{query::QueryPredicate, NeutralPredicate, NeutralResponsePredicate},
-    CacheableHttpRequest, CacheableHttpResponse, FromBytes, SerializableHttpResponse,
+    CacheableHttpRequest, CacheableHttpResponse, FromBytes,
 };
 use http::{Request, Response};
 use hyper::body::{Body, HttpBody};
-use serde::{de::DeserializeOwned, Serialize};
 use tower::Service;
 
-use hitbox::fsm::CacheFuture3;
-use tracing::log::warn;
-
-use crate::future::{Transformer, UpstreamFuture};
+use crate::future::Transformer;
 
 pub struct CacheService<S, B> {
     upstream: S,
