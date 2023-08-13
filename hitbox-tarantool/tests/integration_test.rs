@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use hitbox_backend::{CacheBackend, CacheableResponse, CachedValue, DeleteStatus};
-use hitbox_tarantool::TarantoolBackendBuilder;
+use hitbox_tarantool::{TarantoolBackend, TarantoolBackendBuilder};
 use once_cell::sync::Lazy;
 use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, thread, time::Duration};
 use testcontainers::{clients, core::WaitFor, Container, Image};
 
 static DOCKER: Lazy<clients::Cli> = Lazy::new(|| clients::Cli::default());
@@ -16,15 +16,19 @@ struct Tarantool {
 }
 
 impl<'a> Tarantool {
-    fn start() -> StartedTarantool<'a> {
+    async fn start() -> StartedTarantool<'a> {
         let container = DOCKER.run(Tarantool::default());
         let port = &container.ports().map_to_host_port_ipv4(3301).unwrap();
         let client =
             ClientConfig::new(format!("{}:{}", "127.0.0.1", &port), "hitbox", "hitbox").build();
+        let backend = TarantoolBackendBuilder::default()
+            .port(port.to_string())
+            .build();
+        backend.init().await.unwrap();
         StartedTarantool {
             _container: container,
             client,
-            port: port.to_string(),
+            backend,
         }
     }
 }
@@ -32,7 +36,7 @@ impl<'a> Tarantool {
 struct StartedTarantool<'a> {
     _container: Container<'a, Tarantool>,
     client: Client,
-    port: String,
+    backend: TarantoolBackend,
 }
 
 impl<'a> StartedTarantool<'a> {
@@ -101,19 +105,17 @@ impl Image for Tarantool {
 
 #[tokio::test]
 async fn test_init() {
-    let c = Tarantool::start();
-    let backend = TarantoolBackendBuilder::default()
-        .port(c.port.clone())
-        .build();
-    backend.init().await.unwrap();
-    let space_exists: (bool,) = c
+    let t = Tarantool::start().await;
+
+    let space_exists: (bool,) = t
         .eval(
             "return box.space[...] and true or false",
             &("hitbox_cache".to_string(),),
         )
         .await;
     assert!(space_exists.0);
-    let fiber_exists: (bool,) = c
+
+    let fiber_exists: (bool,) = t
         .eval(
             "return _G[...] and true or false",
             &("__hitbox_cache_fiber".to_string(),),
@@ -158,22 +160,18 @@ struct TarantoolTuple {
 
 #[tokio::test]
 async fn test_set() {
-    let c = Tarantool::start();
-    let backend = TarantoolBackendBuilder::default()
-        .port(c.port.clone())
-        .build();
-    backend.init().await.unwrap();
-
+    let t = Tarantool::start().await;
     let key = "test_key".to_owned();
     let dt = "2012-12-12T12:12:12Z".to_string();
     let ttl = 42;
     let value = CachedValue::new(Test::new(), DateTime::from_str(&dt).unwrap());
-    backend
+
+    t.backend
         .set::<Test>(key.clone(), &value, Some(ttl))
         .await
         .unwrap();
 
-    let result: Vec<TarantoolTuple> = c.call("box.space.hitbox_cache:get", &(key.clone())).await;
+    let result: Vec<TarantoolTuple> = t.call("box.space.hitbox_cache:get", &(key.clone())).await;
 
     assert_eq!(
         result.first().unwrap(),
@@ -186,28 +184,42 @@ async fn test_set() {
 }
 
 #[tokio::test]
-async fn test_delete() {
-    let c = Tarantool::start();
-    let backend = TarantoolBackendBuilder::default()
-        .port(c.port.clone())
-        .build();
-    backend.init().await.unwrap();
+async fn test_expire() {
+    let t = Tarantool::start().await;
+    let key = "test_key".to_owned();
+    let dt = "2012-12-12T12:12:12Z".to_string();
+    let ttl = 0;
+    let value = CachedValue::new(Test::new(), DateTime::from_str(&dt).unwrap());
 
+    t.backend
+        .set::<Test>(key.clone(), &value, Some(ttl))
+        .await
+        .unwrap();
+
+    thread::sleep(Duration::from_secs(1));
+
+    let result: Vec<TarantoolTuple> = t.call("box.space.hitbox_cache:get", &(key.clone())).await;
+
+    assert_eq!(result.len(), 0)
+}
+
+#[tokio::test]
+async fn test_delete() {
+    let t = Tarantool::start().await;
     let key = "test_key".to_owned();
     let value = r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string();
     let ttl = 42;
 
-    c.call::<_, (String, Option<u32>, String)>(
+    t.call::<_, (String, Option<u32>, String)>(
         "box.space.hitbox_cache:replace",
         &("test_key".to_string(), ttl, value),
     )
     .await;
 
-    let status = backend.delete(key.clone()).await.unwrap();
-
+    let status = t.backend.delete(key.clone()).await.unwrap();
     assert_eq!(status, DeleteStatus::Deleted(1));
 
-    let result: Vec<(String, Option<u32>, String)> = c
+    let result: Vec<(String, Option<u32>, String)> = t
         .call("box.space.hitbox_cache:get", &("test_key".to_string()))
         .await;
 
@@ -216,22 +228,17 @@ async fn test_delete() {
 
 #[tokio::test]
 async fn test_get() {
-    let c = Tarantool::start();
-    let backend = TarantoolBackendBuilder::default()
-        .port(c.port.clone())
-        .build();
-    backend.init().await.unwrap();
-
+    let t = Tarantool::start().await;
     let key = "test_key".to_owned();
     let value = r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string();
 
-    c.call::<_, (String, Option<u32>, String)>(
+    t.call::<_, (String, Option<u32>, String)>(
         "box.space.hitbox_cache:replace",
-        &(key.clone(), 42, value)
+        &(key.clone(), 42, value),
     )
     .await;
 
-    let data = backend.get::<Test>(key).await.unwrap().unwrap();
+    let data = t.backend.get::<Test>(key).await.unwrap().unwrap();
     let dt: DateTime<Utc> = DateTime::from_str(&"2012-12-12T12:12:12Z").unwrap();
 
     assert_eq!(data.data, Test::new());
