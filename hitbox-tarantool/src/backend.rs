@@ -120,16 +120,16 @@ impl CacheBackend for TarantoolBackend {
     async fn set<T>(
         &self,
         key: String,
-        value: CachedValue<T::Cached>,
+        value: &CachedValue<T::Cached>,
         ttl: Option<u32>,
     ) -> BackendResult<()>
     where
         T: CacheableResponse + Send,
-        <T as CacheableResponse>::Cached: serde::Serialize + Send,
+        T::Cached: serde::Serialize + Send + Sync,
     {
         let client = self.client.clone();
         let serialized_value =
-            JsonSerializer::<String>::serialize(&value).map_err(BackendError::from)?;
+            JsonSerializer::<String>::serialize(value).map_err(BackendError::from)?;
         client
             .prepare_fn_call("box.space.hitbox_cache:replace")
             .bind_ref(&(key, ttl, serialized_value))
