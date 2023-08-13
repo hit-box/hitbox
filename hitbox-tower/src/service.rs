@@ -1,3 +1,4 @@
+use crate::config::Config;
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};
@@ -16,11 +17,12 @@ use crate::future::Transformer;
 pub struct CacheService<S, B> {
     upstream: S,
     backend: Arc<B>,
+    config: Config,
 }
 
 impl<S, B> CacheService<S, B> {
-    pub fn new(upstream: S, backend: Arc<B>) -> Self {
-        CacheService { upstream, backend }
+    pub fn new(upstream: S, backend: Arc<B>, config: Config) -> Self {
+        CacheService { upstream, backend, config }
     }
 }
 
@@ -33,6 +35,7 @@ where
         Self {
             upstream: self.upstream.clone(),
             backend: Arc::clone(&self.backend),
+            config: self.config.clone(),
         }
     }
 }
@@ -70,15 +73,17 @@ where
         dbg!(&req);
 
         let transformer = Transformer::new(self.upstream.clone());
+        let config = self.config.clone();
+        let request_predicate = NeutralPredicate::new().query(config.query.0, config.query.1);
+        let response_predicate = NeutralResponsePredicate::new();
+        let extractor = NeutralExtractor::new().method().path("/{path}*");
         CacheFuture::new(
             self.backend.clone(),
             CacheableHttpRequest::from_request(req),
             transformer,
-            Arc::new(Box::new(
-                NeutralPredicate::new().query("cache".to_owned(), "true".to_owned()),
-            )),
-            Arc::new(NeutralResponsePredicate::new()),
-            Arc::new(NeutralExtractor::new().method().path("/{path}*")),
+            Arc::new(request_predicate),
+            Arc::new(response_predicate),
+            Arc::new(extractor),
         )
     }
 }

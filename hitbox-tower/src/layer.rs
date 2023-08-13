@@ -13,43 +13,37 @@ use tower::Layer;
 use crate::{dummy::DummyBackend, service::CacheService};
 
 #[derive(Clone)]
-pub struct Cache<B, Req, Res> {
+pub struct Cache<B> {
     pub backend: Arc<B>,
-    request_predicates: Arc<dyn Predicate<Subject = Req> + Send + Sync>,
-    response_predicates: Arc<dyn Predicate<Subject = Res> + Send + Sync>,
-    key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
 }
 
-impl<B, Req, Res> Cache<B, Req, Res> {
-    pub fn new(backend: B) -> Cache<B, Req, Res> {
+impl<B> Cache<B> {
+    pub fn new(backend: B) -> Cache<B> {
         Cache {
             backend: Arc::new(backend),
-            request_predicates: Arc::new(NeutralPredicate::new()),
-            response_predicates: Arc::new(NeutralResponsePredicate::new()),
-            key_extractors: Arc::new(NeutralExtractor::new()),
         }
     }
 }
 
-impl<S, B, Req, Res> Layer<S> for Cache<B, Req, Res> {
+impl<S, B> Layer<S> for Cache<B> {
     type Service = CacheService<S, B>;
 
     fn layer(&self, upstream: S) -> Self::Service {
-        CacheService::new(upstream, Arc::clone(&self.backend))
+        CacheService::new(upstream, Arc::clone(&self.backend), crate::config::Config::new())
     }
 }
 
-impl<Req, Res> Cache<DummyBackend, Req, Res> {
-    pub fn builder() -> CacheBuilder<DummyBackend, Req, Res> {
+impl Cache<DummyBackend> {
+    pub fn builder() -> CacheBuilder<DummyBackend> {
         CacheBuilder::<DummyBackend>::default()
     }
 }
 
-pub struct CacheBuilder<B, Req, Res> {
+pub struct CacheBuilder<B> {
     backend: Option<B>,
 }
 
-impl<B, Req, Res> CacheBuilder<B, Req, Res>
+impl<B> CacheBuilder<B>
 where
     B: CacheBackend,
 {
@@ -59,7 +53,7 @@ where
         }
     }
 
-    pub fn build(self) -> Cache<B, Req, Res> {
+    pub fn build(self) -> Cache<B> {
         Cache {
             backend: Arc::new(self.backend.expect("Please add some cache backend")),
         }
