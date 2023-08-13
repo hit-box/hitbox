@@ -210,6 +210,9 @@ async fn test_delete() {
     let value = r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string();
     let ttl = 42;
 
+    let status = t.backend.delete(key.clone()).await.unwrap();
+    assert_eq!(status, DeleteStatus::Missing);
+
     t.call::<_, (String, Option<u32>, String)>(
         "box.space.hitbox_cache:replace",
         &("test_key".to_string(), ttl, value),

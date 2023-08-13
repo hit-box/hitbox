@@ -155,10 +155,13 @@ impl CacheBackend for TarantoolBackend {
             .map_err(|err| BackendError::InternalError(Box::new(err)))?;
         let result = response
             .decode_result_set::<(String, Option<u32>, String)>()
-            .map(|_| Some(DeleteStatus::Deleted(1)))
-            .map_err(|err| BackendError::InternalError(Box::new(err)))?
-            .unwrap_or(DeleteStatus::Missing);
-        Ok(result)
+            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
+
+        if result.is_empty() {
+            Ok(DeleteStatus::Missing)
+        } else {
+            Ok(DeleteStatus::Deleted(1))
+        }
     }
 
     async fn set<T>(
