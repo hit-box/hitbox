@@ -9,6 +9,20 @@ use hitbox_backend::{
 use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
 use serde::{Deserialize, Serialize};
 
+/// Tarantool cache backend based on rusty_tarantool crate.
+///
+/// # Examples
+/// ```
+/// use hitbox_tarantool::TarantoolBackend;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut backend = TarantoolBackendBuilder::default()
+///         .build()
+///         .unwrap();
+///     backend.init().await.unwrap();
+/// }
+/// ```
 #[derive(Clone, Builder)]
 pub struct TarantoolBackend {
     #[builder(default = "\"hitbox\".to_string()")]
@@ -31,14 +45,18 @@ impl TarantoolBackend {
             .ok_or(BackendError::InternalError(Box::new(err)))
     }
 
+    /// Init backend and configure tarantool instance
+    /// This function is idempotent
     pub async fn init(&mut self) -> BackendResult<()> {
-        let client = ClientConfig::new(
-            format!("{}:{}", self.host, self.port),
-            self.user.clone(),
-            self.password.clone(),
-        )
-        .build();
-        self.client = Some(client);
+        if self.client.is_none() {
+            let client = ClientConfig::new(
+                format!("{}:{}", self.host, self.port),
+                self.user.clone(),
+                self.password.clone(),
+            )
+            .build();
+            self.client = Some(client);
+        }
 
         self.client()?
             .eval(
