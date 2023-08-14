@@ -4,6 +4,7 @@ use hitbox_backend::{
     BackendError, BackendResult, CacheBackend, CacheableResponse, CachedValue, DeleteStatus,
 };
 use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub struct TarantoolBackend {
@@ -117,6 +118,13 @@ impl TarantoolBackendBuilder {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct CacheEntry {
+    pub key: String,
+    pub ttl: Option<u32>,
+    pub value: String,
+}
+
 #[async_trait]
 impl CacheBackend for TarantoolBackend {
     async fn get<T>(&self, key: String) -> BackendResult<Option<CachedValue<T::Cached>>>
@@ -133,10 +141,10 @@ impl CacheBackend for TarantoolBackend {
             .await
             .map_err(|err| BackendError::InternalError(Box::new(err)))?;
         response
-            .decode_result_set::<(String, Option<u32>, String)>()
+            .decode_result_set::<CacheEntry>()
             .map(|value| {
                 Some(
-                    JsonSerializer::<String>::deserialize(value.first().unwrap().2.clone())
+                    JsonSerializer::<String>::deserialize(value.first().unwrap().value.clone())
                         .map_err(BackendError::from)
                         .unwrap(),
                 )
@@ -153,8 +161,8 @@ impl CacheBackend for TarantoolBackend {
             .execute()
             .await
             .map_err(|err| BackendError::InternalError(Box::new(err)))?;
-        let result = response
-            .decode_result_set::<(String, Option<u32>, String)>()
+        let result: Vec<CacheEntry> = response
+            .decode_result_set()
             .map_err(|err| BackendError::InternalError(Box::new(err)))?;
 
         if result.is_empty() {
