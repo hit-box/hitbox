@@ -1,10 +1,6 @@
 # TODO
 
-- [ ] Backend
-- [ ] Tracing
-- [ ] Metrics
-- [ ] Tests
-- [ ] Logs
-- [ ] Remove unwraps
+- [x] Backend
+- [x] Tests
+- [x] Remove unwraps
 - [ ] Add readme
-- [ ] Remove TODO (or move it into issue)
