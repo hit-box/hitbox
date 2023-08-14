@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::EndpointConfig;
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};
@@ -17,12 +17,16 @@ use crate::future::Transformer;
 pub struct CacheService<S, B> {
     upstream: S,
     backend: Arc<B>,
-    config: Config,
+    endpoint_config: Arc<EndpointConfig>,
 }
 
 impl<S, B> CacheService<S, B> {
-    pub fn new(upstream: S, backend: Arc<B>, config: Config) -> Self {
-        CacheService { upstream, backend, config }
+    pub fn new(upstream: S, backend: Arc<B>, endpoint_config: Arc<EndpointConfig>) -> Self {
+        CacheService {
+            upstream,
+            backend,
+            endpoint_config,
+        }
     }
 }
 
@@ -35,7 +39,7 @@ where
         Self {
             upstream: self.upstream.clone(),
             backend: Arc::clone(&self.backend),
-            config: self.config.clone(),
+            endpoint_config: Arc::clone(&self.endpoint_config),
         }
     }
 }
@@ -73,15 +77,14 @@ where
         dbg!(&req);
 
         let transformer = Transformer::new(self.upstream.clone());
-        let config = self.config.clone();
-        let request_predicate = NeutralPredicate::new().query(config.query.0, config.query.1);
+        let config = &self.endpoint_config;
         let response_predicate = NeutralResponsePredicate::new();
         let extractor = NeutralExtractor::new().method().path("/{path}*");
         CacheFuture::new(
             self.backend.clone(),
             CacheableHttpRequest::from_request(req),
             transformer,
-            Arc::new(request_predicate),
+            Arc::new(config.create()),
             Arc::new(response_predicate),
             Arc::new(extractor),
         )

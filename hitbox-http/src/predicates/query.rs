@@ -9,6 +9,12 @@ pub struct Query<P> {
     inner: P,
 }
 
+impl<P> Query<P> {
+    pub fn new(name: String, value: crate::query::Value, operation: Operation, inner: P) -> Self {
+        Self { name, value, operation, inner }
+    }
+}
+
 pub trait QueryPredicate: Sized {
     fn query(self, name: String, value: String) -> Query<Self>;
 }

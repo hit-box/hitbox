@@ -73,9 +73,9 @@ pub mod fsm;
 pub mod metrics;
 pub mod predicates;
 pub use cache::Cacheable;
+pub use cache::Extractor;
 pub use error::CacheError;
 pub use hitbox_backend::{CachePolicy, CacheState, CacheableResponse, CachedValue};
-pub use cache::Extractor;
 
 /// The `hitbox` prelude.
 pub mod prelude {

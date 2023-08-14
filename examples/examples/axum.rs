@@ -39,42 +39,41 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let backend = RedisBackend::new().unwrap();
-    let inmemory = StrettoBackend::builder(2 ^ 16)
-        .finalize()
-        .unwrap();
+    let inmemory = StrettoBackend::builder(2 ^ 16).finalize().unwrap();
     //let request_predicate = predicate::RequestBuilder::new()
-        //.query("cache", "true")
-        //.build();
+    //.query("cache", "true")
+    //.build();
     //let response_predicate = predicate::ResponseBuilder::new()
-        //.status_code(200)
-        //.body(operations::NE(operations::EmptyVec))
-        //.build();
+    //.status_code(200)
+    //.body(operations::NE(operations::EmptyVec))
+    //.build();
     //let cache_key = CacheKeyBuilder::new()
-        //.path(Full)
-        //.method()
-        //.build();
+    //.path(Full)
+    //.method()
+    //.build();
     //let endpoint_config = Config::builder()
-        //.request_predicate(response_predicate)
-        //.response_predicate(response_predicate)
-        //.cache_key(cache_key)
-        //.build();
+    //.request_predicate(response_predicate)
+    //.response_predicate(response_predicate)
+    //.cache_key(cache_key)
+    //.build();
     let app = Router::new()
         .route("/greet/:name/", get(handler_result))
         .route("/", get(handler))
         .route("/json/", get(handler_json))
         .layer(
             ServiceBuilder::new()
+                //.layer(
+                    //Cache::builder()
+                        ////.config(config)
+                        //.backend(inmemory)
+                        //.build(),
+                //)
                 .layer(
                     Cache::builder()
-                       //.config(config)
-                       .backend(inmemory)
-                       .build()
-                )
-                .layer(
-                    Cache::builder()
-                       //.config(config)
-                       .backend(backend)
-                       .build()),
+                        //.config(config)
+                        .backend(backend)
+                        .build(),
+                ),
         );
 
     // run it with hyper on localhost:3000
