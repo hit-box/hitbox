@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use hitbox_backend::{CacheBackend, CacheableResponse, CachedValue, DeleteStatus};
-use hitbox_tarantool::{TarantoolBackend, TarantoolBackendBuilder};
+use hitbox_tarantool::{backend::CacheEntry, TarantoolBackend, TarantoolBackendBuilder};
 use once_cell::sync::Lazy;
 use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,30 @@ use std::{collections::HashMap, str::FromStr, thread, time::Duration};
 use testcontainers::{clients, core::WaitFor, Container, Image};
 
 static DOCKER: Lazy<clients::Cli> = Lazy::new(|| clients::Cli::default());
+
+impl Image for Tarantool {
+    type Args = ();
+
+    fn name(&self) -> String {
+        "tarantool/tarantool".to_owned()
+    }
+
+    fn tag(&self) -> String {
+        "latest".to_owned()
+    }
+
+    fn ready_conditions(&self) -> Vec<WaitFor> {
+        vec![WaitFor::Healthcheck]
+    }
+
+    fn expose_ports(&self) -> Vec<u16> {
+        vec![3301]
+    }
+
+    fn env_vars(&self) -> Box<dyn Iterator<Item = (&String, &String)> + '_> {
+        Box::new(self.env_vars.iter())
+    }
+}
 
 #[derive(Debug)]
 struct Tarantool {
@@ -79,27 +103,30 @@ impl Default for Tarantool {
     }
 }
 
-impl Image for Tarantool {
-    type Args = ();
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+struct Test {
+    a: i32,
+    b: String,
+}
 
-    fn name(&self) -> String {
-        "tarantool/tarantool".to_owned()
+#[async_trait]
+impl CacheableResponse for Test {
+    type Cached = Self;
+
+    async fn into_cached(self) -> Self::Cached {
+        self
     }
-
-    fn tag(&self) -> String {
-        "latest".to_owned()
+    async fn from_cached(cached: Self::Cached) -> Self {
+        cached
     }
+}
 
-    fn ready_conditions(&self) -> Vec<WaitFor> {
-        vec![WaitFor::Healthcheck]
-    }
-
-    fn expose_ports(&self) -> Vec<u16> {
-        vec![3301]
-    }
-
-    fn env_vars(&self) -> Box<dyn Iterator<Item = (&String, &String)> + '_> {
-        Box::new(self.env_vars.iter())
+impl Default for Test {
+    fn default() -> Self {
+        Self {
+            a: 42,
+            b: "nope".to_owned(),
+        }
     }
 }
 
@@ -124,58 +151,24 @@ async fn test_init() {
     assert!(fiber_exists.0);
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-struct Test {
-    a: i32,
-    b: String,
-}
-
-#[async_trait]
-impl CacheableResponse for Test {
-    type Cached = Self;
-
-    async fn into_cached(self) -> Self::Cached {
-        self
-    }
-    async fn from_cached(cached: Self::Cached) -> Self {
-        cached
-    }
-}
-
-impl Test {
-    pub fn new() -> Self {
-        Self {
-            a: 42,
-            b: "nope".to_owned(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-struct TarantoolTuple {
-    key: String,
-    ttl: Option<u32>,
-    value: String,
-}
-
 #[tokio::test]
 async fn test_set() {
     let t = Tarantool::start().await;
     let key = "test_key".to_string();
     let dt = "2012-12-12T12:12:12Z";
     let ttl = 42;
-    let value = CachedValue::new(Test::new(), DateTime::from_str(&dt).unwrap());
+    let value = CachedValue::new(Test::default(), DateTime::from_str(&dt).unwrap());
 
     t.backend
         .set::<Test>(key.clone(), &value, Some(ttl))
         .await
         .unwrap();
 
-    let result: Vec<TarantoolTuple> = t.call("get", &(key.clone())).await;
+    let result: Vec<CacheEntry> = t.call("get", &(key.clone())).await;
 
     assert_eq!(
         result.first().unwrap(),
-        &TarantoolTuple {
+        &CacheEntry {
             key,
             ttl: Some(ttl),
             value: r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#.to_string()
@@ -188,7 +181,7 @@ async fn test_expire() {
     let t = Tarantool::start().await;
     let key = "test_key".to_owned();
     let dt = "2012-12-12T12:12:12Z";
-    let value = CachedValue::new(Test::new(), DateTime::from_str(&dt).unwrap());
+    let value = CachedValue::new(Test::default(), DateTime::from_str(&dt).unwrap());
 
     t.backend
         .set::<Test>(key.clone(), &value, Some(0))
@@ -197,7 +190,7 @@ async fn test_expire() {
 
     thread::sleep(Duration::from_secs(1));
 
-    let result: Vec<TarantoolTuple> = t.call("get", &(key)).await;
+    let result: Vec<CacheEntry> = t.call("get", &(key)).await;
     assert_eq!(result.len(), 0)
 }
 
@@ -210,13 +203,12 @@ async fn test_delete() {
     let status = t.backend.delete(key.to_string()).await.unwrap();
     assert_eq!(status, DeleteStatus::Missing);
 
-    t.call::<_, TarantoolTuple>("replace", &(key, 42, value))
-        .await;
+    t.call::<_, CacheEntry>("replace", &(key, 42, value)).await;
 
     let status = t.backend.delete(key.to_string()).await.unwrap();
     assert_eq!(status, DeleteStatus::Deleted(1));
 
-    let result: Vec<TarantoolTuple> = t.call("get", &(key)).await;
+    let result: Vec<CacheEntry> = t.call("get", &(key)).await;
     assert_eq!(result.len(), 0)
 }
 
@@ -226,12 +218,11 @@ async fn test_get() {
     let key = "test_key";
     let value = r#"{"data":{"a":42,"b":"nope"},"expired":"2012-12-12T12:12:12Z"}"#;
 
-    t.call::<_, TarantoolTuple>("replace", &(key, 42, value))
-        .await;
+    t.call::<_, CacheEntry>("replace", &(key, 42, value)).await;
 
     let data = t.backend.get::<Test>(key.into()).await.unwrap().unwrap();
     let dt: DateTime<Utc> = DateTime::from_str(&"2012-12-12T12:12:12Z").unwrap();
 
-    assert_eq!(data.data, Test::new());
+    assert_eq!(data.data, Test::default());
     assert_eq!(data.expired, dt);
 }
