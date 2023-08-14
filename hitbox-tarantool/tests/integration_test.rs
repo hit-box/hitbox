@@ -45,9 +45,10 @@ impl<'a> Tarantool {
         let port = &container.ports().map_to_host_port_ipv4(3301).unwrap();
         let client =
             ClientConfig::new(format!("{}:{}", "127.0.0.1", &port), "hitbox", "hitbox").build();
-        let backend = TarantoolBackendBuilder::default()
+        let mut backend = TarantoolBackendBuilder::default()
             .port(port.to_string())
-            .build();
+            .build()
+            .unwrap();
         backend.init().await.unwrap();
         StartedTarantool {
             _container: container,

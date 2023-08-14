@@ -1,4 +1,7 @@
+use std::io::{Error, ErrorKind};
+
 use async_trait::async_trait;
+use derive_builder::Builder;
 use hitbox_backend::{
     serializer::{JsonSerializer, Serializer},
     BackendError, BackendResult, CacheBackend, CacheableResponse, CachedValue, DeleteStatus,
@@ -6,26 +9,38 @@ use hitbox_backend::{
 use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Clone, Builder)]
 pub struct TarantoolBackend {
-    client: Client,
+    #[builder(default = "\"hitbox\".to_string()")]
+    user: String,
+    #[builder(default = "\"hitbox\".to_string()")]
+    password: String,
+    #[builder(default = "\"127.0.0.1\".to_string()")]
+    host: String,
+    #[builder(default = "\"3301\".to_string()")]
+    port: String,
+    #[builder(setter(skip))]
+    client: Option<Client>,
 }
 
 impl TarantoolBackend {
-    pub fn new() -> Result<TarantoolBackend, BackendError> {
-        Ok(Self::builder().build())
+    fn client(&self) -> BackendResult<Client> {
+        let err = Error::new(ErrorKind::Other, "Backend is not initialized");
+        self.client
+            .clone()
+            .ok_or(BackendError::InternalError(Box::new(err)))
     }
 
-    /// Creates new TarantoolBackend builder with default settings.
-    pub fn builder() -> TarantoolBackendBuilder {
-        TarantoolBackendBuilder::default()
-    }
-}
+    pub async fn init(&mut self) -> BackendResult<()> {
+        let client = ClientConfig::new(
+            format!("{}:{}", self.host, self.port),
+            self.user.clone(),
+            self.password.clone(),
+        )
+        .build();
+        self.client = Some(client);
 
-impl TarantoolBackend {
-    pub async fn init(&self) -> BackendResult<()> {
-        let client = self.client.clone();
-        client
+        self.client()?
             .eval(
                 "
                     local space_name = ...
@@ -62,59 +77,30 @@ impl TarantoolBackend {
             )
             .await
             .map_err(|err| BackendError::InternalError(Box::new(err)))?;
+
         Ok(())
     }
-}
 
-/// Part of builder pattern implementation for TarantoolBackend actor.
-pub struct TarantoolBackendBuilder {
-    user: String,
-    password: String,
-    host: String,
-    port: String,
-}
-
-impl Default for TarantoolBackendBuilder {
-    fn default() -> Self {
-        Self {
-            user: "hitbox".to_owned(),
-            password: "hitbox".to_owned(),
-            host: "127.0.0.1".to_owned(),
-            port: "3301".to_owned(),
-        }
-    }
-}
-
-impl TarantoolBackendBuilder {
-    pub fn user(mut self, user: String) -> Self {
-        self.user = user;
-        self
+    fn map_err(err: Error) -> BackendError {
+        BackendError::InternalError(Box::new(err))
     }
 
-    pub fn password(mut self, password: String) -> Self {
-        self.password = password;
-        self
-    }
+    async fn call<T>(&self, cmd: &str, params: &T) -> BackendResult<Vec<CacheEntry>>
+    where
+        T: Serialize,
+    {
+        let result: Vec<CacheEntry> = self
+            .client()?
+            .prepare_fn_call(format!("box.space.hitbox_cache:{}", cmd))
+            .bind_ref(params)
+            .map_err(TarantoolBackend::map_err)?
+            .execute()
+            .await
+            .map_err(TarantoolBackend::map_err)?
+            .decode_result_set()
+            .map_err(TarantoolBackend::map_err)?;
 
-    pub fn host(mut self, host: String) -> Self {
-        self.host = host;
-        self
-    }
-
-    pub fn port(mut self, port: String) -> Self {
-        self.port = port;
-        self
-    }
-
-    pub fn build(self) -> TarantoolBackend {
-        let client = ClientConfig::new(
-            format!("{}:{}", self.host, self.port),
-            self.user,
-            self.password,
-        )
-        .build();
-
-        TarantoolBackend { client }
+        Ok(result)
     }
 }
 
@@ -132,40 +118,21 @@ impl CacheBackend for TarantoolBackend {
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
-        let client = self.client.clone();
-        let response = client
-            .prepare_fn_call("box.space.hitbox_cache:get")
-            .bind_ref(&(key))
-            .map_err(|err| BackendError::InternalError(Box::new(err)))?
-            .execute()
-            .await
-            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
-        response
-            .decode_result_set::<CacheEntry>()
-            .map(|value| {
-                Some(
-                    JsonSerializer::<String>::deserialize(value.first().unwrap().value.clone())
-                        .map_err(BackendError::from)
-                        .unwrap(),
-                )
-            })
-            .map_err(|err| BackendError::InternalError(Box::new(err)))
+        let entries = self.call("get", &(key)).await?;
+        let entry = match entries.first() {
+            Some(v) => Some(
+                JsonSerializer::<String>::deserialize(v.value.clone())
+                    .map_err(BackendError::from)?,
+            ),
+            None => None,
+        };
+
+        Ok(entry)
     }
 
     async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
-        let client = self.client.clone();
-        let response = client
-            .prepare_fn_call("box.space.hitbox_cache:delete")
-            .bind_ref(&(key))
-            .map_err(|err| BackendError::InternalError(Box::new(err)))?
-            .execute()
-            .await
-            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
-        let result: Vec<CacheEntry> = response
-            .decode_result_set()
-            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
-
-        if result.is_empty() {
+        let entries = self.call("delete", &(key)).await?;
+        if entries.is_empty() {
             Ok(DeleteStatus::Missing)
         } else {
             Ok(DeleteStatus::Deleted(1))
@@ -182,16 +149,9 @@ impl CacheBackend for TarantoolBackend {
         T: CacheableResponse + Send,
         T::Cached: serde::Serialize + Send + Sync,
     {
-        let client = self.client.clone();
         let serialized_value =
             JsonSerializer::<String>::serialize(value).map_err(BackendError::from)?;
-        client
-            .prepare_fn_call("box.space.hitbox_cache:replace")
-            .bind_ref(&(key, ttl, serialized_value))
-            .map_err(|err| BackendError::InternalError(Box::new(err)))?
-            .execute()
-            .await
-            .map_err(|err| BackendError::InternalError(Box::new(err)))?;
+        self.call("replace", &(key, ttl, serialized_value)).await?;
         Ok(())
     }
 
