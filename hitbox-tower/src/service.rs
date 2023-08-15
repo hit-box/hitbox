@@ -5,7 +5,7 @@ use hitbox::{backend::CacheBackend, fsm::CacheFuture};
 use hitbox_http::{
     extractors::NeutralExtractor,
     extractors::{method::MethodExtractor, path::PathExtractor},
-    predicates::{query::QueryPredicate, NeutralPredicate, NeutralResponsePredicate},
+    predicates::NeutralResponsePredicate,
     CacheableHttpRequest, CacheableHttpResponse, FromBytes,
 };
 use http::{Request, Response};
@@ -78,15 +78,13 @@ where
 
         let transformer = Transformer::new(self.upstream.clone());
         let config = &self.endpoint_config;
-        let response_predicate = NeutralResponsePredicate::new();
-        let extractor = NeutralExtractor::new().method().path("/{path}*");
         CacheFuture::new(
             self.backend.clone(),
             CacheableHttpRequest::from_request(req),
             transformer,
-            Arc::new(config.create()),
-            Arc::new(response_predicate),
-            Arc::new(extractor),
+            Arc::new(config.request_predicates()),
+            Arc::new(config.response_predicates()),
+            Arc::new(config.extractors()),
         )
     }
 }

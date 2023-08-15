@@ -11,7 +11,12 @@ pub struct Query<P> {
 
 impl<P> Query<P> {
     pub fn new(name: String, value: crate::query::Value, operation: Operation, inner: P) -> Self {
-        Self { name, value, operation, inner }
+        Self {
+            name,
+            value,
+            operation,
+            inner,
+        }
     }
 }
 

@@ -1,31 +1,30 @@
 use crate::CacheableHttpRequest;
-use actix_router::ResourceDef;
 use async_trait::async_trait;
 use hitbox::predicates::{Predicate, PredicateResult};
 
-pub struct Path<P> {
-    resource: ResourceDef,
+pub struct Method<P> {
+    method: http::Method,
     inner: P,
 }
 
-pub trait PathPredicate: Sized {
-    fn path(self, resource: String) -> Path<Self>;
+pub trait MethodPredicate: Sized {
+    fn method(self, method: http::Method) -> Method<Self>;
 }
 
-impl<P> PathPredicate for P
+impl<P> MethodPredicate for P
 where
     P: Predicate,
 {
-    fn path(self, resource: String) -> Path<Self> {
-        Path {
-            resource: ResourceDef::from(resource),
+    fn method(self, method: http::Method) -> Method<Self> {
+        Method {
+            method,
             inner: self,
         }
     }
 }
 
 #[async_trait]
-impl<P, ReqBody> Predicate for Path<P>
+impl<P, ReqBody> Predicate for Method<P>
 where
     P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
     ReqBody: Send + 'static,
@@ -35,7 +34,7 @@ where
     async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
-                if self.resource.is_match(request.parts().uri.path()) {
+                if self.method == request.parts().method {
                     PredicateResult::Cacheable(request)
                 } else {
                     PredicateResult::NonCacheable(request)

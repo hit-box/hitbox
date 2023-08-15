@@ -28,8 +28,8 @@ where
 }
 
 pub struct CacheableHttpResponse<ResBody> {
-    parts: Parts,
-    body: ResponseBody<ResBody>,
+    pub parts: Parts,
+    pub body: ResponseBody<ResBody>,
 }
 
 impl<ResBody> CacheableHttpResponse<ResBody>
