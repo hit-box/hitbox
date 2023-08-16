@@ -1,7 +1,7 @@
 mod body;
 pub mod extractors;
 pub mod predicates;
-mod query;
+pub mod query;
 mod request;
 mod response;
 

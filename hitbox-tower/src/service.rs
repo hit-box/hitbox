@@ -1,41 +1,32 @@
-use std::{fmt::Debug, marker::PhantomData, pin::Pin, sync::Arc};
+use crate::config::EndpointConfig;
+use std::{fmt::Debug, sync::Arc};
 
-use bytes::Bytes;
-use chrono::{Duration, Utc};
-use futures::{
-    future::{BoxFuture, Map},
-    Future, FutureExt,
-};
-use hitbox::{
-    backend::{BackendError, CacheBackend},
-    fsm::{CacheFuture, Transform},
-    Cacheable, CachedValue,
-};
-use hitbox_backend::CacheableResponse;
+use hitbox::{backend::CacheBackend, fsm::CacheFuture};
 use hitbox_http::{
     extractors::NeutralExtractor,
     extractors::{method::MethodExtractor, path::PathExtractor},
-    predicates::{query::QueryPredicate, NeutralPredicate, NeutralResponsePredicate},
-    CacheableHttpRequest, CacheableHttpResponse, FromBytes, SerializableHttpResponse,
+    predicates::NeutralResponsePredicate,
+    CacheableHttpRequest, CacheableHttpResponse, FromBytes,
 };
 use http::{Request, Response};
 use hyper::body::{Body, HttpBody};
-use serde::{de::DeserializeOwned, Serialize};
 use tower::Service;
 
-use hitbox::fsm::CacheFuture3;
-use tracing::log::warn;
-
-use crate::future::{Transformer, UpstreamFuture};
+use crate::future::Transformer;
 
 pub struct CacheService<S, B> {
     upstream: S,
     backend: Arc<B>,
+    endpoint_config: Arc<EndpointConfig>,
 }
 
 impl<S, B> CacheService<S, B> {
-    pub fn new(upstream: S, backend: Arc<B>) -> Self {
-        CacheService { upstream, backend }
+    pub fn new(upstream: S, backend: Arc<B>, endpoint_config: Arc<EndpointConfig>) -> Self {
+        CacheService {
+            upstream,
+            backend,
+            endpoint_config,
+        }
     }
 }
 
@@ -48,6 +39,7 @@ where
         Self {
             upstream: self.upstream.clone(),
             backend: Arc::clone(&self.backend),
+            endpoint_config: Arc::clone(&self.endpoint_config),
         }
     }
 }
@@ -85,15 +77,14 @@ where
         dbg!(&req);
 
         let transformer = Transformer::new(self.upstream.clone());
+        let config = &self.endpoint_config;
         CacheFuture::new(
             self.backend.clone(),
             CacheableHttpRequest::from_request(req),
             transformer,
-            Arc::new(Box::new(
-                NeutralPredicate::new().query("cache".to_owned(), "true".to_owned()),
-            )),
-            Arc::new(NeutralResponsePredicate::new()),
-            Arc::new(NeutralExtractor::new().method().path("/{path}*")),
+            Arc::new(config.request_predicates()),
+            Arc::new(config.response_predicates()),
+            Arc::new(config.extractors()),
         )
     }
 }

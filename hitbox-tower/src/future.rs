@@ -4,12 +4,10 @@ use std::{
     task::{Context, Poll},
 };
 
-use bytes::Bytes;
-use futures::{future::BoxFuture, Future, FutureExt};
+use futures::{future::BoxFuture, Future};
 use hitbox::fsm::Transform;
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, FromBytes};
 use http::{Request, Response};
-use hyper::Body;
 use pin_project::pin_project;
 use tower::Service;
 

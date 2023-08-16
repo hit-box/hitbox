@@ -312,6 +312,7 @@ where
                 } => {
                     let policy = ready!(cache_policy_future.poll(cx));
                     trace!("{policy:?}");
+                    dbg!(&policy);
                     match policy {
                         crate::cache::CachePolicy::Cacheable { key, request } => {
                             let backend = this.backend.clone();
@@ -372,10 +373,12 @@ where
                 StateProj::UpstreamPolled { upstream_result } => {
                     let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
                     let predicates = this.response_predicates.clone();
-                    let cache_policy =
-                        Box::pin(async move { upstream_result.cache_policy(predicates).await });
-                    State::CheckResponseCachePolicy { cache_policy }
-                    // return Poll::Ready(this.transformer.response_transform(upstream_result));
+                    match this.cache_key {
+                        Some(_cache_key) => State::CheckResponseCachePolicy { 
+                            cache_policy: Box::pin(async move { upstream_result.cache_policy(predicates).await }) 
+                        },
+                        None => State::Response { response: Some(upstream_result) }
+                    }
                 }
                 StateProj::CheckResponseCachePolicy { cache_policy } => {
                     let policy = ready!(cache_policy.poll(cx));

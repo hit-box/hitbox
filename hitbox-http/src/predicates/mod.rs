@@ -1,7 +1,4 @@
-use std::{
-    marker::PhantomData,
-    sync::{atomic::AtomicPtr, Arc, RwLock},
-};
+use std::{marker::PhantomData, sync::atomic::AtomicPtr};
 
 use async_trait::async_trait;
 use hitbox_backend::predicates::{Predicate, PredicateResult};
@@ -10,8 +7,10 @@ use crate::{CacheableHttpRequest, CacheableHttpResponse};
 
 pub mod body;
 pub mod header;
+pub mod method;
 pub mod path;
 pub mod query;
+pub mod status_code;
 
 pub struct NeutralPredicate<ReqBody> {
     _req: PhantomData<AtomicPtr<Box<ReqBody>>>, // FIX: NOT HEHE
