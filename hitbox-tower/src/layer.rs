@@ -1,4 +1,4 @@
-use crate::config::EndpointConfig;
+use crate::config::{EndpointConfig, RequestPredicateBuilder};
 use std::sync::Arc;
 
 use hitbox::backend::CacheBackend;
@@ -28,7 +28,7 @@ impl<S, B> Layer<S> for Cache<B> {
         CacheService::new(
             upstream,
             Arc::clone(&self.backend),
-            Arc::new(Default::default()),
+            Arc::clone(&self.endpoint_config),
         )
     }
 }
@@ -41,7 +41,7 @@ impl Cache<DummyBackend> {
 
 pub struct CacheBuilder<B> {
     backend: Option<B>,
-    endpoint_config: Option<EndpointConfig>,
+    endpoint_config: EndpointConfig,
 }
 
 impl<B> CacheBuilder<B>
@@ -55,10 +55,23 @@ where
         }
     }
 
+    pub fn request(self, predicates: RequestPredicateBuilder) -> Self {
+        let endpoint_config = EndpointConfig {
+            request_predicates: predicates.build(),
+            response_predicates: self.endpoint_config.response_predicates,
+            extractors: self.endpoint_config.extractors,
+        };
+        CacheBuilder {
+            backend: self.backend,
+            endpoint_config,
+        }
+    }
+
     pub fn build(self) -> Cache<B> {
+        dbg!(&self.endpoint_config);
         Cache {
             backend: Arc::new(self.backend.expect("Please add some cache backend")),
-            endpoint_config: Arc::new(self.endpoint_config.unwrap_or_default()),
+            endpoint_config: Arc::new(self.endpoint_config),
         }
     }
 }

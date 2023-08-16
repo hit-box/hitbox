@@ -16,6 +16,7 @@ use hitbox_http::predicates::{
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 
+#[derive(Debug)]
 pub enum RequestPredicate {
     Path { path: String },
     Method { method: http::Method },
@@ -24,11 +25,13 @@ pub enum RequestPredicate {
     //Body { statement: String },
 }
 
+#[derive(Debug)]
 pub enum ResponsePredicate {
     StatusCode { code: http::StatusCode },
     //Body { statement: String },
 }
 
+#[derive(Debug)]
 pub enum RequestExtractor {
     Path { path: String },
     Method,
@@ -37,6 +40,7 @@ pub enum RequestExtractor {
     //Body { statement: String },
 }
 
+#[derive(Debug)]
 pub struct EndpointConfig {
     pub request_predicates: Vec<RequestPredicate>,
     pub response_predicates: Vec<ResponsePredicate>,
@@ -50,6 +54,10 @@ impl EndpointConfig {
             response_predicates: Vec::new(),
             extractors: Vec::new(),
         }
+    }
+
+    pub fn builder<ReqBody>() -> EndpointConfigBuilder<NeutralPredicate<ReqBody>> {
+        EndpointConfigBuilder::default()
     }
 
     pub fn with_request_predicate(self, predicate: RequestPredicate) -> Self {
@@ -71,17 +79,22 @@ impl EndpointConfig {
         ReqBody: Send + 'static,
     {
         let acc_predicate = Box::new(NeutralPredicate::new());
+        dbg!(&self.request_predicates);
         self.request_predicates
             .iter()
-            .rfold(acc_predicate, |inner, predicate| match predicate {
-                RequestPredicate::Path { path } => Box::new(inner.path(path.clone())),
-                RequestPredicate::Query { key, value } => {
-                    Box::new(inner.query(key.clone(), value.clone()))
+            .rfold(acc_predicate, |inner, predicate| {
+                dbg!("+++++++++++++++++++++++++++++++++++++++++++++++");
+                dbg!(&predicate);
+                match predicate {
+                    RequestPredicate::Path { path } => Box::new(inner.path(path.clone())),
+                    RequestPredicate::Query { key, value } => {
+                        Box::new(inner.query(key.clone(), value.clone()))
+                    }
+                    RequestPredicate::Header { key, value } => {
+                        Box::new(inner.header(key.clone(), value.clone()))
+                    }
+                    RequestPredicate::Method { method } => Box::new(inner.method(method.clone())),
                 }
-                RequestPredicate::Header { key, value } => {
-                    Box::new(inner.header(key.clone(), value.clone()))
-                }
-                RequestPredicate::Method { method } => Box::new(inner.method(method.clone())),
             })
     }
 
@@ -133,3 +146,117 @@ impl Default for EndpointConfig {
         }
     }
 }
+
+pub struct EndpointConfigBuilder<RP> {
+    request_predicates: RP,
+}
+
+impl<ReqBody> Default for EndpointConfigBuilder<NeutralPredicate<ReqBody>> {
+    fn default() -> Self {
+        EndpointConfigBuilder {
+            request_predicates: NeutralPredicate::new(),
+        }
+    }
+}
+
+// impl<P> EndpointConfigBuilder<P> {
+//     pub fn request(predicate_builder: RequestPredicateBuilder<P>) -> EndpointConfigBuilder<P> {
+//         EndpointConfigBuilder {
+//             request_predicates: predicate_builder.predicate,
+//         }
+//     }
+// }
+
+pub struct RequestPredicateBuilder {
+    predicates: Vec<RequestPredicate>,
+}
+
+impl RequestPredicateBuilder {
+    pub fn new() -> Self {
+        RequestPredicateBuilder {
+            predicates: Vec::new(),
+        }
+    }
+
+    pub fn query(mut self, key: &str, value: &str) -> Self {
+        self.predicates.push(RequestPredicate::Query {
+            key: key.to_owned(),
+            value: value.to_owned(),
+        });
+        self
+    }
+
+    pub fn path(mut self, path: &str) -> Self {
+        self.predicates.push(RequestPredicate::Path {
+            path: path.to_owned(),
+        });
+        self
+    }
+
+    pub fn build(self) -> Vec<RequestPredicate> {
+        self.predicates
+    }
+}
+
+pub mod request {
+    use super::RequestPredicateBuilder;
+
+    pub fn query(key: &str, value: &str) -> RequestPredicateBuilder {
+        RequestPredicateBuilder::new().query(key, value)
+    }
+
+    pub fn path(path: &str) -> RequestPredicateBuilder {
+        RequestPredicateBuilder::new().path(path)
+    }
+}
+
+// pub struct RequestPredicateBuilder<P> {
+//     predicate: P,
+// }
+//
+// impl<ReqBody> Default for RequestPredicateBuilder<NeutralPredicate<ReqBody>> {
+//     fn default() -> Self {
+//         RequestPredicateBuilder {
+//             predicate: NeutralPredicate::new(),
+//         }
+//     }
+// }
+//
+// use hitbox_http::predicates::query::Query;
+//
+// impl<P> RequestPredicateBuilder<P>
+// where
+//     P: Predicate,
+// {
+//     pub fn query(self, key: &str, value: &str) -> RequestPredicateBuilder<Query<P>> {
+//         RequestPredicateBuilder {
+//             predicate: self.predicate.query(key.to_owned(), value.to_owned()),
+//         }
+//     }
+// }
+//
+// pub struct Request;
+//
+// impl Request {
+//     fn query<ReqBody>(
+//         key: &str,
+//         value: &str,
+//     ) -> RequestPredicateBuilder<Query<NeutralPredicate<ReqBody>>>
+//     where
+//         ReqBody: Send + 'static,
+//     {
+//         RequestPredicateBuilder {
+//             predicate: NeutralPredicate::new().query(key.to_owned(), value.to_owned()),
+//         }
+//     }
+// }
+//
+// #[test]
+// fn test_endpoint_config_builder() {
+//     use hyper::Body;
+//     let config = EndpointConfigBuilder::request(
+//         Request::query::<Body>("hui", "hui")
+//             .query("pizda", "pizda")
+//             .query("test", "test"),
+//     );
+// }

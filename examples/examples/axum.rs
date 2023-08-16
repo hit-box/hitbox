@@ -56,6 +56,7 @@ async fn main() {
     //.response_predicate(response_predicate)
     //.cache_key(cache_key)
     //.build();
+    use hitbox_tower::config::request;
     let app = Router::new()
         .route("/greet/:name/", get(handler_result))
         .route("/", get(handler))
@@ -63,15 +64,22 @@ async fn main() {
         .layer(
             ServiceBuilder::new()
                 //.layer(
-                    //Cache::builder()
-                        ////.config(config)
-                        //.backend(inmemory)
-                        //.build(),
+                //Cache::builder()
+                ////.config(config)
+                //.backend(inmemory)
+                //.build(),
                 //)
                 .layer(
                     Cache::builder()
                         //.config(config)
                         .backend(backend)
+                        .request(
+                            request::query("cache", "true")
+                                .query("x-cache", "true")
+                                .path("/{path}*"),
+                        )
+                        // .response(response::header())
+                        // .key(path("/{}*"))
                         .build(),
                 ),
         );
