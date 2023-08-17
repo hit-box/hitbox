@@ -1,7 +1,7 @@
 use crate::CacheableHttpRequest;
 use actix_router::ResourceDef;
 use async_trait::async_trait;
-use hitbox::predicates::{Predicate, PredicateResult};
+use hitbox::predicate::{Predicate, PredicateResult};
 
 pub struct Path<P> {
     resource: ResourceDef,

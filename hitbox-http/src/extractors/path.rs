@@ -1,7 +1,6 @@
-use actix_router::{ResourceDef, ResourcePath};
+use actix_router::ResourceDef;
 use async_trait::async_trait;
-use hitbox::cache::{CacheableRequest, Extractor, KeyPart, KeyParts};
-use http::HeaderValue;
+use hitbox::{Extractor, KeyPart, KeyParts};
 
 use crate::CacheableHttpRequest;
 
@@ -39,10 +38,7 @@ where
         self.resource.capture_match_info(&mut path);
         let mut matched_parts = path
             .iter()
-            .map(|(key, value)| KeyPart {
-                key: key.to_owned(),
-                value: Some(value.to_owned()),
-            })
+            .map(|(key, value)| KeyPart::new(key.to_owned(), Some(value.to_owned())))
             .collect::<Vec<_>>();
         let mut parts = self.inner.get(subject).await;
         parts.append(&mut matched_parts);

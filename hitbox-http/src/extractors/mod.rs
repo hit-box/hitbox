@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
-use hitbox::cache::{Extractor, KeyPart, KeyParts};
+use hitbox::{Extractor, KeyParts};
 
 use crate::CacheableHttpRequest;
 
@@ -28,9 +28,12 @@ where
     type Subject = CacheableHttpRequest<ResBody>;
 
     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
-        KeyParts {
-            subject,
-            parts: Vec::new(),
-        }
+        KeyParts::new(subject)
+    }
+}
+
+impl<ResBody> Default for NeutralExtractor<ResBody> {
+    fn default() -> Self {
+        Self::new()
     }
 }

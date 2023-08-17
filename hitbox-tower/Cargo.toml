@@ -7,15 +7,20 @@ license = "MIT"
 description = "Hitbox integration for Tower framework"
 readme = "README.md"
 repository = "https://github.com/hit-box/hitbox/"
-categories = ["caching", "asynchronous", "network-programming", "web-programming"]
+categories = [
+    "caching",
+    "asynchronous",
+    "network-programming",
+    "web-programming",
+]
 keywords = ["cache", "tower", "async", "http", "hitbox"]
 
 [dependencies]
 tower = "0.4"
 hitbox = { path = "../hitbox", version = "0.1" }
 hitbox-http = { path = "../hitbox-http", version = "0.1" }
-hitbox-redis = { path = "../hitbox-redis", version = "0.1" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
+hitbox-stretto = { path = "../hitbox-stretto", version = "0.1" }
 hyper = { version = "0.14", default-features = false }
 tracing = { version = "0.1" }
 http = "0.2"
@@ -23,5 +28,4 @@ serde = "1"
 futures = "0.3"
 pin-project = "1"
 chrono = "0.4"
-axum = "0.6"
 bytes = "1"

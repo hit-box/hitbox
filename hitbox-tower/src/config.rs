@@ -1,4 +1,4 @@
-use hitbox::predicates::Predicate;
+use hitbox::predicate::Predicate;
 use hitbox::Extractor;
 use hitbox_http::extractors::NeutralExtractor;
 use hitbox_http::extractors::{
@@ -11,7 +11,7 @@ use hitbox_http::predicates::{
     //body::BodyPredicate,
     query::QueryPredicate,
     status_code::StatusCodePredicate,
-    NeutralPredicate,
+    NeutralRequestPredicate,
     NeutralResponsePredicate,
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
@@ -56,20 +56,8 @@ impl EndpointConfig {
         }
     }
 
-    pub fn builder<ReqBody>() -> EndpointConfigBuilder<NeutralPredicate<ReqBody>> {
+    pub fn builder<ReqBody>() -> EndpointConfigBuilder<NeutralRequestPredicate<ReqBody>> {
         EndpointConfigBuilder::default()
-    }
-
-    pub fn with_request_predicate(self, predicate: RequestPredicate) -> Self {
-        self
-    }
-
-    pub fn with_response_predicate(self, predicate: ResponsePredicate) -> Self {
-        self
-    }
-
-    pub fn with_cache_key(self, extractor: RequestExtractor) -> Self {
-        self
     }
 
     pub(crate) fn request_predicates<ReqBody>(
@@ -78,7 +66,7 @@ impl EndpointConfig {
     where
         ReqBody: Send + 'static,
     {
-        let acc_predicate = Box::new(NeutralPredicate::new());
+        let acc_predicate = Box::new(NeutralRequestPredicate::new());
         dbg!(&self.request_predicates);
         self.request_predicates
             .iter()
@@ -148,24 +136,16 @@ impl Default for EndpointConfig {
 }
 
 pub struct EndpointConfigBuilder<RP> {
-    request_predicates: RP,
+    pub request_predicates: RP, // TODO: maybe private?
 }
 
-impl<ReqBody> Default for EndpointConfigBuilder<NeutralPredicate<ReqBody>> {
+impl<ReqBody> Default for EndpointConfigBuilder<NeutralRequestPredicate<ReqBody>> {
     fn default() -> Self {
         EndpointConfigBuilder {
-            request_predicates: NeutralPredicate::new(),
+            request_predicates: NeutralRequestPredicate::new(),
         }
     }
 }
-
-// impl<P> EndpointConfigBuilder<P> {
-//     pub fn request(predicate_builder: RequestPredicateBuilder<P>) -> EndpointConfigBuilder<P> {
-//         EndpointConfigBuilder {
-//             request_predicates: predicate_builder.predicate,
-//         }
-//     }
-// }
 
 pub struct RequestPredicateBuilder {
     predicates: Vec<RequestPredicate>,
@@ -198,6 +178,12 @@ impl RequestPredicateBuilder {
     }
 }
 
+impl Default for RequestPredicateBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub mod request {
     use super::RequestPredicateBuilder;
 
@@ -209,54 +195,3 @@ pub mod request {
         RequestPredicateBuilder::new().path(path)
     }
 }
-
-// pub struct RequestPredicateBuilder<P> {
-//     predicate: P,
-// }
-//
-// impl<ReqBody> Default for RequestPredicateBuilder<NeutralPredicate<ReqBody>> {
-//     fn default() -> Self {
-//         RequestPredicateBuilder {
-//             predicate: NeutralPredicate::new(),
-//         }
-//     }
-// }
-//
-// use hitbox_http::predicates::query::Query;
-//
-// impl<P> RequestPredicateBuilder<P>
-// where
-//     P: Predicate,
-// {
-//     pub fn query(self, key: &str, value: &str) -> RequestPredicateBuilder<Query<P>> {
-//         RequestPredicateBuilder {
-//             predicate: self.predicate.query(key.to_owned(), value.to_owned()),
-//         }
-//     }
-// }
-//
-// pub struct Request;
-//
-// impl Request {
-//     fn query<ReqBody>(
-//         key: &str,
-//         value: &str,
-//     ) -> RequestPredicateBuilder<Query<NeutralPredicate<ReqBody>>>
-//     where
-//         ReqBody: Send + 'static,
-//     {
-//         RequestPredicateBuilder {
-//             predicate: NeutralPredicate::new().query(key.to_owned(), value.to_owned()),
-//         }
-//     }
-// }
-//
-// #[test]
-// fn test_endpoint_config_builder() {
-//     use hyper::Body;
-//     let config = EndpointConfigBuilder::request(
-//         Request::query::<Body>("hui", "hui")
-//             .query("pizda", "pizda")
-//             .query("test", "test"),
-//     );
-// }

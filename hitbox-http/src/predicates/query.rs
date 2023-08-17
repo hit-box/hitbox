@@ -1,6 +1,11 @@
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
-use hitbox::predicates::{Operation, Predicate, PredicateResult};
+use hitbox::predicate::{Predicate, PredicateResult};
+
+pub enum Operation {
+    Eq,
+    In,
+}
 
 pub struct Query<P> {
     pub name: String,

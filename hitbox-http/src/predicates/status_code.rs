@@ -1,6 +1,6 @@
 use crate::CacheableHttpResponse;
 use async_trait::async_trait;
-use hitbox::predicates::{Predicate, PredicateResult};
+use hitbox::predicate::{Predicate, PredicateResult};
 
 pub struct StatusCode<P> {
     status_code: http::StatusCode,

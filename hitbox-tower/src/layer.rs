@@ -2,9 +2,10 @@ use crate::config::{EndpointConfig, RequestPredicateBuilder};
 use std::sync::Arc;
 
 use hitbox::backend::CacheBackend;
+use hitbox_stretto::StrettoBackend;
 use tower::Layer;
 
-use crate::{dummy::DummyBackend, service::CacheService};
+use crate::service::CacheService;
 
 #[derive(Clone)]
 pub struct Cache<B> {
@@ -33,9 +34,9 @@ impl<S, B> Layer<S> for Cache<B> {
     }
 }
 
-impl Cache<DummyBackend> {
-    pub fn builder() -> CacheBuilder<DummyBackend> {
-        CacheBuilder::<DummyBackend>::default()
+impl Cache<StrettoBackend> {
+    pub fn builder() -> CacheBuilder<StrettoBackend> {
+        CacheBuilder::default()
     }
 }
 

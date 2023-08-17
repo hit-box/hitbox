@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use async_trait::async_trait;
-use hitbox::predicates::{Predicate, PredicateResult};
+use hitbox::predicate::{Predicate, PredicateResult};
 use http::Request;
 use hyper::body::{to_bytes, HttpBody};
 

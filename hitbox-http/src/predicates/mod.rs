@@ -1,7 +1,7 @@
-use std::{marker::PhantomData, sync::atomic::AtomicPtr};
+use std::marker::PhantomData;
 
 use async_trait::async_trait;
-use hitbox_backend::predicates::{Predicate, PredicateResult};
+use hitbox::predicate::{Predicate, PredicateResult};
 
 use crate::{CacheableHttpRequest, CacheableHttpResponse};
 
@@ -12,18 +12,18 @@ pub mod path;
 pub mod query;
 pub mod status_code;
 
-pub struct NeutralPredicate<ReqBody> {
-    _req: PhantomData<AtomicPtr<Box<ReqBody>>>, // FIX: NOT HEHE
+pub struct NeutralRequestPredicate<ReqBody> {
+    _req: PhantomData<fn(ReqBody) -> ReqBody>,
 }
 
-impl<ReqBody> NeutralPredicate<ReqBody> {
+impl<ReqBody> NeutralRequestPredicate<ReqBody> {
     pub fn new() -> Self {
-        NeutralPredicate { _req: PhantomData }
+        NeutralRequestPredicate { _req: PhantomData }
     }
 }
 
 #[async_trait]
-impl<ReqBody> Predicate for NeutralPredicate<ReqBody>
+impl<ReqBody> Predicate for NeutralRequestPredicate<ReqBody>
 where
     ReqBody: Send + 'static,
 {
@@ -34,8 +34,14 @@ where
     }
 }
 
+impl<ReqBody> Default for NeutralRequestPredicate<ReqBody> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct NeutralResponsePredicate<ResBody> {
-    _res: PhantomData<fn(ResBody) -> ResBody>, // FIX: HEHE
+    _res: PhantomData<fn(ResBody) -> ResBody>,
 }
 
 impl<ResBody> NeutralResponsePredicate<ResBody> {
@@ -53,5 +59,11 @@ where
 
     async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
         PredicateResult::Cacheable(subject)
+    }
+}
+
+impl<ResBody> Default for NeutralResponsePredicate<ResBody> {
+    fn default() -> Self {
+        Self::new()
     }
 }

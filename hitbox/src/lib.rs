@@ -61,23 +61,30 @@
 //! [RedisBackend]: https://docs.rs/hitbox_redis/
 //! [hitbox-actix]: https://docs.rs/hitbox_actix/
 //! [dogpile effect]: https://www.sobstel.org/blog/preventing-dogpile-effect/
-#![warn(missing_docs)]
+#![allow(missing_docs)] // TODO: replace to warn
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod backend;
-pub mod cache;
 pub mod error;
 pub mod fsm;
 #[cfg(feature = "metrics")]
 #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
 pub mod metrics;
-pub mod predicates;
-pub use cache::Cacheable;
-pub use cache::Extractor;
 pub use error::CacheError;
-pub use hitbox_backend::{CachePolicy, CacheState, CacheableResponse, CachedValue};
+pub use hitbox_core::{
+    CacheKey, CachePolicy, CacheState, CacheablePolicyData, CacheableRequest, CacheableResponse,
+    CachedValue, Extractor, KeyPart, KeyParts, Predicate, RequestCachePolicy, ResponseCachePolicy,
+};
+
+pub mod predicate {
+    pub use hitbox_core::{Predicate, PredicateResult};
+}
+
+pub mod extractor {
+    pub use hitbox_core::Extractor;
+}
 
 /// The `hitbox` prelude.
 pub mod prelude {
-    pub use crate::{CacheError, Cacheable, CacheableResponse};
+    pub use crate::{CacheError, CacheableRequest, CacheableResponse};
 }

@@ -1,7 +1,10 @@
 [package]
 name = "hitbox-stretto"
 version = "0.1.0"
-authors = ["Belousov Max <mail@singulared.space>", "Andrey Ermilov <andrerm@ya.ru>"]
+authors = [
+    "Belousov Max <mail@singulared.space>",
+    "Andrey Ermilov <andrerm@ya.ru>",
+]
 license = "MIT"
 edition = "2021"
 description = "Hitbox in-memory backend based on Stretto lib."
@@ -13,23 +16,11 @@ keywords = ["cache", "async", "cache-backend", "hitbox", "redis"]
 [dependencies]
 hitbox = { path = "../hitbox", features = ["metrics"] }
 hitbox-backend = { path = "../hitbox-backend" }
-hitbox-tower = { path = "../hitbox-tower" }
-hitbox-redis = { path = "../hitbox-redis" }
+async-trait = "0.1"
 thiserror = "1"
 stretto = { version = "0.8", features = ["async"] }
-actix = "0.13"
-axum = "0.6"
-log = "0.4"
-actix-rt = "2"
 serde = { version = "1", features = ["derive"] }
-env_logger = "0.10"
-serde_json = "1"
-hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
-tower = { version = "0.4", features = ["full"] }
-tower-http = { version = "0.4", features = ["full"] }
-http = "0.2"
-lazy_static = "1"
 
 [dev-dependencies]
 chrono = { version = "0.4", features = ["serde"] }

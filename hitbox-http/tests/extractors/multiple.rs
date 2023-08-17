@@ -1,4 +1,4 @@
-use hitbox::cache::Extractor;
+use hitbox::Extractor;
 use hitbox_http::extractors::{
     header::HeaderExtractor, method::MethodExtractor, path::PathExtractor, NeutralExtractor,
 };

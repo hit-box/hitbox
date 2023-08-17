@@ -3,8 +3,9 @@
 members = [
     "hitbox",
     "hitbox-backend",
+    "hitbox-core",
     "hitbox-redis",
-		"hitbox-stretto",
+    "hitbox-stretto",
     "hitbox-tower",
     "examples",
 ]

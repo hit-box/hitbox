@@ -1,6 +1,10 @@
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
-use hitbox::predicates::{Operation, Predicate, PredicateResult};
+use hitbox::predicate::{Predicate, PredicateResult};
+
+pub enum Operation {
+    Eq,
+}
 
 pub struct Header<P> {
     pub name: String,
@@ -49,7 +53,6 @@ where
                     }
                     None => PredicateResult::NonCacheable(request),
                 },
-                _ => unimplemented!(),
             },
             PredicateResult::NonCacheable(request) => PredicateResult::NonCacheable(request),
         }

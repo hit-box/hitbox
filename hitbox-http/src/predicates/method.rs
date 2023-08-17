@@ -1,6 +1,6 @@
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
-use hitbox::predicates::{Predicate, PredicateResult};
+use hitbox::predicate::{Predicate, PredicateResult};
 
 pub struct Method<P> {
     method: http::Method,

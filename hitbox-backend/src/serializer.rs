@@ -1,10 +1,7 @@
 use std::marker::PhantomData;
 
-use crate::{
-    response::{CachePolicy, CacheableResponse},
-    CachedValue,
-};
 use chrono::{DateTime, Utc};
+use hitbox_core::CachedValue;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
@@ -36,10 +33,6 @@ struct SerializableCachedValue<U> {
 }
 
 impl<U> SerializableCachedValue<U> {
-    pub fn new(data: U, expired: DateTime<Utc>) -> Self {
-        SerializableCachedValue { data, expired }
-    }
-
     pub fn into_cached_value(self) -> CachedValue<U> {
         CachedValue::new(self.data, self.expired)
     }
@@ -60,10 +53,7 @@ impl Serializer for JsonSerializer<Vec<u8>> {
         let deserialized: SerializableCachedValue<T> = serde_json::from_slice(&data)
             .map_err(|err| SerializerError::Deserialize(Box::new(err)))?;
         let cached_value = deserialized.into_cached_value();
-        Ok(CachedValue::new(
-            cached_value.data.into(),
-            cached_value.expired,
-        ))
+        Ok(CachedValue::new(cached_value.data, cached_value.expired))
     }
 
     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, SerializerError>
@@ -74,8 +64,8 @@ impl Serializer for JsonSerializer<Vec<u8>> {
             data: &value.data,
             expired: value.expired,
         };
-        Ok(serde_json::to_vec(&serializable_value)
-            .map_err(|err| SerializerError::Serialize(Box::new(err)))?)
+        serde_json::to_vec(&serializable_value)
+            .map_err(|err| SerializerError::Serialize(Box::new(err)))
     }
 }
 
@@ -89,10 +79,7 @@ impl Serializer for JsonSerializer<String> {
         let deserialized: SerializableCachedValue<T> = serde_json::from_str(&data)
             .map_err(|err| SerializerError::Deserialize(Box::new(err)))?;
         let cached_value = deserialized.into_cached_value();
-        Ok(CachedValue::new(
-            cached_value.data.into(),
-            cached_value.expired,
-        ))
+        Ok(CachedValue::new(cached_value.data, cached_value.expired))
     }
 
     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, SerializerError>
@@ -103,8 +90,8 @@ impl Serializer for JsonSerializer<String> {
             data: &value.data,
             expired: value.expired,
         };
-        Ok(serde_json::to_string(&serializable_value)
-            .map_err(|err| SerializerError::Serialize(Box::new(err)))?)
+        serde_json::to_string(&serializable_value)
+            .map_err(|err| SerializerError::Serialize(Box::new(err)))
     }
 }
 
@@ -123,10 +110,7 @@ impl Serializer for BinSerializer<Vec<u8>> {
         let deserialized: SerializableCachedValue<T> = bincode::deserialize(&data)
             .map_err(|err| SerializerError::Deserialize(Box::new(err)))?;
         let cached_value = deserialized.into_cached_value();
-        Ok(CachedValue::new(
-            cached_value.data.into(),
-            cached_value.expired,
-        ))
+        Ok(CachedValue::new(cached_value.data, cached_value.expired))
     }
 
     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, SerializerError>
@@ -137,19 +121,17 @@ impl Serializer for BinSerializer<Vec<u8>> {
             data: &value.data,
             expired: value.expired,
         };
-        Ok(bincode::serialize(&serializable_value)
-            .map_err(|err| SerializerError::Serialize(Box::new(err)))?)
+        bincode::serialize(&serializable_value)
+            .map_err(|err| SerializerError::Serialize(Box::new(err)))
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::convert::Infallible;
-
     use async_trait::async_trait;
+    use hitbox_core::CacheableResponse;
 
     use super::*;
-    use crate::response::CacheableResponse;
 
     #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
     struct Test {

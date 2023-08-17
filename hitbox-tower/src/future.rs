@@ -20,7 +20,7 @@ impl<S, ReqBody> Transformer<S, ReqBody> {
     pub fn new(inner: S) -> Self {
         Transformer {
             inner,
-            _req: PhantomData::default(),
+            _req: PhantomData,
         }
     }
 }

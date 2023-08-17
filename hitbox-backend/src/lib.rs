@@ -3,16 +3,11 @@
 //!
 //! If you want implement your own backend, you in the right place.
 mod backend;
-pub mod predicates;
-mod response;
 pub mod serializer;
-mod value;
 
 pub use backend::{BackendResult, CacheBackend};
-pub use response::{CachePolicy, CacheState, CacheableResponse};
 use serializer::SerializerError;
 use thiserror::Error;
-pub use value::{CachedValue, EvictionPolicy, TtlSettings};
 
 /// Proxy Error describes general groups of errors in backend interaction process.
 #[derive(Debug, Error)]

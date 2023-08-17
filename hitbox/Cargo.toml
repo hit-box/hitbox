@@ -1,7 +1,10 @@
 [package]
 name = "hitbox"
 version = "0.1.0"
-authors = ["Belousov Max <mail@singulared.space>", "Andrey Ermilov <andrerm@ya.ru>"]
+authors = [
+    "Belousov Max <mail@singulared.space>",
+    "Andrey Ermilov <andrerm@ya.ru>",
+]
 license = "MIT"
 edition = "2021"
 description = "Asynchronous caching framework."
@@ -11,21 +14,17 @@ categories = ["caching", "asynchronous"]
 keywords = ["cache", "async", "cache-backend", "hitbox", "tokio"]
 
 [dependencies]
+hitbox-core = { path = "../hitbox-core", version = "0.1.0" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"], default-features = false }
 thiserror = "1"
 metrics = { version = "0.21", optional = true }
 lazy_static = { version = "1", optional = true }
 tracing = "0.1"
-tokio = { version = "1.17.0", features = ["macros"] }
 async-trait = "0.1.52"
 pin-project = "1"
-futures = { version = "0.3", futures = ["alloc"] }
-
-[dev-dependencies]
-tokio = { version = "1", features = ["macros", "test-util"] }
-metrics-util = "0.15"
+futures = { version = "0.3", features = ["alloc"], default-features = false }
 
 [features]
 default = []

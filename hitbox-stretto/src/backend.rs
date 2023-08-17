@@ -1,8 +1,9 @@
 use crate::builder::StrettoBackendBuilder;
-use axum::async_trait;
+use async_trait::async_trait;
+use hitbox::{CacheableResponse, CachedValue};
 use hitbox_backend::{
     serializer::{BinSerializer, Serializer},
-    BackendError, BackendResult, CacheBackend, CacheableResponse, CachedValue, DeleteStatus,
+    BackendError, BackendResult, CacheBackend, DeleteStatus,
 };
 use std::time::Duration;
 use stretto::AsyncCache;
@@ -51,7 +52,7 @@ impl CacheBackend for StrettoBackend {
         T: CacheableResponse + Send,
         T::Cached: serde::Serialize + Send + Sync,
     {
-        let serialized = BinSerializer::<Vec<u8>>::serialize(&value).map_err(BackendError::from)?;
+        let serialized = BinSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
         let cost = serialized.len();
         let inserted = match ttl {
             Some(ttl) => {
@@ -85,12 +86,12 @@ impl CacheBackend for StrettoBackend {
 
 #[cfg(test)]
 mod test {
-    use axum::async_trait;
+    use async_trait::async_trait;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
 
     use super::*;
-    use hitbox_backend::CacheableResponse;
+    use hitbox::CacheableResponse;
 
     #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
     struct Test {

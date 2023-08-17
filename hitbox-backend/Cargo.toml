@@ -1,7 +1,10 @@
 [package]
 name = "hitbox-backend"
 version = "0.1.0"
-authors = ["Belousov Max <mail@singulared.space>", "Andrey Ermilov <andrerm@ya.ru>"]
+authors = [
+    "Belousov Max <mail@singulared.space>",
+    "Andrey Ermilov <andrerm@ya.ru>",
+]
 license = "MIT"
 edition = "2021"
 description = "Backend trait for asynchronous caching framework in Rust."
@@ -11,9 +14,9 @@ categories = ["caching", "asynchronous"]
 keywords = ["cache", "actix", "async", "cache-backend", "hitbox"]
 
 [dependencies]
+hitbox-core = { path = "../hitbox-core", version = "0.1.0" }
 async-trait = "0.1"
-futures = { version = "0.3", default-features = false }
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"], default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 bincode = "1"

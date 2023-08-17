@@ -1,7 +1,10 @@
 [package]
 name = "hitbox-redis"
 version = "0.1.0"
-authors = ["Belousov Max <mail@singulared.space>", "Andrey Ermilov <andrerm@ya.ru>"]
+authors = [
+    "Belousov Max <mail@singulared.space>",
+    "Andrey Ermilov <andrerm@ya.ru>",
+]
 license = "MIT"
 edition = "2021"
 description = "Hitbox redis backend."
@@ -12,8 +15,9 @@ keywords = ["cache", "async", "cache-backend", "hitbox", "redis"]
 
 [dependencies]
 hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
+hitbox = { path = "../hitbox", version = "0.1.0" }
 log = "0.4"
-redis = { version = "0.22", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "0.23", features = ["tokio-comp", "connection-manager"] }
 thiserror = "1"
 async-trait = "0.1"
 serde = "1"
@@ -22,7 +26,9 @@ tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 chrono = "0.4"
-env_logger = "0.10"
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", features = ["time", "macros", "test-util", "rt-multi-thread"] }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
+tokio = { version = "1", features = [
+    "time",
+    "macros",
+    "test-util",
+    "rt-multi-thread",
+] }

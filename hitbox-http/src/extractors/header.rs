@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use hitbox::cache::{Extractor, KeyPart, KeyParts};
+use hitbox::{Extractor, KeyPart, KeyParts};
 use http::HeaderValue;
 
 use crate::CacheableHttpRequest;
@@ -41,10 +41,7 @@ where
             .flatten()
             .map(str::to_string);
         let mut parts = self.inner.get(subject).await;
-        parts.push(KeyPart {
-            key: self.name.clone(),
-            value,
-        });
+        parts.push(KeyPart::new(self.name.clone(), value));
         parts
     }
 }

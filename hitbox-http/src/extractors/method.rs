@@ -1,6 +1,5 @@
 use async_trait::async_trait;
-use hitbox::cache::{Extractor, KeyPart, KeyParts};
-use http::HeaderValue;
+use hitbox::{Extractor, KeyPart, KeyParts};
 
 use crate::CacheableHttpRequest;
 
@@ -32,10 +31,7 @@ where
     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
         let method = subject.parts().method.to_string();
         let mut parts = self.inner.get(subject).await;
-        parts.push(KeyPart {
-            key: "method".to_owned(),
-            value: Some(method),
-        });
+        parts.push(KeyPart::new("method".to_owned(), Some(method)));
         parts
     }
 }

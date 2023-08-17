@@ -2,9 +2,8 @@ use std::{collections::HashMap, fmt::Debug};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use hitbox::cache::CacheableResponse;
+use hitbox::CacheableResponse;
 use http::{response::Parts, Response};
-use http_body::Full;
 use hyper::body::{to_bytes, HttpBody};
 use serde::{Deserialize, Serialize};
 

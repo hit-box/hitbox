@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use hitbox::cache::{Extractor, KeyPart, KeyParts};
+use hitbox::{Extractor, KeyPart, KeyParts};
 
 use crate::CacheableHttpRequest;
 
@@ -35,15 +35,11 @@ where
             .uri
             .query()
             .map(crate::query::parse)
-            .map(|m| m.get(&self.name).map(crate::query::Value::inner))
-            .flatten()
+            .and_then(|m| m.get(&self.name).map(crate::query::Value::inner))
             .unwrap_or_default();
         let mut parts = self.inner.get(subject).await;
         for value in values {
-            parts.push(KeyPart {
-                key: self.name.clone(),
-                value: Some(value),
-            });
+            parts.push(KeyPart::new(self.name.clone(), Some(value)));
         }
         parts
     }

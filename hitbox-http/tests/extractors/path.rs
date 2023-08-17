@@ -1,4 +1,4 @@
-use hitbox::cache::Extractor;
+use hitbox::Extractor;
 use hitbox_http::extractors::{path::PathExtractor, NeutralExtractor};
 use hitbox_http::CacheableHttpRequest;
 use http::Request;

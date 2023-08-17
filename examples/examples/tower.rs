@@ -1,5 +1,4 @@
 use hitbox_redis::RedisBackend;
-use hitbox_stretto::builder::StrettoBackendBuilder;
 use hitbox_stretto::StrettoBackend;
 use hitbox_tower::Cache;
 use hyper::{Body, Server};

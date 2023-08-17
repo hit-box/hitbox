@@ -1,10 +1,11 @@
 use std::fmt::Debug;
 
 use futures::future::BoxFuture;
-use hitbox_backend::{BackendError, CachePolicy, CacheState, CacheableResponse, CachedValue};
+use hitbox_backend::BackendError;
+use hitbox_core::{RequestCachePolicy, ResponseCachePolicy};
 use pin_project::pin_project;
 
-use crate::cache::CacheKey;
+use crate::{CacheState, CacheableResponse, CachedValue};
 
 pub type CacheResult<R> = Result<Option<CachedValue<R>>, BackendError>;
 pub type PollCache<R> = BoxFuture<'static, CacheResult<R>>;
@@ -19,7 +20,7 @@ where
     Initial,
     CheckRequestCachePolicy {
         #[pin]
-        cache_policy_future: BoxFuture<'static, crate::cache::CachePolicy<R>>,
+        cache_policy_future: BoxFuture<'static, RequestCachePolicy<R>>,
     },
     PollCache {
         #[pin]
@@ -40,7 +41,7 @@ where
     },
     CheckResponseCachePolicy {
         #[pin]
-        cache_policy: BoxFuture<'static, CachePolicy<C>>,
+        cache_policy: BoxFuture<'static, ResponseCachePolicy<C>>,
     },
     UpdateCache {
         #[pin]

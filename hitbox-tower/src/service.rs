@@ -2,12 +2,7 @@ use crate::config::EndpointConfig;
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};
-use hitbox_http::{
-    extractors::NeutralExtractor,
-    extractors::{method::MethodExtractor, path::PathExtractor},
-    predicates::NeutralResponsePredicate,
-    CacheableHttpRequest, CacheableHttpResponse, FromBytes,
-};
+use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, FromBytes};
 use http::{Request, Response};
 use hyper::body::{Body, HttpBody};
 use tower::Service;

@@ -1,4 +1,4 @@
-use hitbox::cache::Extractor;
+use hitbox::Extractor;
 use hitbox_http::extractors::{method::MethodExtractor, NeutralExtractor};
 use hitbox_http::CacheableHttpRequest;
 use http::{Method, Request};

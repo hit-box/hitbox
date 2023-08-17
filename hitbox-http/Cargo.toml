@@ -7,7 +7,12 @@ edition = "2021"
 description = "Cacheable HTTP Request and Response"
 readme = "README.md"
 repository = "https://github.com/hit-box/hitbox/"
-categories = ["caching", "asynchronous", "web-programming", "network-programming"]
+categories = [
+    "caching",
+    "asynchronous",
+    "web-programming",
+    "network-programming",
+]
 keywords = ["cache", "async", "http", "hitbox"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -28,5 +33,7 @@ serde_qs = "0.12"
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["test-util"], default-features = false }
-
+tokio = { version = "1", features = [
+    "test-util",
+    "macros",
+], default-features = false }

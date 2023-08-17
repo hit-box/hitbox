@@ -1,5 +1,6 @@
-use crate::{BackendError, CacheableResponse, CachedValue, DeleteStatus};
+use crate::{BackendError, DeleteStatus};
 use async_trait::async_trait;
+use hitbox_core::{CacheableResponse, CachedValue};
 
 pub type BackendResult<T> = Result<T, BackendError>;
 

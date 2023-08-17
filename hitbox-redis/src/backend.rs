@@ -1,9 +1,10 @@
 //! Redis backend actor implementation.
 use crate::error::Error;
 use async_trait::async_trait;
+use hitbox::{CacheableResponse, CachedValue};
 use hitbox_backend::{
     serializer::{JsonSerializer, Serializer},
-    BackendError, BackendResult, CacheBackend, CacheableResponse, CachedValue, DeleteStatus,
+    BackendError, BackendResult, CacheBackend, DeleteStatus,
 };
 use redis::{aio::ConnectionManager, Client};
 use tokio::sync::OnceCell;
@@ -142,7 +143,7 @@ impl CacheBackend for RedisBackend {
         let mut con = self.connection().await?.clone();
         let mut request = redis::cmd("SET");
         let serialized_value =
-            JsonSerializer::<Vec<u8>>::serialize(&value).map_err(BackendError::from)?;
+            JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
         request.arg(key).arg(serialized_value);
         if let Some(ttl) = ttl {
             request.arg("EX").arg(ttl);

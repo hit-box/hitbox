@@ -39,7 +39,7 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let backend = RedisBackend::new().unwrap();
-    let inmemory = StrettoBackend::builder(2 ^ 16).finalize().unwrap();
+    let _inmemory = StrettoBackend::builder(2 ^ 16).finalize().unwrap();
     //let request_predicate = predicate::RequestBuilder::new()
     //.query("cache", "true")
     //.build();

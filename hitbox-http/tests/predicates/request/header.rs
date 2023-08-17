@@ -1,6 +1,6 @@
-use hitbox::predicates::{Operation, Predicate};
+use hitbox::predicate::{Predicate, PredicateResult};
 use hitbox_http::predicates::header::HeaderPredicate;
-use hitbox_http::predicates::NeutralPredicate;
+use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::CacheableHttpRequest;
 use http::Request;
 use hyper::Body;
@@ -12,12 +12,10 @@ async fn test_request_header_predicates_positive() {
         .body(Body::empty())
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
-    let predicate = NeutralPredicate::new().header("x-test".to_owned(), "test-value".to_owned());
+    let predicate =
+        NeutralRequestPredicate::new().header("x-test".to_owned(), "test-value".to_owned());
     let prediction = predicate.check(request).await;
-    assert!(matches!(
-        prediction,
-        hitbox::predicates::PredicateResult::Cacheable(_)
-    ));
+    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
 #[tokio::test]
@@ -27,12 +25,10 @@ async fn test_request_header_predicates_negative_by_key() {
         .body(Body::empty())
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
-    let predicate = NeutralPredicate::new().header("missing".to_owned(), "test-value".to_owned());
+    let predicate =
+        NeutralRequestPredicate::new().header("missing".to_owned(), "test-value".to_owned());
     let prediction = predicate.check(request).await;
-    assert!(matches!(
-        prediction,
-        hitbox::predicates::PredicateResult::NonCacheable(_)
-    ));
+    assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }
 
 #[tokio::test]
@@ -42,10 +38,8 @@ async fn test_request_header_predicates_negative_by_value() {
         .body(Body::empty())
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
-    let predicate = NeutralPredicate::new().header("x-test".to_owned(), "missing".to_owned());
+    let predicate =
+        NeutralRequestPredicate::new().header("x-test".to_owned(), "missing".to_owned());
     let prediction = predicate.check(request).await;
-    assert!(matches!(
-        prediction,
-        hitbox::predicates::PredicateResult::NonCacheable(_)
-    ));
+    assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }
