@@ -1,4 +1,7 @@
-use crate::config::{EndpointConfig, RequestPredicateBuilder};
+use crate::{
+    config::EndpointConfig, request_extractor::ExtractorBuilder,
+    request_predicate::RequestPredicateBuilder, response_predicate::ResponsePredicateBuilder,
+};
 use std::sync::Arc;
 
 use hitbox::backend::CacheBackend;
@@ -61,6 +64,30 @@ where
             request_predicates: predicates.build(),
             response_predicates: self.endpoint_config.response_predicates,
             extractors: self.endpoint_config.extractors,
+        };
+        CacheBuilder {
+            backend: self.backend,
+            endpoint_config,
+        }
+    }
+
+    pub fn response(self, predicates: ResponsePredicateBuilder) -> Self {
+        let endpoint_config = EndpointConfig {
+            request_predicates: self.endpoint_config.request_predicates,
+            response_predicates: predicates.build(),
+            extractors: self.endpoint_config.extractors,
+        };
+        CacheBuilder {
+            backend: self.backend,
+            endpoint_config,
+        }
+    }
+
+    pub fn cache_key(self, extractors: ExtractorBuilder) -> Self {
+        let endpoint_config = EndpointConfig {
+            request_predicates: self.endpoint_config.request_predicates,
+            response_predicates: self.endpoint_config.response_predicates,
+            extractors: extractors.build(),
         };
         CacheBuilder {
             backend: self.backend,

@@ -1,9 +1,12 @@
 use axum::{extract::Path, routing::get, Json, Router};
+use hitbox_tower::{
+    extractor,
+    predicate::{request, response},
+    Method, StatusCode,
+};
 
 use hitbox_redis::RedisBackend;
-use hitbox_stretto::StrettoBackend;
 use hitbox_tower::Cache;
-use http::StatusCode;
 use tower::ServiceBuilder;
 
 async fn handler_result(Path(name): Path<String>) -> Result<String, StatusCode> {
@@ -39,50 +42,22 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let backend = RedisBackend::new().unwrap();
-    let _inmemory = StrettoBackend::builder(2 ^ 16).finalize().unwrap();
-    //let request_predicate = predicate::RequestBuilder::new()
-    //.query("cache", "true")
-    //.build();
-    //let response_predicate = predicate::ResponseBuilder::new()
-    //.status_code(200)
-    //.body(operations::NE(operations::EmptyVec))
-    //.build();
-    //let cache_key = CacheKeyBuilder::new()
-    //.path(Full)
-    //.method()
-    //.build();
-    //let endpoint_config = Config::builder()
-    //.request_predicate(response_predicate)
-    //.response_predicate(response_predicate)
-    //.cache_key(cache_key)
-    //.build();
-    use hitbox_tower::config::request;
+    let json_cache = Cache::builder()
+        .backend(backend)
+        .request(
+            request::method(Method::GET)
+                .query("cache", "true")
+                .query("x-cache", "true")
+                .path("/{path}*"),
+        )
+        .response(response::status_code(StatusCode::OK))
+        .cache_key(extractor::method().query("cache").path("/{path}*"))
+        .build();
     let app = Router::new()
         .route("/greet/:name/", get(handler_result))
         .route("/", get(handler))
         .route("/json/", get(handler_json))
-        .layer(
-            ServiceBuilder::new()
-                //.layer(
-                //Cache::builder()
-                ////.config(config)
-                //.backend(inmemory)
-                //.build(),
-                //)
-                .layer(
-                    Cache::builder()
-                        //.config(config)
-                        .backend(backend)
-                        .request(
-                            request::query("cache", "true")
-                                .query("x-cache", "true")
-                                .path("/{path}*"),
-                        )
-                        // .response(response::header())
-                        // .key(path("/{}*"))
-                        .build(),
-                ),
-        );
+        .layer(ServiceBuilder::new().layer(json_cache));
 
     // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
