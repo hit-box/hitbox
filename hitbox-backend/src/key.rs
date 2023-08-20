@@ -10,11 +10,11 @@ pub trait KeySerializer {
     fn serialize(key: &CacheKey) -> Result<Self::Output, SerializerError>;
 }
 
-pub struct UrlEncodedSerializer<Output = String> {
+pub struct UrlEncodedKeySerializer<Output = String> {
     _output: PhantomData<Output>,
 }
 
-impl KeySerializer for UrlEncodedSerializer<String> {
+impl KeySerializer for UrlEncodedKeySerializer<String> {
     type Output = String;
 
     fn serialize(key: &CacheKey) -> Result<Self::Output, SerializerError> {

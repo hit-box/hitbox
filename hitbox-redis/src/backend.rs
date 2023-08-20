@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use hitbox::{CacheKey, CacheableResponse, CachedValue};
 use hitbox_backend::{
     serializer::{JsonSerializer, Serializer},
-    BackendError, BackendResult, CacheBackend, DeleteStatus, KeySerializer, UrlEncodedSerializer,
+    BackendError, BackendResult, CacheBackend, DeleteStatus, KeySerializer,
+    UrlEncodedKeySerializer,
 };
 use redis::{aio::ConnectionManager, Client};
 use tokio::sync::OnceCell;
@@ -96,7 +97,7 @@ impl CacheBackend for RedisBackend {
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
         let client = self.client.clone();
-        let cache_key = UrlEncodedSerializer::<String>::serialize(key)?;
+        let cache_key = UrlEncodedKeySerializer::serialize(key)?;
         async move {
             let mut con = client.get_tokio_connection_manager().await.unwrap();
             let result: Option<Vec<u8>> = redis::cmd("GET")
@@ -116,7 +117,7 @@ impl CacheBackend for RedisBackend {
 
     async fn delete(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
         let mut con = self.connection().await?.clone();
-        let cache_key = UrlEncodedSerializer::<String>::serialize(key)?;
+        let cache_key = UrlEncodedKeySerializer::serialize(key)?;
         redis::cmd("DEL")
             .arg(cache_key)
             .query_async(&mut con)
@@ -144,7 +145,7 @@ impl CacheBackend for RedisBackend {
     {
         let mut con = self.connection().await?.clone();
         let mut request = redis::cmd("SET");
-        let cache_key = UrlEncodedSerializer::<String>::serialize(key)?;
+        let cache_key = UrlEncodedKeySerializer::serialize(key)?;
         let serialized_value =
             JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
         request.arg(cache_key).arg(serialized_value);

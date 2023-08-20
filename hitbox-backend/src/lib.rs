@@ -7,7 +7,7 @@ mod key;
 pub mod serializer;
 
 pub use backend::{BackendResult, CacheBackend};
-pub use key::{KeySerializer, UrlEncodedSerializer};
+pub use key::{KeySerializer, UrlEncodedKeySerializer};
 use serializer::SerializerError;
 use thiserror::Error;
 
