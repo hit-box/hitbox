@@ -1,7 +1,7 @@
 #[derive(Default, Debug)]
 pub struct EnabledCacheConfig {
-    ttl: Option<std::time::Duration>,
-    stale_cache: Option<std::time::Duration>,
+    ttl: Option<u32>,
+    stale_cache: Option<u32>,
 }
 
 #[derive(Debug)]
