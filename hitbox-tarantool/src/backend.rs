@@ -15,14 +15,14 @@ const TARANTOOL_INIT_LUA: &str = include_str!("init.lua");
 ///
 /// # Examples
 /// ```
-/// use hitbox_tarantool::TarantoolBackend;
+/// use hitbox_tarantool::TarantoolBackendBuilder;
 ///
 /// #[tokio::main]
 /// async fn main() {
 ///     let mut backend = TarantoolBackendBuilder::default()
 ///         .build()
 ///         .unwrap();
-///     backend.init().await.unwrap();
+///     // backend.init().await.unwrap();
 /// }
 /// ```
 #[derive(Clone, Builder)]
@@ -78,7 +78,7 @@ impl TarantoolBackend {
     {
         let result: Vec<CacheEntry> = self
             .client()?
-            .prepare_fn_call(format!("box.space.hitbox_cache:{}", cmd))
+            .prepare_fn_call(format!("hitbox.{}", cmd))
             .bind_ref(params)
             .map_err(TarantoolBackend::map_err)?
             .execute()
@@ -138,7 +138,7 @@ impl CacheBackend for TarantoolBackend {
     {
         let serialized_value =
             JsonSerializer::<String>::serialize(value).map_err(BackendError::from)?;
-        self.call("replace", &(key, ttl, serialized_value)).await?;
+        self.call("set", &(key, ttl, serialized_value)).await?;
         Ok(())
     }
 
