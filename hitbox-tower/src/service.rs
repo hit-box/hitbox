@@ -1,7 +1,7 @@
 use crate::config::EndpointConfig;
 use std::{fmt::Debug, sync::Arc};
 
-use hitbox::{backend::CacheBackend, fsm::CacheFuture};
+use hitbox::{backend::CacheBackend, fsm::CacheFuture, policy::PolicyConfig};
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, FromBytes};
 use http::{Request, Response};
 use hyper::body::{Body, HttpBody};
@@ -13,14 +13,21 @@ pub struct CacheService<S, B> {
     upstream: S,
     backend: Arc<B>,
     endpoint_config: Arc<EndpointConfig>,
+    policy: Arc<PolicyConfig>,
 }
 
 impl<S, B> CacheService<S, B> {
-    pub fn new(upstream: S, backend: Arc<B>, endpoint_config: Arc<EndpointConfig>) -> Self {
+    pub fn new(
+        upstream: S,
+        backend: Arc<B>,
+        endpoint_config: Arc<EndpointConfig>,
+        policy: Arc<PolicyConfig>,
+    ) -> Self {
         CacheService {
             upstream,
             backend,
             endpoint_config,
+            policy,
         }
     }
 }
@@ -35,6 +42,7 @@ where
             upstream: self.upstream.clone(),
             backend: Arc::clone(&self.backend),
             endpoint_config: Arc::clone(&self.endpoint_config),
+            policy: Arc::clone(&self.policy),
         }
     }
 }
@@ -69,7 +77,7 @@ where
     }
 
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        dbg!(&req);
+        //dbg!(&req);
 
         let transformer = Transformer::new(self.upstream.clone());
         let config = &self.endpoint_config;
@@ -80,6 +88,7 @@ where
             Arc::new(config.request_predicates()),
             Arc::new(config.response_predicates()),
             Arc::new(config.extractors()),
+            self.policy.clone(),
         )
     }
 }

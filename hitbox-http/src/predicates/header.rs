@@ -40,7 +40,7 @@ where
     type Subject = P::Subject;
 
     async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
-        dbg!("HeaderPredicate::check");
+        //dbg!("HeaderPredicate::check");
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => match self.operation {
                 Operation::Eq => match request.parts().headers.get(self.name.as_str()) {

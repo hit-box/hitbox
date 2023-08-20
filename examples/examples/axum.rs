@@ -10,12 +10,12 @@ use hitbox_tower::Cache;
 use tower::ServiceBuilder;
 
 async fn handler_result(Path(name): Path<String>) -> Result<String, StatusCode> {
-    dbg!("axum::handler_result");
+    //dbg!("axum::handler_result");
     Ok(format!("Hello, {name}"))
 }
 
 async fn handler() -> String {
-    dbg!("axum::handler");
+    //dbg!("axum::handler");
     format!("root")
 }
 
@@ -26,7 +26,7 @@ struct Greet {
 }
 
 async fn handler_json() -> Json<Greet> {
-    dbg!("axum::handler");
+    //dbg!("axum::handler");
     Json(Greet {
         name: "root".to_owned(),
         answer: 42,
@@ -53,11 +53,21 @@ async fn main() {
         .response(response::status_code(StatusCode::OK))
         .cache_key(extractor::method().query("cache").path("/{path}*"))
         .build();
+    let backend = hitbox_stretto::StrettoBackend::builder(10)
+        .finalize()
+        .unwrap();
+    let health_check = Cache::builder()
+        .backend(backend) // FIX: it should work withod backend
+        .request(request::path("/health").method(Method::GET))
+        .disable()
+        .build();
     let app = Router::new()
         .route("/greet/:name/", get(handler_result))
         .route("/", get(handler))
         .route("/json/", get(handler_json))
-        .layer(ServiceBuilder::new().layer(json_cache));
+        .layer(ServiceBuilder::new().layer(json_cache))
+        .route("/health", get(handler))
+        .layer(ServiceBuilder::new().layer(health_check));
 
     // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())

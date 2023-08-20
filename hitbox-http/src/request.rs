@@ -44,7 +44,7 @@ where
         P: Predicate<Subject = Self> + Send + Sync,
         E: Extractor<Subject = Self> + Send + Sync,
     {
-        dbg!("CacheableHttpRequest::cache_policy");
+        //dbg!("CacheableHttpRequest::cache_policy");
         let (request, key) = extractors.get(self).await.into_cache_key();
 
         match predicates.check(request).await {

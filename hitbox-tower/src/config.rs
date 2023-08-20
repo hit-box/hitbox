@@ -59,7 +59,7 @@ impl EndpointConfig {
         ReqBody: Send + 'static,
     {
         let acc_predicate = Box::new(NeutralRequestPredicate::new());
-        dbg!(&self.request_predicates);
+        //dbg!(&self.request_predicates);
         self.request_predicates
             .iter()
             .rfold(acc_predicate, |inner, predicate| match predicate {

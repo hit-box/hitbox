@@ -4,7 +4,10 @@ use crate::{
 };
 use std::sync::Arc;
 
-use hitbox::backend::CacheBackend;
+use hitbox::{
+    backend::CacheBackend,
+    policy::{EnabledCacheConfig, PolicyConfig},
+};
 use hitbox_stretto::StrettoBackend;
 use tower::Layer;
 
@@ -14,6 +17,7 @@ use crate::service::CacheService;
 pub struct Cache<B> {
     pub backend: Arc<B>,
     pub endpoint_config: Arc<EndpointConfig>,
+    pub policy: Arc<PolicyConfig>,
 }
 
 impl<B> Cache<B> {
@@ -21,6 +25,7 @@ impl<B> Cache<B> {
         Cache {
             backend: Arc::new(backend),
             endpoint_config: Arc::new(Default::default()),
+            policy: Arc::new(Default::default()),
         }
     }
 }
@@ -33,6 +38,7 @@ impl<S, B> Layer<S> for Cache<B> {
             upstream,
             Arc::clone(&self.backend),
             Arc::clone(&self.endpoint_config),
+            Arc::clone(&self.policy),
         )
     }
 }
@@ -46,6 +52,7 @@ impl Cache<StrettoBackend> {
 pub struct CacheBuilder<B> {
     backend: Option<B>,
     endpoint_config: EndpointConfig,
+    policy: PolicyConfig,
 }
 
 impl<B> CacheBuilder<B>
@@ -56,6 +63,23 @@ where
         CacheBuilder {
             backend: Some(backend),
             endpoint_config: self.endpoint_config,
+            policy: self.policy,
+        }
+    }
+
+    pub fn enable(self, policy: EnabledCacheConfig) -> Self {
+        CacheBuilder {
+            backend: self.backend,
+            endpoint_config: self.endpoint_config,
+            policy: PolicyConfig::Enabled(policy),
+        }
+    }
+
+    pub fn disable(self) -> Self {
+        CacheBuilder {
+            backend: self.backend,
+            endpoint_config: self.endpoint_config,
+            policy: PolicyConfig::Disabled,
         }
     }
 
@@ -68,6 +92,7 @@ where
         CacheBuilder {
             backend: self.backend,
             endpoint_config,
+            policy: self.policy,
         }
     }
 
@@ -80,6 +105,7 @@ where
         CacheBuilder {
             backend: self.backend,
             endpoint_config,
+            policy: self.policy,
         }
     }
 
@@ -92,14 +118,15 @@ where
         CacheBuilder {
             backend: self.backend,
             endpoint_config,
+            policy: self.policy,
         }
     }
 
     pub fn build(self) -> Cache<B> {
-        dbg!(&self.endpoint_config);
         Cache {
             backend: Arc::new(self.backend.expect("Please add some cache backend")),
             endpoint_config: Arc::new(self.endpoint_config),
+            policy: Arc::new(self.policy),
         }
     }
 }
@@ -109,6 +136,7 @@ impl<B> Default for CacheBuilder<B> {
         Self {
             backend: None,
             endpoint_config: Default::default(),
+            policy: Default::default(),
         }
     }
 }

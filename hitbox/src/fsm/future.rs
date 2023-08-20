@@ -172,6 +172,7 @@ where
     request_predicates: Arc<dyn Predicate<Subject = Req> + Send + Sync>,
     response_predicates: Arc<dyn Predicate<Subject = Res> + Send + Sync>,
     key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
+    policy: Arc<crate::policy::PolicyConfig>,
 }
 
 impl<B, Req, Res, T> CacheFuture<B, Req, Res, T>
@@ -189,6 +190,7 @@ where
         request_predicates: Arc<dyn Predicate<Subject = Req> + Send + Sync>,
         response_predicates: Arc<dyn Predicate<Subject = Res> + Send + Sync>,
         key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
+        policy: Arc<crate::policy::PolicyConfig>,
     ) -> Self {
         CacheFuture {
             transformer,
@@ -200,6 +202,7 @@ where
             request_predicates,
             response_predicates,
             key_extractors,
+            policy,
         }
     }
 }
@@ -226,13 +229,24 @@ where
         loop {
             let state = match this.state.as_mut().project() {
                 StateProj::Initial => {
-                    let request = this.request.take().expect(POLL_AFTER_READY_ERROR);
                     let predicates = this.request_predicates.clone();
                     let extractors = this.key_extractors.clone();
-                    let cache_policy_future =
-                        Box::pin(async move { request.cache_policy(predicates, extractors).await });
-                    State::CheckRequestCachePolicy {
-                        cache_policy_future,
+                    let request = this.request.take().expect(POLL_AFTER_READY_ERROR);
+                    match this.policy.as_ref() {
+                        crate::policy::PolicyConfig::Enabled(_) => {
+                            let cache_policy_future = Box::pin(async move {
+                                request.cache_policy(predicates, extractors).await
+                            });
+                            State::CheckRequestCachePolicy {
+                                cache_policy_future,
+                            }
+                        }
+                        crate::policy::PolicyConfig::Disabled => {
+                            dbg!("Cache Disabled");
+                            let upstream_future =
+                                Box::pin(this.transformer.upstream_transform(request));
+                            State::PollUpstream { upstream_future }
+                        }
                     }
                 }
                 StateProj::CheckRequestCachePolicy {
@@ -262,8 +276,8 @@ where
                     poll_cache,
                     request,
                 } => {
-                    let cached = ready!(poll_cache.poll(cx)).unwrap_or_else(|err| {
-                        println!("cache backend error: {err}");
+                    let cached = ready!(poll_cache.poll(cx)).unwrap_or_else(|_err| {
+                        //println!("cache backend error: {err}");
                         None
                     });
                     match cached {
