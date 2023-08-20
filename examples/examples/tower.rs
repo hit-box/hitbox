@@ -7,8 +7,9 @@ use std::{convert::Infallible, net::SocketAddr};
 use http::{Request, Response};
 use tower::make::Shared;
 
-async fn handle(_: Request<Body>) -> Result<Response<Body>, Infallible> {
-    Ok(Response::new("Hello, World!".into()))
+async fn handle(_: Request<Body>) -> Result<Response<Body>, String> {
+    // Ok(Response::new("Hello, World!".into()))
+    Err("handler error".to_owned())
 }
 
 #[tokio::main]

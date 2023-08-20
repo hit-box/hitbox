@@ -9,9 +9,10 @@ use hitbox_redis::RedisBackend;
 use hitbox_tower::Cache;
 use tower::ServiceBuilder;
 
-async fn handler_result(Path(name): Path<String>) -> Result<String, StatusCode> {
+async fn handler_result(Path(name): Path<String>) -> Result<String, String> {
     //dbg!("axum::handler_result");
-    Ok(format!("Hello, {name}"))
+    // Ok(format!("Hello, {name}"))
+    Err("error".to_owned())
 }
 
 async fn handler() -> String {
@@ -65,9 +66,8 @@ async fn main() {
         .route("/greet/:name/", get(handler_result))
         .route("/", get(handler))
         .route("/json/", get(handler_json))
-        .layer(json_cache)
-        .route("/health", get(handler))
-        .layer(health_check);
+        .route("/health", get(handler).layer(health_check))
+        .layer(json_cache);
 
     // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())

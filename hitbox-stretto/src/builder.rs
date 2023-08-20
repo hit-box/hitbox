@@ -1,8 +1,9 @@
-use crate::error::Error;
+use crate::{error::Error, StrettoBackend};
+use hitbox::CacheKey;
 use std::time::Duration;
 use stretto::AsyncCacheBuilder;
 
-type Cache = AsyncCacheBuilder<String, Vec<u8>>;
+type Cache = AsyncCacheBuilder<CacheKey, Vec<u8>>;
 
 pub struct StrettoBackendBuilder(Cache);
 
@@ -24,11 +25,11 @@ impl StrettoBackendBuilder {
         Self(self.0.set_cleanup_duration(d))
     }
 
-    pub fn finalize(self) -> Result<crate::backend::StrettoBackend, Error> {
+    pub fn finalize(self) -> Result<StrettoBackend, Error> {
         self.0
             .set_ignore_internal_cost(true)
             .finalize(tokio::spawn)
-            .map(|cache| crate::backend::StrettoBackend { cache })
+            .map(|cache| StrettoBackend { cache })
             .map_err(Error::from)
     }
 }

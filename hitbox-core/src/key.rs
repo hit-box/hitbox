@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct CacheKey {
     parts: Vec<KeyPart>,
     version: u32,
@@ -21,17 +21,28 @@ impl CacheKey {
             .join("::");
         format!("{}::{}::{}", self.prefix, self.version, key)
     }
+
+    pub fn from_str(key: &str, value: &str) -> Self {
+        CacheKey {
+            parts: vec![KeyPart::new(key, Some(value))],
+            version: 0,
+            prefix: "".to_owned(),
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct KeyPart {
     key: String,
     value: Option<String>,
 }
 
 impl KeyPart {
-    pub fn new(key: String, value: Option<String>) -> Self {
-        KeyPart { key, value }
+    pub fn new<K: ToString, V: ToString>(key: K, value: Option<V>) -> Self {
+        KeyPart {
+            key: key.to_string(),
+            value: value.as_ref().map(V::to_string),
+        }
     }
 }
 

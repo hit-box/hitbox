@@ -6,7 +6,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{CachePolicy, CacheState, CacheableResponse};
+use crate::{policy::PolicyConfig, CachePolicy, CacheState, CacheableResponse};
 use futures::ready;
 use hitbox_core::CacheablePolicyData;
 use pin_project::pin_project;
@@ -233,7 +233,7 @@ where
                     let extractors = this.key_extractors.clone();
                     let request = this.request.take().expect(POLL_AFTER_READY_ERROR);
                     match this.policy.as_ref() {
-                        crate::policy::PolicyConfig::Enabled(_) => {
+                        PolicyConfig::Enabled(_) => {
                             let cache_policy_future = Box::pin(async move {
                                 request.cache_policy(predicates, extractors).await
                             });
@@ -241,8 +241,7 @@ where
                                 cache_policy_future,
                             }
                         }
-                        crate::policy::PolicyConfig::Disabled => {
-                            dbg!("Cache Disabled");
+                        PolicyConfig::Disabled => {
                             let upstream_future =
                                 Box::pin(this.transformer.upstream_transform(request));
                             State::PollUpstream { upstream_future }
@@ -256,10 +255,10 @@ where
                     match policy {
                         CachePolicy::Cacheable(CacheablePolicyData { key, request }) => {
                             let backend = this.backend.clone();
-                            let cache_key = key.serialize();
+                            let cache_key = key.clone();
                             let _ = this.cache_key.insert(key);
                             let poll_cache =
-                                Box::pin(async move { backend.get::<Res>(cache_key).await });
+                                Box::pin(async move { backend.get::<Res>(&cache_key).await });
                             State::PollCache {
                                 poll_cache,
                                 request: Some(request),
@@ -331,9 +330,8 @@ where
                     match policy {
                         CachePolicy::Cacheable(cache_value) => {
                             let update_cache_future = Box::pin(async move {
-                                let update_cache_result = backend
-                                    .set::<Res>(cache_key.serialize(), &cache_value, None)
-                                    .await;
+                                let update_cache_result =
+                                    backend.set::<Res>(&cache_key, &cache_value, None).await;
                                 let upstream_result =
                                     Res::from_cached(cache_value.into_inner()).await;
                                 (update_cache_result, upstream_result)

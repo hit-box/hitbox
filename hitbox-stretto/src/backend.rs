@@ -1,6 +1,6 @@
 use crate::builder::StrettoBackendBuilder;
 use async_trait::async_trait;
-use hitbox::{CacheableResponse, CachedValue};
+use hitbox::{CacheKey, CacheableResponse, CachedValue};
 use hitbox_backend::{
     serializer::{BinSerializer, Serializer},
     BackendError, BackendResult, CacheBackend, DeleteStatus,
@@ -10,7 +10,7 @@ use stretto::AsyncCache;
 
 #[derive(Clone)]
 pub struct StrettoBackend {
-    pub(crate) cache: AsyncCache<String, Vec<u8>>,
+    pub(crate) cache: AsyncCache<CacheKey, Vec<u8>>,
 }
 
 impl StrettoBackend {
@@ -21,7 +21,7 @@ impl StrettoBackend {
 
 #[async_trait]
 impl CacheBackend for StrettoBackend {
-    async fn get<T>(&self, key: String) -> BackendResult<Option<CachedValue<T::Cached>>>
+    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CachedValue<T::Cached>>>
     where
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
@@ -44,7 +44,7 @@ impl CacheBackend for StrettoBackend {
 
     async fn set<T>(
         &self,
-        key: String,
+        key: &CacheKey,
         value: &CachedValue<T::Cached>,
         ttl: Option<u32>,
     ) -> BackendResult<()>
@@ -58,14 +58,18 @@ impl CacheBackend for StrettoBackend {
             Some(ttl) => {
                 self.cache
                     .insert_with_ttl(
-                        key,
+                        key.to_owned(),
                         serialized,
                         cost as i64,
                         Duration::from_secs(ttl as u64),
                     )
                     .await
             }
-            None => self.cache.insert(key, serialized, cost as i64).await,
+            None => {
+                self.cache
+                    .insert(key.to_owned(), serialized, cost as i64)
+                    .await
+            }
         };
         if inserted {
             Ok(())
@@ -74,7 +78,7 @@ impl CacheBackend for StrettoBackend {
         }
     }
 
-    async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
+    async fn delete(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
         self.cache.remove(&key).await;
         Ok(DeleteStatus::Deleted(1))
     }
@@ -124,14 +128,10 @@ mod test {
     async fn test_set_and_get() {
         let cache = crate::StrettoBackend::builder(100).finalize().unwrap();
         let value = CachedValue::new(Test::new(), Utc::now());
-        let res = cache.set::<Test>("key-1".to_string(), &value, None).await;
+        let key = CacheKey::from_str("key", "1");
+        let res = cache.set::<Test>(&key, &value, None).await;
         assert!(res.is_ok());
-        let value = cache
-            .get::<Test>("key-1".to_string())
-            .await
-            .unwrap()
-            .unwrap()
-            .into_inner();
+        let value = cache.get::<Test>(&key).await.unwrap().unwrap().into_inner();
         assert_eq!(value.a, 42);
         assert_eq!(value.b, "nope".to_owned());
     }

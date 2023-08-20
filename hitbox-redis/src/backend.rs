@@ -1,7 +1,7 @@
 //! Redis backend actor implementation.
 use crate::error::Error;
 use async_trait::async_trait;
-use hitbox::{CacheableResponse, CachedValue};
+use hitbox::{CacheKey, CacheableResponse, CachedValue};
 use hitbox_backend::{
     serializer::{JsonSerializer, Serializer},
     BackendError, BackendResult, CacheBackend, DeleteStatus,
@@ -90,16 +90,17 @@ impl RedisBackendBuilder {
 
 #[async_trait]
 impl CacheBackend for RedisBackend {
-    async fn get<T>(&self, key: String) -> BackendResult<Option<CachedValue<T::Cached>>>
+    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CachedValue<T::Cached>>>
     where
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
         let client = self.client.clone();
+        let cache_key = key.serialize();
         async move {
             let mut con = client.get_tokio_connection_manager().await.unwrap();
             let result: Option<Vec<u8>> = redis::cmd("GET")
-                .arg(key)
+                .arg(cache_key)
                 .query_async(&mut con)
                 .await
                 .map_err(Error::from)
@@ -113,10 +114,11 @@ impl CacheBackend for RedisBackend {
         .await
     }
 
-    async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
+    async fn delete(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
         let mut con = self.connection().await?.clone();
+        let cache_key = key.serialize();
         redis::cmd("DEL")
-            .arg(key)
+            .arg(cache_key)
             .query_async(&mut con)
             .await
             .map(|res| {
@@ -132,7 +134,7 @@ impl CacheBackend for RedisBackend {
 
     async fn set<T>(
         &self,
-        key: String,
+        key: &CacheKey,
         value: &CachedValue<T::Cached>,
         ttl: Option<u32>,
     ) -> BackendResult<()>
@@ -142,9 +144,10 @@ impl CacheBackend for RedisBackend {
     {
         let mut con = self.connection().await?.clone();
         let mut request = redis::cmd("SET");
+        let cache_key = key.serialize();
         let serialized_value =
             JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
-        request.arg(key).arg(serialized_value);
+        request.arg(cache_key).arg(serialized_value);
         if let Some(ttl) = ttl {
             request.arg("EX").arg(ttl);
         };
