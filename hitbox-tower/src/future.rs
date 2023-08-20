@@ -1,6 +1,4 @@
 use std::{
-    any::type_name,
-    fmt::Debug,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},

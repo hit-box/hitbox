@@ -9,14 +9,9 @@ use hitbox_http::extractors::{
     header::HeaderExtractor, method::MethodExtractor, path::PathExtractor, query::QueryExtractor,
 };
 use hitbox_http::predicates::{
-    header::HeaderPredicate,
-    method::MethodPredicate,
-    path::PathPredicate,
-    //body::BodyPredicate,
-    query::QueryPredicate,
-    status_code::StatusCodePredicate,
-    NeutralRequestPredicate,
-    NeutralResponsePredicate,
+    request::{HeaderPredicate, MethodPredicate, PathPredicate, QueryPredicate},
+    response::StatusCodePredicate,
+    NeutralRequestPredicate, NeutralResponsePredicate,
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 

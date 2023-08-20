@@ -5,12 +5,8 @@ use hitbox::predicate::{Predicate, PredicateResult};
 
 use crate::{CacheableHttpRequest, CacheableHttpResponse};
 
-pub mod body;
-pub mod header;
-pub mod method;
-pub mod path;
-pub mod query;
-pub mod status_code;
+pub mod request;
+pub mod response;
 
 pub struct NeutralRequestPredicate<ReqBody> {
     _req: PhantomData<fn(ReqBody) -> ReqBody>,

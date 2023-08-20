@@ -1,5 +1,5 @@
 use hitbox::predicate::{Predicate, PredicateResult};
-use hitbox_http::predicates::header::HeaderPredicate;
+use hitbox_http::predicates::request::HeaderPredicate;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::CacheableHttpRequest;
 use http::Request;
