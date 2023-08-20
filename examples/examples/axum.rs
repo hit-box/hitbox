@@ -65,9 +65,9 @@ async fn main() {
         .route("/greet/:name/", get(handler_result))
         .route("/", get(handler))
         .route("/json/", get(handler_json))
-        .layer(ServiceBuilder::new().layer(json_cache))
+        .layer(json_cache)
         .route("/health", get(handler))
-        .layer(ServiceBuilder::new().layer(health_check));
+        .layer(health_check);
 
     // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
