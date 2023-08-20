@@ -3,9 +3,11 @@
 //!
 //! If you want implement your own backend, you in the right place.
 mod backend;
+mod key;
 pub mod serializer;
 
 pub use backend::{BackendResult, CacheBackend};
+pub use key::{KeySerializer, UrlEncodedSerializer};
 use serializer::SerializerError;
 use thiserror::Error;
 

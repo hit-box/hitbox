@@ -29,3 +29,11 @@ futures = "0.3"
 pin-project = "1"
 chrono = "0.4"
 bytes = "1"
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["async", "async_tokio"] }
+tokio = { version = "1.32.0", features = ["rt-multi-thread"] }
+
+[[bench]]
+name = "cache_service_benchmark"
+harness = false

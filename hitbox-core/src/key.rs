@@ -22,6 +22,10 @@ impl CacheKey {
         format!("{}::{}::{}", self.prefix, self.version, key)
     }
 
+    pub fn parts(&self) -> impl Iterator<Item = &KeyPart> {
+        self.parts.iter()
+    }
+
     pub fn from_str(key: &str, value: &str) -> Self {
         CacheKey {
             parts: vec![KeyPart::new(key, Some(value))],
@@ -43,6 +47,14 @@ impl KeyPart {
             key: key.to_string(),
             value: value.as_ref().map(V::to_string),
         }
+    }
+
+    pub fn key(&self) -> &String {
+        &self.key
+    }
+
+    pub fn value(&self) -> &Option<String> {
+        &self.value
     }
 }
 
