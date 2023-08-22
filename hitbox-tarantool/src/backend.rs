@@ -3,8 +3,8 @@ use std::io::{Error, ErrorKind};
 use async_trait::async_trait;
 use derive_builder::Builder;
 use hitbox_backend::{
-    serializer::{JsonSerializer, Serializer},
-    BackendError, BackendResult, CacheBackend, CacheableResponse, CachedValue, DeleteStatus,
+    serializer::SerializableCachedValue, BackendError, BackendResult, CacheBackend,
+    CacheableResponse, CachedValue, DeleteStatus,
 };
 use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
 use serde::{Deserialize, Serialize};
@@ -71,31 +71,13 @@ impl TarantoolBackend {
     fn map_err(err: Error) -> BackendError {
         BackendError::InternalError(Box::new(err))
     }
-
-    async fn call<T>(&self, cmd: &str, params: &T) -> BackendResult<Vec<CacheEntry>>
-    where
-        T: Serialize,
-    {
-        let result: Vec<CacheEntry> = self
-            .client()?
-            .prepare_fn_call(format!("hitbox.{}", cmd))
-            .bind_ref(params)
-            .map_err(TarantoolBackend::map_err)?
-            .execute()
-            .await
-            .map_err(TarantoolBackend::map_err)?
-            .decode_result_set()
-            .map_err(TarantoolBackend::map_err)?;
-
-        Ok(result)
-    }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct CacheEntry {
+#[derive(Serialize, Deserialize)]
+pub struct CacheEntry<T> {
     pub key: String,
     pub ttl: Option<u32>,
-    pub value: String,
+    pub value: SerializableCachedValue<T>,
 }
 
 #[async_trait]
@@ -105,24 +87,32 @@ impl CacheBackend for TarantoolBackend {
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
-        let entries = self.call("get", &(key)).await?;
-        let entry = match entries.first() {
-            Some(v) => Some(
-                JsonSerializer::<String>::deserialize(v.value.clone())
-                    .map_err(BackendError::from)?,
-            ),
-            None => None,
-        };
-
-        Ok(entry)
+        self.client()?
+            .prepare_fn_call("hitbox.get")
+            .bind_ref(&(key))
+            .map_err(TarantoolBackend::map_err)?
+            .execute()
+            .await
+            .map_err(TarantoolBackend::map_err)?
+            .decode_single::<Option<CacheEntry<T::Cached>>>()
+            .map_err(TarantoolBackend::map_err)
+            .map(|v| v.map(|v| v.value.into_cached_value()))
     }
 
     async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
-        let entries = self.call("delete", &(key)).await?;
-        if entries.is_empty() {
-            Ok(DeleteStatus::Missing)
-        } else {
-            Ok(DeleteStatus::Deleted(1))
+        let result: bool = self
+            .client()?
+            .prepare_fn_call("hitbox.delete")
+            .bind_ref(&(key))
+            .map_err(TarantoolBackend::map_err)?
+            .execute()
+            .await
+            .map_err(TarantoolBackend::map_err)?
+            .decode_single()
+            .map_err(TarantoolBackend::map_err)?;
+        match result {
+            true => Ok(DeleteStatus::Deleted(1)),
+            false => Ok(DeleteStatus::Missing),
         }
     }
 
@@ -136,10 +126,19 @@ impl CacheBackend for TarantoolBackend {
         T: CacheableResponse + Send,
         T::Cached: serde::Serialize + Send + Sync,
     {
-        let serialized_value =
-            JsonSerializer::<String>::serialize(value).map_err(BackendError::from)?;
-        self.call("set", &(key, ttl, serialized_value)).await?;
-        Ok(())
+        let entry: CacheEntry<T::Cached> = CacheEntry {
+            key,
+            ttl,
+            value: value.clone().into(),
+        };
+        self.client()?
+            .prepare_fn_call("hitbox.set")
+            .bind_ref(&entry)
+            .map_err(TarantoolBackend::map_err)?
+            .execute()
+            .await
+            .map(|_| ())
+            .map_err(TarantoolBackend::map_err)
     }
 
     async fn start(&self) -> BackendResult<()> {

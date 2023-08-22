@@ -27,7 +27,7 @@ pub trait Serializer {
 }
 
 #[derive(Deserialize, Serialize)]
-struct SerializableCachedValue<U> {
+pub struct SerializableCachedValue<U> {
     data: U,
     expired: DateTime<Utc>,
 }

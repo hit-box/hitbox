@@ -49,8 +49,8 @@ _G.hitbox = {
 	end,
 	---Delete cache entry
 	---@param key string
-	---@return table?
+	---@return boolean
 	delete = function(key)
-		return box.space[space_name]:delete(key)
+		return box.space[space_name]:delete(key) and true or false
 	end,
 }
