@@ -7,9 +7,9 @@ use hitbox_tower::{
 
 use hitbox_redis::RedisBackend;
 use hitbox_tower::Cache;
-use tower::ServiceBuilder;
 
-async fn handler_result(Path(name): Path<String>) -> Result<String, String> {
+
+async fn handler_result(Path(_name): Path<String>) -> Result<String, String> {
     //dbg!("axum::handler_result");
     // Ok(format!("Hello, {name}"))
     Err("error".to_owned())
@@ -17,7 +17,7 @@ async fn handler_result(Path(name): Path<String>) -> Result<String, String> {
 
 async fn handler() -> String {
     //dbg!("axum::handler");
-    format!("root")
+    "root".to_string()
 }
 
 #[derive(serde::Serialize)]

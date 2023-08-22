@@ -22,6 +22,6 @@ impl KeySerializer for UrlEncodedKeySerializer<String> {
             .parts()
             .map(|part| (part.key(), part.value()))
             .collect::<Vec<_>>();
-        serde_urlencoded::to_string(&parts).map_err(|err| SerializerError::Serialize(Box::new(err)))
+        serde_urlencoded::to_string(parts).map_err(|err| SerializerError::Serialize(Box::new(err)))
     }
 }

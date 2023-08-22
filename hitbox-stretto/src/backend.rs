@@ -33,7 +33,7 @@ impl CacheBackend for StrettoBackend {
             .map_err(crate::error::Error::from)
             .map_err(BackendError::from)?;
 
-        match self.cache.get(&key).await {
+        match self.cache.get(key).await {
             Some(cached) => BinSerializer::<Vec<u8>>::deserialize(cached.value().to_owned())
                 .map_err(BackendError::from)
                 .map(Some),
@@ -79,7 +79,7 @@ impl CacheBackend for StrettoBackend {
     }
 
     async fn delete(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
-        self.cache.remove(&key).await;
+        self.cache.remove(key).await;
         Ok(DeleteStatus::Deleted(1))
     }
 

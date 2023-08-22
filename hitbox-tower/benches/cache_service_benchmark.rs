@@ -6,7 +6,7 @@ use criterion::{criterion_group, criterion_main};
 use tokio::runtime::Runtime;
 
 // Here we have an async function to benchmark
-async fn do_something(size: usize) {
+async fn do_something(_size: usize) {
     // Do something async with the size
 }
 

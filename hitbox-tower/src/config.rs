@@ -14,6 +14,7 @@ use hitbox_http::predicates::{
     NeutralRequestPredicate, NeutralResponsePredicate,
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
+use serde::{Deserialize, Serialize};
 
 pub struct EndpointConfigBuilder<RP> {
     pub request_predicates: RP, // TODO: maybe private?
@@ -27,7 +28,7 @@ impl<ReqBody> Default for EndpointConfigBuilder<NeutralRequestPredicate<ReqBody>
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EndpointConfig {
     pub request_predicates: Vec<RequestPredicate>,
     pub response_predicates: Vec<ResponsePredicate>,
