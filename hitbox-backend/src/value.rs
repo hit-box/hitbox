@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::{CacheState, CacheableResponse};
+use crate::{serializer::SerializableCachedValue, CacheState, CacheableResponse};
 
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[derive(Debug, Clone)]
@@ -23,6 +23,12 @@ impl<T> CachedValue<T> {
     pub async fn cache_state<C: CacheableResponse<Cached = T>>(self) -> CacheState<C> {
         let origin = C::from_cached(self.data).await;
         CacheState::Actual(origin)
+    }
+}
+
+impl<T> From<CachedValue<T>> for SerializableCachedValue<T> {
+    fn from(value: CachedValue<T>) -> SerializableCachedValue<T> {
+        SerializableCachedValue::new(value.data, value.expired)
     }
 }
 
