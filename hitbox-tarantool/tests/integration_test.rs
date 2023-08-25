@@ -12,7 +12,7 @@ use testcontainers::{clients, core::WaitFor, Container, Image};
 
 static DOCKER: Lazy<clients::Cli> = Lazy::new(|| clients::Cli::default());
 
-impl Image for TarantoolContainer {
+impl Image for TarantoolImage {
     type Args = ();
 
     fn name(&self) -> String {
@@ -37,19 +37,19 @@ impl Image for TarantoolContainer {
 }
 
 #[derive(Debug)]
-struct TarantoolContainer {
+struct TarantoolImage {
     env_vars: HashMap<String, String>,
 }
 
-impl<'a> TarantoolContainer {
-    async fn start() -> StartedTarantool<'a> {
-        let container = DOCKER.run(TarantoolContainer::default());
+impl<'a> TarantoolImage {
+    async fn start() -> TarantoolContainer<'a> {
+        let container = DOCKER.run(TarantoolImage::default());
         let port = &container.ports().map_to_host_port_ipv4(3301).unwrap();
         let client =
             ClientConfig::new(format!("{}:{}", "127.0.0.1", &port), "hitbox", "hitbox").build();
         let mut backend = Tarantool::builder().port(port.to_string()).build();
         backend.init().await.unwrap();
-        StartedTarantool {
+        TarantoolContainer {
             _container: container,
             client,
             backend,
@@ -57,13 +57,13 @@ impl<'a> TarantoolContainer {
     }
 }
 
-struct StartedTarantool<'a> {
-    _container: Container<'a, TarantoolContainer>,
+struct TarantoolContainer<'a> {
+    _container: Container<'a, TarantoolImage>,
     client: Client,
     backend: TarantoolBackend,
 }
 
-impl<'a> StartedTarantool<'a> {
+impl<'a> TarantoolContainer<'a> {
     async fn eval<T, R>(&self, cmd: &str, params: &T) -> R
     where
         T: Serialize,
@@ -78,7 +78,7 @@ impl<'a> StartedTarantool<'a> {
     }
 }
 
-impl Default for TarantoolContainer {
+impl Default for TarantoolImage {
     fn default() -> Self {
         let mut env_vars = HashMap::new();
         env_vars.insert("TARANTOOL_USER_NAME".to_owned(), "hitbox".to_owned());
@@ -117,7 +117,7 @@ impl Default for Test {
 
 #[tokio::test]
 async fn test_init() {
-    let t = TarantoolContainer::start().await;
+    let t = TarantoolImage::start().await;
 
     let space_exists: (bool,) = t
         .eval(
@@ -138,7 +138,7 @@ async fn test_init() {
 
 #[tokio::test]
 async fn test_set() {
-    let t = TarantoolContainer::start().await;
+    let t = TarantoolImage::start().await;
     let key = "test_key".to_string();
     let dt = "2012-12-12T12:12:12Z";
     let ttl = 42;
@@ -167,7 +167,7 @@ async fn test_set() {
 
 #[tokio::test]
 async fn test_expire() {
-    let t = TarantoolContainer::start().await;
+    let t = TarantoolImage::start().await;
     let key = "test_key".to_owned();
     let dt = "2012-12-12T12:12:12Z";
     let value = CachedValue::new(Test::default(), DateTime::from_str(&dt).unwrap());
@@ -194,7 +194,7 @@ async fn test_expire() {
 
 #[tokio::test]
 async fn test_delete() {
-    let t = TarantoolContainer::start().await;
+    let t = TarantoolImage::start().await;
     let key = "test_key";
     let dt: DateTime<Utc> = DateTime::from_str(&"2012-12-12T12:12:12Z").unwrap();
     let value = Test::default();
@@ -235,7 +235,7 @@ async fn test_delete() {
 
 #[tokio::test]
 async fn test_get() {
-    let t = TarantoolContainer::start().await;
+    let t = TarantoolImage::start().await;
     let key = "test_key";
     let dt: DateTime<Utc> = DateTime::from_str(&"2012-12-12T12:12:12Z").unwrap();
 
