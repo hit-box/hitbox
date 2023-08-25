@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use hitbox_backend::{CacheBackend, CacheableResponse, CachedValue, DeleteStatus, serializer::SerializableCachedValue};
-use hitbox_tarantool::{backend::CacheEntry, TarantoolBackend, TarantoolBackendBuilder};
+use hitbox_backend::{
+    serializer::SerializableCachedValue, CacheBackend, CacheableResponse, CachedValue, DeleteStatus,
+};
+use hitbox_tarantool::{backend::CacheEntry, backend::TarantoolBackend, Tarantool};
 use once_cell::sync::Lazy;
 use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
 use serde::{Deserialize, Serialize};
@@ -10,7 +12,7 @@ use testcontainers::{clients, core::WaitFor, Container, Image};
 
 static DOCKER: Lazy<clients::Cli> = Lazy::new(|| clients::Cli::default());
 
-impl Image for Tarantool {
+impl Image for TarantoolContainer {
     type Args = ();
 
     fn name(&self) -> String {
@@ -35,20 +37,17 @@ impl Image for Tarantool {
 }
 
 #[derive(Debug)]
-struct Tarantool {
+struct TarantoolContainer {
     env_vars: HashMap<String, String>,
 }
 
-impl<'a> Tarantool {
+impl<'a> TarantoolContainer {
     async fn start() -> StartedTarantool<'a> {
-        let container = DOCKER.run(Tarantool::default());
+        let container = DOCKER.run(TarantoolContainer::default());
         let port = &container.ports().map_to_host_port_ipv4(3301).unwrap();
         let client =
             ClientConfig::new(format!("{}:{}", "127.0.0.1", &port), "hitbox", "hitbox").build();
-        let mut backend = TarantoolBackendBuilder::default()
-            .port(port.to_string())
-            .build()
-            .unwrap();
+        let mut backend = Tarantool::builder().port(port.to_string()).build();
         backend.init().await.unwrap();
         StartedTarantool {
             _container: container,
@@ -59,7 +58,7 @@ impl<'a> Tarantool {
 }
 
 struct StartedTarantool<'a> {
-    _container: Container<'a, Tarantool>,
+    _container: Container<'a, TarantoolContainer>,
     client: Client,
     backend: TarantoolBackend,
 }
@@ -79,7 +78,7 @@ impl<'a> StartedTarantool<'a> {
     }
 }
 
-impl Default for Tarantool {
+impl Default for TarantoolContainer {
     fn default() -> Self {
         let mut env_vars = HashMap::new();
         env_vars.insert("TARANTOOL_USER_NAME".to_owned(), "hitbox".to_owned());
@@ -118,7 +117,7 @@ impl Default for Test {
 
 #[tokio::test]
 async fn test_init() {
-    let t = Tarantool::start().await;
+    let t = TarantoolContainer::start().await;
 
     let space_exists: (bool,) = t
         .eval(
@@ -139,7 +138,7 @@ async fn test_init() {
 
 #[tokio::test]
 async fn test_set() {
-    let t = Tarantool::start().await;
+    let t = TarantoolContainer::start().await;
     let key = "test_key".to_string();
     let dt = "2012-12-12T12:12:12Z";
     let ttl = 42;
@@ -151,7 +150,8 @@ async fn test_set() {
         .unwrap();
 
     // let result: Vec<CacheEntry> = t.call("get", &(key.clone())).await;
-    let result = t.client
+    let result = t
+        .client
         .prepare_fn_call(format!("box.space.hitbox_cache:get"))
         .bind_ref(&key)
         .unwrap()
@@ -167,7 +167,7 @@ async fn test_set() {
 
 #[tokio::test]
 async fn test_expire() {
-    let t = Tarantool::start().await;
+    let t = TarantoolContainer::start().await;
     let key = "test_key".to_owned();
     let dt = "2012-12-12T12:12:12Z";
     let value = CachedValue::new(Test::default(), DateTime::from_str(&dt).unwrap());
@@ -179,7 +179,8 @@ async fn test_expire() {
 
     thread::sleep(Duration::from_secs(1));
 
-    let result = t.client
+    let result = t
+        .client
         .prepare_fn_call(format!("box.space.hitbox_cache:get"))
         .bind_ref(&key)
         .unwrap()
@@ -193,12 +194,16 @@ async fn test_expire() {
 
 #[tokio::test]
 async fn test_delete() {
-    let t = Tarantool::start().await;
+    let t = TarantoolContainer::start().await;
     let key = "test_key";
     let dt: DateTime<Utc> = DateTime::from_str(&"2012-12-12T12:12:12Z").unwrap();
     let value = Test::default();
     let cached_value = SerializableCachedValue::new(&value, dt);
-    let entry = CacheEntry{key: key.into(), ttl: Some(42), value: cached_value};
+    let entry = CacheEntry {
+        key: key.into(),
+        ttl: Some(42),
+        value: cached_value,
+    };
 
     let status = t.backend.delete(key.to_string()).await.unwrap();
     assert_eq!(status, DeleteStatus::Missing);
@@ -214,7 +219,8 @@ async fn test_delete() {
     let status = t.backend.delete(key.to_string()).await.unwrap();
     assert_eq!(status, DeleteStatus::Deleted(1));
 
-    let result  = t.client
+    let result = t
+        .client
         .prepare_fn_call(format!("box.space.hitbox_cache:get"))
         .bind_ref(&key)
         .unwrap()
@@ -229,13 +235,17 @@ async fn test_delete() {
 
 #[tokio::test]
 async fn test_get() {
-    let t = Tarantool::start().await;
+    let t = TarantoolContainer::start().await;
     let key = "test_key";
     let dt: DateTime<Utc> = DateTime::from_str(&"2012-12-12T12:12:12Z").unwrap();
 
     let value = Test::default();
     let cached_value = SerializableCachedValue::new(&value, dt);
-    let entry = CacheEntry{key: key.into(), ttl: Some(42), value: cached_value};
+    let entry = CacheEntry {
+        key: key.into(),
+        ttl: Some(42),
+        value: cached_value,
+    };
 
     t.client
         .prepare_fn_call(format!("box.space.hitbox_cache:replace"))
