@@ -1,13 +1,12 @@
-use std::io::{Error, ErrorKind};
-
 use async_trait::async_trait;
-use derive_builder::Builder;
 use hitbox_backend::{
     serializer::SerializableCachedValue, BackendError, BackendResult, CacheBackend,
     CacheableResponse, CachedValue, DeleteStatus,
 };
 use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
 use serde::{Deserialize, Serialize};
+use std::io::Error;
+use typed_builder::TypedBuilder;
 
 const TARANTOOL_INIT_LUA: &str = include_str!("init.lua");
 
@@ -15,52 +14,52 @@ const TARANTOOL_INIT_LUA: &str = include_str!("init.lua");
 ///
 /// # Examples
 /// ```
-/// use hitbox_tarantool::TarantoolBackendBuilder;
+/// use hitbox_tarantool::Tarantool;
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut backend = TarantoolBackendBuilder::default()
-///         .build()
-///         .unwrap();
+///     let mut backend = Tarantool::builder().build();
 ///     // backend.init().await.unwrap();
 /// }
 /// ```
-#[derive(Clone, Builder)]
-pub struct TarantoolBackend {
-    #[builder(default = "\"hitbox\".to_string()")]
+#[derive(Clone, TypedBuilder)]
+#[builder(build_method(vis="", name=__build))]
+pub struct Tarantool {
+    #[builder(default = "hitbox".to_string())]
     user: String,
-    #[builder(default = "\"hitbox\".to_string()")]
+    #[builder(default = "hitbox".to_string())]
     password: String,
-    #[builder(default = "\"127.0.0.1\".to_string()")]
+    #[builder(default = "127.0.0.1".to_string())]
     host: String,
-    #[builder(default = "\"3301\".to_string()")]
+    #[builder(default = "3301".to_string())]
     port: String,
-    #[builder(setter(skip))]
-    client: Option<Client>,
+}
+
+pub struct TarantoolBackend {
+    client: Client,
+}
+
+#[allow(non_camel_case_types)]
+impl<
+        __user: ::typed_builder::Optional<String>,
+        __password: ::typed_builder::Optional<String>,
+        __host: ::typed_builder::Optional<String>,
+        __port: ::typed_builder::Optional<String>,
+    > TarantoolBuilder<(__user, __password, __host, __port)>
+{
+    pub fn build(self) -> TarantoolBackend {
+        let t = self.__build();
+        let client =
+            ClientConfig::new(format!("{}:{}", t.host, t.port), t.user, t.password).build();
+        TarantoolBackend { client }
+    }
 }
 
 impl TarantoolBackend {
-    fn client(&self) -> BackendResult<Client> {
-        let err = Error::new(ErrorKind::Other, "Backend is not initialized");
-        self.client
-            .clone()
-            .ok_or(BackendError::InternalError(Box::new(err)))
-    }
-
     /// Init backend and configure tarantool instance
     /// This function is idempotent
     pub async fn init(&mut self) -> BackendResult<()> {
-        if self.client.is_none() {
-            let client = ClientConfig::new(
-                format!("{}:{}", self.host, self.port),
-                self.user.clone(),
-                self.password.clone(),
-            )
-            .build();
-            self.client = Some(client);
-        }
-
-        self.client()?
+        self.client
             .eval(TARANTOOL_INIT_LUA, &("hitbox_cache",))
             .await
             .map_err(|err| BackendError::InternalError(Box::new(err)))?;
@@ -88,7 +87,7 @@ impl CacheBackend for TarantoolBackend {
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
-        self.client()?
+        self.client
             .prepare_fn_call("hitbox.get")
             .bind_ref(&(key))
             .map_err(TarantoolBackend::map_err)?
@@ -102,7 +101,7 @@ impl CacheBackend for TarantoolBackend {
 
     async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
         let result: bool = self
-            .client()?
+            .client
             .prepare_fn_call("hitbox.delete")
             .bind_ref(&(key))
             .map_err(TarantoolBackend::map_err)?
@@ -132,7 +131,7 @@ impl CacheBackend for TarantoolBackend {
             ttl,
             value: value.clone().into(),
         };
-        self.client()?
+        self.client
             .prepare_fn_call("hitbox.set")
             .bind_ref(&entry)
             .map_err(TarantoolBackend::map_err)?

@@ -3,4 +3,4 @@
 pub mod backend;
 
 #[doc(inline)]
-pub use crate::backend::{TarantoolBackend, TarantoolBackendBuilder};
+pub use crate::backend::Tarantool;
