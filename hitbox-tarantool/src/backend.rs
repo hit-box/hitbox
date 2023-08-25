@@ -73,6 +73,7 @@ impl TarantoolBackend {
     }
 }
 
+#[doc(hidden)]
 #[derive(Serialize, Deserialize)]
 pub struct CacheEntry<T> {
     pub key: String,
