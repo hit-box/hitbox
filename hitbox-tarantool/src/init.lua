@@ -7,6 +7,7 @@ local space_name = ...
 
 box.schema.space.create(space_name, { if_not_exists = true })
 box.space[space_name]:create_index("primary", {
+	type = 'HASH',
 	parts = { { 1, "string" } },
 	if_not_exists = true,
 })
