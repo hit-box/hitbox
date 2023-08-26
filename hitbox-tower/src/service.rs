@@ -1,7 +1,7 @@
 use crate::config::EndpointConfig;
 use std::{fmt::Debug, sync::Arc};
 
-use hitbox::{backend::CacheBackend, fsm::CacheFuture, policy::PolicyConfig};
+use hitbox::{backend::CacheBackend, fsm::CacheFuture};
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, FromBytes};
 use http::{Request, Response};
 use hyper::body::{Body, HttpBody};
@@ -13,21 +13,14 @@ pub struct CacheService<S, B> {
     upstream: S,
     backend: Arc<B>,
     endpoint_config: Arc<EndpointConfig>,
-    policy: Arc<PolicyConfig>,
 }
 
 impl<S, B> CacheService<S, B> {
-    pub fn new(
-        upstream: S,
-        backend: Arc<B>,
-        endpoint_config: Arc<EndpointConfig>,
-        policy: Arc<PolicyConfig>,
-    ) -> Self {
+    pub fn new(upstream: S, backend: Arc<B>, endpoint_config: Arc<EndpointConfig>) -> Self {
         CacheService {
             upstream,
             backend,
             endpoint_config,
-            policy,
         }
     }
 }
@@ -42,7 +35,6 @@ where
             upstream: self.upstream.clone(),
             backend: Arc::clone(&self.backend),
             endpoint_config: Arc::clone(&self.endpoint_config),
-            policy: Arc::clone(&self.policy),
         }
     }
 }
@@ -88,7 +80,7 @@ where
             Arc::new(config.request_predicates()),
             Arc::new(config.response_predicates()),
             Arc::new(config.extractors()),
-            self.policy.clone(),
+            Arc::new(config.policy.clone()), //TODO: remove clone
         )
     }
 }

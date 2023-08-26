@@ -17,7 +17,6 @@ use crate::service::CacheService;
 pub struct Cache<B> {
     pub backend: Arc<B>,
     pub endpoint_config: Arc<EndpointConfig>,
-    pub policy: Arc<PolicyConfig>,
 }
 
 impl<B> Cache<B> {
@@ -25,7 +24,6 @@ impl<B> Cache<B> {
         Cache {
             backend: Arc::new(backend),
             endpoint_config: Arc::new(Default::default()),
-            policy: Arc::new(Default::default()),
         }
     }
 }
@@ -38,7 +36,6 @@ impl<S, B> Layer<S> for Cache<B> {
             upstream,
             Arc::clone(&self.backend),
             Arc::clone(&self.endpoint_config),
-            Arc::clone(&self.policy),
         )
     }
 }
@@ -52,7 +49,6 @@ impl Cache<StrettoBackend> {
 pub struct CacheBuilder<B> {
     backend: Option<B>,
     endpoint_config: EndpointConfig,
-    policy: PolicyConfig,
 }
 
 impl<B> CacheBuilder<B>
@@ -63,15 +59,19 @@ where
         CacheBuilder {
             backend: Some(backend),
             endpoint_config: self.endpoint_config,
-            policy: self.policy,
         }
     }
 
     pub fn enable(self, policy: EnabledCacheConfig) -> Self {
+        let endpoint_config = EndpointConfig {
+            request_predicates: self.endpoint_config.request_predicates,
+            response_predicates: self.endpoint_config.response_predicates,
+            extractors: self.endpoint_config.extractors,
+            policy: PolicyConfig::Enabled(policy),
+        };
         CacheBuilder {
             backend: self.backend,
-            endpoint_config: self.endpoint_config,
-            policy: PolicyConfig::Enabled(policy),
+            endpoint_config,
         }
     }
 
@@ -79,7 +79,6 @@ where
         CacheBuilder {
             backend: self.backend,
             endpoint_config: self.endpoint_config,
-            policy: PolicyConfig::Disabled,
         }
     }
 
@@ -88,11 +87,11 @@ where
             request_predicates: predicates.build(),
             response_predicates: self.endpoint_config.response_predicates,
             extractors: self.endpoint_config.extractors,
+            policy: self.endpoint_config.policy,
         };
         CacheBuilder {
             backend: self.backend,
             endpoint_config,
-            policy: self.policy,
         }
     }
 
@@ -101,11 +100,11 @@ where
             request_predicates: self.endpoint_config.request_predicates,
             response_predicates: predicates.build(),
             extractors: self.endpoint_config.extractors,
+            policy: self.endpoint_config.policy,
         };
         CacheBuilder {
             backend: self.backend,
             endpoint_config,
-            policy: self.policy,
         }
     }
 
@@ -114,11 +113,11 @@ where
             request_predicates: self.endpoint_config.request_predicates,
             response_predicates: self.endpoint_config.response_predicates,
             extractors: extractors.build(),
+            policy: self.endpoint_config.policy,
         };
         CacheBuilder {
             backend: self.backend,
             endpoint_config,
-            policy: self.policy,
         }
     }
 
@@ -126,7 +125,6 @@ where
         Cache {
             backend: Arc::new(self.backend.expect("Please add some cache backend")),
             endpoint_config: Arc::new(self.endpoint_config),
-            policy: Arc::new(self.policy),
         }
     }
 }
@@ -136,7 +134,6 @@ impl<B> Default for CacheBuilder<B> {
         Self {
             backend: None,
             endpoint_config: Default::default(),
-            policy: Default::default(),
         }
     }
 }

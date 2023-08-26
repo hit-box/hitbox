@@ -1,3 +1,5 @@
+use hitbox::policy::PolicyConfig;
+
 use crate::{
     request_extractor::RequestExtractor, request_predicate::RequestPredicate,
     response_predicate::ResponsePredicate,
@@ -33,6 +35,7 @@ pub struct EndpointConfig {
     pub request_predicates: Vec<RequestPredicate>,
     pub response_predicates: Vec<ResponsePredicate>,
     pub extractors: Vec<RequestExtractor>,
+    pub policy: PolicyConfig,
 }
 
 impl EndpointConfig {
@@ -41,6 +44,7 @@ impl EndpointConfig {
             request_predicates: Vec::new(),
             response_predicates: Vec::new(),
             extractors: Vec::new(),
+            policy: Default::default(),
         }
     }
 
@@ -115,6 +119,7 @@ impl Default for EndpointConfig {
                 },
                 RequestExtractor::Method,
             ],
+            policy: Default::default(),
         }
     }
 }

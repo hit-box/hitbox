@@ -8,7 +8,6 @@ use hitbox_tower::{
 use hitbox_redis::RedisBackend;
 use hitbox_tower::Cache;
 
-
 async fn handler_result(Path(_name): Path<String>) -> Result<String, String> {
     //dbg!("axum::handler_result");
     // Ok(format!("Hello, {name}"))
