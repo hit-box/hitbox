@@ -3,6 +3,7 @@ name = "hitbox-examples"
 version = "0.0.0"
 publish = false
 edition = "2021"
+autoexamples = false
 
 [features]
 default = []
@@ -28,3 +29,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = { version = "0.1" }
 http = "0.2"
 lazy_static = "1"
+
+[[example]]
+name = "axum"
+path = "examples/axum.rs"
+
+[[example]]
+name = "tower"
+path = "examples/tower.rs"
