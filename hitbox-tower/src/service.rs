@@ -1,4 +1,4 @@
-use crate::configuration::EndpointConfig;
+use crate::Configurable;
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};
@@ -9,23 +9,23 @@ use tower::Service;
 
 use crate::future::Transformer;
 
-pub struct CacheService<S, B> {
+pub struct CacheService<S, B, C> {
     upstream: S,
     backend: Arc<B>,
-    endpoint_config: Arc<EndpointConfig>,
+    configuration: Arc<C>,
 }
 
-impl<S, B> CacheService<S, B> {
-    pub fn new(upstream: S, backend: Arc<B>, endpoint_config: Arc<EndpointConfig>) -> Self {
+impl<S, B, C> CacheService<S, B, C> {
+    pub fn new(upstream: S, backend: Arc<B>, configuration: Arc<C>) -> Self {
         CacheService {
             upstream,
             backend,
-            endpoint_config,
+            configuration,
         }
     }
 }
 
-impl<S, B> Clone for CacheService<S, B>
+impl<S, B, C> Clone for CacheService<S, B, C>
 where
     S: Clone,
     B: Clone,
@@ -33,17 +33,18 @@ where
     fn clone(&self) -> Self {
         Self {
             upstream: self.upstream.clone(),
-            backend: Arc::clone(&self.backend),
-            endpoint_config: Arc::clone(&self.endpoint_config),
+            backend: self.backend.clone(),
+            configuration: self.configuration.clone(),
         }
     }
 }
 
-impl<S, B, ReqBody, ResBody> Service<Request<ReqBody>> for CacheService<S, B>
+impl<S, B, C, ReqBody, ResBody> Service<Request<ReqBody>> for CacheService<S, B, C>
 where
     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
     B: CacheBackend + Clone + Send + Sync + 'static,
     S::Future: Send,
+    C: Configurable,
 
     // debug bounds
     ReqBody: Debug + HttpBody + Send + 'static,
@@ -69,18 +70,16 @@ where
     }
 
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        //dbg!(&req);
-
         let transformer = Transformer::new(self.upstream.clone());
-        let config = &self.endpoint_config;
+        let configuration = &self.configuration;
         CacheFuture::new(
             self.backend.clone(),
             CacheableHttpRequest::from_request(req),
             transformer,
-            Arc::new(config.request_predicates()),
-            Arc::new(config.response_predicates()),
-            Arc::new(config.extractors()),
-            Arc::new(config.policy.clone()), //TODO: remove clone
+            Arc::new(configuration.request_predicates()),
+            Arc::new(configuration.response_predicates()),
+            Arc::new(configuration.extractors()),
+            Arc::new(configuration.policy()),
         )
     }
 }
