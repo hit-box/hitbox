@@ -14,6 +14,9 @@ pub enum PolicyConfig {
 
 impl Default for PolicyConfig {
     fn default() -> Self {
-        Self::Enabled(Default::default())
+        Self::Enabled(EnabledCacheConfig {
+            ttl: Some(5),
+            stale_cache: None,
+        })
     }
 }

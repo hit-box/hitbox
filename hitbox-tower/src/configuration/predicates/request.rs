@@ -1,7 +1,7 @@
 use crate::configuration::serializers::method;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RequestPredicate {
     Path {
         path: String,

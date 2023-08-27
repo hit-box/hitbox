@@ -1,4 +1,7 @@
-use crate::configuration::{RequestExtractor, RequestPredicate, ResponsePredicate};
+use crate::configuration::{
+    builder::EndpointConfigBuilder, RequestExtractor, RequestPredicate, ResponsePredicate,
+};
+use crate::Configurable;
 use hitbox::policy::PolicyConfig;
 use hitbox::predicate::Predicate;
 use hitbox::Extractor;
@@ -13,8 +16,9 @@ use hitbox_http::predicates::{
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EndpointConfig {
     pub request_predicates: Vec<RequestPredicate>,
     pub response_predicates: Vec<ResponsePredicate>,
@@ -32,7 +36,13 @@ impl EndpointConfig {
         }
     }
 
-    pub(crate) fn request_predicates<ReqBody>(
+    pub fn builder() -> EndpointConfigBuilder {
+        EndpointConfigBuilder::new()
+    }
+}
+
+impl Configurable for EndpointConfig {
+    fn request_predicates<ReqBody>(
         &self,
     ) -> Box<dyn Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
     where
@@ -54,7 +64,7 @@ impl EndpointConfig {
             })
     }
 
-    pub(crate) fn response_predicates<ResBody>(
+    fn response_predicates<ResBody>(
         &self,
     ) -> Box<dyn Predicate<Subject = CacheableHttpResponse<ResBody>> + Send + Sync>
     where
@@ -68,7 +78,7 @@ impl EndpointConfig {
             })
     }
 
-    pub(crate) fn extractors<ReqBody>(
+    fn extractors<ReqBody>(
         &self,
     ) -> Box<dyn Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
     where
@@ -83,6 +93,46 @@ impl EndpointConfig {
                 RequestExtractor::Query { key } => Box::new(inner.query(key.to_string())),
                 RequestExtractor::Header { key } => Box::new(inner.header(key.to_string())),
             })
+    }
+
+    fn policy(&self) -> PolicyConfig {
+        self.policy.clone()
+    }
+}
+
+impl<C> Configurable for Arc<C>
+where
+    C: Configurable,
+{
+    fn request_predicates<ReqBody>(
+        &self,
+    ) -> Box<dyn Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
+    where
+        ReqBody: Send + 'static,
+    {
+        self.as_ref().request_predicates()
+    }
+
+    fn response_predicates<ResBody>(
+        &self,
+    ) -> Box<dyn Predicate<Subject = CacheableHttpResponse<ResBody>> + Send + Sync>
+    where
+        ResBody: Send + 'static,
+    {
+        self.as_ref().response_predicates()
+    }
+
+    fn extractors<ReqBody>(
+        &self,
+    ) -> Box<dyn Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
+    where
+        ReqBody: Send + 'static,
+    {
+        self.as_ref().extractors()
+    }
+
+    fn policy(&self) -> PolicyConfig {
+        self.as_ref().policy()
     }
 }
 

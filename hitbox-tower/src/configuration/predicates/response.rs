@@ -1,7 +1,7 @@
 use crate::configuration::serializers::status_code;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResponsePredicate {
     #[serde(with = "status_code")]
     StatusCode { code: http::StatusCode },
