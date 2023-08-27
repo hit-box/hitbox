@@ -1,11 +1,17 @@
 //! Cacheable trait and implementation of cache logic.
 
-use crate::CacheError;
+use std::sync::Arc;
+
+use crate::{predicates::Predicate, CacheError};
+use async_trait::async_trait;
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use hitbox_derive::Cacheable;
 
+pub use hitbox_backend::CacheableResponse;
+
 /// Trait describes cache configuration per type that implements this trait.
+#[async_trait]
 pub trait Cacheable {
     /// Method should return unique identifier for struct object.
     ///
@@ -36,7 +42,7 @@ pub trait Cacheable {
     /// let query = QueryNothing { id: None };
     /// assert_eq!(query.cache_key().unwrap(), "database::QueryNothing::id::None");
     /// ```
-    fn cache_key(&self) -> Result<String, CacheError>;
+    async fn cache_key(&self) -> Result<String, CacheError>;
 
     /// Method return cache key prefix based on message type.
     fn cache_key_prefix(&self) -> String;
@@ -70,35 +76,5 @@ pub trait Cacheable {
     /// Describe current cache version for this type.
     fn cache_version(&self) -> u32 {
         0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct Message(i32);
-
-    impl Cacheable for Message {
-        fn cache_key(&self) -> Result<String, CacheError> {
-            Ok("Message".to_owned())
-        }
-        fn cache_key_prefix(&self) -> String {
-            "Message".to_owned()
-        }
-        fn cache_ttl(&self) -> u32 {
-            2
-        }
-    }
-
-    #[test]
-    fn test_cache_stale_ttl_subtract_overflow() {
-        let a = Message(42);
-        assert_eq!(0, a.cache_stale_ttl());
-    }
-
-    #[allow(dead_code)]
-    async fn upstream_fn(message: Message) -> i32 {
-        message.0 
     }
 }

@@ -1,0 +1,26 @@
+[package]
+name = "hitbox-stretto"
+version = "0.1.0"
+authors = [
+    "Belousov Max <mail@singulared.space>",
+    "Andrey Ermilov <andrerm@ya.ru>",
+]
+license = "MIT"
+edition = "2021"
+description = "Hitbox in-memory backend based on Stretto lib."
+readme = "README.md"
+repository = "https://github.com/hit-box/hitbox/"
+categories = ["caching", "asynchronous"]
+keywords = ["cache", "async", "cache-backend", "hitbox", "redis"]
+
+[dependencies]
+hitbox = { path = "../hitbox", features = ["metrics"] }
+hitbox-backend = { path = "../hitbox-backend" }
+async-trait = "0.1"
+thiserror = "1"
+stretto = { version = "0.8", features = ["async"] }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+chrono = { version = "0.4", features = ["serde"] }

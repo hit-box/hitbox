@@ -59,6 +59,4 @@ async fn main() -> Result<(), CacheError> {
     Ok(())
 }*/
 
-fn main() {
-
-}
+fn main() {}

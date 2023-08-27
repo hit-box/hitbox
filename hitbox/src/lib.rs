@@ -61,37 +61,31 @@
 //! [RedisBackend]: https://docs.rs/hitbox_redis/
 //! [hitbox-actix]: https://docs.rs/hitbox_actix/
 //! [dogpile effect]: https://www.sobstel.org/blog/preventing-dogpile-effect/
-#![warn(missing_docs)]
+#![allow(missing_docs)] // TODO: replace to warn
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-pub mod cache;
-pub mod dev;
+pub mod backend;
 pub mod error;
+pub mod fsm;
 #[cfg(feature = "metrics")]
 #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
 pub mod metrics;
-pub mod response;
-pub mod runtime;
-pub mod settings;
-pub mod states;
-pub mod transition_groups;
-pub mod value;
-
-pub use cache::Cacheable;
 pub use error::CacheError;
-pub use value::CacheState;
-pub use hitbox_backend::{CachedValue, CacheableResponse, CachePolicy};
+pub use hitbox_core::{
+    CacheKey, CachePolicy, CacheState, CacheablePolicyData, CacheableRequest, CacheableResponse,
+    CachedValue, Extractor, KeyPart, KeyParts, Predicate, RequestCachePolicy, ResponseCachePolicy,
+};
+pub mod policy;
 
-#[cfg(feature = "derive")]
-pub use hitbox_derive::CacheableResponse;
+pub mod predicate {
+    pub use hitbox_core::{Predicate, PredicateResult};
+}
 
-#[cfg(feature = "derive")]
-#[doc(hidden)]
-pub use serde_qs as hitbox_serializer;
+pub mod extractor {
+    pub use hitbox_core::Extractor;
+}
 
 /// The `hitbox` prelude.
 pub mod prelude {
-    #[cfg(feature = "derive")]
-    pub use crate::hitbox_serializer;
-    pub use crate::{CacheError, Cacheable, CacheableResponse};
+    pub use crate::{CacheError, CacheableRequest, CacheableResponse};
 }

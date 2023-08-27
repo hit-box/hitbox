@@ -1,12 +1,12 @@
 [workspace]
+resolver = "2"
 
 members = [
     "hitbox",
-    "hitbox-tokio",
-    "hitbox-actix",
     "hitbox-backend",
-    "hitbox-derive",
+    "hitbox-core",
     "hitbox-redis",
+    "hitbox-stretto",
     "hitbox-tower",
     "examples",
 ]
