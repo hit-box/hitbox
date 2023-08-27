@@ -1,7 +1,7 @@
 use axum::{extract::Path, routing::get, Json, Router};
 use hitbox_tower::{
-    extractor,
-    predicate::{request, response},
+    configuration::extractor,
+    configuration::predicate::{request, response},
     Method, StatusCode,
 };
 

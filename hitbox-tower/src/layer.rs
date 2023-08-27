@@ -1,6 +1,5 @@
-use crate::{
-    config::EndpointConfig, request_extractor::ExtractorBuilder,
-    request_predicate::RequestPredicateBuilder, response_predicate::ResponsePredicateBuilder,
+use crate::configuration::{
+    EndpointConfig, ExtractorBuilder, RequestPredicateBuilder, ResponsePredicateBuilder,
 };
 use std::sync::Arc;
 

@@ -1,9 +1,5 @@
+use crate::configuration::{RequestExtractor, RequestPredicate, ResponsePredicate};
 use hitbox::policy::PolicyConfig;
-
-use crate::{
-    request_extractor::RequestExtractor, request_predicate::RequestPredicate,
-    response_predicate::ResponsePredicate,
-};
 use hitbox::predicate::Predicate;
 use hitbox::Extractor;
 use hitbox_http::extractors::NeutralExtractor;
@@ -17,18 +13,6 @@ use hitbox_http::predicates::{
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 use serde::{Deserialize, Serialize};
-
-pub struct EndpointConfigBuilder<RP> {
-    pub request_predicates: RP, // TODO: maybe private?
-}
-
-impl<ReqBody> Default for EndpointConfigBuilder<NeutralRequestPredicate<ReqBody>> {
-    fn default() -> Self {
-        EndpointConfigBuilder {
-            request_predicates: NeutralRequestPredicate::new(),
-        }
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EndpointConfig {
@@ -46,10 +30,6 @@ impl EndpointConfig {
             extractors: Vec::new(),
             policy: Default::default(),
         }
-    }
-
-    pub fn builder<ReqBody>() -> EndpointConfigBuilder<NeutralRequestPredicate<ReqBody>> {
-        EndpointConfigBuilder::default()
     }
 
     pub(crate) fn request_predicates<ReqBody>(

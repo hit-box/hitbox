@@ -1,4 +1,4 @@
-use crate::config::EndpointConfig;
+use crate::configuration::EndpointConfig;
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};
