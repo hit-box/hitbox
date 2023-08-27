@@ -1,7 +1,7 @@
 use crate::configuration::{
     builder::EndpointConfigBuilder, RequestExtractor, RequestPredicate, ResponsePredicate,
 };
-use crate::Configurable;
+use crate::CacheConfig;
 use hitbox::policy::PolicyConfig;
 use hitbox::predicate::Predicate;
 use hitbox::Extractor;
@@ -41,7 +41,7 @@ impl EndpointConfig {
     }
 }
 
-impl Configurable for EndpointConfig {
+impl CacheConfig for EndpointConfig {
     fn request_predicates<ReqBody>(
         &self,
     ) -> Box<dyn Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
@@ -100,9 +100,9 @@ impl Configurable for EndpointConfig {
     }
 }
 
-impl<C> Configurable for Arc<C>
+impl<C> CacheConfig for Arc<C>
 where
-    C: Configurable,
+    C: CacheConfig,
 {
     fn request_predicates<ReqBody>(
         &self,

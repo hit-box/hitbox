@@ -12,7 +12,7 @@ type ResponsePredicate<ResBody> =
 type RequestExtractor<ResBody> =
     Box<dyn Extractor<Subject = CacheableHttpRequest<ResBody>> + Send + Sync>;
 
-pub trait Configurable {
+pub trait CacheConfig {
     fn request_predicates<ReqBody>(&self) -> RequestPredicate<ReqBody>
     where
         ReqBody: Send + 'static;
