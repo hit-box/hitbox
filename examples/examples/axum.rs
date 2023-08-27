@@ -6,7 +6,7 @@ use hitbox_tower::{
 };
 
 use hitbox_redis::RedisBackend;
-use hitbox_tower::Cache;
+use hitbox_tower::{Cache, EndpointConfig};
 
 async fn handler_result(Path(_name): Path<String>) -> Result<String, String> {
     //dbg!("axum::handler_result");
@@ -41,9 +41,12 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let backend = RedisBackend::new().unwrap();
-    let json_cache = Cache::builder()
-        .backend(backend)
+    let redis_backend = RedisBackend::new().unwrap();
+    let inmemory_backend = hitbox_stretto::StrettoBackend::builder(10)
+        .finalize()
+        .unwrap();
+
+    let json_config = EndpointConfig::builder()
         .request(
             request::method(Method::GET)
                 .query("cache", "true")
@@ -53,14 +56,22 @@ async fn main() {
         .response(response::status_code(StatusCode::OK))
         .cache_key(extractor::method().query("cache").path("/{path}*"))
         .build();
-    let backend = hitbox_stretto::StrettoBackend::builder(10)
-        .finalize()
-        .unwrap();
-    let health_check = Cache::builder()
-        .backend(backend) // FIX: it should work withod backend
+
+    let health_config = EndpointConfig::builder()
         .request(request::path("/health").method(Method::GET))
         .disable()
         .build();
+
+    let json_cache = Cache::builder()
+        .backend(redis_backend)
+        .config(json_config)
+        .build();
+
+    let health_check = Cache::builder()
+        .backend(inmemory_backend) // FIX: it should work withod backend
+        .config(health_config)
+        .build();
+
     let app = Router::new()
         .route("/greet/:name/", get(handler_result))
         .route("/", get(handler))

@@ -1,134 +1,87 @@
-use crate::configuration::{
-    EndpointConfig, ExtractorBuilder, RequestPredicateBuilder, ResponsePredicateBuilder,
-};
+use crate::configuration::EndpointConfig;
 use std::sync::Arc;
 
-use hitbox::{
-    backend::CacheBackend,
-    policy::{EnabledCacheConfig, PolicyConfig},
-};
+use hitbox::backend::CacheBackend;
 use hitbox_stretto::StrettoBackend;
 use tower::Layer;
 
 use crate::service::CacheService;
 
 #[derive(Clone)]
-pub struct Cache<B> {
+pub struct Cache<B, C> {
     pub backend: Arc<B>,
-    pub configuration: Arc<EndpointConfig>,
+    pub configuration: C,
 }
 
-impl<B> Cache<B> {
-    pub fn new(backend: B) -> Cache<B> {
+impl<B, C> Cache<B, C>
+where
+    C: Default,
+{
+    pub fn new(backend: B) -> Cache<B, C> {
         Cache {
             backend: Arc::new(backend),
-            configuration: Arc::new(Default::default()),
+            configuration: Default::default(),
         }
     }
 }
 
-impl<S, B> Layer<S> for Cache<B> {
-    type Service = CacheService<S, B, EndpointConfig>;
+impl<S, B, C> Layer<S> for Cache<B, C>
+where
+    C: Clone,
+{
+    type Service = CacheService<S, B, C>;
 
     fn layer(&self, upstream: S) -> Self::Service {
         CacheService::new(
             upstream,
             Arc::clone(&self.backend),
-            Arc::clone(&self.configuration),
+            self.configuration.clone(),
         )
     }
 }
 
-impl Cache<StrettoBackend> {
-    pub fn builder() -> CacheBuilder<StrettoBackend> {
+impl Cache<StrettoBackend, EndpointConfig> {
+    pub fn builder() -> CacheBuilder<StrettoBackend, EndpointConfig> {
         CacheBuilder::default()
     }
 }
 
-pub struct CacheBuilder<B> {
+pub struct CacheBuilder<B, C> {
     backend: Option<B>,
-    configuration: EndpointConfig,
+    configuration: C,
 }
 
-impl<B> CacheBuilder<B>
+impl<B, C> CacheBuilder<B, C>
 where
     B: CacheBackend,
+    C: Default,
 {
-    pub fn backend<NB: CacheBackend>(self, backend: NB) -> CacheBuilder<NB> {
+    pub fn backend<NB: CacheBackend>(self, backend: NB) -> CacheBuilder<NB, C> {
         CacheBuilder {
             backend: Some(backend),
             configuration: self.configuration,
         }
     }
 
-    pub fn enable(self, policy: EnabledCacheConfig) -> Self {
-        let configuration = EndpointConfig {
-            request_predicates: self.configuration.request_predicates,
-            response_predicates: self.configuration.response_predicates,
-            extractors: self.configuration.extractors,
-            policy: PolicyConfig::Enabled(policy),
-        };
+    pub fn config<NC>(self, configuration: NC) -> CacheBuilder<B, NC> {
         CacheBuilder {
             backend: self.backend,
             configuration,
         }
     }
 
-    pub fn disable(self) -> Self {
-        CacheBuilder {
-            backend: self.backend,
-            configuration: self.configuration,
-        }
-    }
-
-    pub fn request(self, predicates: RequestPredicateBuilder) -> Self {
-        let configuration = EndpointConfig {
-            request_predicates: predicates.build(),
-            response_predicates: self.configuration.response_predicates,
-            extractors: self.configuration.extractors,
-            policy: self.configuration.policy,
-        };
-        CacheBuilder {
-            backend: self.backend,
-            configuration,
-        }
-    }
-
-    pub fn response(self, predicates: ResponsePredicateBuilder) -> Self {
-        let configuration = EndpointConfig {
-            request_predicates: self.configuration.request_predicates,
-            response_predicates: predicates.build(),
-            extractors: self.configuration.extractors,
-            policy: self.configuration.policy,
-        };
-        CacheBuilder {
-            backend: self.backend,
-            configuration,
-        }
-    }
-
-    pub fn cache_key(self, extractors: ExtractorBuilder) -> Self {
-        let configuration = EndpointConfig {
-            request_predicates: self.configuration.request_predicates,
-            response_predicates: self.configuration.response_predicates,
-            extractors: extractors.build(),
-            policy: self.configuration.policy,
-        };
-        CacheBuilder {
-            backend: self.backend,
-            configuration,
-        }
-    }
-
-    pub fn build(self) -> Cache<B> {
+    pub fn build(self) -> Cache<B, C> {
         Cache {
             backend: Arc::new(self.backend.expect("Please add some cache backend")),
-            configuration: Arc::new(self.configuration),
+            configuration: self.configuration,
         }
     }
 }
 
-impl<B> Default for CacheBuilder<B> {
+impl<B, C> Default for CacheBuilder<B, C>
+where
+    C: Default,
+{
     fn default() -> Self {
         Self {
             backend: None,

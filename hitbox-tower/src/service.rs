@@ -12,11 +12,11 @@ use crate::future::Transformer;
 pub struct CacheService<S, B, C> {
     upstream: S,
     backend: Arc<B>,
-    configuration: Arc<C>,
+    configuration: C,
 }
 
 impl<S, B, C> CacheService<S, B, C> {
-    pub fn new(upstream: S, backend: Arc<B>, configuration: Arc<C>) -> Self {
+    pub fn new(upstream: S, backend: Arc<B>, configuration: C) -> Self {
         CacheService {
             upstream,
             backend,
@@ -29,6 +29,7 @@ impl<S, B, C> Clone for CacheService<S, B, C>
 where
     S: Clone,
     B: Clone,
+    C: Clone,
 {
     fn clone(&self) -> Self {
         Self {

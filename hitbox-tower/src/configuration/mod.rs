@@ -1,3 +1,4 @@
+pub mod builder;
 mod endpoint;
 mod extractors;
 mod predicates;
