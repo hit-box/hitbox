@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.64.0, stable]
+        rust: [1.70.0, stable]
     steps:
     - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.64.0, stable, beta]
+        rust: [1.70.0, stable, beta]
         redis-version: [6]
     steps:
     - uses: actions/checkout@v3
