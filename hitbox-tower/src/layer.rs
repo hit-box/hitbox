@@ -5,6 +5,8 @@ use hitbox::backend::CacheBackend;
 use hitbox_stretto::StrettoBackend;
 use tower::Layer;
 
+use hitbox_http::SerializableHttpResponse;
+
 use crate::service::CacheService;
 
 #[derive(Clone)]
@@ -53,10 +55,13 @@ pub struct CacheBuilder<B, C> {
 
 impl<B, C> CacheBuilder<B, C>
 where
-    B: CacheBackend,
+    B: CacheBackend<SerializableHttpResponse>,
     C: Default,
 {
-    pub fn backend<NB: CacheBackend>(self, backend: NB) -> CacheBuilder<NB, C> {
+    pub fn backend<NB: CacheBackend<SerializableHttpResponse>>(
+        self,
+        backend: NB,
+    ) -> CacheBuilder<NB, C> {
         CacheBuilder {
             backend: Some(backend),
             configuration: self.configuration,

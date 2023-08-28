@@ -1,7 +1,7 @@
 //! Redis backend actor implementation.
 use crate::error::Error;
 use async_trait::async_trait;
-use hitbox::{CacheKey, CacheableResponse, CachedValue};
+use hitbox::{CacheKey, CachedValue};
 use hitbox_backend::{
     serializer::{JsonSerializer, Serializer},
     BackendError, BackendResult, CacheBackend, DeleteStatus, KeySerializer,
@@ -90,12 +90,11 @@ impl RedisBackendBuilder {
 }
 
 #[async_trait]
-impl CacheBackend for RedisBackend {
-    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CachedValue<T::Cached>>>
-    where
-        T: CacheableResponse,
-        <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
-    {
+impl<T> CacheBackend<T> for RedisBackend
+where
+    T: serde::de::DeserializeOwned + serde::Serialize + Send + Sync,
+{
+    async fn get(&self, key: &CacheKey) -> BackendResult<Option<CachedValue<T>>> {
         let client = self.client.clone();
         let cache_key = UrlEncodedKeySerializer::serialize(key)?;
         async move {
@@ -133,16 +132,12 @@ impl CacheBackend for RedisBackend {
             .map_err(BackendError::from)
     }
 
-    async fn set<T>(
+    async fn set(
         &self,
         key: &CacheKey,
-        value: &CachedValue<T::Cached>,
+        value: &CachedValue<T>,
         ttl: Option<u32>,
-    ) -> BackendResult<()>
-    where
-        T: CacheableResponse + Send,
-        T::Cached: serde::Serialize + Send + Sync,
-    {
+    ) -> BackendResult<()> {
         let mut con = self.connection().await?.clone();
         let mut request = redis::cmd("SET");
         let cache_key = UrlEncodedKeySerializer::serialize(key)?;

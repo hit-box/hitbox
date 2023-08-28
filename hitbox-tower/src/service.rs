@@ -1,4 +1,5 @@
 use crate::CacheConfig;
+use hitbox_http::SerializableHttpResponse;
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};
@@ -43,7 +44,7 @@ where
 impl<S, B, C, ReqBody, ResBody> Service<Request<ReqBody>> for CacheService<S, B, C>
 where
     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
-    B: CacheBackend + Clone + Send + Sync + 'static,
+    B: CacheBackend<SerializableHttpResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
     C: CacheConfig,
 

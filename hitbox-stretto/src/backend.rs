@@ -1,6 +1,6 @@
 use crate::builder::StrettoBackendBuilder;
 use async_trait::async_trait;
-use hitbox::{CacheKey, CacheableResponse, CachedValue};
+use hitbox::{CacheKey, CachedValue};
 use hitbox_backend::{
     serializer::{BinSerializer, Serializer},
     BackendError, BackendResult, CacheBackend, DeleteStatus,
@@ -20,12 +20,11 @@ impl StrettoBackend {
 }
 
 #[async_trait]
-impl CacheBackend for StrettoBackend {
-    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CachedValue<T::Cached>>>
-    where
-        T: CacheableResponse,
-        <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
-    {
+impl<T> CacheBackend<T> for StrettoBackend
+where
+    T: serde::de::DeserializeOwned + serde::Serialize + Send + Sync,
+{
+    async fn get(&self, key: &CacheKey) -> BackendResult<Option<CachedValue<T>>> {
         let () = self
             .cache
             .wait()
@@ -42,16 +41,12 @@ impl CacheBackend for StrettoBackend {
         }
     }
 
-    async fn set<T>(
+    async fn set(
         &self,
         key: &CacheKey,
-        value: &CachedValue<T::Cached>,
+        value: &CachedValue<T>,
         ttl: Option<u32>,
-    ) -> BackendResult<()>
-    where
-        T: CacheableResponse + Send,
-        T::Cached: serde::Serialize + Send + Sync,
-    {
+    ) -> BackendResult<()> {
         let serialized = BinSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
         let cost = serialized.len();
         let inserted = match ttl {

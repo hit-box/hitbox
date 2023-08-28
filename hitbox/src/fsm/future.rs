@@ -157,7 +157,8 @@ pub struct CacheFuture<B, Req, Res, T>
 where
     T: Transform<Req, Res>,
     T::Future: Future<Output = Res> + Send,
-    B: CacheBackend,
+    B: CacheBackend<Res::Cached>,
+    Res::Cached: Serialize + DeserializeOwned + Send + Sync,
     Res: CacheableResponse,
     Req: CacheableRequest,
 {
@@ -179,7 +180,8 @@ impl<B, Req, Res, T> CacheFuture<B, Req, Res, T>
 where
     T: Transform<Req, Res>,
     T::Future: Future<Output = Res> + Send,
-    B: CacheBackend,
+    B: CacheBackend<Res::Cached>,
+    Res::Cached: Serialize + DeserializeOwned + Send + Sync,
     Res: CacheableResponse,
     Req: CacheableRequest,
 {
@@ -211,7 +213,7 @@ impl<B, Req, Res, T> Future for CacheFuture<B, Req, Res, T>
 where
     T: Transform<Req, Res>,
     T::Future: Future<Output = Res> + Send + 'static,
-    B: CacheBackend + Send + Sync + 'static,
+    B: CacheBackend<Res::Cached> + Send + Sync + 'static,
     Res: CacheableResponse,
     Res::Cached: Serialize + DeserializeOwned + Send + Sync,
     Req: CacheableRequest + Send + 'static,
@@ -257,8 +259,7 @@ where
                             let backend = this.backend.clone();
                             let cache_key = key.clone();
                             let _ = this.cache_key.insert(key);
-                            let poll_cache =
-                                Box::pin(async move { backend.get::<Res>(&cache_key).await });
+                            let poll_cache = Box::pin(async move { backend.get(&cache_key).await });
                             State::PollCache {
                                 poll_cache,
                                 request: Some(request),
@@ -331,7 +332,7 @@ where
                         CachePolicy::Cacheable(cache_value) => {
                             let update_cache_future = Box::pin(async move {
                                 let update_cache_result =
-                                    backend.set::<Res>(&cache_key, &cache_value, None).await;
+                                    backend.set(&cache_key, &cache_value, None).await;
                                 let upstream_result =
                                     Res::from_cached(cache_value.into_inner()).await;
                                 (update_cache_result, upstream_result)
