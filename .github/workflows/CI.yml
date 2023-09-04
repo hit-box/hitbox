@@ -14,7 +14,7 @@ jobs:
       matrix:
         rust: [1.60.0, stable]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: ${{ matrix.rust }}
@@ -34,7 +34,7 @@ jobs:
         rust: [1.60.0, stable, beta]
         redis-version: [6]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: ${{ matrix.rust }}
@@ -69,7 +69,7 @@ jobs:
     # Check for any warnings. This is informational and thus is allowed to fail.
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
