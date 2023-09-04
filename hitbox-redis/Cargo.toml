@@ -17,12 +17,12 @@ keywords = ["cache", "async", "cache-backend", "hitbox", "redis"]
 hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
 hitbox = { path = "../hitbox", version = "0.1.0" }
 log = "0.4"
-redis = { version = "0.23", features = ["tokio-comp", "connection-manager"] }
 thiserror = "1"
 async-trait = "0.1"
 serde = "1"
 tokio = "1"
 tracing = { version = "0.1", default-features = false }
+fred = { version = "6.3.0" }
 
 [dev-dependencies]
 chrono = "0.4"
