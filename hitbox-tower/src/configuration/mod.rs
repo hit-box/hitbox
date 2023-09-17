@@ -1,7 +1,7 @@
 pub mod builder;
-mod endpoint;
-mod extractors;
-mod predicates;
+pub mod endpoint;
+pub mod extractors;
+pub mod predicates;
 pub mod serializers;
 
 pub use endpoint::EndpointConfig;
