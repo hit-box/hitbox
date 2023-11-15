@@ -180,7 +180,7 @@ impl<B, Req, Res, T> CacheFuture<B, Req, Res, T>
 where
     T: Transform<Req, Res>,
     T::Future: Future<Output = Res> + Send,
-    B: CacheBackend<Res::Cached>,
+    B: CacheBackend<Res::Cached> + Send,
     Res::Cached: Serialize + DeserializeOwned + Send + Sync,
     Res: CacheableResponse,
     Req: CacheableRequest,
