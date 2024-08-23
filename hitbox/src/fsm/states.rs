@@ -7,54 +7,54 @@ use pin_project::pin_project;
 
 use crate::{CacheState, CacheableResponse, CachedValue};
 
-pub type CacheResult<R> = Result<Option<CachedValue<R>>, BackendError>;
-pub type PollCache<R> = BoxFuture<'static, CacheResult<R>>;
-pub type UpdateCache<R> = BoxFuture<'static, (Result<(), BackendError>, R)>;
+pub type CacheResult<T> = Result<Option<CachedValue<T>>, BackendError>;
+pub type PollCacheFuture<T> = BoxFuture<'static, CacheResult<T>>;
+pub type UpdateCache<T> = BoxFuture<'static, (Result<(), BackendError>, T)>;
+pub type RequestCachePolicyFuture<T> = BoxFuture<'static, RequestCachePolicy<T>>;
+pub type CacheStateFuture<T> = BoxFuture<'static, CacheState<T>>;
+pub type UpstreamFuture<T> = BoxFuture<'static, T>;
 
 #[allow(missing_docs)]
 #[pin_project(project = StateProj)]
-pub enum State<U, C, R>
+pub enum State<Res, Req, E>
 where
-    C: CacheableResponse,
+    Res: CacheableResponse,
 {
     Initial,
     CheckRequestCachePolicy {
         #[pin]
-        cache_policy_future: BoxFuture<'static, RequestCachePolicy<R>>,
+        cache_policy_future: RequestCachePolicyFuture<Req>,
     },
     PollCache {
         #[pin]
-        poll_cache: PollCache<C::Cached>,
-        request: Option<R>,
+        poll_cache: PollCacheFuture<Res::Cached>,
+        request: Option<Req>,
     },
-    // CachePolled {
-    //     cache_result: CacheResult<C::Cached>,
-    // },
     CheckCacheState {
-        cache_state: BoxFuture<'static, CacheState<C>>,
+        cache_state: CacheStateFuture<Res>,
     },
     PollUpstream {
-        upstream_future: BoxFuture<'static, C>,
+        upstream_future: UpstreamFuture<Result<Res, E>>,
     },
     UpstreamPolled {
-        upstream_result: Option<U>,
+        upstream_result: Option<Result<Res, E>>,
     },
     CheckResponseCachePolicy {
         #[pin]
-        cache_policy: BoxFuture<'static, ResponseCachePolicy<C>>,
+        cache_policy: BoxFuture<'static, ResponseCachePolicy<Res>>,
     },
     UpdateCache {
         #[pin]
-        update_cache_future: UpdateCache<C>,
+        update_cache_future: UpdateCache<Res>,
     },
     Response {
-        response: Option<C>,
+        response: Option<Result<Res, E>>,
     },
 }
 
-impl<U, C, R> Debug for State<U, C, R>
+impl<Res, Req, E> Debug for State<Res, Req, E>
 where
-    C: CacheableResponse,
+    Res: CacheableResponse,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

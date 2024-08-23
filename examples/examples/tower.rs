@@ -7,9 +7,11 @@ use std::net::SocketAddr;
 use http::{Request, Response};
 use tower::make::Shared;
 
-async fn handle(_: Request<Body>) -> Result<Response<Body>, String> {
-    Ok(Response::new("Hello, World!".into()))
-    // Err("handler error".to_owned())
+async fn handle(request: Request<Body>) -> Result<Response<Body>, String> {
+    match request.headers().get("error") {
+        Some(_) => Err("error response".to_owned()),
+        _ => Ok(Response::new("Hello, World!".into())),
+    }
 }
 
 #[tokio::main]
@@ -24,7 +26,7 @@ async fn main() {
     let redis = RedisBackend::builder().build().unwrap();
 
     let service = tower::ServiceBuilder::new()
-        .layer(Cache::builder().backend(inmemory).build())
+        // .layer(Cache::builder().backend(inmemory).build())
         .layer(Cache::builder().backend(redis).build())
         .service_fn(handle);
 

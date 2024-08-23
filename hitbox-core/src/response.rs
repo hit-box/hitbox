@@ -52,20 +52,35 @@ where
     async fn from_cached(cached: Self::Cached) -> Self;
 }
 
-#[async_trait]
-impl<T, E> CacheableResponse for Result<T, E>
-where
-    T: CacheableResponse + 'static,
-    E: Send + 'static,
-    T::Cached: Send,
-{
-    type Cached = <T as CacheableResponse>::Cached;
-
-    async fn into_cached(self) -> Self::Cached {
-        unimplemented!()
-    }
-
-    async fn from_cached(_cached: Self::Cached) -> Self {
-        unimplemented!()
-    }
-}
+// #[async_trait]
+// impl<T, E> CacheableResponse for Result<T, E>
+// where
+//     T: CacheableResponse + 'static,
+//     E: Send + 'static,
+//     T::Cached: Send,
+// {
+//     type Cached = <T as CacheableResponse>::Cached;
+//
+//     async fn cache_policy<P>(self, predicates: P) -> ResponseCachePolicy<Self>
+//     where
+//         P: Predicate<Subject = T> + Send + Sync,
+//     {
+//         match self {
+//             Ok(response) => match predicates.check(response).await {
+//                 PredicateResult::Cacheable(res) => {
+//                     CachePolicy::Cacheable(CachedValue::new(res.into_cached().await, Utc::now()))
+//                 }
+//                 PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
+//             },
+//             Err(error) => CachePolicy::NonCacheable(Err(error)),
+//         }
+//     }
+//
+//     async fn into_cached(self) -> Self::Cached {
+//         unimplemented!()
+//     }
+//
+//     async fn from_cached(_cached: Self::Cached) -> Self {
+//         unimplemented!()
+//     }
+// }

@@ -33,7 +33,7 @@ where
     ReqBody: Send + 'static,
     ResBody: FromBytes,
 {
-    type Future = UpstreamFuture<ResBody>;
+    type Future = UpstreamFuture<ResBody, S::Error>;
     type Response = Result<Response<ResBody>, S::Error>;
 
     fn upstream_transform(&self, req: CacheableHttpRequest<ReqBody>) -> Self::Future {
@@ -46,14 +46,14 @@ where
 }
 
 #[pin_project]
-pub struct UpstreamFuture<ResBody> {
-    inner_future: BoxFuture<'static, CacheableHttpResponse<ResBody>>,
+pub struct UpstreamFuture<ResBody, E> {
+    inner_future: BoxFuture<'static, Result<CacheableHttpResponse<ResBody>, E>>,
 }
 
-impl<ResBody> UpstreamFuture<ResBody> {
+impl<ResBody, E> UpstreamFuture<ResBody, E> {
     pub fn new<S, ReqBody>(mut inner_service: S, req: CacheableHttpRequest<ReqBody>) -> Self
     where
-        S: Service<Request<ReqBody>, Response = Response<ResBody>> + Send + 'static,
+        S: Service<Request<ReqBody>, Response = Response<ResBody>, Error = E> + Send + 'static,
         S::Future: Send,
         ReqBody: Send + 'static,
         ResBody: FromBytes,
@@ -61,16 +61,16 @@ impl<ResBody> UpstreamFuture<ResBody> {
         let inner_future = Box::pin(async move {
             let res = inner_service.call(req.into_request()).await;
             match res {
-                Ok(res) => CacheableHttpResponse::from_response(res),
-                _ => unimplemented!(),
+                Ok(res) => Ok(CacheableHttpResponse::from_response(res)),
+                Err(err) => Err(err),
             }
         });
         UpstreamFuture { inner_future }
     }
 }
 
-impl<ResBody> Future for UpstreamFuture<ResBody> {
-    type Output = CacheableHttpResponse<ResBody>;
+impl<ResBody, E> Future for UpstreamFuture<ResBody, E> {
+    type Output = Result<CacheableHttpResponse<ResBody>, E>;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         this.inner_future.as_mut().poll(cx)

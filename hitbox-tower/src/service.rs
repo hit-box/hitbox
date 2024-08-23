@@ -53,6 +53,7 @@ where
     ResBody: FromBytes + HttpBody + Send + 'static,
     ResBody::Error: Debug,
     ResBody::Data: Send,
+    S::Error: Debug + Send,
 {
     type Response = Response<ResBody>;
     type Error = S::Error;
@@ -61,6 +62,7 @@ where
         CacheableHttpRequest<ReqBody>,
         CacheableHttpResponse<ResBody>,
         Transformer<S, ReqBody>,
+        S::Error,
     >;
 
     fn poll_ready(

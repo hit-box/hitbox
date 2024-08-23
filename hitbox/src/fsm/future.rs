@@ -8,14 +8,14 @@ use std::{
 
 use crate::{policy::PolicyConfig, CachePolicy, CacheState, CacheableResponse};
 use futures::ready;
-use hitbox_core::CacheablePolicyData;
+use hitbox_core::{CacheablePolicyData, ResponseCachePolicy};
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::debug;
 
 use crate::{
     backend::CacheBackend,
-    fsm::{states::StateProj, PollCache, State},
+    fsm::{states::StateProj, PollCacheFuture, State},
     CacheKey, CacheableRequest, Extractor, Predicate,
 };
 
@@ -144,19 +144,19 @@ const POLL_AFTER_READY_ERROR: &str = "CacheFuture can't be polled after finishin
 //     }
 // }
 
-pub trait Transform<Req, Res> {
+pub trait Transform<Req, Res, E> {
     type Future;
     type Response;
 
     fn upstream_transform(&self, req: Req) -> Self::Future;
-    fn response_transform(&self, res: Res) -> Self::Response;
+    fn response_transform(&self, res: Result<Res, E>) -> Self::Response;
 }
 
 #[pin_project]
-pub struct CacheFuture<B, Req, Res, T>
+pub struct CacheFuture<B, Req, Res, T, E>
 where
-    T: Transform<Req, Res>,
-    T::Future: Future<Output = Res> + Send,
+    T: Transform<Req, Res, E>,
+    T::Future: Future<Output = Result<Res, E>> + Send,
     B: CacheBackend,
     Res: CacheableResponse,
     Req: CacheableRequest,
@@ -166,19 +166,19 @@ where
     request: Option<Req>,
     cache_key: Option<CacheKey>,
     #[pin]
-    state: State<<T::Future as Future>::Output, Res, Req>,
+    state: State<Res, Req, E>,
     #[pin]
-    poll_cache: Option<PollCache<Res>>,
+    poll_cache: Option<PollCacheFuture<Res>>,
     request_predicates: Arc<dyn Predicate<Subject = Req> + Send + Sync>,
     response_predicates: Arc<dyn Predicate<Subject = Res> + Send + Sync>,
     key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
     policy: Arc<crate::policy::PolicyConfig>,
 }
 
-impl<B, Req, Res, T> CacheFuture<B, Req, Res, T>
+impl<B, Req, Res, T, E> CacheFuture<B, Req, Res, T, E>
 where
-    T: Transform<Req, Res>,
-    T::Future: Future<Output = Res> + Send,
+    T: Transform<Req, Res, E>,
+    T::Future: Future<Output = Result<Res, E>> + Send,
     B: CacheBackend,
     Res: CacheableResponse,
     Req: CacheableRequest,
@@ -207,10 +207,10 @@ where
     }
 }
 
-impl<B, Req, Res, T> Future for CacheFuture<B, Req, Res, T>
+impl<B, Req, Res, T, E> Future for CacheFuture<B, Req, Res, T, E>
 where
-    T: Transform<Req, Res>,
-    T::Future: Future<Output = Res> + Send + 'static,
+    T: Transform<Req, Res, E>,
+    T::Future: Future<Output = Result<Res, E>> + Send + 'static,
     B: CacheBackend + Send + Sync + 'static,
     Res: CacheableResponse,
     Res::Cached: Serialize + DeserializeOwned + Send + Sync,
@@ -219,6 +219,7 @@ where
     // Debug bounds
     Req: Debug,
     Res::Cached: Debug,
+    E: Send + Debug + 'static,
 {
     type Output = T::Response;
 
@@ -296,10 +297,10 @@ where
                     let state = ready!(cache_state.as_mut().poll(cx));
                     match state {
                         CacheState::Actual(response) => State::Response {
-                            response: Some(response),
+                            response: Some(Ok(response)),
                         },
                         CacheState::Stale(response) => State::Response {
-                            response: Some(response),
+                            response: Some(Ok(response)),
                         },
                     }
                 }
@@ -311,13 +312,19 @@ where
                 }
                 StateProj::UpstreamPolled { upstream_result } => {
                     let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
+                    // .unwrap();
                     let predicates = this.response_predicates.clone();
                     match this.cache_key {
                         Some(_cache_key) => State::CheckResponseCachePolicy {
                             cache_policy: Box::pin(async move {
-                                upstream_result.cache_policy(predicates).await
+                                match upstream_result {
+                                    Ok(response) => response.cache_policy(predicates).await,
+                                    Err(err) => ResponseCachePolicy::NonCacheable(Err(err)),
+                                }
+                                // upstream_result.cache_policy(predicates).await
                             }),
                         },
+                        // CheckRequestCachePolicy is NonCacheable
                         None => State::Response {
                             response: Some(upstream_result),
                         },
@@ -341,7 +348,7 @@ where
                             }
                         }
                         CachePolicy::NonCacheable(response) => State::Response {
-                            response: Some(response),
+                            response: Some(Ok(response)),
                         },
                     }
                 }
@@ -351,7 +358,7 @@ where
                     // TODO: check backend result
                     let (_backend_result, upstream_result) = ready!(update_cache_future.poll(cx));
                     State::Response {
-                        response: Some(upstream_result),
+                        response: Some(Ok(upstream_result)),
                     }
                 }
                 StateProj::Response { response } => {
