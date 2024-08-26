@@ -34,20 +34,13 @@ where
     Self::Cached: Clone,
 {
     type Cached;
+    type Subject: CacheableResponse;
 
     async fn cache_policy<P>(self, predicates: P) -> ResponseCachePolicy<Self>
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-    {
-        match predicates.check(self).await {
-            PredicateResult::Cacheable(res) => {
-                CachePolicy::Cacheable(CachedValue::new(res.into_cached().await, Utc::now()))
-            }
-            PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
-        }
-    }
+        P: Predicate<Subject = Self::Subject> + Send + Sync;
 
-    async fn into_cached(self) -> Self::Cached;
+    async fn into_cached(self) -> CachePolicy<Self::Cached, Self>;
 
     async fn from_cached(cached: Self::Cached) -> Self;
 }
@@ -60,12 +53,37 @@ where
     T::Cached: Send,
 {
     type Cached = <T as CacheableResponse>::Cached;
+    type Subject = T;
 
-    async fn into_cached(self) -> Self::Cached {
-        unimplemented!()
+    async fn cache_policy<P>(self, predicates: P) -> ResponseCachePolicy<Self>
+    where
+        P: Predicate<Subject = Self::Subject> + Send + Sync,
+    {
+        match self {
+            Ok(response) => match predicates.check(response).await {
+                PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
+                    CachePolicy::Cacheable(res) => {
+                        CachePolicy::Cacheable(CachedValue::new(res, Utc::now()))
+                    }
+                    CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
+                },
+                PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
+            },
+            Err(error) => ResponseCachePolicy::NonCacheable(Err(error)),
+        }
     }
 
-    async fn from_cached(_cached: Self::Cached) -> Self {
-        unimplemented!()
+    async fn into_cached(self) -> CachePolicy<Self::Cached, Self> {
+        match self {
+            Ok(response) => match response.into_cached().await {
+                CachePolicy::Cacheable(res) => CachePolicy::Cacheable(res),
+                CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
+            },
+            Err(error) => CachePolicy::NonCacheable(Err(error)),
+        }
+    }
+
+    async fn from_cached(cached: Self::Cached) -> Self {
+        Ok(T::from_cached(cached).await)
     }
 }

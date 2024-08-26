@@ -8,10 +8,10 @@ use hitbox_tower::{
 use hitbox_redis::RedisBackend;
 use hitbox_tower::{Cache, EndpointConfig};
 
-async fn handler_result(Path(_name): Path<String>) -> Result<String, String> {
+async fn handler_result(Path(_name): Path<String>) -> Result<String, StatusCode> {
     //dbg!("axum::handler_result");
     // Ok(format!("Hello, {name}"))
-    Err("error".to_owned())
+    Err(StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 async fn handler() -> String {

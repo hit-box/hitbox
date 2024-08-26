@@ -15,7 +15,7 @@ use tracing::debug;
 
 use crate::{
     backend::CacheBackend,
-    fsm::{states::StateProj, PollCache, State},
+    fsm::{states::StateProj, PollCacheFuture, State},
     CacheKey, CacheableRequest, Extractor, Predicate,
 };
 
@@ -166,11 +166,11 @@ where
     request: Option<Req>,
     cache_key: Option<CacheKey>,
     #[pin]
-    state: State<<T::Future as Future>::Output, Res, Req>,
+    state: State<Res, Req>,
     #[pin]
-    poll_cache: Option<PollCache<Res>>,
+    poll_cache: Option<PollCacheFuture<Res>>,
     request_predicates: Arc<dyn Predicate<Subject = Req> + Send + Sync>,
-    response_predicates: Arc<dyn Predicate<Subject = Res> + Send + Sync>,
+    response_predicates: Arc<dyn Predicate<Subject = Res::Subject> + Send + Sync>,
     key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
     policy: Arc<crate::policy::PolicyConfig>,
 }
@@ -188,7 +188,7 @@ where
         request: Req,
         transformer: T,
         request_predicates: Arc<dyn Predicate<Subject = Req> + Send + Sync>,
-        response_predicates: Arc<dyn Predicate<Subject = Res> + Send + Sync>,
+        response_predicates: Arc<dyn Predicate<Subject = Res::Subject> + Send + Sync>,
         key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
         policy: Arc<crate::policy::PolicyConfig>,
     ) -> Self {

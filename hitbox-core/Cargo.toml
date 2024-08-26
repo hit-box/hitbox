@@ -17,3 +17,9 @@ keywords = ["cache", "async", "cache-backend", "hitbox", "tokio"]
 [dependencies]
 async-trait = "0.1.73"
 chrono = { version = "0.4.26", default-features = false, features = ["clock"] }
+
+[dev-dependencies]
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt-multi-thread",
+] }

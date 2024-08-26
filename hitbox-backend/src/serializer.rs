@@ -129,7 +129,7 @@ impl Serializer for BinSerializer<Vec<u8>> {
 #[cfg(test)]
 mod test {
     use async_trait::async_trait;
-    use hitbox_core::CacheableResponse;
+    use hitbox_core::{CachePolicy, CacheableResponse, PredicateResult};
 
     use super::*;
 
@@ -142,9 +142,25 @@ mod test {
     #[async_trait]
     impl CacheableResponse for Test {
         type Cached = Self;
+        type Subject = Self;
 
-        async fn into_cached(self) -> Self::Cached {
-            self
+        async fn cache_policy<P>(self, predicates: P) -> hitbox_core::ResponseCachePolicy<Self>
+        where
+            P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
+        {
+            match predicates.check(self).await {
+                PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
+                    CachePolicy::Cacheable(res) => {
+                        CachePolicy::Cacheable(CachedValue::new(res, Utc::now()))
+                    }
+                    CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
+                },
+                PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
+            }
+        }
+
+        async fn into_cached(self) -> CachePolicy<Self::Cached, Self> {
+            CachePolicy::Cacheable(self)
         }
         async fn from_cached(cached: Self::Cached) -> Self {
             cached

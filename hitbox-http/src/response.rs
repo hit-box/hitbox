@@ -2,7 +2,8 @@ use std::{collections::HashMap, fmt::Debug};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use hitbox::CacheableResponse;
+use chrono::Utc;
+use hitbox::{predicate::PredicateResult, CachePolicy, CacheableResponse, CachedValue};
 use http::{response::Parts, Response};
 use hyper::body::{to_bytes, HttpBody};
 use serde::{Deserialize, Serialize};
@@ -71,9 +72,25 @@ where
     ResBody::Data: Send,
 {
     type Cached = SerializableHttpResponse;
+    type Subject = Self;
 
-    async fn into_cached(self) -> Self::Cached {
-        SerializableHttpResponse {
+    async fn cache_policy<P>(self, predicates: P) -> hitbox::ResponseCachePolicy<Self>
+    where
+        P: hitbox::Predicate<Subject = Self::Subject> + Send + Sync,
+    {
+        match predicates.check(self).await {
+            PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
+                CachePolicy::Cacheable(res) => {
+                    CachePolicy::Cacheable(CachedValue::new(res, Utc::now()))
+                }
+                CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
+            },
+            PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
+        }
+    }
+
+    async fn into_cached(self) -> CachePolicy<Self::Cached, Self> {
+        CachePolicy::Cacheable(SerializableHttpResponse {
             status: 200,
             version: "HTTP/1.1".to_owned(),
             body: to_bytes(self.body.into_inner_body())
@@ -86,7 +103,7 @@ where
                 .into_iter()
                 .map(|(h, v)| (h.unwrap().to_string(), v.to_str().unwrap().to_string()))
                 .collect(),
-        }
+        })
     }
 
     async fn from_cached(cached: Self::Cached) -> Self {
