@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use hitbox_backend::{
-    serializer::SerializableCachedValue, BackendError, BackendResult, CacheBackend,
-    CacheableResponse, CachedValue, DeleteStatus,
+    serializer::SerializableCachedValue, BackendError, BackendResult, CacheBackend, DeleteStatus,
 };
+use hitbox_core::{CacheKey, CacheableResponse, CachedValue};
 use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
 use serde::{Deserialize, Serialize};
 use std::io::Error;
@@ -82,14 +82,14 @@ pub struct CacheEntry<T> {
 
 #[async_trait]
 impl CacheBackend for TarantoolBackend {
-    async fn get<T>(&self, key: String) -> BackendResult<Option<CachedValue<T::Cached>>>
+    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CachedValue<T::Cached>>>
     where
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
     {
         self.client
             .prepare_fn_call("hitbox.get")
-            .bind_ref(&(key))
+            .bind_ref(&(key.serialize()))
             .map_err(TarantoolBackend::map_err)?
             .execute()
             .await
@@ -99,11 +99,11 @@ impl CacheBackend for TarantoolBackend {
             .map(|v| v.map(|v| v.value.into_cached_value()))
     }
 
-    async fn delete(&self, key: String) -> BackendResult<DeleteStatus> {
+    async fn delete(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
         let result: bool = self
             .client
             .prepare_fn_call("hitbox.delete")
-            .bind_ref(&(key))
+            .bind_ref(&(key.serialize()))
             .map_err(TarantoolBackend::map_err)?
             .execute()
             .await
@@ -118,7 +118,7 @@ impl CacheBackend for TarantoolBackend {
 
     async fn set<T>(
         &self,
-        key: String,
+        key: &CacheKey,
         value: &CachedValue<T::Cached>,
         ttl: Option<u32>,
     ) -> BackendResult<()>
@@ -127,7 +127,7 @@ impl CacheBackend for TarantoolBackend {
         T::Cached: serde::Serialize + Send + Sync,
     {
         let entry: CacheEntry<T::Cached> = CacheEntry {
-            key,
+            key: key.serialize(),
             ttl,
             value: value.clone().into(),
         };

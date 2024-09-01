@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use hitbox_backend::{
-    serializer::SerializableCachedValue, CacheBackend, CacheableResponse, CachedValue, DeleteStatus,
-};
+use hitbox_backend::{CacheBackend, DeleteStatus};
+use hitbox_core::{CacheKey, CachePolicy, CacheableResponse, CachedValue, PredicateResult};
 use hitbox_tarantool::{backend::CacheEntry, backend::TarantoolBackend, Tarantool};
 use once_cell::sync::Lazy;
 use rusty_tarantool::tarantool::{Client, ClientConfig, ExecWithParamaters};
@@ -10,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr, thread, time::Duration};
 use testcontainers::{clients, core::WaitFor, Container, Image};
 
-static DOCKER: Lazy<clients::Cli> = Lazy::new(|| clients::Cli::default());
+static DOCKER: Lazy<clients::Cli> = Lazy::new(clients::Cli::default);
 
 impl Image for TarantoolImage {
     type Args = ();
@@ -97,9 +96,24 @@ struct Test {
 #[async_trait]
 impl CacheableResponse for Test {
     type Cached = Self;
+    type Subject = Self;
 
-    async fn into_cached(self) -> Self::Cached {
-        self
+    async fn cache_policy<P>(self, predicates: P) -> hitbox_core::ResponseCachePolicy<Self>
+    where
+        P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
+    {
+        match predicates.check(self).await {
+            PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
+                CachePolicy::Cacheable(res) => {
+                    CachePolicy::Cacheable(CachedValue::new(res, Utc::now()))
+                }
+                CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
+            },
+            PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
+        }
+    }
+    async fn into_cached(self) -> CachePolicy<Self::Cached, Self> {
+        CachePolicy::Cacheable(self)
     }
     async fn from_cached(cached: Self::Cached) -> Self {
         cached
@@ -139,21 +153,20 @@ async fn test_init() {
 #[tokio::test]
 async fn test_set() {
     let t = TarantoolImage::start().await;
-    let key = "test_key".to_string();
+    let key = CacheKey::from_str("test_key", "1");
     let dt = "2012-12-12T12:12:12Z";
     let ttl = 42;
-    let value = CachedValue::new(Test::default(), DateTime::from_str(&dt).unwrap());
+    let value = CachedValue::new(Test::default(), DateTime::from_str(dt).unwrap());
 
     t.backend
-        .set::<Test>(key.clone(), &value, Some(ttl))
+        .set::<Test>(&key, &value, Some(ttl))
         .await
         .unwrap();
 
-    // let result: Vec<CacheEntry> = t.call("get", &(key.clone())).await;
     let result = t
         .client
-        .prepare_fn_call(format!("box.space.hitbox_cache:get"))
-        .bind_ref(&key)
+        .prepare_fn_call("box.space.hitbox_cache:get")
+        .bind_ref(&key.serialize())
         .unwrap()
         .execute()
         .await
@@ -168,21 +181,18 @@ async fn test_set() {
 #[tokio::test]
 async fn test_expire() {
     let t = TarantoolImage::start().await;
-    let key = "test_key".to_owned();
+    let key = CacheKey::from_str("test_key", "1");
     let dt = "2012-12-12T12:12:12Z";
-    let value = CachedValue::new(Test::default(), DateTime::from_str(&dt).unwrap());
+    let value = CachedValue::new(Test::default(), DateTime::from_str(dt).unwrap());
 
-    t.backend
-        .set::<Test>(key.clone(), &value, Some(0))
-        .await
-        .unwrap();
+    t.backend.set::<Test>(&key, &value, Some(0)).await.unwrap();
 
     thread::sleep(Duration::from_secs(1));
 
     let result = t
         .client
-        .prepare_fn_call(format!("box.space.hitbox_cache:get"))
-        .bind_ref(&key)
+        .prepare_fn_call("box.space.hitbox_cache:get")
+        .bind_ref(&key.serialize())
         .unwrap()
         .execute()
         .await
@@ -195,34 +205,34 @@ async fn test_expire() {
 #[tokio::test]
 async fn test_delete() {
     let t = TarantoolImage::start().await;
-    let key = "test_key";
-    let dt: DateTime<Utc> = DateTime::from_str(&"2012-12-12T12:12:12Z").unwrap();
+    let key = CacheKey::from_str("test_key", "1");
+    let dt: DateTime<Utc> = DateTime::from_str("2012-12-12T12:12:12Z").unwrap();
     let value = Test::default();
-    let cached_value = SerializableCachedValue::new(&value, dt);
+    let cached_value = CachedValue::new(&value, dt);
     let entry = CacheEntry {
-        key: key.into(),
+        key: key.serialize(),
         ttl: Some(42),
-        value: cached_value,
+        value: cached_value.into(),
     };
 
-    let status = t.backend.delete(key.to_string()).await.unwrap();
+    let status = t.backend.delete(&key).await.unwrap();
     assert_eq!(status, DeleteStatus::Missing);
 
     t.client
-        .prepare_fn_call(format!("box.space.hitbox_cache:replace"))
+        .prepare_fn_call("box.space.hitbox_cache:replace")
         .bind_ref(&entry)
         .unwrap()
         .execute()
         .await
         .unwrap();
 
-    let status = t.backend.delete(key.to_string()).await.unwrap();
+    let status = t.backend.delete(&key).await.unwrap();
     assert_eq!(status, DeleteStatus::Deleted(1));
 
     let result = t
         .client
-        .prepare_fn_call(format!("box.space.hitbox_cache:get"))
-        .bind_ref(&key)
+        .prepare_fn_call("box.space.hitbox_cache:get")
+        .bind_ref(&key.serialize())
         .unwrap()
         .execute()
         .await
@@ -236,26 +246,26 @@ async fn test_delete() {
 #[tokio::test]
 async fn test_get() {
     let t = TarantoolImage::start().await;
-    let key = "test_key";
-    let dt: DateTime<Utc> = DateTime::from_str(&"2012-12-12T12:12:12Z").unwrap();
+    let key = CacheKey::from_str("test_key", "1");
+    let dt: DateTime<Utc> = DateTime::from_str("2012-12-12T12:12:12Z").unwrap();
 
     let value = Test::default();
-    let cached_value = SerializableCachedValue::new(&value, dt);
+    let cached_value = CachedValue::new(&value, dt);
     let entry = CacheEntry {
-        key: key.into(),
+        key: key.serialize(),
         ttl: Some(42),
-        value: cached_value,
+        value: cached_value.into(),
     };
 
     t.client
-        .prepare_fn_call(format!("box.space.hitbox_cache:replace"))
+        .prepare_fn_call("box.space.hitbox_cache:replace")
         .bind_ref(&entry)
         .unwrap()
         .execute()
         .await
         .unwrap();
 
-    let data = t.backend.get::<Test>(key.into()).await.unwrap().unwrap();
+    let data = t.backend.get::<Test>(&key).await.unwrap().unwrap();
 
     assert_eq!(data.data, value);
     assert_eq!(data.expired, dt);

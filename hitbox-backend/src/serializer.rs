@@ -38,6 +38,15 @@ impl<U> SerializableCachedValue<U> {
     }
 }
 
+impl<T> From<CachedValue<T>> for SerializableCachedValue<T> {
+    fn from(value: CachedValue<T>) -> SerializableCachedValue<T> {
+        SerializableCachedValue {
+            data: value.data,
+            expired: value.expired,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct JsonSerializer<Raw = Vec<u8>> {
     _raw: PhantomData<Raw>,
