@@ -27,7 +27,7 @@ pub trait Serializer {
 }
 
 #[derive(Deserialize, Serialize)]
-struct SerializableCachedValue<U> {
+pub struct SerializableCachedValue<U> {
     data: U,
     expired: DateTime<Utc>,
 }
@@ -35,6 +35,15 @@ struct SerializableCachedValue<U> {
 impl<U> SerializableCachedValue<U> {
     pub fn into_cached_value(self) -> CachedValue<U> {
         CachedValue::new(self.data, self.expired)
+    }
+}
+
+impl<T> From<CachedValue<T>> for SerializableCachedValue<T> {
+    fn from(value: CachedValue<T>) -> SerializableCachedValue<T> {
+        SerializableCachedValue {
+            data: value.data,
+            expired: value.expired,
+        }
     }
 }
 

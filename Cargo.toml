@@ -8,5 +8,6 @@ members = [
     "hitbox-redis",
     "hitbox-stretto",
     "hitbox-tower",
+    "hitbox-tarantool",
     "examples",
 ]

@@ -1,0 +1,34 @@
+[package]
+name = "hitbox-tarantool"
+version = "0.1.0"
+authors = [
+    "Evgeniy <ea@lowit.ru>",
+    "Belousov Max <mail@singulared.space>",
+    "Andrey Ermilov <andrerm@ya.ru>",
+]
+license = "MIT"
+edition = "2021"
+description = "Hitbox tarantool backend."
+readme = "README.md"
+repository = "https://github.com/hit-box/hitbox/"
+categories = ["caching", "asynchronous"]
+keywords = ["cache", "async", "cache-backend", "hitbox", "tarantool"]
+
+[dependencies]
+hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
+hitbox-core = { path = "../hitbox-core", version = "0.1.0" }
+async-trait = "0.1"
+serde = "1"
+rusty_tarantool = "0.3.0"
+typed-builder = "0.15"
+
+[dev-dependencies]
+tokio = { version = "1", features = [
+    "time",
+    "macros",
+    "test-util",
+    "rt-multi-thread",
+] }
+testcontainers = "0.14"
+chrono = "0.4"
+once_cell = "1"
