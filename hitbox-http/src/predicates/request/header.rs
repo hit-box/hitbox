@@ -1,31 +1,30 @@
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
+use http::{HeaderName, HeaderValue};
 
 pub enum Operation {
-    Eq,
+    Eq(HeaderName, HeaderValue),
+    Exist(HeaderName),
+    In(HeaderName, Vec<HeaderValue>),
 }
 
 pub struct Header<P> {
-    pub name: String,
-    pub value: String,
     pub operation: Operation,
     inner: P,
 }
 
 pub trait HeaderPredicate: Sized {
-    fn header(self, name: String, value: String) -> Header<Self>;
+    fn header(self, operation: Operation) -> Header<Self>;
 }
 
 impl<P> HeaderPredicate for P
 where
     P: Predicate,
 {
-    fn header(self, name: String, value: String) -> Header<P> {
+    fn header(self, operation: Operation) -> Header<Self> {
         Header {
-            name,
-            value,
-            operation: Operation::Eq,
+            operation,
             inner: self,
         }
     }
@@ -40,20 +39,27 @@ where
     type Subject = P::Subject;
 
     async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
-        //dbg!("HeaderPredicate::check");
         match self.inner.check(request).await {
-            PredicateResult::Cacheable(request) => match self.operation {
-                Operation::Eq => match request.parts().headers.get(self.name.as_str()) {
-                    Some(header_value) => {
-                        if self.value.as_str() == header_value {
-                            PredicateResult::Cacheable(request)
-                        } else {
-                            PredicateResult::NonCacheable(request)
-                        }
-                    }
-                    None => PredicateResult::NonCacheable(request),
-                },
-            },
+            PredicateResult::Cacheable(request) => {
+                let is_cacheable = match &self.operation {
+                    Operation::Eq(name, value) => request
+                        .parts()
+                        .headers
+                        .get(name)
+                        .map_or(false, |v| v.eq(value)),
+                    Operation::Exist(name) => request.parts().headers.get(name).is_some(),
+                    Operation::In(name, values) => request
+                        .parts()
+                        .headers
+                        .get(name)
+                        .map_or(false, |v| values.contains(v)),
+                };
+                if is_cacheable {
+                    PredicateResult::Cacheable(request)
+                } else {
+                    PredicateResult::NonCacheable(request)
+                }
+            }
             PredicateResult::NonCacheable(request) => PredicateResult::NonCacheable(request),
         }
     }
