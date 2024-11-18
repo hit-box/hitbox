@@ -33,7 +33,7 @@ impl<P> QueryPredicate for P
 where
     P: Predicate,
 {
-    fn query(self, name: String, value: String) -> Query<P> {
+    fn query(self, name: String, value: String) -> Query<Self> {
         Query {
             name,
             value: crate::query::Value::Scalar(value),

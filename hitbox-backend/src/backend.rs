@@ -1,7 +1,7 @@
-use std::sync::Arc;
 use crate::{BackendError, DeleteStatus};
 use async_trait::async_trait;
 use hitbox_core::{CacheKey, CachedValue};
+use std::sync::Arc;
 
 pub type BackendResult<T> = Result<T, BackendError>;
 
