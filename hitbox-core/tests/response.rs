@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use hitbox_core::{CachePolicy, CacheableResponse, CachedValue, Predicate, PredicateResult};
+use hitbox_core::{CachePolicy, CacheValue, CacheableResponse, Predicate, PredicateResult};
 
 #[derive(Clone, Debug)]
 struct TestResponse {
@@ -29,7 +29,7 @@ impl CacheableResponse for TestResponse {
         match predicates.check(self).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                 CachePolicy::Cacheable(res) => {
-                    CachePolicy::Cacheable(CachedValue::new(res, Utc::now()))
+                    CachePolicy::Cacheable(CacheValue::new(res, Utc::now()))
                 }
                 CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
             },

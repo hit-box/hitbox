@@ -6,7 +6,7 @@ mod backend;
 mod key;
 pub mod serializer;
 
-pub use backend::{BackendResult, CacheBackend};
+pub use backend::{Backend, BackendResult, CacheBackend};
 pub use key::{KeySerializer, UrlEncodedKeySerializer};
 use serializer::SerializerError;
 use thiserror::Error;
@@ -25,6 +25,10 @@ pub enum BackendError {
     /// Serializing\Deserializing data error.
     #[error(transparent)]
     SerializerError(#[from] SerializerError),
+
+    /// DEBUG @TODO: remove
+    #[error("test")]
+    Test(u8),
 }
 
 /// Status of deleting result.

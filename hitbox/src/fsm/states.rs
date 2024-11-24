@@ -5,9 +5,9 @@ use hitbox_backend::BackendError;
 use hitbox_core::{RequestCachePolicy, ResponseCachePolicy};
 use pin_project::pin_project;
 
-use crate::{CacheState, CacheableResponse, CachedValue};
+use crate::{CacheState, CacheValue, CacheableResponse};
 
-pub type CacheResult<T> = Result<Option<CachedValue<T>>, BackendError>;
+pub type CacheResult<T> = Result<Option<CacheValue<T>>, BackendError>;
 pub type PollCacheFuture<T> = BoxFuture<'static, CacheResult<T>>;
 pub type UpdateCache<T> = BoxFuture<'static, (Result<(), BackendError>, T)>;
 pub type RequestCachePolicyFuture<T> = BoxFuture<'static, RequestCachePolicy<T>>;

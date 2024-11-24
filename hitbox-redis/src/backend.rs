@@ -1,7 +1,7 @@
 //! Redis backend actor implementation.
 use crate::error::Error;
 use async_trait::async_trait;
-use hitbox::{CacheKey, CacheableResponse, CachedValue};
+use hitbox::{CacheKey, CacheValue, CacheableResponse};
 use hitbox_backend::{
     serializer::{JsonSerializer, Serializer},
     BackendError, BackendResult, CacheBackend, DeleteStatus, KeySerializer,
@@ -91,7 +91,7 @@ impl RedisBackendBuilder {
 
 #[async_trait]
 impl CacheBackend for RedisBackend {
-    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CachedValue<T::Cached>>>
+    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<T::Cached>>>
     where
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
@@ -136,7 +136,7 @@ impl CacheBackend for RedisBackend {
     async fn set<T>(
         &self,
         key: &CacheKey,
-        value: &CachedValue<T::Cached>,
+        value: &CacheValue<T::Cached>,
         ttl: Option<u32>,
     ) -> BackendResult<()>
     where

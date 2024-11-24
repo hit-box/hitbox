@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug};
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Utc;
-use hitbox::{predicate::PredicateResult, CachePolicy, CacheableResponse, CachedValue};
+use hitbox::{predicate::PredicateResult, CachePolicy, CacheValue, CacheableResponse};
 use http::{response::Parts, Response};
 use hyper::body::{to_bytes, HttpBody};
 use serde::{Deserialize, Serialize};
@@ -81,7 +81,7 @@ where
         match predicates.check(self).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                 CachePolicy::Cacheable(res) => {
-                    CachePolicy::Cacheable(CachedValue::new(res, Utc::now()))
+                    CachePolicy::Cacheable(CacheValue::new(res, Utc::now()))
                 }
                 CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
             },

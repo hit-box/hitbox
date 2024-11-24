@@ -5,7 +5,7 @@ use chrono::Utc;
 
 use crate::{
     predicate::{Predicate, PredicateResult},
-    value::CachedValue,
+    value::CacheValue,
     CachePolicy,
 };
 
@@ -19,7 +19,7 @@ use crate::{
 //     /// This variant shouldn't be stored in the cache backend.
 //     NonCacheable(C),
 // }
-pub type ResponseCachePolicy<C> = CachePolicy<CachedValue<<C as CacheableResponse>::Cached>, C>;
+pub type ResponseCachePolicy<C> = CachePolicy<CacheValue<<C as CacheableResponse>::Cached>, C>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum CacheState<Cached> {
@@ -63,7 +63,7 @@ where
             Ok(response) => match predicates.check(response).await {
                 PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                     CachePolicy::Cacheable(res) => {
-                        CachePolicy::Cacheable(CachedValue::new(res, Utc::now()))
+                        CachePolicy::Cacheable(CacheValue::new(res, Utc::now()))
                     }
                     CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
                 },

@@ -1,6 +1,6 @@
 use crate::builder::StrettoBackendBuilder;
 use async_trait::async_trait;
-use hitbox::{CacheKey, CacheableResponse, CachedValue};
+use hitbox::{CacheKey, CacheValue, CacheableResponse};
 use hitbox_backend::{
     serializer::{BinSerializer, Serializer},
     BackendError, BackendResult, CacheBackend, DeleteStatus,
@@ -21,7 +21,7 @@ impl StrettoBackend {
 
 #[async_trait]
 impl CacheBackend for StrettoBackend {
-    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CachedValue<T::Cached>>>
+    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<T::Cached>>>
     where
         T: CacheableResponse,
         <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
@@ -45,7 +45,7 @@ impl CacheBackend for StrettoBackend {
     async fn set<T>(
         &self,
         key: &CacheKey,
-        value: &CachedValue<T::Cached>,
+        value: &CacheValue<T::Cached>,
         ttl: Option<u32>,
     ) -> BackendResult<()>
     where
@@ -127,7 +127,7 @@ mod test {
     #[tokio::test]
     async fn test_set_and_get() {
         let cache = crate::StrettoBackend::builder(100).finalize().unwrap();
-        let value = CachedValue::new(Test::new(), Utc::now());
+        let value = CacheValue::new(Test::new(), Utc::now());
         let key = CacheKey::from_str("key", "1");
         let res = cache.set::<Test>(&key, &value, None).await;
         assert!(res.is_ok());
