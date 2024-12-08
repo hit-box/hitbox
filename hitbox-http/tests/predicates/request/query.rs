@@ -1,4 +1,5 @@
 use hitbox::predicate::{Predicate, PredicateResult};
+use hitbox_http::predicates::request::query;
 use hitbox_http::predicates::request::QueryPredicate;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::CacheableHttpRequest;
@@ -11,7 +12,8 @@ async fn test_request_query_predicates_positive() {
     let request = CacheableHttpRequest::from_request(
         Request::builder().uri(path).body(Body::empty()).unwrap(),
     );
-    let predicate = NeutralRequestPredicate::new().query("name".to_owned(), "value".to_owned());
+    let predicate = NeutralRequestPredicate::new()
+        .query(query::Operation::Eq("name".to_owned(), "value".to_owned()));
     let prediction = predicate.check(request).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
@@ -22,7 +24,10 @@ async fn test_request_query_predicates_multiple() {
     let request = CacheableHttpRequest::from_request(
         Request::builder().uri(path).body(Body::empty()).unwrap(),
     );
-    let predicate = NeutralRequestPredicate::new().query("name".to_owned(), "value".to_owned());
+    let predicate = NeutralRequestPredicate::new().query(query::Operation::In(
+        "name".to_owned(),
+        vec!["value".to_owned(), "second-value".to_owned()],
+    ));
     let prediction = predicate.check(request).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
@@ -33,7 +38,10 @@ async fn test_request_query_predicates_negative() {
     let request = CacheableHttpRequest::from_request(
         Request::builder().uri(path).body(Body::empty()).unwrap(),
     );
-    let predicate = NeutralRequestPredicate::new().query("name".to_owned(), "value".to_owned());
+    let predicate = NeutralRequestPredicate::new().query(query::Operation::Eq(
+        "name".to_owned(),
+        "wrong-value".to_owned(),
+    ));
     let prediction = predicate.check(request).await;
     assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }

@@ -15,6 +15,9 @@ impl Value {
             Value::Array(values) => values.to_owned(),
         }
     }
+    pub fn contains(&self, value: &String) -> bool {
+        self.inner().contains(value)
+    }
 }
 
 pub fn parse(value: &str) -> HashMap<String, Value> {

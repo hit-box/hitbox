@@ -1,6 +1,7 @@
 use hitbox::predicate::{Predicate, PredicateResult};
 use hitbox_http::predicates::conditions::{NotPredicate, OrPredicate};
 use hitbox_http::predicates::request::header;
+use hitbox_http::predicates::request::query;
 use hitbox_http::predicates::request::{HeaderPredicate, PathPredicate, QueryPredicate};
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::CacheableHttpRequest;
@@ -18,8 +19,10 @@ async fn test_conditions_or() {
             .body(Body::empty())
             .unwrap(),
     );
-    let wrong_query_predicate =
-        NeutralRequestPredicate::new().query("name".to_owned(), "wrong-value".to_owned());
+    let wrong_query_predicate = NeutralRequestPredicate::new().query(query::Operation::Eq(
+        "name".to_owned(),
+        "wrong-value".to_owned(),
+    ));
     let wrong_path_predicate = NeutralRequestPredicate::new().path(expression.into());
     let correct_header_predicate = NeutralRequestPredicate::new().header(header::Operation::Eq(
         "x-test".parse().unwrap(),
@@ -44,8 +47,8 @@ async fn test_conditions_not() {
             .body(Body::empty())
             .unwrap(),
     );
-    let correct_query_predicate =
-        NeutralRequestPredicate::new().query("name".to_owned(), "value".to_owned());
+    let correct_query_predicate = NeutralRequestPredicate::new()
+        .query(query::Operation::Eq("name".to_owned(), "value".to_owned()));
     let wrong_path_predicate = NeutralRequestPredicate::new().path(expression.into());
     let wrong_header_predicate = NeutralRequestPredicate::new().header(header::Operation::Eq(
         "x-test".parse().unwrap(),
