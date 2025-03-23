@@ -35,9 +35,13 @@ serde_json = "1.0.138"
 jaq-core = "2.1.0"
 jaq-std = "2.1.0"
 jaq-json = { version = "1.1.0", features = [ "serde_json" ] }
+prost = "0.12"
+prost-reflect = { version = "0.14", features = [ "serde", "derive" ] }
+protox = "0.7"
 
 [dev-dependencies]
 tokio = { version = "1", features = [
     "test-util",
     "macros",
 ], default-features = false }
+protox = "0.7"

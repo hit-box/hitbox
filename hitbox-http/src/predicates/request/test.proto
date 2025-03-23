@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package test;
+
+message TestMessage {
+    int32 foo = 1;
+    string name = 2;
+    repeated string tags = 3;
+    map<string, string> metadata = 4;
+    oneof test_oneof {
+        string text = 5;
+        int64 number = 6;
+    }
+} 
