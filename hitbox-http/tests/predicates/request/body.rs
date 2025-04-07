@@ -140,8 +140,9 @@ mod in_tests {
 #[tokio::test]
 async fn test_request_body_predicates_positive_basic() {
     let json_body = r#"{"inner":{"field_one":"value_one","field_two":"value_two"}}"#;
-    let request =
-        CacheableHttpRequest::from_request(Request::builder().body(HttpBody::from(json_body)).unwrap());
+    let request = CacheableHttpRequest::from_request(
+        Request::builder().body(HttpBody::from(json_body)).unwrap(),
+    );
 
     let predicate = NeutralRequestPredicate::new().body(
         ParsingType::Jq,
@@ -160,8 +161,9 @@ async fn test_request_body_predicates_positive_array() {
         {"key": "my-key-00", "value": "my-value-00"},
         {"key": "my-key-01", "value": "my-value-01"}
     ]"#;
-    let request =
-        CacheableHttpRequest::from_request(Request::builder().body(HttpBody::from(json_body)).unwrap());
+    let request = CacheableHttpRequest::from_request(
+        Request::builder().body(HttpBody::from(json_body)).unwrap(),
+    );
 
     let predicate = NeutralRequestPredicate::new().body(
         ParsingType::Jq,
@@ -181,8 +183,9 @@ async fn test_request_body_predicates_positive_multiple_value() {
         {"key": "my-key-01", "value": "my-value-01"},
         {"key": "my-key-02", "value": "my-value-02"}
     ]"#;
-    let request =
-        CacheableHttpRequest::from_request(Request::builder().body(HttpBody::from(json_body)).unwrap());
+    let request = CacheableHttpRequest::from_request(
+        Request::builder().body(HttpBody::from(json_body)).unwrap(),
+    );
 
     let predicate = NeutralRequestPredicate::new().body(
         ParsingType::Jq,
@@ -197,8 +200,8 @@ async fn test_request_body_predicates_positive_multiple_value() {
 #[cfg(test)]
 mod protobuf_tests {
     use super::*;
-    use prost_reflect::{DescriptorPool, DynamicMessage, Value as ReflectValue};
     use prost_reflect::prost::Message;
+    use prost_reflect::{DescriptorPool, DynamicMessage, Value as ReflectValue};
     use std::fs;
 
     const TEST_PROTO: &str = r#"
@@ -228,9 +231,7 @@ mod protobuf_tests {
         // Create a request with the protobuf message
         let encoded = dynamic_msg.encode_to_vec();
         let body = HttpBody::from(encoded);
-        let request = Request::builder()
-            .body(body)
-            .unwrap();
+        let request = Request::builder().body(body).unwrap();
         let cacheable_request = CacheableHttpRequest::from_request(request);
 
         // Create the predicate

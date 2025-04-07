@@ -1,4 +1,5 @@
 use hitbox_backend::Backend;
+use hitbox_moka::MokaBackend;
 use hitbox_redis::RedisBackend;
 use hitbox_stretto::StrettoBackend;
 use hitbox_tower::Cache;
@@ -21,17 +22,18 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let inmemory = StrettoBackend::builder(10_000_000).finalize().unwrap();
-    let redis = RedisBackend::builder().build().unwrap();
+    let inmemory = MokaBackend::builder(10_000).build();
+    // let inmemory = StrettoBackend::builder(10_000_000).finalize().unwrap();
+    // let redis = RedisBackend::builder().build().unwrap();
 
     let service = tower::ServiceBuilder::new()
-        // .layer(Cache::builder().backend(inmemory).build())
+        .layer(Cache::builder().backend(inmemory).build())
         // .layer(Cache::builder().backend(redis).build())
-        .layer(
-            Cache::builder()
-                .backend(Arc::new(redis) as Arc<dyn Backend>)
-                .build(),
-        )
+        // .layer(
+        //     Cache::builder()
+        //         .backend(Arc::new(redis) as Arc<dyn Backend>)
+        //         .build(),
+        // )
         .service_fn(handle);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

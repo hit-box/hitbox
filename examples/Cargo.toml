@@ -12,6 +12,7 @@ default = []
 hitbox = { path = "../hitbox", features = ["metrics"] }
 hitbox-backend = { path = "../hitbox-backend" }
 hitbox-tower = { path = "../hitbox-tower" }
+hitbox-moka = { path = "../hitbox-moka" }
 hitbox-redis = { path = "../hitbox-redis" }
 hitbox-stretto = { path = "../hitbox-stretto" }
 actix = "0.13"
