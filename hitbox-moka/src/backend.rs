@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::Backend;
 use hitbox_backend::{BackendResult, DeleteStatus};
@@ -18,11 +18,10 @@ impl Expiry<CacheKey, CacheValue<Raw>> for Expiration {
         value: &CacheValue<Raw>,
         _created_at: Instant,
     ) -> Option<Duration> {
-        let duration = value.expire.map(|expiration| {
+        value.expire.map(|expiration| {
             let delta = expiration - Utc::now();
             Duration::from_secs(delta.num_seconds() as u64)
-        });
-        duration
+        })
     }
 }
 
@@ -49,12 +48,13 @@ impl Backend for MokaBackend {
         value: CacheValue<Raw>,
         _ttl: Option<Duration>,
     ) -> BackendResult<()> {
-        Ok(self.cache.insert(key.clone(), value).await)
+        self.cache.insert(key.clone(), value).await;
+        Ok(())
     }
 
     async fn remove(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
         let value = self.cache.remove(key).await;
-        // FIXME: No need to have u32 insude Deleted option. We can remove it
+        // FIXME: No need to have u32 inside Deleted option. We can remove it
         match value {
             Some(_) => Ok(DeleteStatus::Deleted(1)),
             None => Ok(DeleteStatus::Missing),
