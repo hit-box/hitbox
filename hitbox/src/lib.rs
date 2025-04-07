@@ -73,8 +73,8 @@ pub mod metrics;
 pub use error::CacheError;
 pub use hitbox_core::{
     CacheKey, CachePolicy, CacheState, CacheValue, CacheablePolicyData, CacheableRequest,
-    CacheableResponse, Extractor, KeyPart, KeyParts, Predicate, RequestCachePolicy,
-    ResponseCachePolicy,
+    CacheableResponse, EntityPolicyConfig, Extractor, KeyPart, KeyParts, Predicate,
+    RequestCachePolicy, ResponseCachePolicy,
 };
 pub mod policy;
 

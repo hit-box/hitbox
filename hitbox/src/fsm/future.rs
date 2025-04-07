@@ -8,7 +8,7 @@ use std::{
 
 use crate::{policy::PolicyConfig, CachePolicy, CacheState, CacheableResponse};
 use futures::ready;
-use hitbox_core::CacheablePolicyData;
+use hitbox_core::{CacheablePolicyData, EntityPolicyConfig};
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::debug;
@@ -315,7 +315,9 @@ where
                     match this.cache_key {
                         Some(_cache_key) => State::CheckResponseCachePolicy {
                             cache_policy: Box::pin(async move {
-                                upstream_result.cache_policy(predicates).await
+                                upstream_result
+                                    .cache_policy(predicates, &EntityPolicyConfig::default())
+                                    .await
                             }),
                         },
                         None => State::Response {

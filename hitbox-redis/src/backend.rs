@@ -1,10 +1,11 @@
 //! Redis backend actor implementation.
 use crate::error::Error;
 use async_trait::async_trait;
+use chrono::Utc;
 use hitbox::{CacheKey, CacheValue, CacheableResponse};
 use hitbox_backend::{
-    serializer::{JsonSerializer, Serializer},
-    BackendError, BackendResult, CacheBackend, DeleteStatus, KeySerializer,
+    serializer::{Format, Raw, Serializer},
+    Backend, BackendError, BackendResult, CacheBackend, DeleteStatus, KeySerializer,
     UrlEncodedKeySerializer,
 };
 use redis::{aio::ConnectionManager, Client};
@@ -22,6 +23,7 @@ use tracing::trace;
 pub struct RedisBackend {
     client: Client,
     connection: OnceCell<ConnectionManager>,
+    format: Format,
 }
 
 impl RedisBackend {
@@ -63,12 +65,14 @@ impl RedisBackend {
 /// Part of builder pattern implementation for RedisBackend actor.
 pub struct RedisBackendBuilder {
     connection_info: String,
+    format: Format,
 }
 
 impl Default for RedisBackendBuilder {
     fn default() -> Self {
         Self {
             connection_info: "redis://127.0.0.1/".to_owned(),
+            format: Format::default(),
         }
     }
 }
@@ -85,82 +89,111 @@ impl RedisBackendBuilder {
         Ok(RedisBackend {
             client: Client::open(self.connection_info)?,
             connection: OnceCell::new(),
+            format: self.format,
         })
     }
 }
 
 #[async_trait]
-impl CacheBackend for RedisBackend {
-    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<T::Cached>>>
-    where
-        T: CacheableResponse,
-        <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
-    {
+impl Backend for RedisBackend {
+    async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         let client = self.client.clone();
         let cache_key = UrlEncodedKeySerializer::serialize(key)?;
-        async move {
-            let mut con = client.get_tokio_connection_manager().await.unwrap();
-            let result: Option<Vec<u8>> = redis::cmd("GET")
-                .arg(cache_key)
-                .query_async(&mut con)
-                .await
-                .map_err(Error::from)
-                .map_err(BackendError::from)?;
-            result
-                .map(|value| {
-                    JsonSerializer::<Vec<u8>>::deserialize(value).map_err(BackendError::from)
-                })
-                .transpose()
-        }
-        .await
-    }
-
-    async fn delete(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
-        let mut con = self.connection().await?.clone();
-        let cache_key = UrlEncodedKeySerializer::serialize(key)?;
-        redis::cmd("DEL")
+        let mut con = client
+            .get_tokio_connection_manager()
+            .await
+            .map_err(Error::from)?;
+        let result: Option<Vec<u8>> = redis::cmd("GET")
             .arg(cache_key)
             .query_async(&mut con)
             .await
-            .map(|res| {
-                if res > 0 {
-                    DeleteStatus::Deleted(res)
-                } else {
-                    DeleteStatus::Missing
-                }
-            })
-            .map_err(Error::from)
-            .map_err(BackendError::from)
+            .map_err(Error::from)?;
+        Ok(result.map(|value| CacheValue::new(value, Utc::now())))
     }
 
-    async fn set<T>(
+    async fn write(
         &self,
         key: &CacheKey,
-        value: &CacheValue<T::Cached>,
-        ttl: Option<u32>,
-    ) -> BackendResult<()>
-    where
-        T: CacheableResponse + Send,
-        T::Cached: serde::Serialize + Send + Sync,
-    {
-        let mut con = self.connection().await?.clone();
-        let mut request = redis::cmd("SET");
-        let cache_key = UrlEncodedKeySerializer::serialize(key)?;
-        let serialized_value =
-            JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
-        request.arg(cache_key).arg(serialized_value);
-        if let Some(ttl) = ttl {
-            request.arg("EX").arg(ttl);
-        };
-        request
-            .query_async(&mut con)
-            .await
-            .map_err(Error::from)
-            .map_err(BackendError::from)
+        value: CacheValue<Raw>,
+        ttl: Option<std::time::Duration>,
+    ) -> BackendResult<()> {
+        todo!()
     }
 
-    async fn start(&self) -> BackendResult<()> {
-        self.connection().await?;
-        Ok(())
+    async fn remove(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
+        todo!()
     }
+
+    fn format(&self) -> &Format {
+        &self.format
+    }
+
+    // async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
+    //     let client = self.client.clone();
+    //     let cache_key = UrlEncodedKeySerializer::serialize(key)?;
+    //     async move {
+    //         let mut con = client.get_tokio_connection_manager().await.unwrap();
+    //         let result: Option<Vec<u8>> = redis::cmd("GET")
+    //             .arg(cache_key)
+    //             .query_async(&mut con)
+    //             .await
+    //             .map_err(Error::from)
+    //             .map_err(BackendError::from)?;
+    //         result
+    //             .map(|value| {
+    //                 JsonSerializer::<Vec<u8>>::deserialize(value).map_err(BackendError::from)
+    //             })
+    //             .transpose()
+    //     }
+    //     .await
+    // }
+    //
+    // async fn delete(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
+    //     let mut con = self.connection().await?.clone();
+    //     let cache_key = UrlEncodedKeySerializer::serialize(key)?;
+    //     redis::cmd("DEL")
+    //         .arg(cache_key)
+    //         .query_async(&mut con)
+    //         .await
+    //         .map(|res| {
+    //             if res > 0 {
+    //                 DeleteStatus::Deleted(res)
+    //             } else {
+    //                 DeleteStatus::Missing
+    //             }
+    //         })
+    //         .map_err(Error::from)
+    //         .map_err(BackendError::from)
+    // }
+    //
+    // async fn set<T>(
+    //     &self,
+    //     key: &CacheKey,
+    //     value: &CacheValue<T::Cached>,
+    //     ttl: Option<u32>,
+    // ) -> BackendResult<()>
+    // where
+    //     T: CacheableResponse + Send,
+    //     T::Cached: serde::Serialize + Send + Sync,
+    // {
+    //     let mut con = self.connection().await?.clone();
+    //     let mut request = redis::cmd("SET");
+    //     let cache_key = UrlEncodedKeySerializer::serialize(key)?;
+    //     let serialized_value =
+    //         JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
+    //     request.arg(cache_key).arg(serialized_value);
+    //     if let Some(ttl) = ttl {
+    //         request.arg("EX").arg(ttl);
+    //     };
+    //     request
+    //         .query_async(&mut con)
+    //         .await
+    //         .map_err(Error::from)
+    //         .map_err(BackendError::from)
+    // }
+
+    // async fn start(&self) -> BackendResult<()> {
+    //     self.connection().await?;
+    //     Ok(())
+    // }
 }

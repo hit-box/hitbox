@@ -29,6 +29,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = { version = "0.1" }
 http = "0.2"
 lazy_static = "1"
+erased-serde = "0.4"
 
 [[example]]
 name = "axum"
@@ -37,3 +38,11 @@ path = "examples/axum.rs"
 [[example]]
 name = "tower"
 path = "examples/tower.rs"
+
+# [[example]]
+# name = "dyn-backend"
+# path = "examples/dyn_backend.rs"
+#
+# [[example]]
+# name = "backend"
+# path = "examples/backend.rs"

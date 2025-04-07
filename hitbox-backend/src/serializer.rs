@@ -1,6 +1,3 @@
-use std::io::{Read, Write};
-
-use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
@@ -15,197 +12,103 @@ pub enum SerializerError {
 
 pub type Raw = Vec<u8>;
 
-#[derive(Debug, Default)]
+pub trait Serializer {
+    fn serialize<T>(&self, value: &T) -> Result<Raw, SerializerError>
+    where
+        T: Serialize;
+
+    fn deserialize<T>(&self, value: &Raw) -> Result<T, SerializerError>
+    where
+        T: DeserializeOwned;
+}
+
+pub struct Json;
+
+impl Serializer for Json {
+    fn serialize<T>(&self, value: &T) -> Result<Raw, SerializerError>
+    where
+        T: Serialize,
+    {
+        serde_json::to_vec(value).map_err(|error| SerializerError::Serialize(Box::new(error)))
+    }
+
+    fn deserialize<T>(&self, value: &Raw) -> Result<T, SerializerError>
+    where
+        T: DeserializeOwned,
+    {
+        serde_json::from_slice(value.as_slice())
+            .map_err(|error| SerializerError::Deserialize(Box::new(error)))
+    }
+}
+
+#[derive(Default)]
 pub enum Format {
     #[default]
     Json,
-    Yaml,
+    FlexBuffers,
+    Bencode,
 }
 
 impl Format {
-    pub fn serialize<T>(&self, value: &T) -> Raw
+    pub fn serialize<T>(&self, value: &T) -> Result<Raw, SerializerError>
     where
         T: Serialize,
     {
         match self {
-            Format::Json => serde_json::to_vec(value).unwrap(),
-            Format::Yaml => {
-                let mut writer = Vec::with_capacity(128);
-                serde_yaml::to_writer(&mut writer, value).unwrap();
-                writer
-            }
+            Format::Json => serde_json::to_vec(value)
+                .map_err(|error| SerializerError::Serialize(Box::new(error))),
+            Format::FlexBuffers => unimplemented!(),
+            Format::Bencode => unimplemented!(),
         }
     }
 
-    pub fn deserialize<T>(&self, value: &Raw) -> T
+    pub fn deserialize<T>(&self, value: &Raw) -> Result<T, SerializerError>
     where
         T: DeserializeOwned,
     {
         match self {
-            Format::Json => serde_json::from_slice(value).unwrap(),
-            Format::Yaml => serde_yaml::from_slice(value).unwrap(),
+            Format::Json => serde_json::from_slice(value.as_slice())
+                .map_err(|error| SerializerError::Deserialize(Box::new(error))),
+            Format::FlexBuffers => todo!(),
+            Format::Bencode => todo!(),
         }
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct Serializer<P = NeuralProcessor> {
-    format: Format,
-    processors: P,
-}
-
-impl Serializer {
-    pub fn builder() -> SerializerBuilder<NeuralProcessor> {
-        SerializerBuilder {
-            format: Format::Json,
-            processors: NeuralProcessor::new(),
-        }
-    }
-}
-
-impl<P> Serializer<P>
-where
-    P: Processor,
-{
-    pub fn serialize<T>(&self, value: &T) -> Raw
-    where
-        T: Serialize,
-    {
-        let value = self.format.serialize(value);
-        self.processors.set_preprocess(value)
-    }
-
-    pub fn deserialize<T>(&self, value: Raw) -> T
-    where
-        T: DeserializeOwned,
-    {
-        let value = self.processors.get_preprocess(value);
-        self.format.deserialize(&value)
-    }
-}
-
-pub struct SerializerBuilder<P> {
-    format: Format,
-    processors: P,
-}
-
-impl<P> SerializerBuilder<P> {
-    pub fn format(self, format: Format) -> Self {
-        SerializerBuilder { format, ..self }
-    }
-
-    pub fn processors<T>(self, processors: T) -> SerializerBuilder<T> {
-        SerializerBuilder {
-            processors,
-            format: self.format,
-        }
-    }
-
-    pub fn build(self) -> Serializer<P> {
-        Serializer {
-            format: self.format,
-            processors: self.processors,
-        }
-    }
-}
-
-pub trait Processor {
-    fn get_preprocess(&self, value: Raw) -> Raw;
-    fn set_preprocess(&self, value: Raw) -> Raw;
-    // fn chain<P: Processor>(self, inner: P) -> impl Processor;
-}
-
-#[derive(Debug, Default)]
-pub struct NeuralProcessor {}
-
-impl NeuralProcessor {
-    fn new() -> Self {
-        NeuralProcessor {}
-    }
-}
-
-impl Processor for NeuralProcessor {
-    #[inline]
-    fn get_preprocess(&self, value: Raw) -> Raw {
-        value
-    }
-
-    #[inline]
-    fn set_preprocess(&self, value: Raw) -> Raw {
-        value
-    }
-
-    // fn chain<P: Processor>(self, inner: P) -> impl Processor {
-    // }
-}
-
-pub struct Gzip<P> {
-    _inner: P,
-}
-
-impl Gzip<NeuralProcessor> {
-    pub fn new() -> Gzip<NeuralProcessor> {
-        Gzip::default()
-    }
-}
-
-impl Default for Gzip<NeuralProcessor> {
-    fn default() -> Self {
-        Gzip {
-            _inner: NeuralProcessor::new(),
-        }
-    }
-}
-
-impl<P> Processor for Gzip<P> {
-    fn get_preprocess(&self, value: Raw) -> Raw {
-        let mut decoder = GzDecoder::new(value.as_slice());
-        let mut value = Vec::new();
-        decoder.read_to_end(&mut value).unwrap();
-        value
-    }
-
-    fn set_preprocess(&self, value: Raw) -> Raw {
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(value.as_slice()).unwrap();
-        encoder.finish().unwrap()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use serde::Deserialize;
-
-    use super::*;
-
-    #[derive(Serialize, Deserialize, Debug)]
-    struct Value {
-        name: String,
-        number: u32,
-    }
-
-    impl Value {
-        fn new() -> Self {
-            Value {
-                name: "name".to_owned(),
-                number: 42,
-            }
-        }
-    }
-
-    #[test]
-    fn test_processors() {
-        let serializer = Serializer::builder()
-            .format(Format::Json)
-            // .processors(Gzip::new().chain(Gzip::new()))
-            .processors(Gzip::new())
-            .build();
-
-        let value = Value::new();
-        let serialized = serializer.serialize(&value);
-        let deserialized = serializer.deserialize::<Value>(serialized);
-        dbg!(&deserialized);
-    }
+    // use serde::Deserialize;
+    //
+    // use super::*;
+    //
+    // #[derive(Serialize, Deserialize, Debug)]
+    // struct Value {
+    //     name: String,
+    //     number: u32,
+    // }
+    //
+    // impl Value {
+    //     fn new() -> Self {
+    //         Value {
+    //             name: "name".to_owned(),
+    //             number: 42,
+    //         }
+    //     }
+    // }
+    //
+    // #[test]
+    // fn test_processors() {
+    //     let serializer = Serializer::builder()
+    //         .format(Format::Json)
+    //         // .processors(Gzip::new().chain(Gzip::new()))
+    //         .processors(Gzip::new())
+    //         .build();
+    //
+    //     let value = Value::new();
+    //     let serialized = serializer.serialize(&value);
+    //     let deserialized = serializer.deserialize::<Value>(serialized);
+    //     dbg!(&deserialized);
+    // }
 }
 
 // pub trait Serializer {

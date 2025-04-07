@@ -3,7 +3,9 @@ use std::{collections::HashMap, fmt::Debug};
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Utc;
-use hitbox::{predicate::PredicateResult, CachePolicy, CacheValue, CacheableResponse};
+use hitbox::{
+    predicate::PredicateResult, CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig,
+};
 use http::{response::Parts, Response};
 use hyper::body::{to_bytes, HttpBody};
 use serde::{Deserialize, Serialize};
@@ -74,15 +76,21 @@ where
     type Cached = SerializableHttpResponse;
     type Subject = Self;
 
-    async fn cache_policy<P>(self, predicates: P) -> hitbox::ResponseCachePolicy<Self>
+    async fn cache_policy<P>(
+        self,
+        predicates: P,
+        config: &EntityPolicyConfig,
+    ) -> hitbox::ResponseCachePolicy<Self>
     where
         P: hitbox::Predicate<Subject = Self::Subject> + Send + Sync,
     {
         match predicates.check(self).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                CachePolicy::Cacheable(res) => {
-                    CachePolicy::Cacheable(CacheValue::new(res, Utc::now()))
-                }
+                CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
+                    res,
+                    config.ttl.map(|duration| Utc::now() + duration),
+                    config.stale_ttl.map(|duration| Utc::now() + duration),
+                )),
                 CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
             },
             PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),

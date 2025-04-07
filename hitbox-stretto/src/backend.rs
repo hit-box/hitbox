@@ -2,8 +2,12 @@ use crate::builder::StrettoBackendBuilder;
 use async_trait::async_trait;
 use hitbox::{CacheKey, CacheValue, CacheableResponse};
 use hitbox_backend::{
-    serializer::{BinSerializer, Serializer},
-    BackendError, BackendResult, CacheBackend, DeleteStatus,
+    // serializer::{BinSerializer, Serializer},
+    Backend,
+    BackendError,
+    BackendResult,
+    CacheBackend,
+    DeleteStatus,
 };
 use std::time::Duration;
 use stretto::AsyncCache;
@@ -20,72 +24,91 @@ impl StrettoBackend {
 }
 
 #[async_trait]
-impl CacheBackend for StrettoBackend {
-    async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<T::Cached>>>
-    where
-        T: CacheableResponse,
-        <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
-    {
-        let () = self
-            .cache
-            .wait()
-            .await
-            .map_err(crate::error::Error::from)
-            .map_err(BackendError::from)?;
-
-        match self.cache.get(key).await {
-            Some(cached) => BinSerializer::<Vec<u8>>::deserialize(cached.value().to_owned())
-                .map_err(BackendError::from)
-                .map(Some),
-
-            None => Ok(None),
-        }
-    }
-
-    async fn set<T>(
+impl Backend for StrettoBackend {
+    async fn read(
         &self,
         key: &CacheKey,
-        value: &CacheValue<T::Cached>,
-        ttl: Option<u32>,
-    ) -> BackendResult<()>
-    where
-        T: CacheableResponse + Send,
-        T::Cached: serde::Serialize + Send + Sync,
-    {
-        let serialized = BinSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
-        let cost = serialized.len();
-        let inserted = match ttl {
-            Some(ttl) => {
-                self.cache
-                    .insert_with_ttl(
-                        key.to_owned(),
-                        serialized,
-                        cost as i64,
-                        Duration::from_secs(ttl as u64),
-                    )
-                    .await
-            }
-            None => {
-                self.cache
-                    .insert(key.to_owned(), serialized, cost as i64)
-                    .await
-            }
-        };
-        if inserted {
-            Ok(())
-        } else {
-            Err(BackendError::from(crate::error::Error::Insert))
-        }
+    ) -> BackendResult<Option<CacheValue<hitbox_backend::serializer::Raw>>> {
+        todo!()
     }
 
-    async fn delete(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
-        self.cache.remove(key).await;
-        Ok(DeleteStatus::Deleted(1))
+    async fn write(
+        &self,
+        key: &CacheKey,
+        value: CacheValue<hitbox_backend::serializer::Raw>,
+        ttl: Option<Duration>,
+    ) -> BackendResult<()> {
+        todo!()
     }
 
-    async fn start(&self) -> BackendResult<()> {
-        Ok(())
+    async fn remove(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
+        todo!()
     }
+    // async fn get<T>(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<T::Cached>>>
+    // where
+    //     T: CacheableResponse,
+    //     <T as CacheableResponse>::Cached: serde::de::DeserializeOwned,
+    // {
+    //     let () = self
+    //         .cache
+    //         .wait()
+    //         .await
+    //         .map_err(crate::error::Error::from)
+    //         .map_err(BackendError::from)?;
+    //
+    //     match self.cache.get(key).await {
+    //         Some(cached) => BinSerializer::<Vec<u8>>::deserialize(cached.value().to_owned())
+    //             .map_err(BackendError::from)
+    //             .map(Some),
+    //
+    //         None => Ok(None),
+    //     }
+    // }
+    //
+    // async fn set<T>(
+    //     &self,
+    //     key: &CacheKey,
+    //     value: &CacheValue<T::Cached>,
+    //     ttl: Option<u32>,
+    // ) -> BackendResult<()>
+    // where
+    //     T: CacheableResponse + Send,
+    //     T::Cached: serde::Serialize + Send + Sync,
+    // {
+    //     let serialized = BinSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
+    //     let cost = serialized.len();
+    //     let inserted = match ttl {
+    //         Some(ttl) => {
+    //             self.cache
+    //                 .insert_with_ttl(
+    //                     key.to_owned(),
+    //                     serialized,
+    //                     cost as i64,
+    //                     Duration::from_secs(ttl as u64),
+    //                 )
+    //                 .await
+    //         }
+    //         None => {
+    //             self.cache
+    //                 .insert(key.to_owned(), serialized, cost as i64)
+    //                 .await
+    //         }
+    //     };
+    //     if inserted {
+    //         Ok(())
+    //     } else {
+    //         Err(BackendError::from(crate::error::Error::Insert))
+    //     }
+    // }
+    //
+    // async fn delete(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
+    //     self.cache.remove(key).await;
+    //     Ok(DeleteStatus::Deleted(1))
+    // }
+    //
+    // async fn start(&self) -> BackendResult<()> {
+    //     Ok(())
+    // }
 }
 
 #[cfg(test)]

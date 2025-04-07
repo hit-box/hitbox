@@ -5,14 +5,16 @@ use crate::response::{CacheState, CacheableResponse};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CacheValue<T> {
     pub data: T,
-    pub expire: DateTime<Utc>,
+    pub stale: Option<DateTime<Utc>>,
+    pub expire: Option<DateTime<Utc>>,
 }
 
 impl<T> CacheValue<T> {
-    pub fn new(data: T, expired: DateTime<Utc>) -> Self {
+    pub fn new(data: T, expire: Option<DateTime<Utc>>, stale: Option<DateTime<Utc>>) -> Self {
         CacheValue {
             data,
-            expire: expired,
+            expire,
+            stale,
         }
     }
 
@@ -21,7 +23,7 @@ impl<T> CacheValue<T> {
     }
 
     pub fn into_parts(self) -> (CacheMeta, T) {
-        (CacheMeta::new(self.expire, self.expire), self.data)
+        (CacheMeta::new(self.expire, self.stale), self.data)
     }
 }
 
@@ -33,12 +35,12 @@ impl<T> CacheValue<T> {
 }
 
 pub struct CacheMeta {
-    pub expire: DateTime<Utc>,
-    stale: DateTime<Utc>,
+    pub expire: Option<DateTime<Utc>>,
+    pub stale: Option<DateTime<Utc>>,
 }
 
 impl CacheMeta {
-    pub fn new(expire: DateTime<Utc>, stale: DateTime<Utc>) -> CacheMeta {
+    pub fn new(expire: Option<DateTime<Utc>>, stale: Option<DateTime<Utc>>) -> CacheMeta {
         CacheMeta { expire, stale }
     }
 }

@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Duration};
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -27,6 +27,12 @@ pub enum CacheState<Cached> {
     Actual(Cached),
 }
 
+#[derive(Default)]
+pub struct EntityPolicyConfig {
+    pub ttl: Option<Duration>,
+    pub stale_ttl: Option<Duration>,
+}
+
 #[async_trait]
 pub trait CacheableResponse
 where
@@ -36,7 +42,11 @@ where
     type Cached;
     type Subject: CacheableResponse;
 
-    async fn cache_policy<P>(self, predicates: P) -> ResponseCachePolicy<Self>
+    async fn cache_policy<P>(
+        self,
+        predicates: P,
+        config: &EntityPolicyConfig,
+    ) -> ResponseCachePolicy<Self>
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync;
 
@@ -55,16 +65,22 @@ where
     type Cached = <T as CacheableResponse>::Cached;
     type Subject = T;
 
-    async fn cache_policy<P>(self, predicates: P) -> ResponseCachePolicy<Self>
+    async fn cache_policy<P>(
+        self,
+        predicates: P,
+        config: &EntityPolicyConfig,
+    ) -> ResponseCachePolicy<Self>
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
     {
         match self {
             Ok(response) => match predicates.check(response).await {
                 PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                    CachePolicy::Cacheable(res) => {
-                        CachePolicy::Cacheable(CacheValue::new(res, Utc::now()))
-                    }
+                    CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
+                        res,
+                        config.ttl.map(|duration| Utc::now() + duration),
+                        config.stale_ttl.map(|duration| Utc::now() + duration),
+                    )),
                     CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
                 },
                 PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
