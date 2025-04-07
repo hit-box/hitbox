@@ -81,7 +81,7 @@ impl Backend for Box<dyn Backend> {
 }
 
 #[async_trait]
-impl Backend for Arc<dyn Backend> {
+impl Backend for Arc<dyn Backend + Send + 'static> {
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         (**self).read(key).await
     }
