@@ -108,7 +108,7 @@ impl Backend for RedisBackend {
             .query_async(&mut con)
             .await
             .map_err(Error::from)?;
-        Ok(result.map(|value| CacheValue::new(value, Utc::now())))
+        Ok(result.map(|value| CacheValue::new(value, Some(Utc::now()), Some(Utc::now()))))
     }
 
     async fn write(

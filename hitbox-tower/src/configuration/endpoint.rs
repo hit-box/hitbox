@@ -9,12 +9,14 @@ use hitbox_http::extractors::NeutralExtractor;
 use hitbox_http::extractors::{
     header::HeaderExtractor, method::MethodExtractor, path::PathExtractor, query::QueryExtractor,
 };
+use hitbox_http::predicates::request::{header, query};
 use hitbox_http::predicates::{
     request::{HeaderPredicate, MethodPredicate, PathPredicate, QueryPredicate},
     response::StatusCodePredicate,
     NeutralRequestPredicate, NeutralResponsePredicate,
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
+use http::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -55,10 +57,13 @@ impl CacheConfig for EndpointConfig {
             .rfold(acc_predicate, |inner, predicate| match predicate {
                 RequestPredicate::Path { path } => Box::new(inner.path(path.clone())),
                 RequestPredicate::Query { key, value } => {
-                    Box::new(inner.query(key.clone(), value.clone()))
+                    Box::new(inner.query(query::Operation::Eq(key.clone(), value.clone())))
                 }
                 RequestPredicate::Header { key, value } => {
-                    Box::new(inner.header(key.clone(), value.clone()))
+                    Box::new(inner.header(header::Operation::Eq(
+                        HeaderName::try_from(key).unwrap(),
+                        HeaderValue::try_from(value).unwrap(),
+                    )))
                 }
                 RequestPredicate::Method { method } => Box::new(inner.method(method.clone())),
             })

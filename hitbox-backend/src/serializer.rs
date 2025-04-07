@@ -41,7 +41,7 @@ impl Serializer for Json {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub enum Format {
     #[default]
     Json,
