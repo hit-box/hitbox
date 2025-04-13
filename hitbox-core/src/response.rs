@@ -6,7 +6,7 @@ use chrono::Utc;
 use crate::{
     predicate::{Predicate, PredicateResult},
     value::CacheValue,
-    CachePolicy,
+    CachePolicy, EntityPolicyConfig,
 };
 
 /// This trait determines which types should be cached or not.
@@ -25,12 +25,6 @@ pub type ResponseCachePolicy<C> = CachePolicy<CacheValue<<C as CacheableResponse
 pub enum CacheState<Cached> {
     Stale(Cached),
     Actual(Cached),
-}
-
-#[derive(Default)]
-pub struct EntityPolicyConfig {
-    pub ttl: Option<Duration>,
-    pub stale_ttl: Option<Duration>,
 }
 
 #[async_trait]

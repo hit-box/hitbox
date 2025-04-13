@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use hitbox_core::{CachePolicy, CacheValue, CacheableResponse, Predicate, PredicateResult};
+use hitbox_core::{
+    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, Predicate, PredicateResult,
+};
 
 #[derive(Clone, Debug)]
 struct TestResponse {
@@ -22,14 +24,18 @@ impl CacheableResponse for TestResponse {
     type Cached = Self;
     type Subject = Self;
 
-    async fn cache_policy<P>(self, predicates: P) -> hitbox_core::ResponseCachePolicy<Self>
+    async fn cache_policy<P>(
+        self,
+        predicates: P,
+        config: &EntityPolicyConfig,
+    ) -> hitbox_core::ResponseCachePolicy<Self>
     where
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
     {
         match predicates.check(self).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                 CachePolicy::Cacheable(res) => {
-                    CachePolicy::Cacheable(CacheValue::new(res, Utc::now()))
+                    CachePolicy::Cacheable(CacheValue::new(res, Some(Utc::now()), Some(Utc::now())))
                 }
                 CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
             },
@@ -65,10 +71,14 @@ impl Predicate for NeuralPredicate {
 #[tokio::test]
 async fn test_cacheable_result() {
     let response: Result<TestResponse, ()> = Ok(TestResponse::new());
-    let policy = response.cache_policy(NeuralPredicate::new()).await;
+    let policy = response
+        .cache_policy(NeuralPredicate::new(), &EntityPolicyConfig::default())
+        .await;
     dbg!(&policy);
 
     let response: Result<TestResponse, ()> = Err(());
-    let policy = response.cache_policy(NeuralPredicate::new()).await;
+    let policy = response
+        .cache_policy(NeuralPredicate::new(), &EntityPolicyConfig::default())
+        .await;
     dbg!(&policy);
 }

@@ -20,7 +20,8 @@ tower = "0.4"
 hitbox = { path = "../hitbox", version = "0.1" }
 hitbox-http = { path = "../hitbox-http", version = "0.1" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
-hitbox-stretto = { path = "../hitbox-stretto", version = "0.1" }
+hitbox-moka = { path = "../hitbox-moka", version = "0.1" }
+# hitbox-stretto = { path = "../hitbox-stretto", version = "0.1" }
 hyper = { version = "0.14", default-features = false }
 tracing = { version = "0.1" }
 http = "0.2"

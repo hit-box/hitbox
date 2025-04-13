@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
 use hitbox_backend::{serializer::Raw, Backend, BackendResult, CacheBackend};
-use hitbox_core::{CacheKey, CacheValue, CacheableResponse};
+use hitbox_core::{CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
@@ -31,7 +31,7 @@ impl Backend for MemBackend {
         let lock = self.storage.read().await;
         let value = lock.get(&key.serialize()).cloned();
         dbg!(String::from_utf8(value.as_ref().unwrap().clone()).unwrap());
-        Ok(value.map(|value| CacheValue::new(value, Utc::now())))
+        Ok(value.map(|value| CacheValue::new(value, Some(Utc::now()), Some(Utc::now()))))
     }
 
     async fn write(
@@ -61,7 +61,11 @@ impl CacheableResponse for Value {
     type Cached = Self;
     type Subject = Self;
 
-    async fn cache_policy<P>(self, _predicates: P) -> hitbox_core::ResponseCachePolicy<Self>
+    async fn cache_policy<P>(
+        self,
+        _predicates: P,
+        _: &EntityPolicyConfig,
+    ) -> hitbox_core::ResponseCachePolicy<Self>
     where
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
     {
@@ -95,7 +99,8 @@ where
                 name: "value3".to_owned(),
                 index: 128,
             },
-            Utc::now(),
+            Some(Utc::now()),
+            Some(Utc::now()),
         );
         self.backend
             .set::<Value>(&CacheKey::from_str("key3", ""), &value, None)
@@ -126,7 +131,8 @@ async fn dyn_backend() {
             name: "value2".to_owned(),
             index: 255,
         },
-        Utc::now(),
+        Some(Utc::now()),
+        Some(Utc::now()),
     );
     backend.set::<Value>(&key2, &value, None).await.unwrap();
     let value = backend.get::<Value>(&key2).await.unwrap();

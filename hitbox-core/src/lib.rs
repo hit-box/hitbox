@@ -8,8 +8,8 @@ mod value;
 
 pub use extractor::Extractor;
 pub use key::{CacheKey, KeyPart, KeyParts};
-pub use policy::CachePolicy;
+pub use policy::{CachePolicy, EntityPolicyConfig};
 pub use predicate::{Predicate, PredicateResult};
 pub use request::{CacheablePolicyData, CacheableRequest, RequestCachePolicy};
-pub use response::{CacheState, CacheableResponse, EntityPolicyConfig, ResponseCachePolicy};
+pub use response::{CacheState, CacheableResponse, ResponseCachePolicy};
 pub use value::CacheValue;

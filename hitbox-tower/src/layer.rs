@@ -2,7 +2,7 @@ use crate::EndpointConfig;
 use std::sync::Arc;
 
 use hitbox::backend::CacheBackend;
-use hitbox_stretto::StrettoBackend;
+use hitbox_moka::MokaBackend;
 use tower::Layer;
 
 use crate::service::CacheService;
@@ -40,8 +40,8 @@ where
     }
 }
 
-impl Cache<StrettoBackend, EndpointConfig> {
-    pub fn builder() -> CacheBuilder<StrettoBackend, EndpointConfig> {
+impl Cache<MokaBackend, EndpointConfig> {
+    pub fn builder() -> CacheBuilder<MokaBackend, EndpointConfig> {
         CacheBuilder::default()
     }
 }

@@ -14,7 +14,7 @@ hitbox-backend = { path = "../hitbox-backend" }
 hitbox-tower = { path = "../hitbox-tower" }
 hitbox-moka = { path = "../hitbox-moka" }
 hitbox-redis = { path = "../hitbox-redis" }
-hitbox-stretto = { path = "../hitbox-stretto" }
+# hitbox-stretto = { path = "../hitbox-stretto" }
 actix = "0.13"
 axum = "0.6"
 log = "0.4"

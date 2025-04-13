@@ -1,7 +1,7 @@
 use hitbox_backend::Backend;
 use hitbox_moka::MokaBackend;
 use hitbox_redis::RedisBackend;
-use hitbox_stretto::StrettoBackend;
+// use hitbox_stretto::StrettoBackend;
 use hitbox_tower::Cache;
 use hyper::{Body, Server};
 use std::{net::SocketAddr, sync::Arc};
