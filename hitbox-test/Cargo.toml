@@ -1,0 +1,32 @@
+[package]
+edition = "2021"
+name = "hitbox-test"
+version = "0.1.0"
+authors = ["Hitbox team <mail@hitbox.rs>"]
+license = "MIT"
+description = "Hitbox integration tests"
+readme = "README.md"
+repository = "https://github.com/hit-box/hitbox/"
+categories = [
+    "caching",
+    "asynchronous",
+    "network-programming",
+    "web-programming",
+]
+keywords = ["cache", "tower", "async", "http", "hitbox"]
+
+[dependencies]
+hitbox = { path = "../hitbox", version = "0.1" }
+hitbox-http = { path = "../hitbox-http", version = "0.1" }
+hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
+hitbox-moka = { path = "../hitbox-moka", version = "0.1" }
+hitbox-tower = { path = "../hitbox-tower", version = "0.1" }
+futures = "0.3"
+tower = "0.4"
+
+[dev-dependencies]
+cucumber = { version = "0.21" }
+
+[[test]]
+name = "integration"
+harness = false
