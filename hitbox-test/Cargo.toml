@@ -22,7 +22,12 @@ hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
 hitbox-moka = { path = "../hitbox-moka", version = "0.1" }
 hitbox-tower = { path = "../hitbox-tower", version = "0.1" }
 futures = "0.3"
-tower = "0.4"
+tower = "0.5"
+http = "1.3"
+bytes = "1"
+axum = "0.8"
+axum-test = "17.3"
+reqwest = "0.12"
 
 [dev-dependencies]
 cucumber = { version = "0.21" }

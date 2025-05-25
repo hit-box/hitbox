@@ -7,5 +7,5 @@ Feature: Cache policy feature
       # ```
     Given request predicate method=GET
     Given request predicate query=cache
-    # When I feed the cat
+    When execute request
     # Then the cat is not hungry
