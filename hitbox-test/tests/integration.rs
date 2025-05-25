@@ -1,8 +1,6 @@
 use axum::{extract::Path, routing::get, Router};
-use axum_test::TestServer;
-use bytes::Bytes;
+use axum_test::{TestResponse, TestServer};
 use cucumber::{gherkin::Step, given, when, World};
-use hitbox::fsm::CacheFuture;
 use hitbox_test::Predicates;
 use hitbox_tower::{
     configuration::{
@@ -11,33 +9,38 @@ use hitbox_tower::{
     },
     Cache, EndpointConfig,
 };
-use http::{Method, Request, StatusCode};
+use http::{Method, StatusCode};
 
-// This runs before everything else, so you can setup things here.
 fn main() {
-    // You may choose any executor you like (`tokio`, `async-std`, etc.).
-    // You may even have an `async` main, it doesn't matter. The point is that
-    // Cucumber is composable. :)
     futures::executor::block_on(HitboxWorld::run("tests/features/basic.feature"));
 }
 
 async fn handler_result(Path(name): Path<String>) -> Result<String, StatusCode> {
     dbg!("axum::handler_result");
     Ok(format!("Hello, {name}"))
-    // Err(StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+#[derive(Debug, Default)]
+pub struct Request {
+    method: Option<Method>,
+    path: Option<String>,
+    headers: Vec<(String, String)>,
+    body: Option<String>,
 }
 
 #[derive(Debug, World)]
 pub struct HitboxWorld {
     predicates: Predicates,
-    request: Request<Bytes>,
+    request: Request,
+    response: Option<TestResponse>,
 }
 
 impl Default for HitboxWorld {
     fn default() -> Self {
         Self {
             predicates: Default::default(),
-            request: Request::new(Bytes::from_static(b"")),
+            request: Default::default(),
+            response: None,
         }
     }
 }
@@ -51,7 +54,32 @@ fn hitbox(_world: &mut HitboxWorld, step: &Step, policy: String) {
 #[given(expr = "request predicate {word}")]
 fn request_predicate(world: &mut HitboxWorld, step: &Step, predicate: String) {
     world.predicates.request.push(predicate);
-    dbg!(&world);
+    // dbg!(&world);
+}
+
+#[when(expr = r#"I send a {word} request to {string}"#)]
+async fn set_method_and_path(world: &mut HitboxWorld, method: String, path: String) {
+    let method = Method::from_bytes(method.as_bytes()).unwrap();
+    world.request.method = Some(method);
+    world.request.path = Some(path);
+}
+
+#[when("I set headers:")]
+async fn set_headers(world: &mut HitboxWorld, step: &Step) {
+    if let Some(table) = &step.table {
+        for row in table.rows.iter() {
+            let key = row[0].clone();
+            let value = row[1].clone();
+            world.request.headers.push((key, value));
+        }
+    }
+}
+
+#[when(expr = r#"the request body is:"#)]
+async fn set_body(world: &mut HitboxWorld, step: &Step) {
+    if let Some(docstring) = &step.docstring {
+        world.request.body = Some(docstring.clone());
+    }
 }
 
 #[when("execute request")]
@@ -78,12 +106,36 @@ async fn execute_fsm(world: &mut HitboxWorld) {
         .route("/greet/{name}", get(handler_result))
         .layer(json_cache);
 
-    // Run the application for testing.
     let server = TestServer::new(app).unwrap();
 
-    // Get the request.
-    let response = server.get("/greet/test").await;
+    let method = world
+        .request
+        .method
+        .as_ref()
+        .expect("Request method not set");
+    let path = world.request.path.as_ref().expect("Request path not set");
+    let mut request = match method {
+        &Method::GET => server.get(path),
+        &Method::POST => server.post(path),
+        _ => panic!("Unsupported method: {}", method),
+    };
+    for (key, value) in &world.request.headers {
+        request = request.add_header(key, value);
+    }
+    if let Some(body) = &world.request.body {
+        request = request.json(body);
+    }
 
-    dbg!(&response);
-    // assert_eq!(response.text(), "pong!");
+    let response = request.await;
+    world.response = Some(response);
+}
+
+#[cucumber::then(expr = "the response status should be {int}")]
+fn check_response_status(world: &mut HitboxWorld, expected: u16) {
+    let response = world.response.as_ref().expect("No response found");
+    assert_eq!(
+        response.status_code().as_u16(),
+        expected,
+        "Unexpected response status"
+    );
 }
