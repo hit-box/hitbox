@@ -4,7 +4,7 @@ use hitbox::{
     CacheablePolicyData, RequestCachePolicy, {CachePolicy, CacheableRequest, Extractor},
 };
 use http::{request::Parts, Request};
-use hyper::body::HttpBody;
+use hyper::body::Body as HttpBody;
 
 #[derive(Debug)]
 pub struct CacheableHttpRequest<ReqBody> {

@@ -8,10 +8,10 @@ use hitbox_tower::{
 use hitbox_redis::RedisBackend;
 use hitbox_tower::{Cache, EndpointConfig};
 
-async fn handler_result(Path(_name): Path<String>) -> Result<String, StatusCode> {
-    //dbg!("axum::handler_result");
-    // Ok(format!("Hello, {name}"))
-    Err(StatusCode::INTERNAL_SERVER_ERROR)
+async fn handler_result(Path(name): Path<String>) -> Result<String, StatusCode> {
+    dbg!("axum::handler_result");
+    Ok(format!("Hello, {name}"))
+    // Err(StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 async fn handler() -> String {
@@ -64,7 +64,7 @@ async fn main() {
         .build();
 
     let json_cache = Cache::builder()
-        .backend(redis_backend)
+        .backend(inmemory_backend.clone())
         .config(json_config)
         .build();
 
@@ -74,15 +74,18 @@ async fn main() {
         .build();
 
     let app = Router::new()
-        .route("/greet/:name/", get(handler_result))
+        .route("/greet/{name}", get(handler_result))
         .route("/", get(handler))
         .route("/json/", get(handler_json))
         .route("/health", get(handler).layer(health_check))
         .layer(json_cache);
 
     // run it with hyper on localhost:3000
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    // axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+    //     .serve(app.into_make_service())
+    //     .await
+    //     .unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    println!("listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, app).await.unwrap();
 }

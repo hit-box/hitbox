@@ -4,7 +4,7 @@ use std::{fmt::Debug, sync::Arc};
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, FromBytes};
 use http::{Request, Response};
-use hyper::body::{Body, HttpBody};
+use hyper::body::Body as HttpBody;
 use tower::Service;
 
 use crate::future::Transformer;
@@ -49,7 +49,7 @@ where
 
     // debug bounds
     ReqBody: Debug + HttpBody + Send + 'static,
-    Body: From<ReqBody>,
+    // Body: From<ReqBody>,
     ResBody: FromBytes + HttpBody + Send + 'static,
     ResBody::Error: Debug,
     ResBody::Data: Send,

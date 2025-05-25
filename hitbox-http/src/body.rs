@@ -1,6 +1,6 @@
+use axum::body::Body;
 use bytes::{Buf, Bytes};
-use http_body::{combinators::UnsyncBoxBody, Full};
-use hyper::body::{Body, HttpBody};
+use http_body_util::{combinators::UnsyncBoxBody, BodyExt, Collected, Full};
 
 pub trait FromBytes {
     fn from_bytes(bytes: Bytes) -> Self;
@@ -11,6 +11,12 @@ impl FromBytes for Body {
         Body::from(bytes)
     }
 }
+
+// impl<D> FromBytes for Collected<D> {
+//     fn from_bytes(bytes: Bytes) -> Self {
+//         Collected::from(bytes)
+//     }
+// }
 
 impl<D, E> FromBytes for UnsyncBoxBody<D, E>
 where

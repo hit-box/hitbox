@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
 use http::Request;
-use hyper::body::{to_bytes, HttpBody};
+use hyper::body::Body as HttpBody;
 use jaq_core::{
     self,
     load::{Arena, File, Loader},
@@ -34,8 +34,12 @@ pub struct Body<P> {
 }
 
 pub trait BodyPredicate: Sized {
-    fn body(self, parsin_type: ParsingType, expression: String, operation: Operation)
-        -> Body<Self>;
+    fn body(
+        self,
+        parsing_type: ParsingType,
+        expression: String,
+        operation: Operation,
+    ) -> Body<Self>;
 }
 
 impl<P> BodyPredicate for P
@@ -102,7 +106,9 @@ where
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
                 let (parts, body) = request.into_parts();
-                let payload = to_bytes(body).await.unwrap();
+                use http_body_util::BodyExt;
+                let payload = body.collect().await.unwrap().to_bytes();
+                // let payload = to_bytes(body).await.unwrap();
                 let body_str = String::from_utf8_lossy(&payload);
                 let json_value = match &self.parsing_type {
                     ParsingType::Jq => serde_json::from_str(&body_str).unwrap_or(Value::Null),

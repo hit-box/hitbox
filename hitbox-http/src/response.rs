@@ -7,7 +7,7 @@ use hitbox::{
     predicate::PredicateResult, CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig,
 };
 use http::{response::Parts, Response};
-use hyper::body::{to_bytes, HttpBody};
+use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
 use crate::body::FromBytes;
@@ -98,13 +98,19 @@ where
     }
 
     async fn into_cached(self) -> CachePolicy<Self::Cached, Self> {
+        use http_body_util::BodyExt;
+        let body = self
+            .body
+            .into_inner_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec();
         CachePolicy::Cacheable(SerializableHttpResponse {
             status: 200,
             version: "HTTP/1.1".to_owned(),
-            body: to_bytes(self.body.into_inner_body())
-                .await
-                .unwrap()
-                .to_vec(),
+            body,
             headers: self
                 .parts
                 .headers

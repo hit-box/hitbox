@@ -1,21 +1,24 @@
+use bytes::Bytes;
 use hitbox_backend::Backend;
 use hitbox_moka::MokaBackend;
 use hitbox_redis::RedisBackend;
 // use hitbox_stretto::StrettoBackend;
 use hitbox_tower::Cache;
-use hyper::{Body, Server};
+use http_body_util::Full;
 use std::{net::SocketAddr, sync::Arc};
+use tokio::net::TcpListener;
 
 use http::{Method, Request, Response};
+use hyper::body::Body;
 use tower::make::Shared;
 
-async fn handle(_: Request<Body>) -> http::Result<Response<Body>> {
+async fn handle(_: Request<impl Body>) -> http::Result<Response<Full<Bytes>>> {
     Ok(Response::new("Hello, World!".into()))
     // Err(http::Error::from(Method::from_bytes(&[0x01]).unwrap_err()))
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let subscriber = tracing_subscriber::fmt()
         .pretty()
         .with_env_filter("debug,hitbox=trace")
@@ -37,8 +40,24 @@ async fn main() {
         .service_fn(handle);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    Server::bind(&addr)
-        .serve(Shared::new(service))
-        .await
-        .expect("server error");
+    let listener = TcpListener::bind(addr).await?;
+
+    // loop {
+    //     let (stream, _) = listener.accept().await?;
+    //     let io = TokioIo::new(stream);
+    //
+    //     tokio::task::spawn(async move {
+    //         if let Err(err) = http1::Builder::new()
+    //             .serve_connection(io, service_fn(echo))
+    //             .await
+    //         {
+    //             println!("Error serving connection: {:?}", err);
+    //         }
+    //     });
+    // }
+    // Server::bind(&addr)
+    //     .serve(Shared::new(service))
+    //     .await
+    //     .expect("server error");
+    Ok(())
 }
