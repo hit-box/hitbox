@@ -28,21 +28,11 @@ pub struct Request {
     body: Option<String>,
 }
 
-#[derive(Debug, World)]
+#[derive(Debug, World, Default)]
 pub struct HitboxWorld {
     predicates: Predicates,
     request: Request,
     response: Option<TestResponse>,
-}
-
-impl Default for HitboxWorld {
-    fn default() -> Self {
-        Self {
-            predicates: Default::default(),
-            request: Default::default(),
-            response: None,
-        }
-    }
 }
 
 #[given(regex = r"^hitbox with\s+(policy (.*))$")]
