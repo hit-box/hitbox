@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anyhow::{anyhow, Context, Error};
 use axum::{extract::Path, routing::get, Router};
 use axum_test::{TestResponse, TestServer};
@@ -11,8 +13,13 @@ use hitbox_tower::{
     },
     Cache, EndpointConfig,
 };
-use http::{Method, StatusCode};
-use hurl_core::{error::DisplaySourceError, parser::parse_hurl_file, text::Format};
+use http::StatusCode;
+use hurl::{
+    http::{Body, RequestSpec},
+    runner::{request::eval_request, VariableSet},
+    util::path::ContextDir,
+};
+use hurl_core::{ast::Method, error::DisplaySourceError, parser::parse_hurl_file, text::Format};
 
 fn main() {
     futures::executor::block_on(HitboxWorld::run("tests/features/basic.feature"));
@@ -26,20 +33,36 @@ async fn handler_result(
     Ok(format!("Hello, {name}"))
 }
 
-#[derive(Debug, Default)]
-pub struct Request {
-    method: Option<Method>,
-    path: Option<String>,
-    headers: Vec<(String, String)>,
-    body: Option<String>,
-}
-
 #[derive(Debug, World, Default)]
 pub struct HitboxWorld {
     predicates: Predicates,
-    request: Request,
     response: Option<TestResponse>,
     policy: PolicyConfig,
+}
+
+impl HitboxWorld {
+    async fn execute_request(&mut self, request_spec: &RequestSpec) -> Result<(), Error> {
+        let app = Router::new().route("/greet/{name}", get(handler_result));
+        // .layer(json_cache);
+
+        let server = TestServer::new(app)?;
+        let path = request_spec.url.path();
+        let mut request = server.method(
+            http::Method::from_str(request_spec.method.0.to_string().as_str())?,
+            path.as_str(),
+        );
+        for header in &request_spec.headers {
+            request = request.add_header(&header.name, &header.value);
+        }
+        let request = match &request_spec.body {
+            Body::Text(body) => Ok(request.json(body)),
+            _ => Err(anyhow!("unsupported body type")),
+        }?;
+
+        let response = request.await;
+        self.response = Some(response);
+        Ok(())
+    }
 }
 
 pub trait StepExt {
@@ -78,6 +101,16 @@ async fn execute(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
                 .to_string(Format::Ansi)
         )
     })?;
+    let variables = VariableSet::new();
+    let request = &hurl_file
+        .entries
+        .get(0)
+        .ok_or_else(|| anyhow!("request not found"))?
+        .request;
+    let request = eval_request(&request, &variables, &ContextDir::default())
+        .map_err(|err| anyhow!("hurl request error {:?}", err))?;
+    world.execute_request(&request).await?;
+    dbg!(&world.response);
     Ok(())
 }
 
@@ -117,32 +150,31 @@ fn request_predicate(world: &mut HitboxWorld, step: &Step, predicate: String) {
     dbg!(&world);
 }
 
-#[when(expr = r#"I send a {word} request to {string}"#)]
-async fn set_method_and_path(world: &mut HitboxWorld, method: String, path: String) {
-    let method = Method::from_bytes(method.as_bytes()).unwrap();
-    world.request.method = Some(method);
-    world.request.path = Some(path);
-}
+// #[when(expr = r#"I send a {word} request to {string}"#)]
+// async fn set_method_and_path(world: &mut HitboxWorld, method: String, path: String) {
+//     let method = Method::from_bytes(method.as_bytes()).unwrap();
+//     world.request.method = Some(method);
+//     world.request.path = Some(path);
+// }
 
-#[when("I set headers:")]
-async fn set_headers(world: &mut HitboxWorld, step: &Step) {
-    if let Some(table) = &step.table {
-        for row in table.rows.iter() {
-            let key = row[0].clone();
-            let value = row[1].clone();
-            world.request.headers.push((key, value));
-        }
-    }
-}
+// #[when("I set headers:")]
+// async fn set_headers(world: &mut HitboxWorld, step: &Step) {
+//     if let Some(table) = &step.table {
+//         for row in table.rows.iter() {
+//             let key = row[0].clone();
+//             let value = row[1].clone();
+//             world.request.headers.push((key, value));
+//         }
+//     }
+// }
 
-#[when(expr = r#"the request body is:"#)]
-async fn set_body(world: &mut HitboxWorld, step: &Step) {
-    if let Some(docstring) = &step.docstring {
-        world.request.body = Some(docstring.clone());
-    }
-}
+// #[when(expr = r#"the request body is:"#)]
+// async fn set_body(world: &mut HitboxWorld, step: &Step) {
+//     if let Some(docstring) = &step.docstring {
+//         world.request.body = Some(docstring.clone());
+//     }
+// }
 
-// #[when("execute request")]
 // async fn execute_fsm(world: &mut HitboxWorld) {
 //     dbg!("execute FSM");
 //     let inmemory_backend = hitbox_moka::MokaBackend::builder(1024 * 1024).build();

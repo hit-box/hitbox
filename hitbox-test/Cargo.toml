@@ -33,7 +33,8 @@ reqwest = "0.12"
 cucumber = { version = "0.21" }
 serde_yaml = "0.9"
 anyhow = "1"
-hurl_core = "6"
+hurl_core = { path = "../../hurl/packages/hurl_core/" }
+hurl = { path = "../../hurl/packages/hurl/" }
 
 [[test]]
 name = "integration"

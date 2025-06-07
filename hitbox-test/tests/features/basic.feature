@@ -14,10 +14,11 @@ Feature: Cache policy feature
     Given key extractor "path=/greet/{name}"
     When execute request
       ```hurl
-      GET /greet/test
+      GET http://localhost/greet/test
       X-Cache-ID: 123
       [Options]
       delay: 3
+      {"key": 42}
       ```
     Then response status is 200
     And cache has records
