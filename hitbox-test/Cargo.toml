@@ -31,6 +31,9 @@ reqwest = "0.12"
 
 [dev-dependencies]
 cucumber = { version = "0.21" }
+serde_yaml = "0.9"
+anyhow = "1"
+hurl_core = "6"
 
 [[test]]
 name = "integration"
