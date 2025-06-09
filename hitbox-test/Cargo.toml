@@ -28,13 +28,12 @@ bytes = "1"
 axum = "0.8"
 axum-test = "17.3"
 reqwest = "0.12"
-
-[dev-dependencies]
 cucumber = { version = "0.21" }
 serde_yaml = "0.9"
 anyhow = "1"
 hurl_core = { path = "../../hurl/packages/hurl_core/" }
 hurl = { path = "../../hurl/packages/hurl/" }
+
 
 [[test]]
 name = "integration"
