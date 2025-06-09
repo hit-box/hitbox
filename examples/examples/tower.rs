@@ -1,18 +1,14 @@
 use bytes::Bytes;
-use hitbox_backend::Backend;
 use hitbox_moka::MokaBackend;
-use hitbox_redis::RedisBackend;
 // use hitbox_stretto::StrettoBackend;
 use hitbox_tower::Cache;
 use http_body_util::Full;
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
-use http::{Method, Request, Response};
-use hyper::body::Body;
-use tower::make::Shared;
+use http::{Request, Response};
 
-async fn handle(_: Request<impl Body>) -> http::Result<Response<Full<Bytes>>> {
+async fn handle(_: Request<Full<Bytes>>) -> http::Result<Response<Full<Bytes>>> {
     Ok(Response::new("Hello, World!".into()))
     // Err(http::Error::from(Method::from_bytes(&[0x01]).unwrap_err()))
 }

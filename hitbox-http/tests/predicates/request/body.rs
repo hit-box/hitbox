@@ -5,7 +5,9 @@ use hitbox_http::predicates::request::ParsingType;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::CacheableHttpRequest;
 use http::Request;
-use hyper::Body as HttpBody;
+use http_body_util::combinators::UnsyncBoxBody;
+use hitbox_http::FromBytes;
+use bytes::Bytes;
 use serde_json::json;
 
 #[cfg(test)]
@@ -15,7 +17,7 @@ mod eq_tests {
     #[tokio::test]
     async fn test_positive() {
         let json_body = r#"{"field":"test-value"}"#;
-        let request = Request::builder().body(HttpBody::from(json_body)).unwrap();
+        let request = Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(json_body))).unwrap();
         let request = CacheableHttpRequest::from_request(request);
 
         let predicate = NeutralRequestPredicate::new().body(
@@ -31,7 +33,7 @@ mod eq_tests {
     #[tokio::test]
     async fn test_negative() {
         let json_body = r#"{"field":"test-value"}"#;
-        let request = Request::builder().body(HttpBody::from(json_body)).unwrap();
+        let request = Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(json_body))).unwrap();
         let request = CacheableHttpRequest::from_request(request);
 
         let predicate = NeutralRequestPredicate::new().body(
@@ -47,7 +49,7 @@ mod eq_tests {
     #[tokio::test]
     async fn test_field_not_found() {
         let json_body = r#"{"field":"test-value"}"#;
-        let request = Request::builder().body(HttpBody::from(json_body)).unwrap();
+        let request = Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(json_body))).unwrap();
         let request = CacheableHttpRequest::from_request(request);
 
         let predicate = NeutralRequestPredicate::new().body(
@@ -68,7 +70,7 @@ mod exist_tests {
     #[tokio::test]
     async fn test_positive() {
         let json_body = r#"{"field":"test-value"}"#;
-        let request = Request::builder().body(HttpBody::from(json_body)).unwrap();
+        let request = Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(json_body))).unwrap();
         let request = CacheableHttpRequest::from_request(request);
 
         let predicate = NeutralRequestPredicate::new().body(
@@ -84,7 +86,7 @@ mod exist_tests {
     #[tokio::test]
     async fn test_negative() {
         let json_body = r#"{"other_field":"test-value"}"#;
-        let request = Request::builder().body(HttpBody::from(json_body)).unwrap();
+        let request = Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(json_body))).unwrap();
         let request = CacheableHttpRequest::from_request(request);
 
         let predicate = NeutralRequestPredicate::new().body(
@@ -105,7 +107,7 @@ mod in_tests {
     #[tokio::test]
     async fn test_positive() {
         let json_body = r#"{"field":"test-value"}"#;
-        let request = Request::builder().body(HttpBody::from(json_body)).unwrap();
+        let request = Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(json_body))).unwrap();
         let request = CacheableHttpRequest::from_request(request);
 
         let values = vec!["value-1".to_owned(), "test-value".to_owned()];
@@ -122,7 +124,7 @@ mod in_tests {
     #[tokio::test]
     async fn test_negative() {
         let json_body = r#"{"field":"wrong-value"}"#;
-        let request = Request::builder().body(HttpBody::from(json_body)).unwrap();
+        let request = Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(json_body))).unwrap();
         let request = CacheableHttpRequest::from_request(request);
 
         let values = vec!["value-1".to_owned(), "test-value".to_owned()];
@@ -141,7 +143,7 @@ mod in_tests {
 async fn test_request_body_predicates_positive_basic() {
     let json_body = r#"{"inner":{"field_one":"value_one","field_two":"value_two"}}"#;
     let request = CacheableHttpRequest::from_request(
-        Request::builder().body(HttpBody::from(json_body)).unwrap(),
+        Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(json_body))).unwrap(),
     );
 
     let predicate = NeutralRequestPredicate::new().body(
@@ -162,7 +164,7 @@ async fn test_request_body_predicates_positive_array() {
         {"key": "my-key-01", "value": "my-value-01"}
     ]"#;
     let request = CacheableHttpRequest::from_request(
-        Request::builder().body(HttpBody::from(json_body)).unwrap(),
+        Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(json_body))).unwrap(),
     );
 
     let predicate = NeutralRequestPredicate::new().body(
@@ -184,7 +186,7 @@ async fn test_request_body_predicates_positive_multiple_value() {
         {"key": "my-key-02", "value": "my-value-02"}
     ]"#;
     let request = CacheableHttpRequest::from_request(
-        Request::builder().body(HttpBody::from(json_body)).unwrap(),
+        Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(json_body))).unwrap(),
     );
 
     let predicate = NeutralRequestPredicate::new().body(
@@ -230,7 +232,7 @@ mod protobuf_tests {
 
         // Create a request with the protobuf message
         let encoded = dynamic_msg.encode_to_vec();
-        let body = HttpBody::from(encoded);
+        let body = UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::from(encoded));
         let request = Request::builder().body(body).unwrap();
         let cacheable_request = CacheableHttpRequest::from_request(request);
 

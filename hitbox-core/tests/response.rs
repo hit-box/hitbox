@@ -27,7 +27,7 @@ impl CacheableResponse for TestResponse {
     async fn cache_policy<P>(
         self,
         predicates: P,
-        config: &EntityPolicyConfig,
+        _config: &EntityPolicyConfig,
     ) -> hitbox_core::ResponseCachePolicy<Self>
     where
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,

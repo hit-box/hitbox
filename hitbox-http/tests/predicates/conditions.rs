@@ -6,7 +6,9 @@ use hitbox_http::predicates::request::{HeaderPredicate, PathPredicate, QueryPred
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::CacheableHttpRequest;
 use http::Request;
-use hyper::Body;
+use http_body_util::combinators::UnsyncBoxBody;
+use hitbox_http::FromBytes;
+use bytes::Bytes;
 
 #[tokio::test]
 async fn test_conditions_or() {
@@ -16,7 +18,7 @@ async fn test_conditions_or() {
         Request::builder()
             .header("x-test", "test-value")
             .uri(path)
-            .body(Body::empty())
+            .body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new()))
             .unwrap(),
     );
     let wrong_query_predicate = NeutralRequestPredicate::new().query(query::Operation::Eq(
@@ -44,7 +46,7 @@ async fn test_conditions_not() {
         Request::builder()
             .header("x-test", "test-value")
             .uri(path)
-            .body(Body::empty())
+            .body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new()))
             .unwrap(),
     );
     let correct_query_predicate = NeutralRequestPredicate::new()

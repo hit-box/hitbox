@@ -2,10 +2,10 @@
 use crate::error::Error;
 use async_trait::async_trait;
 use chrono::Utc;
-use hitbox::{CacheKey, CacheValue, CacheableResponse};
+use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::{
-    serializer::{Format, Raw, Serializer},
-    Backend, BackendError, BackendResult, CacheBackend, DeleteStatus, KeySerializer,
+    serializer::{Format, Raw},
+    Backend, BackendError, BackendResult, DeleteStatus, KeySerializer,
     UrlEncodedKeySerializer,
 };
 use redis::{aio::ConnectionManager, Client};
@@ -113,14 +113,14 @@ impl Backend for RedisBackend {
 
     async fn write(
         &self,
-        key: &CacheKey,
-        value: CacheValue<Raw>,
-        ttl: Option<std::time::Duration>,
+        _key: &CacheKey,
+        _value: CacheValue<Raw>,
+        _ttl: Option<std::time::Duration>,
     ) -> BackendResult<()> {
         todo!()
     }
 
-    async fn remove(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
+    async fn remove(&self, _key: &CacheKey) -> BackendResult<DeleteStatus> {
         todo!()
     }
 

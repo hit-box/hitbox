@@ -5,7 +5,7 @@ use hitbox_core::{CacheKey, CacheValue, CacheableResponse};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    serializer::{Format, Raw, SerializerError},
+    serializer::{Format, Raw},
     BackendError, DeleteStatus,
 };
 

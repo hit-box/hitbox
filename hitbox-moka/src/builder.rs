@@ -2,7 +2,6 @@ use crate::backend::{Expiration, MokaBackend};
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::serializer::Raw;
 use moka::future::{Cache, CacheBuilder};
-use std::time::Duration;
 
 pub struct MokaBackendBuilder {
     builder: CacheBuilder<CacheKey, CacheValue<Raw>, Cache<CacheKey, CacheValue<Raw>>>,

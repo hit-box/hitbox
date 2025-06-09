@@ -1,5 +1,4 @@
 use std::{
-    any::type_name,
     fmt::Debug,
     marker::PhantomData,
     pin::Pin,

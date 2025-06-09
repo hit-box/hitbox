@@ -4,7 +4,9 @@ use hitbox_http::extractors::{
 };
 use hitbox_http::CacheableHttpRequest;
 use http::{Method, Request};
-use hyper::Body;
+use http_body_util::combinators::UnsyncBoxBody;
+use hitbox_http::FromBytes;
+use bytes::Bytes;
 
 #[tokio::test]
 async fn test_request_multiple_extractor_some() {
@@ -12,7 +14,7 @@ async fn test_request_multiple_extractor_some() {
         .uri("/users/42/books/24/")
         .method(Method::PUT)
         .header("X-test", "x-test-value")
-        .body(Body::empty())
+        .body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new()))
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new()

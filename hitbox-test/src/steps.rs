@@ -31,7 +31,7 @@ async fn request_predicates(_world: &mut HitboxWorld) -> Result<(), Error> {
 }
 
 #[given(expr = "key extractor {string}")]
-async fn key_extractor(world: &mut HitboxWorld, extractor: String) -> Result<(), Error> {
+async fn key_extractor(_world: &mut HitboxWorld, _extractor: String) -> Result<(), Error> {
     Ok(())
 }
 
