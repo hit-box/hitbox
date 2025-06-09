@@ -4,7 +4,6 @@ use anyhow::{anyhow, Error};
 use cucumber::gherkin::Step;
 use cucumber::{given, then, when};
 use hitbox::policy::PolicyConfig;
-use hitbox_tower::configuration::predicate::response::status_code;
 use hurl::{
     runner::{request::eval_request, VariableSet},
     util::path::ContextDir,
@@ -32,7 +31,7 @@ async fn request_predicates(_world: &mut HitboxWorld) -> Result<(), Error> {
 }
 
 #[given(expr = "key extractor {string}")]
-async fn key_extractor(_world: &mut HitboxWorld, _extractor: String) -> Result<(), Error> {
+async fn key_extractor(world: &mut HitboxWorld, extractor: String) -> Result<(), Error> {
     Ok(())
 }
 

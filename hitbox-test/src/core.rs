@@ -1,3 +1,4 @@
+use std::fmt;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
@@ -6,12 +7,31 @@ use axum_test::{TestResponse, TestServer};
 use cucumber::gherkin::Step;
 use cucumber::World;
 use hitbox::policy::PolicyConfig;
+use hitbox_http::CacheableHttpRequest;
+use hitbox_http::{extractors::NeutralExtractor, predicates::NeutralRequestPredicate};
 use http::StatusCode;
 use hurl::http::{Body, RequestSpec};
 
-#[derive(Debug, Default)]
 pub struct Settings {
     pub policy: PolicyConfig,
+    pub extractors: Box<dyn hitbox::Extractor<Subject = CacheableHttpRequest<String>>>,
+    pub request_predicates: Box<dyn hitbox::Predicate<Subject = CacheableHttpRequest<String>>>,
+}
+
+impl fmt::Debug for Settings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Settings policy: {:?}", self.policy)
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            policy: PolicyConfig::default(),
+            extractors: Box::new(NeutralExtractor::new()),
+            request_predicates: Box::new(NeutralRequestPredicate::new()),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
