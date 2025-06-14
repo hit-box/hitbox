@@ -1,18 +1,20 @@
+use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
 use hitbox_http::predicates::request::query;
 use hitbox_http::predicates::request::QueryPredicate;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::CacheableHttpRequest;
 use http::Request;
-use http_body_util::combinators::UnsyncBoxBody;
-use hitbox_http::FromBytes;
-use bytes::Bytes;
+use http_body_util::Empty;
 
 #[tokio::test]
 async fn test_request_query_predicates_positive() {
     let path = "/path/?name=value";
     let request = CacheableHttpRequest::from_request(
-        Request::builder().uri(path).body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new())).unwrap(),
+        Request::builder()
+            .uri(path)
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
     );
     let predicate = NeutralRequestPredicate::new()
         .query(query::Operation::Eq("name".to_owned(), "value".to_owned()));
@@ -24,7 +26,10 @@ async fn test_request_query_predicates_positive() {
 async fn test_request_query_predicates_multiple() {
     let path = "/path/?one=two&name=value";
     let request = CacheableHttpRequest::from_request(
-        Request::builder().uri(path).body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new())).unwrap(),
+        Request::builder()
+            .uri(path)
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
     );
     let predicate = NeutralRequestPredicate::new().query(query::Operation::In(
         "name".to_owned(),
@@ -38,7 +43,10 @@ async fn test_request_query_predicates_multiple() {
 async fn test_request_query_predicates_negative() {
     let path = "/path/?one=two&three=four";
     let request = CacheableHttpRequest::from_request(
-        Request::builder().uri(path).body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new())).unwrap(),
+        Request::builder()
+            .uri(path)
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
     );
     let predicate = NeutralRequestPredicate::new().query(query::Operation::Eq(
         "name".to_owned(),

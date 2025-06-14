@@ -1,12 +1,11 @@
+use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
 use hitbox_http::predicates::request::header::Operation;
 use hitbox_http::predicates::request::HeaderPredicate;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::CacheableHttpRequest;
 use http::{HeaderName, HeaderValue, Request};
-use http_body_util::combinators::UnsyncBoxBody;
-use hitbox_http::FromBytes;
-use bytes::Bytes;
+use http_body_util::Empty;
 
 #[cfg(test)]
 mod eq_tests {
@@ -16,7 +15,7 @@ mod eq_tests {
     async fn test_positive() {
         let request = Request::builder()
             .header("x-test", "test-value")
-            .body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new()))
+            .body(Empty::<Bytes>::new())
             .unwrap();
         let request = CacheableHttpRequest::from_request(request);
         let name: HeaderName = "x-test".to_string().parse().unwrap();
@@ -30,7 +29,7 @@ mod eq_tests {
     async fn test_negative() {
         let request = Request::builder()
             .header("x-test", "test-value")
-            .body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new()))
+            .body(Empty::<Bytes>::new())
             .unwrap();
         let request = CacheableHttpRequest::from_request(request);
         let name: HeaderName = "x-test".to_string().parse().unwrap();
@@ -44,7 +43,7 @@ mod eq_tests {
     async fn test_name_not_found() {
         let request = Request::builder()
             .header("x-test", "test-value")
-            .body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new()))
+            .body(Empty::<Bytes>::new())
             .unwrap();
         let request = CacheableHttpRequest::from_request(request);
         let name: HeaderName = "wrong-name".to_string().parse().unwrap();
@@ -63,7 +62,7 @@ mod exist_tests {
     async fn test_positive() {
         let request = Request::builder()
             .header("x-test", "test-value")
-            .body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new()))
+            .body(Empty::<Bytes>::new())
             .unwrap();
         let request = CacheableHttpRequest::from_request(request);
         let name: HeaderName = "x-test".to_string().parse().unwrap();
@@ -74,7 +73,7 @@ mod exist_tests {
 
     #[tokio::test]
     async fn test_negative() {
-        let request = Request::builder().body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new())).unwrap();
+        let request = Request::builder().body(Empty::<Bytes>::new()).unwrap();
         let request = CacheableHttpRequest::from_request(request);
         let name: HeaderName = "x-test".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Exist(name));
@@ -91,7 +90,7 @@ mod in_tests {
     async fn test_positive() {
         let request = Request::builder()
             .header("x-test", "test-value")
-            .body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new()))
+            .body(Empty::<Bytes>::new())
             .unwrap();
         let request = CacheableHttpRequest::from_request(request);
         let name: HeaderName = "x-test".to_string().parse().unwrap();
@@ -108,7 +107,7 @@ mod in_tests {
     async fn test_negative() {
         let request = Request::builder()
             .header("x-test", "wrong-value")
-            .body(UnsyncBoxBody::<Bytes, Box<dyn std::error::Error + Send + Sync>>::from_bytes(Bytes::new()))
+            .body(Empty::<Bytes>::new())
             .unwrap();
         let request = CacheableHttpRequest::from_request(request);
         let name: HeaderName = "x-test".to_string().parse().unwrap();
