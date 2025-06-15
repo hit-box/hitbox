@@ -7,15 +7,21 @@ use axum_test::{TestResponse, TestServer};
 use cucumber::gherkin::Step;
 use cucumber::World;
 use hitbox::policy::PolicyConfig;
-use hitbox_http::CacheableHttpRequest;
-use hitbox_http::{extractors::NeutralExtractor, predicates::NeutralRequestPredicate};
+use hitbox_http::{
+    extractors::NeutralExtractor,
+    predicates::{NeutralRequestPredicate, NeutralResponsePredicate},
+};
+use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 use http::StatusCode;
 use hurl::http::{Body, RequestSpec};
 
 pub struct Settings {
     pub policy: PolicyConfig,
-    pub extractors: Box<dyn hitbox::Extractor<Subject = CacheableHttpRequest<String>>>,
-    pub request_predicates: Box<dyn hitbox::Predicate<Subject = CacheableHttpRequest<String>>>,
+    pub extractors: Box<dyn hitbox::Extractor<Subject = CacheableHttpRequest<axum::body::Body>>>,
+    pub request_predicates:
+        Box<dyn hitbox::Predicate<Subject = CacheableHttpRequest<axum::body::Body>>>,
+    pub response_predicates:
+        Box<dyn hitbox::Predicate<Subject = CacheableHttpResponse<axum::body::Body>>>,
 }
 
 impl fmt::Debug for Settings {
@@ -30,6 +36,7 @@ impl Default for Settings {
             policy: PolicyConfig::default(),
             extractors: Box::new(NeutralExtractor::new()),
             request_predicates: Box::new(NeutralRequestPredicate::new()),
+            response_predicates: Box::new(NeutralResponsePredicate::new()),
         }
     }
 }

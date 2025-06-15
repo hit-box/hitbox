@@ -1,9 +1,16 @@
 use crate::core::{HitboxWorld, StepExt};
+use bytes::Bytes;
+use http_body_util::Full;
 
 use anyhow::{anyhow, Error};
 use cucumber::gherkin::Step;
 use cucumber::{given, then, when};
 use hitbox::policy::PolicyConfig;
+use hitbox_http::predicates::request::{
+    BodyPredicate, HeaderPredicate, MethodPredicate, PathPredicate, QueryPredicate,
+};
+use hitbox_http::predicates::NeutralRequestPredicate;
+use hitbox_http::predicates::request::{ParsingType, body::Operation};
 use hurl::{
     runner::{request::eval_request, VariableSet},
     util::path::ContextDir,
@@ -26,8 +33,33 @@ fn hitbox(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
 }
 
 #[given(expr = "request predicates")]
-async fn request_predicates(_world: &mut HitboxWorld) -> Result<(), Error> {
-    Ok(())
+async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+    match step.table() {
+        Some(table) => {
+            let acc_extractors = Box::new(NeutralRequestPredicate::new());
+            let request_predicate = table.rows.iter().rfold(acc_extractors, |inner, row| {
+                match row.as_slice() {
+                    [name, value, option] => match name.as_str() {
+                        "method" => Box::new(inner.method(http::Method::GET)),
+                        "body" => {
+                            let json_body = r#"{"field":"test-value"}"#;
+                            let body = Full::new(Bytes::from(json_body));
+                            Box::new(inner.body(
+                                ParsingType::Jq,
+                                ".field".to_owned(),
+                                Operation::Eq("test-value".into()),
+                            ))
+                        }
+                        _ => inner,
+                    },
+                    _ => (),
+                };
+                Box::new(inner.path(String::new()))
+            });
+            Ok(())
+        }
+        None => Ok(()),
+    }
 }
 
 #[given(expr = "key extractor {string}")]

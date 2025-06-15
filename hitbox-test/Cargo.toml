@@ -33,6 +33,7 @@ serde_yaml = "0.9"
 anyhow = "1"
 hurl_core = { path = "../../hurl/packages/hurl_core/" }
 hurl = { path = "../../hurl/packages/hurl/" }
+http-body-util = "0.1"
 
 
 [[test]]
