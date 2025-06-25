@@ -22,9 +22,10 @@ pub enum Predicate {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum Condition {
-    And(Predicate, Predicate),
-    Or(Predicate, Predicate),
+pub enum Expression {
+    Predicate(Predicate),
+    And(Box<Expression>, Box<Expression>),
+    Or(Box<Expression>, Box<Expression>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -33,7 +34,7 @@ pub enum Request {
     #[serde(rename = "requests")]
     Flat(Vec<Predicate>),
     #[serde(rename = "request")]
-    Recursive(Condition),
+    Tree(Expression),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
