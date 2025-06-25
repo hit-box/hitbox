@@ -1,16 +1,19 @@
 use crate::core::{HitboxWorld, StepExt};
-use bytes::Bytes;
-use http_body_util::Full;
+use hitbox_http::predicates::request;
 
 use anyhow::{anyhow, Error};
 use cucumber::gherkin::Step;
 use cucumber::{given, then, when};
 use hitbox::policy::PolicyConfig;
+use hitbox::CacheableRequest;
+use hitbox::Predicate;
 use hitbox_http::predicates::request::{
-    BodyPredicate, HeaderPredicate, MethodPredicate, PathPredicate, QueryPredicate,
+    BodyPredicate, HeaderPredicate, MethodPredicate, ParsingType, PathPredicate, QueryPredicate,
 };
-use hitbox_http::predicates::NeutralRequestPredicate;
-use hitbox_http::predicates::request::{ParsingType, body::Operation};
+use hitbox_http::predicates::{request::body::Operation, NeutralRequestPredicate};
+use hitbox_http::CacheableHttpRequest;
+use http_body_util::combinators::UnsyncBoxBody;
+use http_body_util::Full;
 use hurl::{
     runner::{request::eval_request, VariableSet},
     util::path::ContextDir,
@@ -36,26 +39,30 @@ fn hitbox(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
 async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
     match step.table() {
         Some(table) => {
+            //let acc_extractors: Box<dyn Predicate<Subject = CacheableHttpRequest<axum::body::Body>>> =
+            //Box::new(NeutralRequestPredicate::<axum::body::Body>::new());
             let acc_extractors = Box::new(NeutralRequestPredicate::new());
-            let request_predicate = table.rows.iter().rfold(acc_extractors, |inner, row| {
+            let request_predicates = table.rows.iter().rfold(acc_extractors, |inner, row| {
                 match row.as_slice() {
-                    [name, value, option] => match name.as_str() {
-                        "method" => Box::new(inner.method(http::Method::GET)),
-                        "body" => {
-                            let json_body = r#"{"field":"test-value"}"#;
-                            let body = Full::new(Bytes::from(json_body));
-                            Box::new(inner.body(
-                                ParsingType::Jq,
-                                ".field".to_owned(),
-                                Operation::Eq("test-value".into()),
-                            ))
-                        }
-                        _ => inner,
+                    [name, _value, _option] => match name.as_str() {
+                        "method" => Box::new(inner.method(http::Method::GET))
+                            as Box<dyn Predicate<Subject = _>>,
+                        "body" => Box::new(inner.body(
+                            ParsingType::Jq,
+                            "".to_owned(),
+                            Operation::Eq("test".into()),
+                        )),
+                        "query" => Box::new(inner.query(request::query::Operation::Eq(
+                            "name".to_owned(),
+                            "value".to_owned(),
+                        ))),
+                        _ => unreachable!("unknown predicate"),
                     },
-                    _ => (),
+                    _ => unreachable!("predicates should follow format | name | value | option"),
                 };
-                Box::new(inner.path(String::new()))
+                unreachable!();
             });
+            world.settings.request_predicates = request_predicates;
             Ok(())
         }
         None => Ok(()),

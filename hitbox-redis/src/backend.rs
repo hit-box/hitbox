@@ -5,8 +5,7 @@ use chrono::Utc;
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::{
     serializer::{Format, Raw},
-    Backend, BackendError, BackendResult, DeleteStatus, KeySerializer,
-    UrlEncodedKeySerializer,
+    Backend, BackendError, BackendResult, DeleteStatus, KeySerializer, UrlEncodedKeySerializer,
 };
 use redis::{aio::ConnectionManager, Client};
 use tokio::sync::OnceCell;
