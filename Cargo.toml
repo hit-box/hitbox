@@ -11,5 +11,5 @@ members = [
     "hitbox-moka",
     # "hitbox-tarantool",
     "hitbox-test",
-    "examples",
+    "examples", "hitbox-configuration",
 ]
