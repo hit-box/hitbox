@@ -1,4 +1,7 @@
-use hitbox_configuration::{Endpoint, Expression, Predicate, QueryOperation, Request, Wrapper};
+use hitbox_configuration::{
+    Endpoint,
+    request::{Expression, Predicate, QueryOperation, Request, Wrapper},
+};
 
 #[test]
 fn test_expression_tree_serialize() {
