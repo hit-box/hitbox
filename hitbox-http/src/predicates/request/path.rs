@@ -9,6 +9,12 @@ pub struct Path<P> {
     inner: P,
 }
 
+impl<P> Path<P> {
+    pub fn new(inner: P, resource: ResourceDef) -> Self {
+        Self { resource, inner }
+    }
+}
+
 pub trait PathPredicate: Sized {
     fn path(self, resource: String) -> Path<Self>;
 }

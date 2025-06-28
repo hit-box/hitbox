@@ -2,37 +2,69 @@ use hitbox_http::{
     CacheableHttpRequest,
     predicates::{
         NeutralRequestPredicate,
-        request::{Method, Query},
+        conditions::Or,
+        request::{Header, Method, Path, Query},
     },
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
+type CorePredicate<ReqBody> =
+    Box<dyn hitbox_core::Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>;
+
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(untagged)]
 pub enum HeaderOperation {
-    Eq { name: String, value: String },
+    Eq(IndexMap<String, String>),
     Exist(String),
-    In(String, Vec<String>),
+    In(IndexMap<String, Vec<String>>),
+}
+
+impl HeaderOperation {
+    fn into_predicates<ReqBody: Send + 'static>(
+        &self,
+        inner: CorePredicate<ReqBody>,
+    ) -> CorePredicate<ReqBody> {
+        match self {
+            HeaderOperation::Eq(params) => params.iter().rfold(inner, |inner, (key, value)| {
+                Box::new(Header::new(
+                    inner,
+                    hitbox_http::predicates::request::header::Operation::Eq(
+                        key.parse().unwrap(),
+                        value.parse().unwrap(),
+                    ),
+                ))
+            }),
+            HeaderOperation::Exist(param) => Box::new(Header::new(
+                inner,
+                hitbox_http::predicates::request::header::Operation::Exist(param.parse().unwrap()),
+            )),
+            HeaderOperation::In(params) => params.iter().rfold(inner, |inner, (key, values)| {
+                Box::new(Header::new(
+                    inner,
+                    hitbox_http::predicates::request::header::Operation::In(
+                        key.parse().unwrap(),
+                        values.iter().map(|v| v.parse().unwrap()).collect(),
+                    ),
+                ))
+            }),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-// #[serde(untagged)]
 #[serde(tag = "operation")]
 pub enum QueryOperation {
     Eq(IndexMap<String, String>),
     Exist(String),
     In(IndexMap<String, Vec<String>>),
-    // RegExp(String, String),
 }
+
 impl QueryOperation {
     fn into_predicates<ReqBody: Send + 'static>(
         &self,
-        inner: Box<
-            dyn hitbox_core::Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
-        >,
-    ) -> Box<dyn hitbox_core::Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
-    {
+        inner: CorePredicate<ReqBody>,
+    ) -> CorePredicate<ReqBody> {
         match self {
             QueryOperation::Eq(params) => params.iter().rfold(inner, |inner, (key, value)| {
                 Box::new(Query::new(
@@ -43,8 +75,19 @@ impl QueryOperation {
                     ),
                 ))
             }),
-            QueryOperation::Exist(_) => todo!(),
-            QueryOperation::In(hash_map) => todo!(),
+            QueryOperation::Exist(param) => Box::new(Query::new(
+                inner,
+                hitbox_http::predicates::request::query::Operation::Exist(param.to_string()),
+            )),
+            QueryOperation::In(params) => params.iter().rfold(inner, |inner, (key, values)| {
+                Box::new(Query::new(
+                    inner,
+                    hitbox_http::predicates::request::query::Operation::In(
+                        key.clone(),
+                        values.clone(),
+                    ),
+                ))
+            }),
         }
     }
 }
@@ -60,16 +103,13 @@ pub enum Predicate {
 impl Predicate {
     pub fn into_predicates<ReqBody: Send + 'static>(
         &self,
-        inner: Box<
-            dyn hitbox_core::Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
-        >,
-    ) -> Box<dyn hitbox_core::Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
-    {
+        inner: CorePredicate<ReqBody>,
+    ) -> CorePredicate<ReqBody> {
         match self {
             Predicate::Method(method) => Box::new(Method::new(inner, method.as_str()).unwrap()),
-            Predicate::Path(_) => todo!(),
+            Predicate::Path(path) => Box::new(Path::new(inner, path.as_str().into())),
             Predicate::Query(query_operation) => query_operation.into_predicates(inner),
-            Predicate::Header(header_operation) => todo!(),
+            Predicate::Header(header_operation) => header_operation.into_predicates(inner),
         }
     }
 }
@@ -80,11 +120,42 @@ pub enum Operation {
     Or(Box<Expression>, Box<Expression>),
 }
 
+impl Operation {
+    pub fn into_predicates<ReqBody: Send + 'static>(
+        &self,
+        inner: CorePredicate<ReqBody>,
+    ) -> CorePredicate<ReqBody> {
+        match self {
+            Operation::Or(left, right) => {
+                let left = left.into_predicates(Box::new(NeutralRequestPredicate::new()));
+                let right = right.into_predicates(inner);
+                Box::new(Or::new(left, right))
+            }
+            Operation::And(left, right) => {
+                let inner = left.into_predicates(inner);
+                right.into_predicates(inner)
+            }
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(untagged)]
 pub enum Expression {
     Predicate(Predicate),
     Operation(Operation),
+}
+
+impl Expression {
+    fn into_predicates<ReqBody: Send + 'static>(
+        &self,
+        inner: CorePredicate<ReqBody>,
+    ) -> CorePredicate<ReqBody> {
+        match self {
+            Self::Predicate(predicate) => predicate.into_predicates(inner),
+            Self::Operation(operation) => operation.into_predicates(inner),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -95,9 +166,7 @@ pub enum Request {
 }
 
 impl Request {
-    pub fn into_predicates<Req>(
-        &self,
-    ) -> Box<dyn hitbox_core::Predicate<Subject = CacheableHttpRequest<Req>> + Send + Sync>
+    pub fn into_predicates<Req>(&self) -> CorePredicate<Req>
     where
         Req: Send + 'static,
     {
@@ -108,7 +177,7 @@ impl Request {
                 .rfold(neutral_predicate, |inner, predicate| {
                     predicate.into_predicates(inner)
                 }),
-            Request::Tree(expression) => unimplemented!(),
+            Request::Tree(expression) => expression.into_predicates(neutral_predicate),
         }
     }
 }

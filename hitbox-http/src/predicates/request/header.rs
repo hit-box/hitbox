@@ -16,6 +16,12 @@ pub struct Header<P> {
     inner: P,
 }
 
+impl<P> Header<P> {
+    pub fn new(inner: P, operation: Operation) -> Self {
+        Self { operation, inner }
+    }
+}
+
 pub trait HeaderPredicate: Sized {
     fn header(self, operation: Operation) -> Header<Self>;
 }

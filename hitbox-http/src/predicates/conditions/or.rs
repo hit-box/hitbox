@@ -9,6 +9,12 @@ pub struct Or<L, R> {
     right: R,
 }
 
+impl<L, R> Or<L, R> {
+    pub fn new(left: L, right: R) -> Self {
+        Self { left, right }
+    }
+}
+
 #[async_trait]
 impl<L, R, ReqBody> Predicate for Or<L, R>
 where
