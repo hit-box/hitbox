@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use hitbox::predicate::PredicateResult;
 use hitbox::Predicate;
 
+#[derive(Debug)]
 pub struct Not<P, N> {
     prev: P,
     next: N,

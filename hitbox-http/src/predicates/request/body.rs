@@ -15,17 +15,20 @@ use serde_json::Value;
 
 use crate::{CacheableHttpRequest, FromBytes};
 
+#[derive(Debug)]
 pub enum Operation {
     Eq(Value),
     Exist,
     In(Vec<Value>), // TODO: Add key-value pairs
 }
 
+#[derive(Debug)]
 pub enum ParsingType {
     Jq,
     ProtoBuf(MessageDescriptor),
 }
 
+#[derive(Debug)]
 pub struct Body<P> {
     operation: Operation,
     parsing_type: ParsingType,

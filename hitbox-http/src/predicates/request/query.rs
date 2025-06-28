@@ -2,15 +2,23 @@ use crate::CacheableHttpRequest;
 use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
 
+#[derive(Debug)]
 pub enum Operation {
     Eq(String, String),
     Exist(String),
     In(String, Vec<String>),
 }
 
+#[derive(Debug)]
 pub struct Query<P> {
     pub operation: Operation,
     inner: P,
+}
+
+impl<P> Query<P> {
+    pub fn new(inner: P, operation: Operation) -> Self {
+        Self { operation, inner }
+    }
 }
 
 pub trait QueryPredicate: Sized {

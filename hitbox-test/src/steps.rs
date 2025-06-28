@@ -1,4 +1,6 @@
 use crate::core::{HitboxWorld, StepExt};
+use bytes::Bytes;
+use hitbox_configuration::Request;
 use hitbox_http::predicates::request;
 
 use anyhow::{anyhow, Error};
@@ -24,7 +26,6 @@ use hurl_core::{error::DisplaySourceError, parser::parse_hurl_file, text::Format
 
 #[given(regex = r"hitbox with policy")]
 fn hitbox(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    dbg!(step.docstring_content());
     let policy = step
         .docstring_content()
         .as_deref()
@@ -37,36 +38,46 @@ fn hitbox(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
 
 #[given(expr = "request predicates")]
 async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    match step.table() {
-        Some(table) => {
-            //let acc_extractors: Box<dyn Predicate<Subject = CacheableHttpRequest<axum::body::Body>>> =
-            //Box::new(NeutralRequestPredicate::<axum::body::Body>::new());
-            let acc_extractors = Box::new(NeutralRequestPredicate::new());
-            let request_predicates = table.rows.iter().rfold(acc_extractors, |inner, row| {
-                match row.as_slice() {
-                    [name, _value, _option] => match name.as_str() {
-                        "method" => Box::new(inner.method(http::Method::GET))
-                            as Box<dyn Predicate<Subject = _>>,
-                        "body" => Box::new(inner.body(
-                            ParsingType::Jq,
-                            "".to_owned(),
-                            Operation::Eq("test".into()),
-                        )),
-                        "query" => Box::new(inner.query(request::query::Operation::Eq(
-                            "name".to_owned(),
-                            "value".to_owned(),
-                        ))),
-                        _ => unreachable!("unknown predicate"),
-                    },
-                    _ => unreachable!("predicates should follow format | name | value | option"),
-                };
-                unreachable!();
-            });
-            world.settings.request_predicates = request_predicates;
-            Ok(())
-        }
-        None => Ok(()),
-    }
+    let config = serde_yaml::from_str::<Request>(
+        step.docstring_content()
+            .ok_or(anyhow!("Missing predicates configuration"))?
+            .as_str(),
+    )?;
+    dbg!(&config);
+    let predicates = config.into_predicates();
+    world.settings.request_predicates = predicates;
+    dbg!(&world);
+    Ok(())
+    // match step.table() {
+    //     Some(table) => {
+    //         //let acc_extractors: Box<dyn Predicate<Subject = CacheableHttpRequest<axum::body::Body>>> =
+    //         //Box::new(NeutralRequestPredicate::<axum::body::Body>::new());
+    //         let acc_extractors = Box::new(NeutralRequestPredicate::new());
+    //         let request_predicates = table.rows.iter().rfold(acc_extractors, |inner, row| {
+    //             match row.as_slice() {
+    //                 [name, _value, _option] => match name.as_str() {
+    //                     "method" => Box::new(inner.method(http::Method::GET))
+    //                         as Box<dyn Predicate<Subject = _>>,
+    //                     "body" => Box::new(inner.body(
+    //                         ParsingType::Jq,
+    //                         "".to_owned(),
+    //                         Operation::Eq("test".into()),
+    //                     )),
+    //                     "query" => Box::new(inner.query(request::query::Operation::Eq(
+    //                         "name".to_owned(),
+    //                         "value".to_owned(),
+    //                     ))),
+    //                     _ => unreachable!("unknown predicate"),
+    //                 },
+    //                 _ => unreachable!("predicates should follow format | name | value | option"),
+    //             };
+    //             unreachable!();
+    //         });
+    //         world.settings.request_predicates = request_predicates;
+    //         Ok(())
+    //     }
+    //     None => Ok(()),
+    // }
 }
 
 #[given(expr = "key extractor {string}")]

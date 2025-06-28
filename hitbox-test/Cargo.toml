@@ -21,6 +21,8 @@ hitbox-http = { path = "../hitbox-http", version = "0.1" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
 hitbox-moka = { path = "../hitbox-moka", version = "0.1" }
 hitbox-tower = { path = "../hitbox-tower", version = "0.1" }
+hitbox-configuration = { path = "../hitbox-configuration", version = "0.1" }
+
 futures = "0.3"
 tower = "0.5"
 http = "1.3"

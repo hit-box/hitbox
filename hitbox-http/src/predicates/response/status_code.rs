@@ -2,6 +2,7 @@ use crate::CacheableHttpResponse;
 use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
 
+#[derive(Debug)]
 pub struct StatusCode<P> {
     status_code: http::StatusCode,
     inner: P,

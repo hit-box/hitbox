@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 
@@ -7,8 +7,9 @@ pub enum PredicateResult<S> {
     NonCacheable(S),
 }
 
+// @FIX: remove Debug bound for Predicate
 #[async_trait]
-pub trait Predicate {
+pub trait Predicate: Debug {
     type Subject;
     async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject>;
 }

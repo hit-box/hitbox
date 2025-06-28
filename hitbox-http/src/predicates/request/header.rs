@@ -3,12 +3,14 @@ use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
 use http::{HeaderName, HeaderValue};
 
+#[derive(Debug)]
 pub enum Operation {
     Eq(HeaderName, HeaderValue),
     Exist(HeaderName),
     In(HeaderName, Vec<HeaderValue>),
 }
 
+#[derive(Debug)]
 pub struct Header<P> {
     pub operation: Operation,
     inner: P,

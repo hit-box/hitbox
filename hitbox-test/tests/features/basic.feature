@@ -8,8 +8,21 @@ Feature: Cache policy feature
           stale: 43
       ```
     Given request predicates
-      | method | GET   |
-      | query  | cache |
+      ```yaml
+      - Method: GET
+      - Query:
+          operation: Eq
+          x-cache: '42'
+          cache: 'true'
+      ```
+    # Given request predicates
+    #   ```yaml
+    #   And:
+    #   - Method: GET
+    #   - Query:
+    #       operation: Eq
+    #       cache: 'true'
+    #   ```
     Given key extractor "method"
     Given key extractor "path=/greet/{name}"
     When execute request

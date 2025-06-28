@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
@@ -11,6 +11,14 @@ pub mod response;
 
 pub struct NeutralRequestPredicate<ReqBody> {
     _req: PhantomData<fn(ReqBody) -> ReqBody>,
+}
+
+impl<ReqBody> Debug for NeutralRequestPredicate<ReqBody> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NeutralRequestPredicate")
+            .field("_req", &self._req)
+            .finish()
+    }
 }
 
 impl<ReqBody> NeutralRequestPredicate<ReqBody> {
@@ -44,6 +52,14 @@ pub struct NeutralResponsePredicate<ResBody> {
 impl<ResBody> NeutralResponsePredicate<ResBody> {
     pub fn new() -> Self {
         NeutralResponsePredicate { _res: PhantomData }
+    }
+}
+
+impl<ResBody> Debug for NeutralResponsePredicate<ResBody> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NeutralResponsePredicate")
+            .field("_res", &self._res)
+            .finish()
     }
 }
 

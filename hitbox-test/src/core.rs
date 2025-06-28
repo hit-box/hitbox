@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Debug};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
@@ -24,9 +24,14 @@ pub struct Settings {
         Box<dyn hitbox::Predicate<Subject = CacheableHttpResponse<axum::body::Body>>>,
 }
 
-impl fmt::Debug for Settings {
+impl Debug for Settings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Settings policy: {:?}", self.policy)
+        f.debug_struct("Settings")
+            .field("policy", &self.policy)
+            // .field("extractors", &self.extractors)
+            .field("request_predicates", &self.request_predicates)
+            .field("response_predicates", &self.response_predicates)
+            .finish()
     }
 }
 

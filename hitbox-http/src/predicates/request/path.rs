@@ -3,6 +3,7 @@ use actix_router::ResourceDef;
 use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
 
+#[derive(Debug)]
 pub struct Path<P> {
     resource: ResourceDef,
     inner: P,

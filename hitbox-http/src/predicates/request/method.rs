@@ -2,9 +2,22 @@ use crate::CacheableHttpRequest;
 use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
 
+#[derive(Debug)]
 pub struct Method<P> {
     method: http::Method,
     inner: P,
+}
+
+impl<P> Method<P> {
+    pub fn new<E, T>(inner: P, method: T) -> Result<Self, E>
+    where
+        T: TryInto<http::Method, Error = E>,
+    {
+        Ok(Method {
+            method: method.try_into()?,
+            inner,
+        })
+    }
 }
 
 pub trait MethodPredicate: Sized {
