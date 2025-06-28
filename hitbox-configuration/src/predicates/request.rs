@@ -25,23 +25,21 @@ pub enum Predicate {
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-pub enum Expression {
-    And(Box<Wrapper>, Box<Wrapper>),
-    Or(Box<Wrapper>, Box<Wrapper>),
+pub enum Operation {
+    And(Box<Expression>, Box<Expression>),
+    Or(Box<Expression>, Box<Expression>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(untagged)]
-pub enum Wrapper {
+pub enum Expression {
     Predicate(Predicate),
-    Expression(Expression),
+    Operation(Operation),
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(untagged)]
 pub enum Request {
-    #[serde(rename = "requests")]
     Flat(Vec<Predicate>),
-    #[serde(rename = "request")]
-    Tree(Wrapper),
+    Tree(Expression),
 }
