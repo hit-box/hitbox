@@ -116,8 +116,8 @@ impl Predicate {
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum Operation {
-    And(Box<Expression>, Box<Expression>),
-    Or(Box<Expression>, Box<Expression>),
+    And(Vec<Expression>),
+    Or(Vec<Expression>),
 }
 
 impl Operation {
@@ -126,15 +126,13 @@ impl Operation {
         inner: CorePredicate<ReqBody>,
     ) -> CorePredicate<ReqBody> {
         match self {
-            Operation::Or(left, right) => {
-                let left = left.into_predicates(Box::new(NeutralRequestPredicate::new()));
-                let right = right.into_predicates(inner);
-                Box::new(Or::new(left, right))
-            }
-            Operation::And(left, right) => {
-                let inner = left.into_predicates(inner);
-                right.into_predicates(inner)
-            }
+            Operation::Or(predicates) => predicates.iter().rfold(inner, |inner, predicate| {
+                let predicate = predicate.into_predicates(Box::new(NeutralRequestPredicate::new()));
+                Box::new(Or::new(inner, predicate))
+            }),
+            Operation::And(predicates) => predicates
+                .iter()
+                .rfold(inner, |inner, predicate| predicate.into_predicates(inner)),
         }
     }
 }

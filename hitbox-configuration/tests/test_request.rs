@@ -9,11 +9,16 @@ fn test_expression_tree_serialize() {
     let query_params = vec![("cache".to_owned(), "true".to_owned())]
         .into_iter()
         .collect();
-    let method = Expression::Predicate(Predicate::Method("GET".to_owned()));
+    let method_get = Expression::Predicate(Predicate::Method("GET".to_owned()));
+    let method_post = Expression::Predicate(Predicate::Method("POST".to_owned()));
     let path = Expression::Predicate(Predicate::Path("/books".to_owned()));
     let query = Expression::Predicate(Predicate::Query(QueryOperation::Eq(query_params)));
-    let and_ = Expression::Operation(Operation::And(method.into(), path.into()));
-    let or_ = Expression::Operation(Operation::Or(query.into(), and_.into()));
+    let and_ = Expression::Operation(Operation::And(vec![method_get.into(), path.into()]));
+    let or_ = Expression::Operation(Operation::Or(vec![
+        query.into(),
+        method_post.into(),
+        and_.into(),
+    ]));
     let request = Request::Tree(or_);
     let endpoint = Endpoint { request };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
@@ -22,6 +27,7 @@ fn test_expression_tree_serialize() {
   - Query:
       operation: Eq
       cache: 'true'
+  - Method: POST
   - And:
     - Method: GET
     - Path: /books
@@ -37,8 +43,8 @@ fn test_request_predicate_query_in_serialize() {
     let method = Expression::Predicate(Predicate::Method("GET".to_owned()));
     let path = Expression::Predicate(Predicate::Path("/books".to_owned()));
     let query = Expression::Predicate(Predicate::Query(QueryOperation::In(query_params)));
-    let and_ = Expression::Operation(Operation::And(method.into(), path.into()));
-    let or_ = Expression::Operation(Operation::Or(query.into(), and_.into()));
+    let and_ = Expression::Operation(Operation::And(vec![method.into(), path.into()]));
+    let or_ = Expression::Operation(Operation::Or(vec![query.into(), and_.into()]));
     let request = Request::Tree(or_);
     let endpoint = Endpoint { request };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();

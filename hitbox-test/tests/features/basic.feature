@@ -19,6 +19,7 @@ Feature: Cache policy feature
       ```yaml
       Or:
        - Method: POST
+       - Method: HEAD
        - Query:
           operation: Eq
           cache: 'true'
