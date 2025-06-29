@@ -1,14 +1,14 @@
-use hitbox::predicate::PredicateResult;
 use bytes::Bytes;
-use http::Request as HttpRequest;
+use hitbox::predicate::PredicateResult;
 use hitbox_configuration::{
     Endpoint,
     predicates::request::{Expression, Operation, Predicate, QueryOperation, Request},
 };
 use hitbox_http::CacheableHttpRequest;
 use hitbox_http::predicates::NeutralRequestPredicate;
-use pretty_assertions::assert_eq;
+use http::Request as HttpRequest;
 use http_body_util::Empty;
+use pretty_assertions::assert_eq;
 
 #[test]
 fn test_expression_tree_serialize() {
@@ -113,4 +113,150 @@ fn test_expression_flat_deserialize() {
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
     println!("{}", yaml_str);
     assert_eq!(endpoint, expected);
+}
+
+#[tokio::test]
+async fn test_or_with_matching_first_predicate() {
+    let inner = Box::new(NeutralRequestPredicate::new());
+    let method_get = Expression::Predicate(Predicate::Method("GET".to_owned()));
+    let method_post = Expression::Predicate(Predicate::Method("POST".to_owned()));
+    let method_head = Expression::Predicate(Predicate::Method("HEAD".to_owned()));
+    let or_ = Expression::Operation(Operation::Or(vec![
+        method_get.into(),
+        method_post.into(),
+        method_head.into(),
+    ]));
+    let predicate_or = or_.into_predicates(inner);
+
+    let request = CacheableHttpRequest::from_request(
+        HttpRequest::builder()
+            .method("GET")
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
+    );
+    let cacheable = predicate_or.check(request).await;
+    assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
+}
+
+#[tokio::test]
+async fn test_or_with_matching_middle_predicate() {
+    let inner = Box::new(NeutralRequestPredicate::new());
+    let method_get = Expression::Predicate(Predicate::Method("GET".to_owned()));
+    let method_post = Expression::Predicate(Predicate::Method("POST".to_owned()));
+    let method_head = Expression::Predicate(Predicate::Method("HEAD".to_owned()));
+    let or_ = Expression::Operation(Operation::Or(vec![
+        method_get.into(),
+        method_post.into(),
+        method_head.into(),
+    ]));
+    let predicate_or = or_.into_predicates(inner);
+
+    let request = CacheableHttpRequest::from_request(
+        HttpRequest::builder()
+            .method("POST")
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
+    );
+    let cacheable = predicate_or.check(request).await;
+    assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
+}
+
+#[tokio::test]
+async fn test_or_with_matching_last_predicate() {
+    let inner = Box::new(NeutralRequestPredicate::new());
+    let method_get = Expression::Predicate(Predicate::Method("GET".to_owned()));
+    let method_post = Expression::Predicate(Predicate::Method("POST".to_owned()));
+    let method_head = Expression::Predicate(Predicate::Method("HEAD".to_owned()));
+    let or_ = Expression::Operation(Operation::Or(vec![
+        method_get.into(),
+        method_post.into(),
+        method_head.into(),
+    ]));
+    let predicate_or = or_.into_predicates(inner);
+
+    let request = CacheableHttpRequest::from_request(
+        HttpRequest::builder()
+            .method("HEAD")
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
+    );
+    let cacheable = predicate_or.check(request).await;
+    assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
+}
+
+#[tokio::test]
+async fn test_or_with_no_matching_predicates() {
+    let inner = Box::new(NeutralRequestPredicate::new());
+    let method_get = Expression::Predicate(Predicate::Method("GET".to_owned()));
+    let method_post = Expression::Predicate(Predicate::Method("POST".to_owned()));
+    let method_head = Expression::Predicate(Predicate::Method("HEAD".to_owned()));
+    let or_ = Expression::Operation(Operation::Or(vec![
+        method_get.into(),
+        method_post.into(),
+        method_head.into(),
+    ]));
+    let predicate_or = or_.into_predicates(inner);
+
+    let request = CacheableHttpRequest::from_request(
+        HttpRequest::builder()
+            .method("DELETE")
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
+    );
+    let cacheable = predicate_or.check(request).await;
+    assert!(matches!(cacheable, PredicateResult::NonCacheable(_)));
+}
+
+#[tokio::test]
+async fn test_or_with_single_predicate_matching() {
+    let inner = Box::new(NeutralRequestPredicate::new());
+    let method_get = Expression::Predicate(Predicate::Method("GET".to_owned()));
+    let or_ = Expression::Operation(Operation::Or(vec![method_get.into()]));
+    let predicate_or = or_.into_predicates(inner);
+
+    let request = CacheableHttpRequest::from_request(
+        HttpRequest::builder()
+            .method("GET")
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
+    );
+    let cacheable = predicate_or.check(request).await;
+    assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
+}
+
+#[tokio::test]
+async fn test_or_with_single_predicate_not_matching() {
+    let inner = Box::new(NeutralRequestPredicate::new());
+    let method_get = Expression::Predicate(Predicate::Method("GET".to_owned()));
+    let or_ = Expression::Operation(Operation::Or(vec![method_get.into()]));
+    let predicate_or = or_.into_predicates(inner);
+
+    let request = CacheableHttpRequest::from_request(
+        HttpRequest::builder()
+            .method("POST")
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
+    );
+    let cacheable = predicate_or.check(request).await;
+    assert!(matches!(cacheable, PredicateResult::NonCacheable(_)));
+}
+
+#[tokio::test]
+async fn test_or_with_mixed_predicate_types() {
+    let inner = Box::new(NeutralRequestPredicate::new());
+    let method_post = Expression::Predicate(Predicate::Method("POST".to_owned()));
+    let path_books = Expression::Predicate(Predicate::Path("/books".to_owned()));
+    let or_ = Expression::Operation(Operation::Or(vec![method_post.into(), path_books.into()]));
+    let predicate_or = or_.into_predicates(inner);
+
+    // Test request that matches the path but not the method
+    let request = CacheableHttpRequest::from_request(
+        HttpRequest::builder()
+            .method("GET")
+            .uri("/books")
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
+    );
+    let cacheable = predicate_or.check(request).await;
+    assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
 }

@@ -2,7 +2,7 @@ use hitbox_http::{
     CacheableHttpRequest,
     predicates::{
         NeutralRequestPredicate,
-        conditions::{Or, Not},
+        conditions::{Not, Or},
         request::{Header, Method, Path, Query},
     },
 };
@@ -126,11 +126,20 @@ impl Operation {
         inner: CorePredicate<ReqBody>,
     ) -> CorePredicate<ReqBody> {
         match self {
-            Operation::Or(predicates) => predicates.iter().rfold(inner, |inner, predicate| {
-                let neutral_predicate = Box::new(NeutralRequestPredicate::new());
-                let predicate = predicate.into_predicates(neutral_predicate);
-                Box::new(Or::new(predicate, inner))
-            }),
+            Operation::Or(predicates) => {
+                if predicates.is_empty() {
+                    inner
+                } else {
+                    predicates.iter().skip(1).fold(
+                        predicates[0].into_predicates(Box::new(NeutralRequestPredicate::new())),
+                        |acc, predicate| {
+                            let predicate =
+                                predicate.into_predicates(Box::new(NeutralRequestPredicate::new()));
+                            Box::new(Or::new(predicate, acc))
+                        },
+                    )
+                }
+            }
             Operation::And(predicates) => predicates
                 .iter()
                 .rfold(inner, |inner, predicate| predicate.into_predicates(inner)),

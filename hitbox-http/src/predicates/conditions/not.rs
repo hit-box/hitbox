@@ -39,8 +39,6 @@ where
     T: Predicate,
 {
     fn not<P>(self, predicate: P) -> Not<P> {
-        Not {
-            predicate,
-        }
+        Not { predicate }
     }
 }
