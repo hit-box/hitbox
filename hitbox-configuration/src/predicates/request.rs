@@ -2,7 +2,7 @@ use hitbox_http::{
     CacheableHttpRequest,
     predicates::{
         NeutralRequestPredicate,
-        conditions::Or,
+        conditions::{Or, Not},
         request::{Header, Method, Path, Query},
     },
 };
@@ -127,8 +127,9 @@ impl Operation {
     ) -> CorePredicate<ReqBody> {
         match self {
             Operation::Or(predicates) => predicates.iter().rfold(inner, |inner, predicate| {
-                let predicate = predicate.into_predicates(Box::new(NeutralRequestPredicate::new()));
-                Box::new(Or::new(inner, predicate))
+                let neutral_predicate = Box::new(NeutralRequestPredicate::new());
+                let predicate = predicate.into_predicates(neutral_predicate);
+                Box::new(Or::new(predicate, inner))
             }),
             Operation::And(predicates) => predicates
                 .iter()
@@ -145,7 +146,7 @@ pub enum Expression {
 }
 
 impl Expression {
-    fn into_predicates<ReqBody: Send + 'static>(
+    pub fn into_predicates<ReqBody: Send + 'static>(
         &self,
         inner: CorePredicate<ReqBody>,
     ) -> CorePredicate<ReqBody> {

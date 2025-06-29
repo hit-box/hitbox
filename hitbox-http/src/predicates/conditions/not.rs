@@ -4,43 +4,43 @@ use hitbox::predicate::PredicateResult;
 use hitbox::Predicate;
 
 #[derive(Debug)]
-pub struct Not<P, N> {
-    prev: P,
-    next: N,
+pub struct Not<T> {
+    predicate: T,
+}
+
+impl<T> Not<T> {
+    pub fn new(predicate: T) -> Self {
+        Self { predicate }
+    }
 }
 
 #[async_trait]
-impl<P, N, ReqBody> Predicate for Not<P, N>
+impl<T, ReqBody> Predicate for Not<T>
 where
     ReqBody: Send + 'static,
-    P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
-    N: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
+    T: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
 {
     type Subject = CacheableHttpRequest<ReqBody>;
 
     async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.prev.check(request).await {
-            PredicateResult::Cacheable(request) => match self.next.check(request).await {
-                PredicateResult::Cacheable(request) => PredicateResult::NonCacheable(request),
-                PredicateResult::NonCacheable(request) => PredicateResult::Cacheable(request),
-            },
-            PredicateResult::NonCacheable(request) => PredicateResult::NonCacheable(request),
+        match self.predicate.check(request).await {
+            PredicateResult::Cacheable(request) => PredicateResult::NonCacheable(request),
+            PredicateResult::NonCacheable(request) => PredicateResult::Cacheable(request),
         }
     }
 }
 
 pub trait NotPredicate: Sized {
-    fn not<P: Predicate>(self, predicate: P) -> Not<Self, P>;
+    fn not<P: Predicate>(self, predicate: P) -> Not<P>;
 }
 
 impl<T> NotPredicate for T
 where
     T: Predicate,
 {
-    fn not<P>(self, predicate: P) -> Not<Self, P> {
+    fn not<P>(self, predicate: P) -> Not<P> {
         Not {
-            prev: self,
-            next: predicate,
+            predicate,
         }
     }
 }
