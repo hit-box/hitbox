@@ -28,7 +28,7 @@ impl Debug for Settings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Settings")
             .field("policy", &self.policy)
-            // .field("extractors", &self.extractors)
+            .field("extractors", &self.extractors)
             .field("request_predicates", &self.request_predicates)
             .field("response_predicates", &self.response_predicates)
             .finish()

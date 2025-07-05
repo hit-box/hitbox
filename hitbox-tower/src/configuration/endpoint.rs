@@ -18,6 +18,7 @@ use hitbox_http::predicates::{
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 use http::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,7 +88,7 @@ impl CacheConfig for EndpointConfig {
         &self,
     ) -> Box<dyn Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
     where
-        ReqBody: Send + 'static,
+        ReqBody: Send + 'static + Debug,
     {
         let acc_extractors = Box::new(NeutralExtractor::new());
         self.extractors
@@ -131,7 +132,7 @@ where
         &self,
     ) -> Box<dyn Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
     where
-        ReqBody: Send + 'static,
+        ReqBody: Send + 'static + Debug,
     {
         self.as_ref().extractors()
     }

@@ -1,15 +1,19 @@
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 use async_trait::async_trait;
 use hitbox::{Extractor, KeyParts};
 
 use crate::CacheableHttpRequest;
 
+pub use method::Method;
+pub use path::Path;
+
 pub mod header;
 pub mod method;
 pub mod path;
 pub mod query;
 
+#[derive(Debug)]
 pub struct NeutralExtractor<ReqBody> {
     _res: PhantomData<fn(ReqBody) -> ReqBody>,
 }
@@ -23,7 +27,7 @@ impl<ResBody> NeutralExtractor<ResBody> {
 #[async_trait]
 impl<ResBody> Extractor for NeutralExtractor<ResBody>
 where
-    ResBody: Send + 'static,
+    ResBody: Send + 'static + Debug,
 {
     type Subject = CacheableHttpRequest<ResBody>;
 

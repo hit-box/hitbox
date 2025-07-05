@@ -1,6 +1,8 @@
 use crate::core::{HitboxWorld, StepExt};
 use bytes::Bytes;
+use hitbox_configuration::extractors::{BoxExtractor, Extractor};
 use hitbox_configuration::Request;
+use hitbox_http::extractors::{self, NeutralExtractor};
 use hitbox_http::predicates::request;
 
 use anyhow::{anyhow, Error};
@@ -21,6 +23,7 @@ use hurl::{
     util::path::ContextDir,
 };
 use hurl_core::{error::DisplaySourceError, parser::parse_hurl_file, text::Format};
+use serde::{Deserialize, Serialize};
 
 ///////////// GIVEN ////////////
 
@@ -43,45 +46,31 @@ async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), 
             .ok_or(anyhow!("Missing predicates configuration"))?
             .as_str(),
     )?;
-    dbg!(&config);
     let predicates = config.into_predicates();
     world.settings.request_predicates = predicates;
-    dbg!(&world);
     Ok(())
-    // match step.table() {
-    //     Some(table) => {
-    //         //let acc_extractors: Box<dyn Predicate<Subject = CacheableHttpRequest<axum::body::Body>>> =
-    //         //Box::new(NeutralRequestPredicate::<axum::body::Body>::new());
-    //         let acc_extractors = Box::new(NeutralRequestPredicate::new());
-    //         let request_predicates = table.rows.iter().rfold(acc_extractors, |inner, row| {
-    //             match row.as_slice() {
-    //                 [name, _value, _option] => match name.as_str() {
-    //                     "method" => Box::new(inner.method(http::Method::GET))
-    //                         as Box<dyn Predicate<Subject = _>>,
-    //                     "body" => Box::new(inner.body(
-    //                         ParsingType::Jq,
-    //                         "".to_owned(),
-    //                         Operation::Eq("test".into()),
-    //                     )),
-    //                     "query" => Box::new(inner.query(request::query::Operation::Eq(
-    //                         "name".to_owned(),
-    //                         "value".to_owned(),
-    //                     ))),
-    //                     _ => unreachable!("unknown predicate"),
-    //                 },
-    //                 _ => unreachable!("predicates should follow format | name | value | option"),
-    //             };
-    //             unreachable!();
-    //         });
-    //         world.settings.request_predicates = request_predicates;
-    //         Ok(())
-    //     }
-    //     None => Ok(()),
-    // }
 }
 
 #[given(expr = "key extractor {string}")]
 async fn key_extractor(_world: &mut HitboxWorld, _extractor: String) -> Result<(), Error> {
+    Ok(())
+}
+
+#[given(expr = "key extractors")]
+async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+    #[derive(Serialize, Deserialize)]
+    struct Config(#[serde(with = "serde_yaml::with::singleton_map_recursive")] Vec<Extractor>);
+    let config = serde_yaml::from_str::<Config>(
+        step.docstring_content()
+            .ok_or(anyhow!("Missing extractors configuration"))?
+            .as_str(),
+    )?;
+    let extractors = config.0.into_iter().rfold(
+        Box::new(NeutralExtractor::<axum::body::Body>::new()) as BoxExtractor<_>,
+        |inner, item| item.into_extractors(inner),
+    );
+    world.settings.extractors = extractors;
+    dbg!(&world);
     Ok(())
 }
 

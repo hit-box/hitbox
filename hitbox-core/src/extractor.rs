@@ -1,11 +1,12 @@
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 
 use crate::KeyParts;
 
+// @FIX: remove Debug bound for Extractor (needed for hitbox-test)
 #[async_trait]
-pub trait Extractor {
+pub trait Extractor: Debug {
     type Subject;
     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject>;
 }

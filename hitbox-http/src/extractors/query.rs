@@ -3,6 +3,7 @@ use hitbox::{Extractor, KeyPart, KeyParts};
 
 use crate::CacheableHttpRequest;
 
+#[derive(Debug)]
 pub struct Query<E> {
     inner: E,
     name: String,

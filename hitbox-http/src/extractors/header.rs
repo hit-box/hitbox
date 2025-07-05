@@ -4,6 +4,7 @@ use http::HeaderValue;
 
 use crate::CacheableHttpRequest;
 
+#[derive(Debug)]
 pub struct Header<E> {
     inner: E,
     name: String,

@@ -3,8 +3,15 @@ use hitbox::{Extractor, KeyPart, KeyParts};
 
 use crate::CacheableHttpRequest;
 
+#[derive(Debug)]
 pub struct Method<E> {
     inner: E,
+}
+
+impl<E> Method<E> {
+    pub fn new(inner: E) -> Self {
+        Self { inner }
+    }
 }
 
 pub trait MethodExtractor: Sized {

@@ -4,9 +4,19 @@ use hitbox::{Extractor, KeyPart, KeyParts};
 
 use crate::CacheableHttpRequest;
 
+#[derive(Debug)]
 pub struct Path<E> {
     inner: E,
     resource: ResourceDef,
+}
+
+impl<E> Path<E> {
+    pub fn new(inner: E, resource: String) -> Self {
+        Self {
+            inner,
+            resource: ResourceDef::try_from(resource).unwrap(),
+        }
+    }
 }
 
 pub trait PathExtractor: Sized {

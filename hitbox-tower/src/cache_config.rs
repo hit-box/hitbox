@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use hitbox::policy::PolicyConfig;
 use hitbox::predicate::Predicate;
 use hitbox::Extractor;
@@ -23,7 +25,7 @@ pub trait CacheConfig {
 
     fn extractors<ReqBody>(&self) -> RequestExtractor<ReqBody>
     where
-        ReqBody: Send + 'static;
+        ReqBody: Send + 'static + Debug;
 
     fn policy(&self) -> PolicyConfig;
 }

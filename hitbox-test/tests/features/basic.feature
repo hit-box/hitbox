@@ -23,9 +23,12 @@ Feature: Cache policy feature
        - Query:
           operation: Eq
           cache: 'true'
-			 ```
-    Given key extractor "method"
-    Given key extractor "path=/greet/{name}"
+      ```
+    Given key extractors
+      ```yaml
+      - Method:
+      - Path: /greet/{name}
+      ```
     When execute request
       ```hurl
       GET http://localhost/greet/test

@@ -36,6 +36,7 @@ anyhow = "1"
 hurl_core = { path = "../../hurl/packages/hurl_core/" }
 hurl = { path = "../../hurl/packages/hurl/" }
 http-body-util = "0.1"
+serde = { version = "1", features = ["derive"] }
 
 
 [[test]]

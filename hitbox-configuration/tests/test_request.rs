@@ -26,7 +26,10 @@ fn test_expression_tree_serialize() {
         and_.into(),
     ]));
     let request = Request::Tree(or_);
-    let endpoint = Endpoint { request };
+    let endpoint = Endpoint {
+        request,
+        extractors: vec![],
+    };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
     let expected = r"request:
   Or:
@@ -75,7 +78,10 @@ fn test_request_predicate_query_in_serialize() {
     let and_ = Expression::Operation(Operation::And(vec![method.into(), path.into()]));
     let or_ = Expression::Operation(Operation::Or(vec![query.into(), and_.into()]));
     let request = Request::Tree(or_);
-    let endpoint = Endpoint { request };
+    let endpoint = Endpoint {
+        request,
+        extractors: vec![],
+    };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
     let expected = r"request:
   Or:
@@ -109,7 +115,10 @@ fn test_expression_flat_deserialize() {
     let path = Predicate::Path("/books".to_owned());
     let query = Predicate::Query(QueryOperation::Eq(query_params));
     let request = Request::Flat(vec![method, path, query]);
-    let expected = Endpoint { request };
+    let expected = Endpoint {
+        request,
+        extractors: vec![],
+    };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
     println!("{}", yaml_str);
     assert_eq!(endpoint, expected);
