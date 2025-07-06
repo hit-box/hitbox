@@ -72,14 +72,14 @@ impl<ResBody, E> UpstreamFuture<ResBody, E> {
         let inner_future = Box::pin(async move {
             let res = inner_service.call(req.into_request()).await;
             // CacheableHttpResponse::from_response(res.unwrap())
-            match &res {
-                Ok(res) => {
-                    dbg!(res.status());
-                }
-                Err(err) => {
-                    dbg!(err);
-                }
-            };
+            // match &res {
+            //     Ok(res) => {
+            //         dbg!(res.status());
+            //     }
+            //     Err(err) => {
+            //         dbg!(err);
+            //     }
+            // };
             res.map(CacheableHttpResponse::from_response)
         });
         UpstreamFuture { inner_future }

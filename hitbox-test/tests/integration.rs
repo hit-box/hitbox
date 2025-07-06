@@ -1,6 +1,7 @@
 use cucumber::World;
 use hitbox_test::core::HitboxWorld;
 
-fn main() {
-    futures::executor::block_on(HitboxWorld::run("tests/features/basic.feature"));
+#[tokio::main]
+async fn main() {
+    HitboxWorld::run("tests/features").await;
 }

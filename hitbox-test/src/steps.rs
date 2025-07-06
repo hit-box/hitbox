@@ -73,7 +73,7 @@ async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Erro
         |inner, item| item.into_extractors(inner),
     );
     world.settings.extractors = Arc::new(extractors);
-    dbg!(&world);
+    // dbg!(&world);
     Ok(())
 }
 
@@ -137,7 +137,7 @@ async fn check_cache_backend_state(world: &mut HitboxWorld, step: &Step) -> Resu
         let res = response.into_response();
         let bytes = to_bytes(res.into_body(), 100000).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
-        dbg!(&body);
+        // dbg!(&body);
         assert_eq!(body, row[1]);
     }
     // dbg!(String::from_utf8(value.data).unwrap());

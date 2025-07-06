@@ -5,6 +5,7 @@ use hitbox_tower::Cache;
 use std::fmt::{self, Debug};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{anyhow, Error};
 use axum::{extract::Path, routing::get, Router};
@@ -106,7 +107,7 @@ async fn handler_result(
     Path(name): Path<String>,
     _request: axum::extract::Request,
 ) -> Result<String, StatusCode> {
-    dbg!("axum::handler_result");
+    // dbg!("axum::handler_result");
     Ok(format!("Hello, {name}"))
 }
 
@@ -139,7 +140,7 @@ impl HitboxWorld {
 
         let response = request.await;
         self.state.response = Some(response);
-        dbg!(&self.backend.cache);
+        // dbg!(&self.backend.cache);
         Ok(())
     }
 }
