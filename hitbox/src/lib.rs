@@ -77,6 +77,7 @@ pub use hitbox_core::{
     RequestCachePolicy, ResponseCachePolicy,
 };
 pub mod policy;
+pub mod config;
 
 pub mod predicate {
     pub use hitbox_core::{Predicate, PredicateResult};

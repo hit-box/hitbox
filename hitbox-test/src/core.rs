@@ -1,5 +1,8 @@
+use hitbox::config::{CacheConfig, RequestExtractor, RequestPredicate, ResponsePredicate};
+use hitbox_tower::Cache;
 use std::fmt::{self, Debug};
 use std::str::FromStr;
+use std::sync::Arc;
 
 use anyhow::{anyhow, Error};
 use axum::{extract::Path, routing::get, Router};
@@ -17,11 +20,33 @@ use hurl::http::{Body, RequestSpec};
 
 pub struct Settings {
     pub policy: PolicyConfig,
-    pub extractors: Box<dyn hitbox::Extractor<Subject = CacheableHttpRequest<axum::body::Body>>>,
+    pub extractors: Arc<dyn hitbox::Extractor<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>,
     pub request_predicates:
         Box<dyn hitbox::Predicate<Subject = CacheableHttpRequest<axum::body::Body>>>,
     pub response_predicates:
         Box<dyn hitbox::Predicate<Subject = CacheableHttpResponse<axum::body::Body>>>,
+}
+
+impl CacheConfig<axum::body::Body, axum::body::Body> for Settings
+{
+    type RequestBody = CacheableHttpRequest<axum::body::Body>;
+    type ResponseBody = CacheableHttpResponse<axum::body::Body>;
+
+    fn request_predicates(&self) -> RequestPredicate<Self::RequestBody> {
+        self.request_predicates
+    }
+
+    fn response_predicates(&self) -> ResponsePredicate<Self::ResponseBody> {
+        self.response_predicates
+    }
+
+    fn extractors(&self) -> RequestExtractor<Self::RequestBody> {
+        self.extractors
+    }
+
+    fn policy(&self) -> PolicyConfig {
+        PolicyConfig::default()
+    }
 }
 
 impl Debug for Settings {
@@ -67,8 +92,11 @@ async fn handler_result(
 
 impl HitboxWorld {
     pub async fn execute_request(&mut self, request_spec: &RequestSpec) -> Result<(), Error> {
-        let app = Router::new().route("/{*path}", get(handler_result));
-        // .layer(json_cache);
+        let inmemory = hitbox_moka::MokaBackend::builder(1).build();
+        let cache = Cache::builder().backend(inmemory).build();
+        let app = Router::new()
+            .route("/{*path}", get(handler_result))
+            .layer(cache);
 
         let server = TestServer::new(app)?;
         let path = request_spec.url.path();

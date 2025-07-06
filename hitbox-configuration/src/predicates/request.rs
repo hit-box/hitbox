@@ -173,6 +173,12 @@ pub enum Request {
     Tree(Expression),
 }
 
+impl Default for Request {
+    fn default() -> Self {
+        Self::Flat(Vec::default())
+    }
+}
+
 impl Request {
     pub fn into_predicates<Req>(&self) -> CorePredicate<Req>
     where

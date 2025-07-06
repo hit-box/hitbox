@@ -9,7 +9,7 @@ pub mod path;
 pub type BoxExtractor<ReqBody> =
     Box<dyn hitbox_core::Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Extractor {
     Path(Path),
     Method(Method),

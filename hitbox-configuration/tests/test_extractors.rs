@@ -1,5 +1,5 @@
 use hitbox_configuration::{
-    Endpoint, Request,
+    Endpoint, Request, Response,
     extractors::{Extractor, method::Method, path::Path},
 };
 use pretty_assertions::assert_eq;
@@ -13,6 +13,7 @@ fn test_extractors_serialize() {
     let original_endpoint = Endpoint {
         extractors,
         request: Request::Flat(vec![]),
+        response: Response::Flat,
     };
     let yaml_str = serde_yaml::to_string(&original_endpoint).unwrap();
     println!("{}", &yaml_str);

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::extractors::BoxExtractor;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Path(String);
 
 impl Path {

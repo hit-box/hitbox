@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct EnabledCacheConfig {
     ttl: Option<u32>,
     stale: Option<u32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum PolicyConfig {
     Enabled(EnabledCacheConfig),
     Disabled,

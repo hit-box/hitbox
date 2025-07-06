@@ -2,7 +2,10 @@ use bytes::Bytes;
 use hitbox::predicate::PredicateResult;
 use hitbox_configuration::{
     Endpoint,
-    predicates::request::{Expression, Operation, Predicate, QueryOperation, Request},
+    predicates::{
+        request::{Expression, Operation, Predicate, QueryOperation, Request},
+        response::Response,
+    },
 };
 use hitbox_http::CacheableHttpRequest;
 use hitbox_http::predicates::NeutralRequestPredicate;
@@ -29,6 +32,7 @@ fn test_expression_tree_serialize() {
     let endpoint = Endpoint {
         request,
         extractors: vec![],
+        response: Response::Flat,
     };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
     let expected = r"request:
@@ -81,6 +85,7 @@ fn test_request_predicate_query_in_serialize() {
     let endpoint = Endpoint {
         request,
         extractors: vec![],
+        response: Response::Flat,
     };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
     let expected = r"request:
@@ -118,6 +123,7 @@ fn test_expression_flat_deserialize() {
     let expected = Endpoint {
         request,
         extractors: vec![],
+        response: Response::Flat,
     };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
     println!("{}", yaml_str);

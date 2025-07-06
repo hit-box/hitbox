@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+hitbox = { path = "../hitbox/" }
 hitbox-core = { path = "../hitbox-core/" }
 hitbox-http = { path = "../hitbox-http/" }
 async-trait = "0.1"
