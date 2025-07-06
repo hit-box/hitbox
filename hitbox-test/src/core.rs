@@ -1,4 +1,6 @@
 use hitbox::config::{CacheConfig, RequestExtractor, RequestPredicate, ResponsePredicate};
+use hitbox::{Extractor, Predicate};
+use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
 use std::fmt::{self, Debug};
 use std::str::FromStr;
@@ -18,30 +20,37 @@ use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 use http::StatusCode;
 use hurl::http::{Body, RequestSpec};
 
+#[derive(Clone)]
 pub struct Settings {
     pub policy: PolicyConfig,
-    pub extractors: Arc<dyn hitbox::Extractor<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>,
+    pub extractors:
+        Arc<dyn hitbox::Extractor<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>,
     pub request_predicates:
-        Box<dyn hitbox::Predicate<Subject = CacheableHttpRequest<axum::body::Body>>>,
+        Arc<dyn hitbox::Predicate<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>,
     pub response_predicates:
-        Box<dyn hitbox::Predicate<Subject = CacheableHttpResponse<axum::body::Body>>>,
+        Arc<dyn hitbox::Predicate<Subject = CacheableHttpResponse<axum::body::Body>> + Send + Sync>,
 }
 
-impl CacheConfig<axum::body::Body, axum::body::Body> for Settings
+impl CacheConfig<CacheableHttpRequest<axum::body::Body>, CacheableHttpResponse<axum::body::Body>>
+    for Settings
 {
     type RequestBody = CacheableHttpRequest<axum::body::Body>;
     type ResponseBody = CacheableHttpResponse<axum::body::Body>;
 
-    fn request_predicates(&self) -> RequestPredicate<Self::RequestBody> {
-        self.request_predicates
+    fn request_predicates(
+        &self,
+    ) -> impl Predicate<Subject = Self::RequestBody> + Send + Sync + 'static {
+        self.request_predicates.clone()
     }
 
-    fn response_predicates(&self) -> ResponsePredicate<Self::ResponseBody> {
-        self.response_predicates
+    fn response_predicates(
+        &self,
+    ) -> impl Predicate<Subject = Self::ResponseBody> + Send + Sync + 'static {
+        self.response_predicates.clone()
     }
 
-    fn extractors(&self) -> RequestExtractor<Self::RequestBody> {
-        self.extractors
+    fn extractors(&self) -> impl Extractor<Subject = Self::RequestBody> + Send + Sync + 'static {
+        self.extractors.clone()
     }
 
     fn policy(&self) -> PolicyConfig {
@@ -64,9 +73,9 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             policy: PolicyConfig::default(),
-            extractors: Box::new(NeutralExtractor::new()),
-            request_predicates: Box::new(NeutralRequestPredicate::new()),
-            response_predicates: Box::new(NeutralResponsePredicate::new()),
+            extractors: Arc::new(NeutralExtractor::new()),
+            request_predicates: Arc::new(NeutralRequestPredicate::new()),
+            response_predicates: Arc::new(NeutralResponsePredicate::new()),
         }
     }
 }
@@ -76,10 +85,21 @@ pub struct State {
     pub response: Option<TestResponse>,
 }
 
-#[derive(Debug, World, Default)]
+#[derive(Debug, World)]
 pub struct HitboxWorld {
     pub settings: Settings,
     pub state: State,
+    pub backend: MokaBackend,
+}
+
+impl Default for HitboxWorld {
+    fn default() -> Self {
+        Self {
+            settings: Default::default(),
+            state: Default::default(),
+            backend: MokaBackend::builder(100).build(),
+        }
+    }
 }
 
 async fn handler_result(
@@ -92,10 +112,12 @@ async fn handler_result(
 
 impl HitboxWorld {
     pub async fn execute_request(&mut self, request_spec: &RequestSpec) -> Result<(), Error> {
-        let inmemory = hitbox_moka::MokaBackend::builder(1).build();
-        let cache = Cache::builder().backend(inmemory).build();
+        let cache = Cache::builder()
+            .backend(self.backend.clone())
+            .config(self.settings.clone())
+            .build();
         let app = Router::new()
-            .route("/{*path}", get(handler_result))
+            .route("/greet/{name}", get(handler_result))
             .layer(cache);
 
         let server = TestServer::new(app)?;
@@ -107,6 +129,9 @@ impl HitboxWorld {
         for header in &request_spec.headers {
             request = request.add_header(&header.name, &header.value);
         }
+        for param in &request_spec.querystring {
+            request = request.add_query_param(&param.name, &param.value);
+        }
         let request = match &request_spec.body {
             Body::Text(body) => Ok(request.json(body)),
             _ => Err(anyhow!("unsupported body type")),
@@ -114,6 +139,7 @@ impl HitboxWorld {
 
         let response = request.await;
         self.state.response = Some(response);
+        dbg!(&self.backend.cache);
         Ok(())
     }
 }

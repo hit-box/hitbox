@@ -25,7 +25,7 @@ impl Expiry<CacheKey, CacheValue<Raw>> for Expiration {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MokaBackend {
     pub cache: Cache<CacheKey, CacheValue<Raw>>,
 }
@@ -48,6 +48,8 @@ impl Backend for MokaBackend {
         value: CacheValue<Raw>,
         _ttl: Option<Duration>,
     ) -> BackendResult<()> {
+        dbg!("+++++++++++++++++++++++++++++++");
+        dbg!(&key);
         self.cache.insert(key.clone(), value).await;
         Ok(())
     }

@@ -33,6 +33,17 @@ impl CacheKey {
             prefix: "".to_owned(),
         }
     }
+
+    pub fn from_slice(parts: &[(&str, &str)]) -> Self {
+        CacheKey {
+            parts: parts
+                .iter()
+                .map(|(key, value)| KeyPart::new(key, Some(value)))
+                .collect(),
+            version: 0,
+            prefix: "".to_owned(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]

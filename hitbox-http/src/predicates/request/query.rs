@@ -46,6 +46,7 @@ where
     type Subject = P::Subject;
 
     async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
+        dbg!(request.parts().uri.query());
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
                 let is_cacheable = match request.parts().uri.query().map(crate::query::parse) {
@@ -59,8 +60,7 @@ where
                         }
                         Operation::In(name, values) => query_map
                             .get(name)
-                            .map(|value| values.iter().find(|v| value.contains(v)))
-                            .flatten()
+                            .and_then(|value| values.iter().find(|v| value.contains(v)))
                             .map(|_| true)
                             .unwrap_or_default(),
                     },

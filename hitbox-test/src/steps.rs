@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use crate::core::{HitboxWorld, StepExt};
+use axum::body::to_bytes;
 use bytes::Bytes;
 use hitbox_configuration::extractors::{BoxExtractor, Extractor};
 use hitbox_configuration::Request;
@@ -9,13 +12,13 @@ use anyhow::{anyhow, Error};
 use cucumber::gherkin::Step;
 use cucumber::{given, then, when};
 use hitbox::policy::PolicyConfig;
-use hitbox::CacheableRequest;
-use hitbox::Predicate;
+use hitbox::{CacheKey, CacheableRequest, KeyPart};
+use hitbox::{CacheableResponse, Predicate};
 use hitbox_http::predicates::request::{
     BodyPredicate, HeaderPredicate, MethodPredicate, ParsingType, PathPredicate, QueryPredicate,
 };
 use hitbox_http::predicates::{request::body::Operation, NeutralRequestPredicate};
-use hitbox_http::CacheableHttpRequest;
+use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, SerializableHttpResponse};
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::Full;
 use hurl::{
@@ -47,7 +50,7 @@ async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), 
             .as_str(),
     )?;
     let predicates = config.into_predicates();
-    world.settings.request_predicates = predicates;
+    world.settings.request_predicates = Arc::new(predicates);
     Ok(())
 }
 
@@ -69,7 +72,7 @@ async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Erro
         Box::new(NeutralExtractor::<axum::body::Body>::new()) as BoxExtractor<_>,
         |inner, item| item.into_extractors(inner),
     );
-    world.settings.extractors = extractors;
+    world.settings.extractors = Arc::new(extractors);
     dbg!(&world);
     Ok(())
 }
@@ -105,22 +108,40 @@ async fn execute(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
 #[then(expr = "response status is {int}")]
 async fn check_response_status(world: &mut HitboxWorld, status: u16) -> Result<(), Error> {
     match &world.state.response {
-        Some(response) => {
-            if response.status_code().eq(&status) {
-                Ok(())
-            } else {
-                Err(anyhow!(
-                    "expected response status code is {}, received is {}",
-                    response.status_code(),
-                    status
-                ))
-            }
-        }
+        Some(response) => response
+            .status_code()
+            .eq(&status)
+            .then_some(())
+            .ok_or(anyhow!(
+                "expected response status code is {}, received is {}",
+                response.status_code(),
+                status
+            )),
         None => Err(anyhow!("request was not executed")),
     }
 }
 
 #[then(expr = "cache has records")]
-async fn check_cache_backend_state(_world: &mut HitboxWorld) -> Result<(), Error> {
+async fn check_cache_backend_state(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+    for row in step.table.as_ref().unwrap().rows.iter() {
+        let mut key_parts = vec![];
+        let parts: Vec<_> = row[0].split(',').collect();
+        for part in parts.into_iter() {
+            let keys: Vec<_> = part.split(":").collect();
+            key_parts.push((keys[0], keys[1]));
+        }
+        let key = CacheKey::from_slice(&key_parts);
+        let value = world.backend.cache.get(&key).await.unwrap();
+        let cached: SerializableHttpResponse = serde_json::from_slice(&value.data).unwrap();
+        let response = CacheableHttpResponse::<axum::body::Body>::from_cached(cached).await;
+        let res = response.into_response();
+        let bytes = to_bytes(res.into_body(), 100000).await.unwrap();
+        let body = String::from_utf8(bytes.to_vec()).unwrap();
+        dbg!(&body);
+        assert_eq!(body, row[1]);
+    }
+    // dbg!(String::from_utf8(value.data).unwrap());
+    // dbg!(&response.body);
+    // dbg!(String::from_utf8(&cached.body).unwrap());
     Ok(())
 }

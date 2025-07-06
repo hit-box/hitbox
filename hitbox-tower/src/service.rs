@@ -1,4 +1,4 @@
-use crate::CacheConfig;
+use hitbox::{config::CacheConfig, Predicate};
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};
@@ -45,7 +45,7 @@ where
     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
     B: CacheBackend + Clone + Send + Sync + 'static,
     S::Future: Send,
-    C: CacheConfig,
+    C: CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>,
 
     // debug bounds
     ReqBody: Debug + HttpBody + Send + 'static,

@@ -39,27 +39,27 @@ impl Endpoint {
     }
 }
 
-impl<ReqBody, ResBody> CacheConfig<ReqBody, ResBody> for Endpoint
-where
-    ReqBody: Send + Debug + 'static,
-    ResBody: Send + 'static,
-{
-    type RequestBody = CacheableHttpRequest<ReqBody>;
-    type ResponseBody = CacheableHttpResponse<ResBody>;
-
-    fn request_predicates(&self) -> RequestPredicate<Self::RequestBody> {
-        self.request.into_predicates()
-    }
-
-    fn response_predicates(&self) -> ResponsePredicate<Self::ResponseBody> {
-        self.response.into_predicates()
-    }
-
-    fn extractors(&self) -> RequestExtractor<Self::RequestBody> {
-        self.extractors()
-    }
-
-    fn policy(&self) -> PolicyConfig {
-        PolicyConfig::default()
-    }
-}
+// impl<ReqBody, ResBody> CacheConfig<ReqBody, ResBody> for Endpoint
+// where
+//     ReqBody: Send + Debug + 'static,
+//     ResBody: Send + 'static,
+// {
+//     type RequestBody = CacheableHttpRequest<ReqBody>;
+//     type ResponseBody = CacheableHttpResponse<ResBody>;
+//
+//     fn request_predicates(&self) -> RequestPredicate<Self::RequestBody> {
+//         self.request.into_predicates()
+//     }
+//
+//     fn response_predicates(&self) -> ResponsePredicate<Self::ResponseBody> {
+//         self.response.into_predicates()
+//     }
+//
+//     fn extractors(&self) -> RequestExtractor<Self::RequestBody> {
+//         self.extractors()
+//     }
+//
+//     fn policy(&self) -> PolicyConfig {
+//         PolicyConfig::default()
+//     }
+// }
