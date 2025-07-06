@@ -2,7 +2,7 @@ use hitbox_http::{
     CacheableHttpRequest,
     predicates::{
         NeutralRequestPredicate,
-        conditions::{Not, Or},
+        conditions::Or,
         request::{Header, Method, Path, Query},
     },
 };

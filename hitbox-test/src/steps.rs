@@ -2,25 +2,17 @@ use std::sync::Arc;
 
 use crate::core::{HitboxWorld, StepExt};
 use axum::body::to_bytes;
-use bytes::Bytes;
 use hitbox_configuration::extractors::{BoxExtractor, Extractor};
 use hitbox_configuration::Request;
-use hitbox_http::extractors::{self, NeutralExtractor};
-use hitbox_http::predicates::request;
+use hitbox_http::extractors::NeutralExtractor;
 
 use anyhow::{anyhow, Error};
 use cucumber::gherkin::Step;
 use cucumber::{given, then, when};
 use hitbox::policy::PolicyConfig;
-use hitbox::{CacheKey, CacheableRequest, KeyPart};
-use hitbox::{CacheableResponse, Predicate};
-use hitbox_http::predicates::request::{
-    BodyPredicate, HeaderPredicate, MethodPredicate, ParsingType, PathPredicate, QueryPredicate,
-};
-use hitbox_http::predicates::{request::body::Operation, NeutralRequestPredicate};
-use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, SerializableHttpResponse};
-use http_body_util::combinators::UnsyncBoxBody;
-use http_body_util::Full;
+use hitbox::CacheKey;
+use hitbox::CacheableResponse;
+use hitbox_http::{CacheableHttpResponse, SerializableHttpResponse};
 use hurl::{
     runner::{request::eval_request, VariableSet},
     util::path::ContextDir,

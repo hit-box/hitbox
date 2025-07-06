@@ -1,9 +1,5 @@
-use hitbox::{
-    CacheableRequest,
-    config::{CacheConfig, RequestExtractor, RequestPredicate, ResponsePredicate},
-    policy::PolicyConfig,
-};
-use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, extractors::NeutralExtractor};
+use hitbox::policy::PolicyConfig;
+use hitbox_http::{CacheableHttpRequest, extractors::NeutralExtractor};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 

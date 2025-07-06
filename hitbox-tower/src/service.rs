@@ -1,4 +1,4 @@
-use hitbox::{config::CacheConfig, Predicate};
+use hitbox::config::CacheConfig;
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};

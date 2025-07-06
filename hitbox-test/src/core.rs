@@ -1,11 +1,10 @@
-use hitbox::config::{CacheConfig, RequestExtractor, RequestPredicate, ResponsePredicate};
+use hitbox::config::CacheConfig;
 use hitbox::{Extractor, Predicate};
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
 use std::fmt::{self, Debug};
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use anyhow::{anyhow, Error};
 use axum::{extract::Path, routing::get, Router};
