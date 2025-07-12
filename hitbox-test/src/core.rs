@@ -26,7 +26,7 @@ use hurl::http::{Body, RequestSpec};
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct Handler {
+pub struct HandlerConfig {
     pub path: String,
     pub method: String,
     pub status_code: u16,
@@ -34,7 +34,42 @@ pub struct Handler {
     pub body: Option<String>,
 }
 
-impl Default for Handler {
+impl HandlerConfig {
+    fn into_router<T>(self) -> axum::routing::MethodRouter<T>
+    where
+        T: Clone + Send + Sync + 'static,
+    {
+        let handler = move || async move {
+            let mut headers = http::header::HeaderMap::new();
+            for (name, value) in self.headers {
+                if let (Ok(header_name), Ok(header_value)) = (
+                    http::header::HeaderName::from_str(&name),
+                    http::header::HeaderValue::from_str(&value),
+                ) {
+                    headers.insert(header_name, header_value);
+                }
+            }
+
+            let body = self.body.unwrap_or_else(|| String::new());
+
+            (
+                StatusCode::from_u16(self.status_code).unwrap(),
+                headers,
+                body,
+            )
+        };
+        match self.method.to_uppercase().as_str() {
+            "GET" => get(handler),
+            "POST" => post(handler),
+            "PUT" => put(handler),
+            "DELETE" => delete(handler),
+            "PATCH" => patch(handler),
+            _ => get(handler),
+        }
+    }
+}
+
+impl Default for HandlerConfig {
     fn default() -> Self {
         Self {
             path: "/greet/{name}".to_owned(),
@@ -46,10 +81,12 @@ impl Default for Handler {
     }
 }
 
+impl HandlerConfig {}
+
 #[derive(Clone)]
 pub struct Settings {
     pub policy: PolicyConfig,
-    pub handler: Handler,
+    pub handler: HandlerConfig,
     pub extractors:
         Arc<dyn hitbox::Extractor<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>,
     pub request_predicates:
@@ -100,7 +137,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             policy: PolicyConfig::default(),
-            handler: Handler::default(),
+            handler: HandlerConfig::default(),
             extractors: Arc::new(NeutralExtractor::new()),
             request_predicates: Arc::new(NeutralRequestPredicate::new()),
             response_predicates: Arc::new(NeutralResponsePredicate::new()),
@@ -132,42 +169,15 @@ impl Default for HitboxWorld {
 
 impl HitboxWorld {
     pub async fn execute_request(&mut self, request_spec: &RequestSpec) -> Result<(), Error> {
-        let handler_config = self.settings.handler.clone();
-        let headers_clone = handler_config.headers.clone();
-        let body_clone = handler_config.body.clone();
-        let status_code = handler_config.status_code;
-
-        let handler = move || async move {
-            let mut headers = http::header::HeaderMap::new();
-            for (name, value) in headers_clone {
-                if let (Ok(header_name), Ok(header_value)) = (
-                    http::header::HeaderName::from_str(&name),
-                    http::header::HeaderValue::from_str(&value),
-                ) {
-                    headers.insert(header_name, header_value);
-                }
-            }
-
-            let body = body_clone.unwrap_or_else(|| String::new());
-            dbg!(&body);
-
-            (StatusCode::from_u16(status_code).unwrap(), headers, body)
-        };
         let cache = Cache::builder()
             .backend(self.backend.clone())
             .config(self.settings.clone())
             .build();
-        let method_router = match handler_config.method.to_uppercase().as_str() {
-            "GET" => get(handler),
-            "POST" => post(handler),
-            "PUT" => put(handler),
-            "DELETE" => delete(handler),
-            "PATCH" => patch(handler),
-            _ => get(handler), // Default to GET for unsupported methods
-        };
+
+        let method_router = self.settings.handler.clone().into_router();
 
         let router = Router::new()
-            .route(&handler_config.path, method_router)
+            .route(self.settings.handler.path.as_str(), method_router)
             .layer(cache);
 
         let server = TestServer::new(router)?;

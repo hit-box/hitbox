@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::{Handler, HitboxWorld, StepExt};
+use crate::core::{HandlerConfig, HitboxWorld, StepExt};
 use axum::body::to_bytes;
 use hitbox_configuration::extractors::{BoxExtractor, Extractor};
 use hitbox_configuration::Request;
@@ -52,7 +52,7 @@ async fn handler(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
         .docstring_content()
         .ok_or(anyhow!("Missing extractors configuration"))?;
     let handler_config = handler_config_content.as_str();
-    let handler = serde_yaml::from_str::<Handler>(handler_config)?;
+    let handler = serde_yaml::from_str::<HandlerConfig>(handler_config)?;
     world.settings.handler = handler;
     Ok(())
 }
