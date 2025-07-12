@@ -7,6 +7,14 @@ Feature: Cache policy feature
           ttl: 42
           stale: 43
       ```
+    Given handler
+      ```yaml
+      method: GET
+      path: /greet/{name}
+      status_code: 200
+      headers: {}
+      body: Hello, test
+      ```
     Given request predicates
       ```yaml
       - Method: GET

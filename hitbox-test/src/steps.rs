@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::{HitboxWorld, StepExt};
+use crate::core::{Handler, HitboxWorld, StepExt};
 use axum::body::to_bytes;
 use hitbox_configuration::extractors::{BoxExtractor, Extractor};
 use hitbox_configuration::Request;
@@ -46,8 +46,14 @@ async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), 
     Ok(())
 }
 
-#[given(expr = "key extractor {string}")]
-async fn key_extractor(_world: &mut HitboxWorld, _extractor: String) -> Result<(), Error> {
+#[given(expr = "handler")]
+async fn handler(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+    let handler_config_content = step
+        .docstring_content()
+        .ok_or(anyhow!("Missing extractors configuration"))?;
+    let handler_config = handler_config_content.as_str();
+    let handler = serde_yaml::from_str::<Handler>(handler_config)?;
+    world.settings.handler = handler;
     Ok(())
 }
 
@@ -65,7 +71,6 @@ async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Erro
         |inner, item| item.into_extractors(inner),
     );
     world.settings.extractors = Arc::new(extractors);
-    // dbg!(&world);
     Ok(())
 }
 
@@ -129,11 +134,7 @@ async fn check_cache_backend_state(world: &mut HitboxWorld, step: &Step) -> Resu
         let res = response.into_response();
         let bytes = to_bytes(res.into_body(), 100000).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
-        // dbg!(&body);
         assert_eq!(body, row[1]);
     }
-    // dbg!(String::from_utf8(value.data).unwrap());
-    // dbg!(&response.body);
-    // dbg!(String::from_utf8(&cached.body).unwrap());
     Ok(())
 }
