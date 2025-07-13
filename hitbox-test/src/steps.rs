@@ -120,21 +120,58 @@ async fn check_response_status(world: &mut HitboxWorld, status: u16) -> Result<(
 
 #[then(expr = "cache has records")]
 async fn check_cache_backend_state(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    for row in step.table.as_ref().unwrap().rows.iter() {
-        let mut key_parts = vec![];
-        let parts: Vec<_> = row[0].split(',').collect();
-        for part in parts.into_iter() {
-            let keys: Vec<_> = part.split(":").collect();
-            key_parts.push((keys[0], keys[1]));
+    let table = step
+        .table
+        .as_ref()
+        .ok_or_else(|| anyhow!("Expected table with cache records but none found"))?;
+    
+    for row in &table.rows {
+        let key = parse_key(&row[0])?;
+        let cached_body = get_body(world, &key).await?;
+        
+        if cached_body != row[1] {
+            return Err(anyhow!(
+                "Cache body mismatch for key {:?}. Expected: '{}', Found: '{}'", 
+                key, row[1], cached_body
+            ));
         }
-        let key = CacheKey::from_slice(&key_parts);
-        let value = world.backend.cache.get(&key).await.unwrap();
-        let cached: SerializableHttpResponse = serde_json::from_slice(&value.data).unwrap();
-        let response = CacheableHttpResponse::<axum::body::Body>::from_cached(cached).await;
-        let res = response.into_response();
-        let bytes = to_bytes(res.into_body(), 100000).await.unwrap();
-        let body = String::from_utf8(bytes.to_vec()).unwrap();
-        assert_eq!(body, row[1]);
     }
     Ok(())
+}
+
+fn parse_key(key_str: &str) -> Result<CacheKey, Error> {
+    let key_parts: Result<Vec<_>, _> = key_str
+        .split(',')
+        .map(|part| {
+            let mut key_value = part.split(':');
+            match (key_value.next(), key_value.next()) {
+                (Some(key), Some(value)) => Ok((key, value)),
+                _ => Err(anyhow!("Invalid key format: '{}'. Expected 'key:value'", part)),
+            }
+        })
+        .collect();
+    
+    Ok(CacheKey::from_slice(&key_parts?))
+}
+
+async fn get_body(world: &mut HitboxWorld, key: &CacheKey) -> Result<String, Error> {
+    let value = world
+        .backend
+        .cache
+        .get(key)
+        .await
+        .ok_or_else(|| anyhow!("Cache missing expected key: {:?}", key))?;
+    
+    let cached: SerializableHttpResponse = serde_json::from_slice(&value.data)
+        .map_err(|e| anyhow!("Failed to deserialize cached response: {}", e))?;
+    
+    let response = CacheableHttpResponse::<axum::body::Body>::from_cached(cached).await;
+    let res = response.into_response();
+    
+    let bytes = to_bytes(res.into_body(), 100000)
+        .await
+        .map_err(|e| anyhow!("Failed to read response body (size > 100k or other error): {}", e))?;
+    
+    String::from_utf8(bytes.to_vec())
+        .map_err(|e| anyhow!("Response body is not valid UTF-8: {}", e))
 }
