@@ -1,18 +1,18 @@
 # Hitbox Test Cases
 
-## Request Predicates 
+## Request Predicates (unit tests)
 
 ### Method
-- [ ] GET - Basic implementation exists
-- [ ] POST - Basic implementation exists
-- [ ] PUT - Basic implementation exists
-- [ ] PATCH - Basic implementation exists
-- [ ] DELETE - Basic implementation exists
-- [ ] HEAD - Test coverage needed
-- [ ] OPTIONS - Test coverage needed
-- [ ] TRACE - Test coverage needed
-- [ ] CONNECT - Test coverage needed
-- [ ] Custom methods - Test edge cases
+- [ ] GET
+- [ ] POST
+- [ ] PUT
+- [ ] PATCH
+- [ ] DELETE
+- [ ] HEAD
+- [ ] OPTIONS
+- [ ] TRACE
+- [ ] CONNECT
+- [ ] Custom methods
 
 ### Path
 - [ ] Static paths: "", "/", "/home", "/home/", "/Home"

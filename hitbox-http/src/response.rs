@@ -108,8 +108,8 @@ where
             .to_bytes()
             .to_vec();
         CachePolicy::Cacheable(SerializableHttpResponse {
-            status: 200,
-            version: "HTTP/1.1".to_owned(),
+            status: self.parts.status.as_u16(),
+            version: format!("{:?}", self.parts.version),
             body,
             headers: self
                 .parts
