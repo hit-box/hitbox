@@ -110,7 +110,7 @@ async fn check_response_status(world: &mut HitboxWorld, status: u16) -> Result<(
             .eq(&status)
             .then_some(())
             .ok_or(anyhow!(
-                "expected response status code is {}, received is {}",
+                "received response status code is {}, expected is {}",
                 response.status_code(),
                 status
             )),

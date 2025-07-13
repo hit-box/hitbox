@@ -50,7 +50,7 @@ impl HandlerConfig {
                 }
             }
 
-            let body = self.body.unwrap_or_else(|| String::new());
+            let body = self.body.unwrap_or_default();
 
             (
                 StatusCode::from_u16(self.status_code).unwrap(),
