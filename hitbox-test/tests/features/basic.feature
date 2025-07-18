@@ -25,9 +25,13 @@ Feature: Cache policy feature
       ```
     Given response predicates
       ```yaml
-      Or:
-      - Status: 200
-      - Status: 201
+      And:
+        - Status: 200
+        - Or:
+            - Status: 200
+            - Status: 203
+            - Status: 500
+        - Status: 200
       ```
     Given key extractors
       ```yaml

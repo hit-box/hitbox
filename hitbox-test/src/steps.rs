@@ -90,6 +90,7 @@ async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Erro
 
 #[when(expr = "execute request")]
 async fn execute(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+    dbg!(&world.settings.response_predicates);
     let hurl_request = step
         .docstring_content()
         .ok_or_else(|| anyhow!("request not provided"))?;
