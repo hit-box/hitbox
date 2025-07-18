@@ -39,14 +39,18 @@ impl Operation {
     ) -> CorePredicate<ReqBody> {
         match self {
             Operation::Or(predicates) if predicates.is_empty() => inner,
-            Operation::Or(predicates) => predicates.into_iter().fold(
-                Box::new(NeutralResponsePredicate::new()),
-                |acc, predicate| {
+            Operation::Or(predicates) => {
+                let mut predicates = predicates.into_iter();
+                let acc = predicates
+                    .next()
+                    .into_iter()
+                    .fold(inner, |inner, predicate| predicate.into_predicates(inner));
+                predicates.fold(acc, |acc, predicate| {
                     let predicate = predicate
                         .into_predicates(Box::new(NeutralResponsePredicate::<ReqBody>::new()));
                     Box::new(Or::new(predicate, acc))
-                },
-            ),
+                })
+            }
             Operation::And(predicates) => predicates
                 .into_iter()
                 .rfold(inner, |inner, predicate| predicate.into_predicates(inner)),
