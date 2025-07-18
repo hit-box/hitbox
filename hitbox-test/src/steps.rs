@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::core::{HandlerConfig, HitboxWorld, StepExt};
 use axum::body::to_bytes;
 use hitbox_configuration::extractors::{BoxExtractor, Extractor};
-use hitbox_configuration::Request;
+use hitbox_configuration::{Request, Response};
 use hitbox_http::extractors::NeutralExtractor;
 
 use anyhow::{anyhow, Error};
@@ -43,6 +43,18 @@ async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), 
     )?;
     let predicates = config.into_predicates();
     world.settings.request_predicates = Arc::new(predicates);
+    Ok(())
+}
+
+#[given(expr = "response predicates")]
+async fn response_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+    let config = serde_yaml::from_str::<Response>(
+        step.docstring_content()
+            .ok_or(anyhow!("Missing predicates configuration"))?
+            .as_str(),
+    )?;
+    let predicates = config.into_predicates();
+    world.settings.response_predicates = Arc::new(predicates);
     Ok(())
 }
 
@@ -124,15 +136,17 @@ async fn check_cache_backend_state(world: &mut HitboxWorld, step: &Step) -> Resu
         .table
         .as_ref()
         .ok_or_else(|| anyhow!("Expected table with cache records but none found"))?;
-    
+
     for row in &table.rows {
         let key = parse_key(&row[0])?;
         let cached_body = get_body(world, &key).await?;
-        
+
         if cached_body != row[1] {
             return Err(anyhow!(
-                "Cache body mismatch for key {:?}. Expected: '{}', Found: '{}'", 
-                key, row[1], cached_body
+                "Cache body mismatch for key {:?}. Expected: '{}', Found: '{}'",
+                key,
+                row[1],
+                cached_body
             ));
         }
     }
@@ -146,11 +160,14 @@ fn parse_key(key_str: &str) -> Result<CacheKey, Error> {
             let mut key_value = part.split(':');
             match (key_value.next(), key_value.next()) {
                 (Some(key), Some(value)) => Ok((key, value)),
-                _ => Err(anyhow!("Invalid key format: '{}'. Expected 'key:value'", part)),
+                _ => Err(anyhow!(
+                    "Invalid key format: '{}'. Expected 'key:value'",
+                    part
+                )),
             }
         })
         .collect();
-    
+
     Ok(CacheKey::from_slice(&key_parts?))
 }
 
@@ -161,17 +178,20 @@ async fn get_body(world: &mut HitboxWorld, key: &CacheKey) -> Result<String, Err
         .get(key)
         .await
         .ok_or_else(|| anyhow!("Cache missing expected key: {:?}", key))?;
-    
+
     let cached: SerializableHttpResponse = serde_json::from_slice(&value.data)
         .map_err(|e| anyhow!("Failed to deserialize cached response: {}", e))?;
-    
+
     let response = CacheableHttpResponse::<axum::body::Body>::from_cached(cached).await;
     let res = response.into_response();
-    
-    let bytes = to_bytes(res.into_body(), 100000)
-        .await
-        .map_err(|e| anyhow!("Failed to read response body (size > 100k or other error): {}", e))?;
-    
+
+    let bytes = to_bytes(res.into_body(), 100000).await.map_err(|e| {
+        anyhow!(
+            "Failed to read response body (size > 100k or other error): {}",
+            e
+        )
+    })?;
+
     String::from_utf8(bytes.to_vec())
         .map_err(|e| anyhow!("Response body is not valid UTF-8: {}", e))
 }

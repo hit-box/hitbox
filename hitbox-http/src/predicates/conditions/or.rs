@@ -1,4 +1,3 @@
-use crate::CacheableHttpRequest;
 use async_trait::async_trait;
 use hitbox::predicate::PredicateResult;
 use hitbox::Predicate;
@@ -16,13 +15,13 @@ impl<L, R> Or<L, R> {
 }
 
 #[async_trait]
-impl<L, R, ReqBody> Predicate for Or<L, R>
+impl<L, R, Subject> Predicate for Or<L, R>
 where
-    ReqBody: Send + 'static,
-    L: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
-    R: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
+    Subject: Send + 'static,
+    L: Predicate<Subject = Subject> + Send + Sync,
+    R: Predicate<Subject = Subject> + Send + Sync,
 {
-    type Subject = CacheableHttpRequest<ReqBody>;
+    type Subject = Subject;
 
     async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
         let left = self.left.check(request).await;

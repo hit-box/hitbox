@@ -48,9 +48,11 @@ async fn test_conditions_not() {
             .body(Empty::<Bytes>::new())
             .unwrap(),
     );
-    let correct_query_predicate = NeutralRequestPredicate::new()
-        .query(query::Operation::Eq("name".to_owned(), "value".to_owned()));
-    let wrong_path_predicate = NeutralRequestPredicate::new().path(expression.into());
+    let correct_query_predicate =
+        NeutralRequestPredicate::<CacheableHttpRequest<Empty<Bytes>>>::new()
+            .query(query::Operation::Eq("name".to_owned(), "value".to_owned()));
+    let wrong_path_predicate = NeutralRequestPredicate::<CacheableHttpRequest<Empty<Bytes>>>::new()
+        .path(expression.into());
     let wrong_header_predicate = NeutralRequestPredicate::new().header(header::Operation::Eq(
         "x-test".parse().unwrap(),
         "wrong-test-value".parse().unwrap(),

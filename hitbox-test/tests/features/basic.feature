@@ -23,15 +23,10 @@ Feature: Cache policy feature
           x-cache: '42'
           cache: 'true'
       ```
-    # Given request predicates
-    #   ```yaml
-    #   Or:
-    #    - Method: POST
-    #    - Method: HEAD
-    #    - Query:
-    #       operation: Eq
-    #       cache: 'true'
-    #   ```
+    Given response predicates
+      ```yaml
+        - Status: 200
+      ```
     Given key extractors
       ```yaml
       - Method:

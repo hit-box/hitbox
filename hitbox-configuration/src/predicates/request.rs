@@ -134,7 +134,10 @@ impl Operation {
                         predicates[0].into_predicates(Box::new(NeutralRequestPredicate::new())),
                         |acc, predicate| {
                             let predicate =
-                                predicate.into_predicates(Box::new(NeutralRequestPredicate::new()));
+                                predicate
+                                    .into_predicates(Box::new(
+                                        NeutralRequestPredicate::<ReqBody>::new(),
+                                    ));
                             Box::new(Or::new(predicate, acc))
                         },
                     )

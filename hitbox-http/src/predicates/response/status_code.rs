@@ -8,6 +8,12 @@ pub struct StatusCode<P> {
     inner: P,
 }
 
+impl<P> StatusCode<P> {
+    pub fn new(inner: P, status_code: http::StatusCode) -> Self {
+        Self { status_code, inner }
+    }
+}
+
 pub trait StatusCodePredicate: Sized {
     fn status_code(self, status_code: http::StatusCode) -> StatusCode<Self>;
 }
