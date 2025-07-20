@@ -73,7 +73,6 @@ impl Operation {
             Operation::And(predicates) => predicates
                 .into_iter()
                 .fold(inner, |inner, predicate| predicate.into_predicates(inner)),
-            _ => unimplemented!(),
         }
     }
 }

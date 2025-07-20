@@ -30,16 +30,16 @@ Feature: Cache policy feature
       ```yaml
       And:
         - Status: 200
-        - Status: 201
+        - Status: 200
         - Or:
-            - Status: 201
+            - Status: 200
             - Status: 202
             - Status: 203
             - And:
                 - Status: 211
                 - Status: 212
         - Or:
-            - Status: 100
+            - Status: 200
             - Status: 101
       ```
     Given key extractors
