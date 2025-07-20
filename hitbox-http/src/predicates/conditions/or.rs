@@ -27,7 +27,10 @@ where
         let left = self.left.check(request).await;
         match left {
             PredicateResult::Cacheable(request) => PredicateResult::Cacheable(request),
-            PredicateResult::NonCacheable(request) => self.right.check(request).await,
+            PredicateResult::NonCacheable(request) => match self.right.check(request).await {
+                PredicateResult::Cacheable(request) => PredicateResult::Cacheable(request),
+                PredicateResult::NonCacheable(request) => PredicateResult::NonCacheable(request),
+            },
         }
     }
 }

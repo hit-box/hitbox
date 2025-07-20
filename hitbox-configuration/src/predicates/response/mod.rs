@@ -2,10 +2,7 @@ use std::num::NonZeroU16;
 
 use hitbox_http::predicates::NeutralResponsePredicate;
 use hitbox_http::predicates::response::StatusCode;
-use hitbox_http::{
-    CacheableHttpResponse,
-    predicates::conditions::{Not, Or, And},
-};
+use hitbox_http::{CacheableHttpResponse, predicates::conditions::Or};
 use serde::{Deserialize, Serialize};
 
 type CorePredicate<ReqBody> =
@@ -41,21 +38,18 @@ impl Operation {
         inner: CorePredicate<ReqBody>,
     ) -> CorePredicate<ReqBody> {
         match self {
+            Operation::Or(predicates) if predicates.is_empty() => inner,
             Operation::Or(predicates) => {
-                let neutral = Box::new(Not::new(NeutralResponsePredicate::new()));
-                Box::new(And::new(
-                    inner,
-                    predicates
-                        .into_iter()
-                        .rfold(neutral as CorePredicate<ReqBody>, |inner, predicate| {
-                            let predicate =
-                                predicate
-                                    .into_predicates(Box::new(
-                                        NeutralResponsePredicate::<ReqBody>::new(),
-                                    ));
-                            Box::new(Or::new(predicate, inner))
-                        }),
-                ))
+                let mut predicates = predicates.into_iter();
+                let acc = predicates
+                    .next()
+                    .into_iter()
+                    .fold(inner, |inner, predicate| predicate.into_predicates(inner));
+                predicates.fold(acc, |acc, predicate| {
+                    let predicate = predicate
+                        .into_predicates(Box::new(NeutralResponsePredicate::<ReqBody>::new()));
+                    Box::new(Or::new(predicate, acc))
+                })
             }
             Operation::And(predicates) => predicates
                 .into_iter()

@@ -1,3 +1,4 @@
+use crate::CacheableHttpRequest;
 use async_trait::async_trait;
 use hitbox::predicate::PredicateResult;
 use hitbox::Predicate;
@@ -14,12 +15,12 @@ impl<T> Not<T> {
 }
 
 #[async_trait]
-impl<T, Subject> Predicate for Not<T>
+impl<T, ReqBody> Predicate for Not<T>
 where
-    Subject: Send + 'static,
-    T: Predicate<Subject = Subject> + Send + Sync,
+    ReqBody: Send + 'static,
+    T: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
 {
-    type Subject = Subject;
+    type Subject = CacheableHttpRequest<ReqBody>;
 
     async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
         match self.predicate.check(request).await {
