@@ -5,6 +5,8 @@ use hitbox_http::predicates::response::StatusCode;
 use hitbox_http::{CacheableHttpResponse, predicates::conditions::Or};
 use serde::{Deserialize, Serialize};
 
+use crate::predicates;
+
 type CorePredicate<ReqBody> =
     Box<dyn hitbox_core::Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync>;
 
@@ -38,22 +40,40 @@ impl Operation {
         inner: CorePredicate<ReqBody>,
     ) -> CorePredicate<ReqBody> {
         match self {
-            Operation::Or(predicates) if predicates.is_empty() => inner,
             Operation::Or(predicates) => {
                 let mut predicates = predicates.into_iter();
-                let acc = predicates
+                let left = predicates
                     .next()
-                    .into_iter()
-                    .fold(inner, |inner, predicate| predicate.into_predicates(inner));
-                predicates.fold(acc, |acc, predicate| {
-                    let predicate = predicate
-                        .into_predicates(Box::new(NeutralResponsePredicate::<ReqBody>::new()));
-                    Box::new(Or::new(predicate, acc))
+                    .map(|expression| {
+                        expression.into_predicates(
+                            Box::new(NeutralResponsePredicate::new()) as CorePredicate<ReqBody>
+                        )
+                    })
+                    .unwrap_or(Box::new(NeutralResponsePredicate::new()));
+                // FIX: use Not(NeutralResponsePredicate) instead of NeutralResponsePredicate
+                let right = predicates
+                    .next()
+                    .map(|expression| {
+                        expression.into_predicates(
+                            Box::new(NeutralResponsePredicate::new()) as CorePredicate<ReqBody>
+                        )
+                    })
+                    .unwrap_or(Box::new(NeutralResponsePredicate::new()));
+                let acc = Box::new(Or::new(left, right, inner));
+                predicates.rfold(acc, |acc, expression| {
+                    Box::new(Or::new(
+                        acc,
+                        expression.into_predicates(
+                            Box::new(NeutralResponsePredicate::new()) as CorePredicate<ReqBody>
+                        ),
+                        Box::new(NeutralResponsePredicate::new()),
+                    ))
                 })
             }
             Operation::And(predicates) => predicates
                 .into_iter()
-                .rfold(inner, |inner, predicate| predicate.into_predicates(inner)),
+                .fold(inner, |inner, predicate| predicate.into_predicates(inner)),
+            _ => unimplemented!(),
         }
     }
 }

@@ -3,50 +3,56 @@ use hitbox::predicate::PredicateResult;
 use hitbox::Predicate;
 
 #[derive(Debug)]
-pub struct Or<L, R> {
+pub struct Or<L, R, P> {
     left: L,
     right: R,
+    inner: P,
 }
 
-impl<L, R> Or<L, R> {
-    pub fn new(left: L, right: R) -> Self {
-        Self { left, right }
+impl<L, R, P> Or<L, R, P> {
+    pub fn new(left: L, right: R, inner: P) -> Self {
+        Self { left, right, inner }
     }
 }
 
 #[async_trait]
-impl<L, R, Subject> Predicate for Or<L, R>
+impl<L, R, P, Subject> Predicate for Or<L, R, P>
 where
     Subject: Send + 'static,
+    P: Predicate<Subject = Subject> + Send + Sync,
     L: Predicate<Subject = Subject> + Send + Sync,
     R: Predicate<Subject = Subject> + Send + Sync,
 {
     type Subject = Subject;
 
-    async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
-        let left = self.left.check(request).await;
-        match left {
-            PredicateResult::Cacheable(request) => PredicateResult::Cacheable(request),
-            PredicateResult::NonCacheable(request) => match self.right.check(request).await {
-                PredicateResult::Cacheable(request) => PredicateResult::Cacheable(request),
-                PredicateResult::NonCacheable(request) => PredicateResult::NonCacheable(request),
-            },
+    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
+        let inner_result = self.inner.check(subject).await;
+        match inner_result {
+            PredicateResult::Cacheable(subject) => {
+                let left = self.left.check(subject).await;
+                match left {
+                    PredicateResult::Cacheable(request) => PredicateResult::Cacheable(request),
+                    PredicateResult::NonCacheable(request) => self.right.check(request).await,
+                }
+            }
+            PredicateResult::NonCacheable(_) => inner_result,
         }
     }
 }
 
 pub trait OrPredicate: Sized {
-    fn or<P: Predicate>(self, predicate: P) -> Or<Self, P>;
+    fn or<L: Predicate, R: Predicate>(self, left: L, right: R) -> Or<L, R, Self>;
 }
 
 impl<T> OrPredicate for T
 where
     T: Predicate,
 {
-    fn or<P>(self, predicate: P) -> Or<Self, P> {
+    fn or<L, R>(self, left: L, right: R) -> Or<L, R, Self> {
         Or {
-            left: self,
-            right: predicate,
+            left,
+            right,
+            inner: self,
         }
     }
 }

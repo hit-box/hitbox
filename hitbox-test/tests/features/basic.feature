@@ -17,7 +17,10 @@ Feature: Cache policy feature
       ```
     Given request predicates
       ```yaml
-      - Method: GET
+      And:
+      - Or:
+        - Method: POST
+        - Method: GET
       - Query:
           operation: Eq
           x-cache: '42'
@@ -25,9 +28,19 @@ Feature: Cache policy feature
       ```
     Given response predicates
       ```yaml
-      Or:
-      - Status: 200
-      - Status: 201
+      And:
+        - Status: 200
+        - Status: 201
+        - Or:
+            - Status: 201
+            - Status: 202
+            - Status: 203
+            - And:
+                - Status: 211
+                - Status: 212
+        - Or:
+            - Status: 100
+            - Status: 101
       ```
     Given key extractors
       ```yaml
@@ -48,3 +61,14 @@ Feature: Cache policy feature
     Then response status is 200
     And cache has records
       | name:test,method:GET | Hello, test |
+      # S:203 -> OR:( Status: 201, Status: 200 ) -> S: 205
+      # Status {
+      #     205,
+      #     inner: Or {
+      #         left: Or { 
+      #             left: { Status: 205 },
+      #             right: { Status: 200 },
+      #         },
+      #         right: Status: { 200 }.
+      #     }
+      # }

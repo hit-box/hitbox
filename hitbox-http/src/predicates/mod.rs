@@ -45,6 +45,7 @@ impl<ReqBody> Default for NeutralRequestPredicate<ReqBody> {
     }
 }
 
+#[derive(Clone)]
 pub struct NeutralResponsePredicate<ResBody> {
     _res: PhantomData<fn(ResBody) -> ResBody>,
 }
@@ -58,7 +59,7 @@ impl<ResBody> NeutralResponsePredicate<ResBody> {
 impl<ResBody> Debug for NeutralResponsePredicate<ResBody> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NeutralResponsePredicate")
-            .field("_res", &self._res)
+            // .field("_res", &self._res)
             .finish()
     }
 }
