@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::{HandlerConfig, HitboxWorld, StepExt};
+use crate::core::{HitboxWorld, StepExt};
 use axum::body::to_bytes;
 use hitbox_configuration::extractors::{BoxExtractor, Extractor};
 use hitbox_configuration::{Request, Response};
@@ -41,9 +41,7 @@ async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), 
             .ok_or(anyhow!("Missing predicates configuration"))?
             .as_str(),
     )?;
-    // dbg!(&config);
     let predicates = config.into_predicates();
-    // dbg!(&predicates);
     world.settings.request_predicates = Arc::new(predicates);
     Ok(())
 }
@@ -60,21 +58,8 @@ async fn response_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(),
         dbg!(&err.source());
         dbg!(err.location());
     })?;
-    dbg!(&config);
     let predicates = config.into_predicates();
-    dbg!(&predicates);
     world.settings.response_predicates = Arc::new(predicates);
-    Ok(())
-}
-
-#[given(expr = "handler")]
-async fn handler(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    let handler_config_content = step
-        .docstring_content()
-        .ok_or(anyhow!("Missing extractors configuration"))?;
-    let handler_config = handler_config_content.as_str();
-    let handler = serde_yaml::from_str::<HandlerConfig>(handler_config)?;
-    world.settings.handler = handler;
     Ok(())
 }
 

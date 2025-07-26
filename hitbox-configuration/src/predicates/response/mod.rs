@@ -5,8 +5,6 @@ use hitbox_http::predicates::response::StatusCode;
 use hitbox_http::{CacheableHttpResponse, predicates::conditions::Or};
 use serde::{Deserialize, Serialize};
 
-use crate::predicates;
-
 type CorePredicate<ReqBody> =
     Box<dyn hitbox_core::Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync>;
 
