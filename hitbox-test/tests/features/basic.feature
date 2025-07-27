@@ -22,6 +22,8 @@ Feature: Cache policy feature
       ```yaml
       - Method:
       - Path: /v1/authors/{author_id}/books
+      - Query: page
+      - Query: per_page
       ```
     When execute request
       ```hurl
@@ -32,4 +34,4 @@ Feature: Cache policy feature
       ```
     Then response status is 200
     And cache has records
-      | author_id:robert-shekli,method:GET | Hello, robert-shekli |
+			| per_page:20,page:1,author_id:robert-shekli,method:GET | Hello, robert-shekli |

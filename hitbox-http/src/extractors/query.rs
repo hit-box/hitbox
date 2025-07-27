@@ -9,6 +9,12 @@ pub struct Query<E> {
     name: String,
 }
 
+impl<E> Query<E> {
+    pub fn new(inner: E, name: String) -> Self {
+        Self { inner, name }
+    }
+}
+
 pub trait QueryExtractor: Sized {
     fn query(self, name: String) -> Query<Self>;
 }
