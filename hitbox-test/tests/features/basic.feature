@@ -1,5 +1,6 @@
 Feature: Cache policy feature
 
+  @integration
   Scenario: first test scenario
     Given hitbox with policy
       ```yaml
