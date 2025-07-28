@@ -1,5 +1,6 @@
 Feature: Extended tests
 
+  @experimental
   Scenario: second test scenario
     Given hitbox with policy
       ```yaml
