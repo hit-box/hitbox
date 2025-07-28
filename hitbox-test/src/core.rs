@@ -1,5 +1,4 @@
-use crate::handlers;
-use axum::{routing::get, Router};
+use crate::app::app;
 use hitbox::config::CacheConfig;
 use hitbox::{Extractor, Predicate};
 use hitbox_moka::MokaBackend;
@@ -109,10 +108,11 @@ impl HitboxWorld {
             .config(self.settings.clone())
             .build();
 
-        let router = Router::new()
-            .route("/greet/{name}", get(handlers::get_simple))
-            .route("/v1/authors/{author_id}/books", get(handlers::get_books))
-            .layer(cache);
+        // let router = Router::new()
+        //     .route("/greet/{name}", get(handlers::get_simple))
+        //     .route("/v1/authors/{author_id}/books", get(handlers::get_books))
+        //     .layer(cache);
+        let router = app().layer(cache);
 
         let server = TestServer::new(router)?;
         let path = request_spec.url.path();

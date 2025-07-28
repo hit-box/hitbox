@@ -27,11 +27,11 @@ Feature: Cache policy feature
       ```
     When execute request
       ```hurl
-			GET http://localhost/v1/authors/robert-shekli/books
+      GET http://localhost/v1/authors/robert-sheckley/books
       [Query]
-			page: 1
-			per_page: 20
+      page: 1
+      per_page: 20
       ```
     Then response status is 200
     And cache has records
-			| per_page:20,page:1,author_id:robert-shekli,method:GET | Hello, robert-shekli |
+      | per_page:20,page:1,author_id:robert-sheckley,method:GET | Hello, robert-shekley |

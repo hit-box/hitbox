@@ -1,6 +1,13 @@
-use axum::extract::{Path, Query};
+use std::sync::Arc;
+
+use axum::{
+    extract::{Path, Query, State},
+    Json,
+};
 use http::StatusCode;
 use serde::Deserialize;
+
+use crate::app::{AppState, AuthorId, Book};
 
 #[derive(Deserialize, Debug)]
 pub struct Pagination {
@@ -8,12 +15,20 @@ pub struct Pagination {
     per_page: usize,
 }
 
-pub async fn get_books(
+#[axum::debug_handler]
+pub(crate) async fn get_books(
+    State(state): State<AppState>,
     Path(author_id): Path<String>,
-    pagination: Query<Pagination>,
-) -> Result<String, StatusCode> {
-    dbg!(pagination);
-    Ok(format!("Hello, {author_id}"))
+    _pagination: Query<Pagination>,
+) -> Result<Json<Vec<Arc<Book>>>, StatusCode> {
+    let books = Json(
+        state
+            .database()
+            .get_books(AuthorId::new(author_id))
+            .await
+            .ok_or(StatusCode::NOT_FOUND)?,
+    );
+    Ok(books)
 }
 
 pub async fn get_simple(Path(name): Path<String>) -> Result<String, StatusCode> {
