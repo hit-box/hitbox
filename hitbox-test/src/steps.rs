@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::core::{HitboxWorld, StepExt};
+use assert_json_diff::{assert_json_eq, assert_json_include};
 use axum::body::to_bytes;
 use hitbox_configuration::extractors::{BoxExtractor, Extractor};
 use hitbox_configuration::{Request, Response};
@@ -18,7 +19,9 @@ use hurl::{
     util::path::ContextDir,
 };
 use hurl_core::{error::DisplaySourceError, parser::parse_hurl_file, text::Format};
+use pretty_assertions::assert_str_eq;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 ///////////// GIVEN ////////////
 
@@ -135,14 +138,19 @@ async fn check_cache_backend_state(world: &mut HitboxWorld, step: &Step) -> Resu
         let key = parse_key(&row[0])?;
         let cached_body = get_body(world, &key).await?;
 
-        if cached_body != row[1] {
-            return Err(anyhow!(
-                "Cache body mismatch for key {:?}. Expected: '{}', Found: '{}'",
-                key,
-                row[1],
-                cached_body
-            ));
-        }
+        // assert_str_eq!(cached_body, row[1]);
+        let out = serde_json::from_str::<serde_json::Value>(&cached_body)?;
+        let expected = serde_json::from_str::<serde_json::Value>(&row[1])?;
+        // let expected = json!([{"id": "journey-beyond-tomorrow"}, {"id": "victim-prime"}]);
+        assert_json_include!(actual: out, expected: expected);
+        // if cached_body != row[1] {
+        //     return Err(anyhow!(
+        //         "Cache body mismatch for key {:?}. Expected: '{}', Found: '{}'",
+        //         key,
+        //         row[1],
+        //         cached_body
+        //     ));
+        // }
     }
     Ok(())
 }

@@ -34,4 +34,4 @@ Feature: Cache policy feature
       ```
     Then response status is 200
     And cache has records
-      | per_page:20,page:1,author_id:robert-sheckley,method:GET | Hello, robert-shekley |
+      | per_page:20,page:1,author_id:robert-sheckley,method:GET | [{"id": "journey-beyond-tomorrow"}, {"id": "victim-prime"}] |

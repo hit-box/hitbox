@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::handlers::{get_books, get_simple};
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Ord, PartialOrd)]
 pub(crate) struct AuthorId(String);
 
 impl AuthorId {
@@ -15,7 +15,7 @@ impl AuthorId {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize, Ord, PartialOrd)]
 pub(crate) struct BookId(String);
 
 impl BookId {
@@ -24,7 +24,7 @@ impl BookId {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) struct Book {
     id: BookId,
     author: AuthorId,
@@ -78,11 +78,12 @@ impl Database {
         books.insert(journey_id, Arc::new(journey));
 
         let books_by_author_idx = DashMap::new();
-        let sheckley_books = books
+        let mut sheckley_books = books
             .iter()
             .filter(|book| book.value().author == sheckley_id)
             .map(|book| Arc::clone(book.value()))
-            .collect();
+            .collect::<Vec<_>>();
+        sheckley_books.sort();
         books_by_author_idx.insert(sheckley_id.clone(), sheckley_books);
 
         Database {
