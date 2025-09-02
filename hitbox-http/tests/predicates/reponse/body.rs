@@ -1,0 +1,206 @@
+use bytes::Bytes;
+use hitbox::predicate::{Predicate, PredicateResult};
+use hitbox_http::predicates::response::body::Operation;
+use hitbox_http::predicates::response::BodyPredicate;
+use hitbox_http::predicates::response::ParsingType;
+use hitbox_http::predicates::NeutralResponsePredicate;
+use hitbox_http::CacheableHttpResponse;
+use http::Response;
+use serde_json::json;
+
+#[cfg(test)]
+mod eq_tests {
+    use super::*;
+    use bytes::Bytes;
+    use http_body_util::Full;
+
+    #[tokio::test]
+    async fn test_positive() {
+        let json_body = r#"{"field":"test-value"}"#;
+        let body = Full::new(Bytes::from(json_body));
+        let request = Response::builder().body(body).unwrap();
+        let request = CacheableHttpResponse::from_response(request);
+
+        let predicate = NeutralResponsePredicate::new().body(
+            ParsingType::Jq,
+            ".field".to_owned(),
+            Operation::Eq("test-value".into()),
+        );
+
+        let prediction = predicate.check(request).await;
+        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    }
+
+    #[tokio::test]
+    async fn test_negative() {
+        let json_body = r#"{"field":"test-value"}"#;
+        let body = Full::new(Bytes::from(json_body));
+        let response = Response::builder().body(body).unwrap();
+        let response = CacheableHttpResponse::from_response(response);
+
+        let predicate = NeutralResponsePredicate::new().body(
+            ParsingType::Jq,
+            ".field".to_owned(),
+            Operation::Eq("wrong-value".into()),
+        );
+
+        let prediction = predicate.check(response).await;
+        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+    }
+
+    #[tokio::test]
+    async fn test_field_not_found() {
+        let json_body = r#"{"field":"test-value"}"#;
+        let body = Full::new(Bytes::from(json_body));
+        let request = Response::builder().body(body).unwrap();
+        let request = CacheableHttpResponse::from_response(request);
+
+        let predicate = NeutralResponsePredicate::new().body(
+            ParsingType::Jq,
+            ".wrong_field".to_owned(),
+            Operation::Eq("test-value".into()),
+        );
+
+        let prediction = predicate.check(request).await;
+        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+    }
+}
+
+#[cfg(test)]
+mod exist_tests {
+    use super::*;
+    use http_body_util::Full;
+
+    #[tokio::test]
+    async fn test_positive() {
+        let json_body = r#"{"field":"test-value"}"#;
+        let body = Full::new(Bytes::from(json_body));
+        let request = Response::builder().body(body).unwrap();
+        let request = CacheableHttpResponse::from_response(request);
+
+        let predicate = NeutralResponsePredicate::new().body(
+            ParsingType::Jq,
+            ".field".to_owned(),
+            Operation::Exist,
+        );
+
+        let prediction = predicate.check(request).await;
+        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    }
+
+    #[tokio::test]
+    async fn test_negative() {
+        let json_body = r#"{"other_field":"test-value"}"#;
+        let body = Full::new(Bytes::from(json_body));
+        let request = Response::builder().body(body).unwrap();
+        let request = CacheableHttpResponse::from_response(request);
+
+        let predicate = NeutralResponsePredicate::new().body(
+            ParsingType::Jq,
+            ".field".to_owned(),
+            Operation::Exist,
+        );
+
+        let prediction = predicate.check(request).await;
+        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+    }
+}
+
+#[cfg(test)]
+mod in_tests {
+    use super::*;
+    use http_body_util::Full;
+
+    #[tokio::test]
+    async fn test_positive() {
+        let json_body = r#"{"field":"test-value"}"#;
+        let body = Full::new(Bytes::from(json_body));
+        let request = Response::builder().body(body).unwrap();
+        let request = CacheableHttpResponse::from_response(request);
+
+        let values = vec!["value-1".to_owned(), "test-value".to_owned()];
+        let predicate = NeutralResponsePredicate::new().body(
+            ParsingType::Jq,
+            ".field".to_owned(),
+            Operation::In(values.into_iter().map(|v| v.into()).collect()),
+        );
+
+        let prediction = predicate.check(request).await;
+        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    }
+
+    #[tokio::test]
+    async fn test_negative() {
+        let json_body = r#"{"field":"wrong-value"}"#;
+        let body = Full::new(Bytes::from(json_body));
+        let request = Response::builder().body(body).unwrap();
+        let request = CacheableHttpResponse::from_response(request);
+
+        let values = vec!["value-1".to_owned(), "test-value".to_owned()];
+        let predicate = NeutralResponsePredicate::new().body(
+            ParsingType::Jq,
+            ".field".to_owned(),
+            Operation::In(values.into_iter().map(|v| v.into()).collect()),
+        );
+
+        let prediction = predicate.check(request).await;
+        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+    }
+}
+
+#[tokio::test]
+async fn test_request_body_predicates_positive_basic() {
+    let json_body = r#"{"inner":{"field_one":"value_one","field_two":"value_two"}}"#;
+    let body = http_body_util::Full::new(Bytes::from(json_body));
+    let request = CacheableHttpResponse::from_response(Response::builder().body(body).unwrap());
+
+    let predicate = NeutralResponsePredicate::new().body(
+        ParsingType::Jq,
+        ".inner.field_one".to_owned(),
+        Operation::Eq("value_one".into()),
+    );
+
+    let prediction = predicate.check(request).await;
+    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+}
+
+#[tokio::test]
+async fn test_request_body_predicates_positive_array() {
+    let json_body = r#"
+    [
+        {"key": "my-key-00", "value": "my-value-00"},
+        {"key": "my-key-01", "value": "my-value-01"}
+    ]"#;
+    let body = http_body_util::Full::new(Bytes::from(json_body));
+    let request = CacheableHttpResponse::from_response(Response::builder().body(body).unwrap());
+
+    let predicate = NeutralResponsePredicate::new().body(
+        ParsingType::Jq,
+        ".[1].key".to_owned(),
+        Operation::Eq("my-key-01".into()),
+    );
+
+    let prediction = predicate.check(request).await;
+    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+}
+
+#[tokio::test]
+async fn test_request_body_predicates_positive_multiple_value() {
+    let json_body = r#"
+    [
+        {"key": "my-key-00", "value": "my-value-00"},
+        {"key": "my-key-01", "value": "my-value-01"},
+        {"key": "my-key-02", "value": "my-value-02"}
+    ]"#;
+    let body = http_body_util::Full::new(Bytes::from(json_body));
+    let request = CacheableHttpResponse::from_response(Response::builder().body(body).unwrap());
+
+    let predicate = NeutralResponsePredicate::new().body(
+        ParsingType::Jq,
+        ".[].key".to_owned(),
+        Operation::Eq(json!(["my-key-00", "my-key-01", "my-key-02"])),
+    );
+
+    let prediction = predicate.check(request).await;
+    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+}
