@@ -51,6 +51,7 @@ impl CacheableResponse for TestResponse {
     }
 }
 
+#[derive(Debug)]
 struct NeuralPredicate {}
 
 impl NeuralPredicate {

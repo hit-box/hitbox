@@ -7,7 +7,7 @@ use axum::{
 use http::StatusCode;
 use serde::Deserialize;
 
-use crate::app::{AppState, AuthorId, Book};
+use crate::app::{AppState, AuthorId, Book, BookId};
 
 #[derive(Deserialize, Debug)]
 pub struct Pagination {
@@ -33,4 +33,19 @@ pub(crate) async fn get_books(
 
 pub async fn get_simple(Path(name): Path<String>) -> Result<String, StatusCode> {
     Ok(format!("Hello, {name}"))
+}
+
+#[axum::debug_handler]
+pub(crate) async fn get_book(
+    State(state): State<AppState>,
+    Path((author_id, book_id)): Path<(String, String)>,
+) -> Result<Json<Arc<Book>>, StatusCode> {
+    let book = Json(
+        state
+            .database()
+            .get_book(BookId::new(book_id))
+            .await
+            .ok_or(StatusCode::NOT_FOUND)?,
+    );
+    Ok(book)
 }

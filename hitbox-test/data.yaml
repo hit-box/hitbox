@@ -1,0 +1,23 @@
+books:
+  victim-prime:
+    id: victim-prime
+    author: robert-sheckley
+    title: Victim Prime
+    description: |
+      Victim Prime is a science fiction novel by American writer Robert Sheckley, 
+      published in 1987. It is the sequel to 1953's "Seventh Victim", 
+      and is followed by 1988's Hunter/Victim.
+  journey-beyond-tomorrow:
+    id: journey-beyond-tomorrow
+    author: robert-sheckley
+    title: Journey Beyond Tomorrow
+    description: |
+      Journey Beyond Tomorrow is a satirical 1962 science fiction novel 
+      by the American writer Robert Sheckley, originally serialized as The Journey 
+      of Joenes in The Magazine of Fantasy & Science Fiction 
+      in October and November 1962.
+authors:
+  robert-sheckley:
+    id: robert-sheckley
+    name: Robert
+    family: Sheckley

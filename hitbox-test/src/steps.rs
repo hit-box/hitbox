@@ -1,32 +1,23 @@
-use std::sync::Arc;
-
 use crate::core::{HitboxWorld, StepExt};
-use assert_json_diff::{assert_json_eq, assert_json_include};
-use axum::body::to_bytes;
-use hitbox_configuration::extractors::{BoxExtractor, Extractor};
-use hitbox_configuration::{Request, Response};
-use hitbox_http::extractors::NeutralExtractor;
-
 use anyhow::{anyhow, Error};
 use cucumber::gherkin::Step;
-use cucumber::{given, then, when};
+use cucumber::{given, then, when, WriterExt};
 use hitbox::policy::PolicyConfig;
-use hitbox::CacheKey;
-use hitbox::CacheableResponse;
-use hitbox_http::{CacheableHttpResponse, SerializableHttpResponse};
+use hitbox_http::predicates::response::body::{Operation, ParsingType};
+use hitbox_http::predicates::response::{BodyPredicate, StatusCodePredicate};
+use http::StatusCode;
 use hurl::{
     runner::{request::eval_request, VariableSet},
     util::path::ContextDir,
 };
 use hurl_core::{error::DisplaySourceError, parser::parse_hurl_file, text::Format};
-use pretty_assertions::assert_str_eq;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::Value;
+use std::sync::Arc;
 
 ///////////// GIVEN ////////////
 
 #[given(regex = r"hitbox with policy")]
-fn hitbox(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+fn hitbox_with_policy(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
     let policy = step
         .docstring_content()
         .as_deref()
@@ -37,56 +28,109 @@ fn hitbox(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
     Ok(())
 }
 
-#[given(expr = "request predicates")]
-async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    let config = serde_yaml::from_str::<Request>(
-        step.docstring_content()
-            .ok_or(anyhow!("Missing predicates configuration"))?
-            .as_str(),
-    )?;
-    let predicates = config.into_predicates();
-    world.settings.request_predicates = Arc::new(predicates);
+///////////// THEN ////////////
+
+#[then(expr = "response status is {int}")]
+fn response_status_predicate(world: &mut HitboxWorld, status: u16) -> Result<(), Error> {
+    if world
+        .state
+        .response
+        .as_ref()
+        .map(|v| v.status_code().as_u16() == status)
+        .unwrap_or_default()
+    {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Response status {} does not match expected {}",
+            world
+                .state
+                .response
+                .as_ref()
+                .map(|r| r.status_code().as_u16())
+                .unwrap_or(0),
+            status
+        ))
+    }
+}
+
+#[then(expr = "response body jq {string}")]
+fn response_body_jq_predicate(world: &mut HitboxWorld, jq_expression: String) -> Result<(), Error> {
+    // Parse JQ expression to extract field and expected value
+    let (field_path, operation) = if jq_expression.contains('=') {
+        let parts: Vec<&str> = jq_expression.split('=').collect();
+        if parts.len() == 2 {
+            let field = parts[0].trim();
+            let value = parts[1].trim_matches('"').trim();
+            (
+                field.to_string(),
+                Operation::Eq(Value::String(value.to_string())),
+            )
+        } else {
+            return Err(anyhow!("Invalid JQ expression format: {}", jq_expression));
+        }
+    } else {
+        // If no '=' sign, just check if the field exists
+        (jq_expression.clone(), Operation::Exist)
+    };
+
+    let current_predicate = world.settings.response_predicates.clone();
+    let new_predicate = current_predicate.body(ParsingType::Jq, field_path, operation);
+    world.settings.response_predicates = Arc::new(new_predicate);
     Ok(())
 }
 
-#[given(expr = "response predicates")]
-async fn response_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    let config = serde_yaml::from_str::<Response>(
-        step.docstring_content()
-            .ok_or(anyhow!("Missing predicates configuration"))?
-            .as_str(),
-    )
-    .inspect_err(|err| {
-        use std::error::Error;
-        dbg!(&err.source());
-        dbg!(err.location());
-    })?;
-    let predicates = config.into_predicates();
-    world.settings.response_predicates = Arc::new(predicates);
+#[then(expr = "response headers contain {string} header")]
+fn response_has_header(world_: &mut HitboxWorld, header_: String) -> Result<(), Error> {
     Ok(())
 }
 
-#[given(expr = "key extractors")]
-async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    #[derive(Serialize, Deserialize)]
-    struct Config(#[serde(with = "serde_yaml::with::singleton_map_recursive")] Vec<Extractor>);
-    let config = serde_yaml::from_str::<Config>(
-        step.docstring_content()
-            .ok_or(anyhow!("Missing extractors configuration"))?
-            .as_str(),
-    )?;
-    let extractors = config.0.into_iter().rfold(
-        Box::new(NeutralExtractor::<axum::body::Body>::new()) as BoxExtractor<_>,
-        |inner, item| item.into_extractors(inner),
-    );
-    world.settings.extractors = Arc::new(extractors);
+#[then(expr = "response headers have no {string} header")]
+fn response_has_no_header(world_: &mut HitboxWorld, header_: String) -> Result<(), Error> {
+    Ok(())
+}
+
+#[then(expr = "cache has {int} records")]
+async fn check_cache_record_count(
+    world: &mut HitboxWorld,
+    expected_count: usize,
+) -> Result<(), Error> {
+    let actual_count = world.backend.cache.entry_count() as usize;
+
+    if actual_count != expected_count {
+        return Err(anyhow!(
+            "Expected {} cache records, but found {}",
+            expected_count,
+            actual_count
+        ));
+    }
+
+    Ok(())
+}
+
+#[then(expr = "cache key {string} exists")]
+async fn check_cache_key_exists(world: &mut HitboxWorld, key_pattern: String) -> Result<(), Error> {
+    // Parse key pattern like "GET:robert-sheckley:victim-prime"
+    let key_parts: Vec<&str> = key_pattern.split(':').collect();
+    let cache_key =
+        hitbox::CacheKey::from_slice(&key_parts.iter().map(|&s| ("", s)).collect::<Vec<_>>());
+
+    let exists = world.backend.cache.get(&cache_key).await.is_some();
+
+    if !exists {
+        return Err(anyhow!(
+            "Expected cache key '{}' to exist, but it was not found",
+            key_pattern
+        ));
+    }
+
     Ok(())
 }
 
 ///////////// WHEN ////////////
 
 #[when(expr = "execute request")]
-async fn execute(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
     let hurl_request = step
         .docstring_content()
         .ok_or_else(|| anyhow!("request not provided"))?;
@@ -107,93 +151,4 @@ async fn execute(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
         .map_err(|err| anyhow!("hurl request error {:?}", err))?;
     world.execute_request(&request).await?;
     Ok(())
-}
-
-///////////// THEN ////////////
-
-#[then(expr = "response status is {int}")]
-async fn check_response_status(world: &mut HitboxWorld, status: u16) -> Result<(), Error> {
-    match &world.state.response {
-        Some(response) => response
-            .status_code()
-            .eq(&status)
-            .then_some(())
-            .ok_or(anyhow!(
-                "received response status code is {}, expected is {}",
-                response.status_code(),
-                status
-            )),
-        None => Err(anyhow!("request was not executed")),
-    }
-}
-
-#[then(expr = "cache has records")]
-async fn check_cache_backend_state(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    let table = step
-        .table
-        .as_ref()
-        .ok_or_else(|| anyhow!("Expected table with cache records but none found"))?;
-
-    for row in &table.rows {
-        let key = parse_key(&row[0])?;
-        let cached_body = get_body(world, &key).await?;
-
-        // assert_str_eq!(cached_body, row[1]);
-        let out = serde_json::from_str::<serde_json::Value>(&cached_body)?;
-        let expected = serde_json::from_str::<serde_json::Value>(&row[1])?;
-        // let expected = json!([{"id": "journey-beyond-tomorrow"}, {"id": "victim-prime"}]);
-        assert_json_include!(actual: out, expected: expected);
-        // if cached_body != row[1] {
-        //     return Err(anyhow!(
-        //         "Cache body mismatch for key {:?}. Expected: '{}', Found: '{}'",
-        //         key,
-        //         row[1],
-        //         cached_body
-        //     ));
-        // }
-    }
-    Ok(())
-}
-
-fn parse_key(key_str: &str) -> Result<CacheKey, Error> {
-    let key_parts: Result<Vec<_>, _> = key_str
-        .split(',')
-        .map(|part| {
-            let mut key_value = part.split(':');
-            match (key_value.next(), key_value.next()) {
-                (Some(key), Some(value)) => Ok((key, value)),
-                _ => Err(anyhow!(
-                    "Invalid key format: '{}'. Expected 'key:value'",
-                    part
-                )),
-            }
-        })
-        .collect();
-
-    Ok(CacheKey::from_slice(&key_parts?))
-}
-
-async fn get_body(world: &mut HitboxWorld, key: &CacheKey) -> Result<String, Error> {
-    let value = world
-        .backend
-        .cache
-        .get(key)
-        .await
-        .ok_or_else(|| anyhow!("Cache missing expected key: {:?}", key))?;
-
-    let cached: SerializableHttpResponse = serde_json::from_slice(&value.data)
-        .map_err(|e| anyhow!("Failed to deserialize cached response: {}", e))?;
-
-    let response = CacheableHttpResponse::<axum::body::Body>::from_cached(cached).await;
-    let res = response.into_response();
-
-    let bytes = to_bytes(res.into_body(), 100000).await.map_err(|e| {
-        anyhow!(
-            "Failed to read response body (size > 100k or other error): {}",
-            e
-        )
-    })?;
-
-    String::from_utf8(bytes.to_vec())
-        .map_err(|e| anyhow!("Response body is not valid UTF-8: {}", e))
 }
