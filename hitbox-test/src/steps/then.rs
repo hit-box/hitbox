@@ -2,6 +2,7 @@ use crate::core::HitboxWorld;
 use anyhow::{anyhow, Error};
 use cucumber::then;
 use hitbox::CacheKey;
+use hitbox_tower::configuration::serializers::status_code;
 use jaq_core::{
     load::{Arena, File, Loader},
     Ctx, RcIter,
@@ -131,6 +132,39 @@ fn response_has_no_header(world: &mut HitboxWorld, header_name: String) -> Resul
         return Err(anyhow!(
             "Expected header '{}' to NOT be present, but it was found",
             header_name
+        ));
+    }
+
+    Ok(())
+}
+
+#[then(expr = "response header {string} is {string}")]
+fn response_header_is_correct(
+    world: &mut HitboxWorld,
+    header_name: String,
+    expected_value: String,
+) -> Result<(), Error> {
+    let response = world
+        .state
+        .response
+        .as_ref()
+        .ok_or_else(|| anyhow!("No response available"))?;
+
+    let header_value = response
+        .headers()
+        .get(&header_name)
+        .ok_or_else(|| anyhow!("Header '{}' not found", header_name))?;
+
+    let actual_value = header_value
+        .to_str()
+        .map_err(|_| anyhow!("Header '{}' contains invalid UTF-8", header_name))?;
+
+    if actual_value != expected_value {
+        return Err(anyhow!(
+            "Expected header '{}' to have value '{}', but found '{}'",
+            header_name,
+            expected_value,
+            actual_value
         ));
     }
 

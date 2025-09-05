@@ -13,4 +13,5 @@ Feature: Error Response Caching Behavior
 			GET http://localhost/v1/authors/robert-sheckley/books/unknown
       ```
     Then response status is 404
+    And response header "X-Cache-Status" is "MISS"
     And cache has 0 records

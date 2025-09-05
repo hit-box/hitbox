@@ -48,8 +48,19 @@ where
     fn response_transform(
         &self,
         res: Result<CacheableHttpResponse<ResBody>, S::Error>,
+        cache_status: Option<hitbox::CacheStatus>,
     ) -> Self::Response {
-        res.map(CacheableHttpResponse::into_response)
+        res.map(|cacheable_response| {
+            let mut response = cacheable_response.into_response();
+            if let Some(status) = cache_status {
+                let status_value = match status {
+                    hitbox::CacheStatus::Hit => "HIT",
+                    hitbox::CacheStatus::Miss => "MISS",
+                };
+                response.headers_mut().insert("X-Cache-Status", status_value.parse().unwrap());
+            }
+            response
+        })
     }
 }
 

@@ -76,6 +76,12 @@ pub use hitbox_core::{
     CacheableResponse, EntityPolicyConfig, Extractor, KeyPart, KeyParts, Predicate,
     RequestCachePolicy, ResponseCachePolicy,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CacheStatus {
+    Hit,
+    Miss,
+}
 pub mod config;
 pub mod policy;
 

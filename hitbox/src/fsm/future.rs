@@ -150,7 +150,7 @@ pub trait Transform<Req, Res> {
     type Response;
 
     fn upstream_transform(&self, req: Req) -> Self::Future;
-    fn response_transform(&self, res: Res) -> Self::Response;
+    fn response_transform(&self, res: Res, cache_status: Option<crate::CacheStatus>) -> Self::Response;
 }
 
 #[pin_project]
@@ -166,6 +166,8 @@ where
     backend: Arc<B>,
     request: Option<Req>,
     cache_key: Option<CacheKey>,
+    cache_status: crate::CacheStatus,
+    cache_enabled: bool,
     #[pin]
     state: State<Res, Req>,
     #[pin]
@@ -193,10 +195,13 @@ where
         key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
         policy: Arc<crate::policy::PolicyConfig>,
     ) -> Self {
+        let cache_enabled = matches!(policy.as_ref(), crate::policy::PolicyConfig::Enabled(_));
         CacheFuture {
             transformer,
             backend,
             cache_key: None,
+            cache_status: crate::CacheStatus::Miss,
+            cache_enabled,
             request: Some(request),
             state: State::Initial,
             poll_cache: None,
@@ -295,6 +300,7 @@ where
                 }
                 StateProj::CheckCacheState { cache_state } => {
                     let state = ready!(cache_state.as_mut().poll(cx));
+                    *this.cache_status = crate::CacheStatus::Hit;
                     match state {
                         CacheState::Actual(response) => State::Response {
                             response: Some(response),
@@ -369,7 +375,10 @@ where
                 StateProj::Response { response } => {
                     let response = this
                         .transformer
-                        .response_transform(response.take().expect(POLL_AFTER_READY_ERROR));
+                        .response_transform(
+                            response.take().expect(POLL_AFTER_READY_ERROR), 
+                            if *this.cache_enabled { Some(*this.cache_status) } else { None }
+                        );
                     return Poll::Ready(response);
                 }
             };
