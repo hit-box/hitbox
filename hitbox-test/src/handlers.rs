@@ -42,6 +42,9 @@ pub(crate) async fn get_book(
     State(state): State<AppState>,
     Path((_author_id, book_id)): Path<(String, String)>,
 ) -> Result<Json<Arc<Book>>, StatusCode> {
+    if book_id == "invalid-book-id" {
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
     let book = Json(
         state
             .database()
