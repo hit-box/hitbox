@@ -111,7 +111,7 @@ async fn check_cache_record_count(
     world: &mut HitboxWorld,
     expected_count: usize,
 ) -> Result<(), Error> {
-    let actual_count = world.backend.cache.entry_count() as usize;
+    let actual_count = world.backend.cache.iter().count();
 
     if actual_count != expected_count {
         return Err(anyhow!(

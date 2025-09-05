@@ -4,6 +4,7 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use crate::{policy::PolicyConfig, CachePolicy, CacheState, CacheableResponse};
@@ -313,13 +314,22 @@ where
                     let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
                     let predicates = this.response_predicates.clone();
                     match this.cache_key {
-                        Some(_cache_key) => State::CheckResponseCachePolicy {
-                            cache_policy: Box::pin(async move {
-                                upstream_result
-                                    .cache_policy(predicates, &EntityPolicyConfig::default())
-                                    .await
-                            }),
-                        },
+                        Some(_cache_key) => {
+                            let entity_config = match this.policy.as_ref() {
+                                PolicyConfig::Enabled(config) => EntityPolicyConfig {
+                                    ttl: config.ttl.map(|s| Duration::from_secs(s as u64)),
+                                    stale_ttl: config.stale.map(|s| Duration::from_secs(s as u64)),
+                                },
+                                PolicyConfig::Disabled => EntityPolicyConfig::default(),
+                            };
+                            State::CheckResponseCachePolicy {
+                                cache_policy: Box::pin(async move {
+                                    upstream_result
+                                        .cache_policy(predicates, &entity_config)
+                                        .await
+                                }),
+                            }
+                        }
                         None => State::Response {
                             response: Some(upstream_result),
                         },

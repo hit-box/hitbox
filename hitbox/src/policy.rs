@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct EnabledCacheConfig {
-    ttl: Option<u32>,
-    stale: Option<u32>,
+    pub ttl: Option<u32>,
+    pub stale: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

@@ -13,7 +13,7 @@ use cucumber::gherkin::Step;
 use cucumber::World;
 use hitbox::policy::PolicyConfig;
 use hitbox_http::{
-    extractors::NeutralExtractor,
+    extractors::{method::MethodExtractor, path::PathExtractor, NeutralExtractor},
     predicates::{NeutralRequestPredicate, NeutralResponsePredicate},
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
@@ -72,7 +72,11 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             policy: PolicyConfig::default(),
-            extractors: Arc::new(NeutralExtractor::new()),
+            extractors: Arc::new(
+                NeutralExtractor::new()
+                    .method()
+                    .path("/v1/authors/{author_id}/books/{book_id}"),
+            ),
             request_predicates: Arc::new(NeutralRequestPredicate::new()),
             response_predicates: Arc::new(NeutralResponsePredicate::new()),
         }
@@ -130,6 +134,7 @@ impl HitboxWorld {
 
         let response = request.await;
         self.state.response = Some(response);
+
         Ok(())
     }
 }
