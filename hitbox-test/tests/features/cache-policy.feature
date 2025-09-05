@@ -11,7 +11,7 @@ Feature: Cache policy
 			GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then response status is 200
-		And response body jq ".title=\"Victim Prime\""
+		And response body jq '.title=="Victim Prime"'
 		And response headers have no "X-Cache" header
     And cache has 0 records
 
@@ -28,7 +28,7 @@ Feature: Cache policy
 			GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then response status is 200
-		And response body jq ".title=\"Victim Prime\""
+		And response body jq '.title=="Victim Prime"'
 		And response headers have no "X-Cache" header
     And cache has 1 records
 		And cache key `GET:robert-sheckley:victim-prime` exists
