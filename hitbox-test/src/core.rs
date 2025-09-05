@@ -72,11 +72,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             policy: PolicyConfig::default(),
-            extractors: Arc::new(
-                NeutralExtractor::new()
-                    .method()
-                    .path("/v1/authors/{author_id}/books/{book_id}"),
-            ),
+            extractors: Arc::new(NeutralExtractor::new()),
             request_predicates: Arc::new(NeutralRequestPredicate::new()),
             response_predicates: Arc::new(NeutralResponsePredicate::new()),
         }

@@ -23,6 +23,11 @@ Feature: Cache policy
           ttl: 120
           stale: 60
       ```
+		And key extractors
+      ```yaml
+      - Path: "/v1/authors/{author_id}/books/{book_id}"
+      - Method:
+      ```
     When execute request
       ```hurl
 			GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
