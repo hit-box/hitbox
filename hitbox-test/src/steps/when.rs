@@ -33,7 +33,7 @@ async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Err
 }
 
 #[when(expr = "sleep {int}")]
-async fn sleep(world: &mut HitboxWorld, secs: u16) -> Result<(), Error> {
+async fn sleep(_world: &mut HitboxWorld, secs: u16) -> Result<(), Error> {
     tokio::time::sleep(tokio::time::Duration::from_secs(secs.into())).await;
     Ok(())
 }

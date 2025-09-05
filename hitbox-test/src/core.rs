@@ -13,7 +13,7 @@ use cucumber::gherkin::Step;
 use cucumber::World;
 use hitbox::policy::PolicyConfig;
 use hitbox_http::{
-    extractors::{method::MethodExtractor, path::PathExtractor, NeutralExtractor},
+    extractors::NeutralExtractor,
     predicates::{NeutralRequestPredicate, NeutralResponsePredicate},
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};

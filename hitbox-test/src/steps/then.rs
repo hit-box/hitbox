@@ -2,7 +2,6 @@ use crate::core::HitboxWorld;
 use anyhow::{anyhow, Error};
 use cucumber::then;
 use hitbox::CacheKey;
-use hitbox_tower::configuration::serializers::status_code;
 use jaq_core::{
     load::{Arena, File, Loader},
     Ctx, RcIter,

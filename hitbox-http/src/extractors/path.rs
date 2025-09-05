@@ -14,7 +14,7 @@ impl<E> Path<E> {
     pub fn new(inner: E, resource: String) -> Self {
         Self {
             inner,
-            resource: ResourceDef::try_from(resource).unwrap(),
+            resource: ResourceDef::from(resource),
         }
     }
 }
@@ -30,7 +30,7 @@ where
     fn path(self, resource: &str) -> Path<Self> {
         Path {
             inner: self,
-            resource: ResourceDef::try_from(resource).unwrap(),
+            resource: ResourceDef::from(resource),
         }
     }
 }

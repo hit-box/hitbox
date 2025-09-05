@@ -61,7 +61,7 @@ impl Database {
             database
                 .books_by_author_idx
                 .entry(book.author.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(book);
         }
 

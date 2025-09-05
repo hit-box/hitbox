@@ -11,7 +11,9 @@ use crate::app::{AppState, AuthorId, Book, BookId};
 
 #[derive(Deserialize, Debug)]
 pub struct Pagination {
+    #[allow(dead_code)]
     page: usize,
+    #[allow(dead_code)]
     per_page: usize,
 }
 
@@ -38,7 +40,7 @@ pub async fn get_simple(Path(name): Path<String>) -> Result<String, StatusCode> 
 #[axum::debug_handler]
 pub(crate) async fn get_book(
     State(state): State<AppState>,
-    Path((author_id, book_id)): Path<(String, String)>,
+    Path((_author_id, book_id)): Path<(String, String)>,
 ) -> Result<Json<Arc<Book>>, StatusCode> {
     let book = Json(
         state

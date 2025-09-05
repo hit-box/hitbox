@@ -54,13 +54,13 @@ where
                         .parts()
                         .headers
                         .get(name)
-                        .map_or(false, |v| v.eq(value)),
+                        .is_some_and(|v| v.eq(value)),
                     Operation::Exist(name) => request.parts().headers.get(name).is_some(),
                     Operation::In(name, values) => request
                         .parts()
                         .headers
                         .get(name)
-                        .map_or(false, |v| values.contains(v)),
+                        .is_some_and(|v| values.contains(v)),
                 };
                 if is_cacheable {
                     PredicateResult::Cacheable(request)
