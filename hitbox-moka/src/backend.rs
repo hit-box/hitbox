@@ -48,6 +48,7 @@ impl Backend for MokaBackend {
         value: CacheValue<Raw>,
         _ttl: Option<Duration>,
     ) -> BackendResult<()> {
+        dbg!(&key);
         self.cache.insert(key.clone(), value).await;
         Ok(())
     }

@@ -31,11 +31,11 @@ Feature: Cache policy
 		And response body jq '.title=="Victim Prime"'
 		And response headers have no "X-Cache" header
     And cache has 1 records
-		And cache key `GET:robert-sheckley:victim-prime` exists
+		And cache key "method=GET:author_id=robert-sheckley:book_id=victim-prime" exists
     When execute request
       ```hurl
 			GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then response status is 200
-		And response body jq `.title="Victim Prime"` 
-		And response headers contain X-Cache header
+		And response body jq '.title=="Victim Prime"'
+		And response headers contain "X-Cache" header

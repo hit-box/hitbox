@@ -1,6 +1,7 @@
 use crate::core::HitboxWorld;
 use anyhow::{anyhow, Error};
 use cucumber::then;
+use hitbox::CacheKey;
 use jaq_core::{
     load::{Arena, File, Loader},
     Ctx, RcIter,
@@ -97,12 +98,42 @@ fn apply_jq_expression(expression: &str, input: Value) -> Result<Option<Value>, 
 }
 
 #[then(expr = "response headers contain {string} header")]
-fn response_has_header(world_: &mut HitboxWorld, header_: String) -> Result<(), Error> {
+fn response_has_header(world: &mut HitboxWorld, header_name: String) -> Result<(), Error> {
+    let response = world
+        .state
+        .response
+        .as_ref()
+        .ok_or_else(|| anyhow!("No response available"))?;
+
+    let has_header = response.headers().get(&header_name).is_some();
+
+    if !has_header {
+        return Err(anyhow!(
+            "Expected header '{}' to be present, but it was not found",
+            header_name
+        ));
+    }
+
     Ok(())
 }
 
 #[then(expr = "response headers have no {string} header")]
-fn response_has_no_header(world_: &mut HitboxWorld, header_: String) -> Result<(), Error> {
+fn response_has_no_header(world: &mut HitboxWorld, header_name: String) -> Result<(), Error> {
+    let response = world
+        .state
+        .response
+        .as_ref()
+        .ok_or_else(|| anyhow!("No response available"))?;
+
+    let has_header = response.headers().get(&header_name).is_some();
+
+    if has_header {
+        return Err(anyhow!(
+            "Expected header '{}' to NOT be present, but it was found",
+            header_name
+        ));
+    }
+
     Ok(())
 }
 
@@ -126,10 +157,18 @@ async fn check_cache_record_count(
 
 #[then(expr = "cache key {string} exists")]
 async fn check_cache_key_exists(world: &mut HitboxWorld, key_pattern: String) -> Result<(), Error> {
-    // Parse key pattern like "GET:robert-sheckley:victim-prime"
-    let key_parts: Vec<&str> = key_pattern.split(':').collect();
-    let cache_key =
-        hitbox::CacheKey::from_slice(&key_parts.iter().map(|&s| ("", s)).collect::<Vec<_>>());
+    // Parse key pattern like "method=GET:author_id=robert-sheckley:book_id=victim-prime"
+    let key_value_pairs: Vec<(&str, &str)> = key_pattern
+        .split(':')
+        .filter_map(|part| {
+            let mut split = part.split('=');
+            let key = split.next()?;
+            let value = split.next()?;
+            Some((key, value))
+        })
+        .collect();
+
+    let cache_key = CacheKey::from_slice(&key_value_pairs);
 
     let exists = world.backend.cache.get(&cache_key).await.is_some();
 
