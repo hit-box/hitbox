@@ -16,10 +16,10 @@ response:
 ";
     let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
     let expected = ConfigEndpoint {
-        response: Response::Flat(vec![
+        response: Some(Response::Flat(vec![
             Predicate::Status(200.try_into().unwrap()),
             Predicate::Status(201.try_into().unwrap()),
-        ]),
+        ])),
         ..Default::default()
     };
     assert_eq!(endpoint, expected);
@@ -43,7 +43,10 @@ response:
 ";
     let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
     dbg!(&endpoint.response);
-    let predicates = endpoint.response.into_predicates::<Empty<Bytes>>();
+    let predicates = endpoint
+        .response
+        .unwrap_or_default()
+        .into_predicates::<Empty<Bytes>>();
     dbg!(predicates);
     // let expected = Endpoint {
     //     response: Response::Flat(vec![

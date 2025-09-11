@@ -1,11 +1,15 @@
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::policy::PolicyConfig;
-use hitbox_http::extractors::NeutralExtractor;
+use hitbox_http::{
+    extractors::NeutralExtractor,
+    predicates::{NeutralResponsePredicate, response::StatusCodePredicate},
+};
+use http::StatusCode;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Request, Response,
+    Request, Response, ResponsePredicate,
     endpoint::{Endpoint, RequestExtractor},
     extractors::Extractor,
 };
@@ -15,7 +19,7 @@ pub struct ConfigEndpoint {
     #[serde(with = "serde_yaml::with::singleton_map_recursive")]
     pub request: Request,
     #[serde(with = "serde_yaml::with::singleton_map_recursive")]
-    pub response: Response,
+    pub response: Option<Response>,
     #[serde(with = "serde_yaml::with::singleton_map_recursive")]
     pub extractors: Vec<Extractor>,
     pub policy: PolicyConfig,
@@ -37,10 +41,19 @@ impl ConfigEndpoint {
         ReqBody: Send + Debug + 'static,
         ResBody: Send + 'static,
     {
+        let extractors = Arc::new(self.extractors());
+        let response_predicates = Arc::new(
+            self.response
+                .map(|response| response.into_predicates())
+                .unwrap_or_else(|| {
+                    Box::new(NeutralResponsePredicate::new().status_code(StatusCode::OK))
+                        as ResponsePredicate<ResBody>
+                }),
+        );
         Endpoint {
-            extractors: Arc::new(self.extractors()),
+            extractors,
             request_predicates: Arc::new(self.request.into_predicates()),
-            response_predicates: Arc::new(self.response.into_predicates()),
+            response_predicates,
             policy: self.policy,
         }
     }

@@ -18,7 +18,7 @@ fn test_extractors_serialize() {
     println!("{}", &yaml_str);
     let config = r"
     request: []
-    response: []
+    response: null
     policy: !Enabled
       ttl: 5
     extractors:

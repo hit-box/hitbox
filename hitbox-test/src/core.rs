@@ -1,84 +1,15 @@
 use crate::app::app;
-use hitbox::{Extractor, Predicate};
 use hitbox_configuration::Endpoint;
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
-use http_body_util::combinators::UnsyncBoxBody;
-use std::fmt::{self, Debug};
+use std::fmt::Debug;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use anyhow::Error;
 use axum_test::{TestResponse, TestServer};
 use cucumber::gherkin::Step;
 use cucumber::World;
-use hitbox::policy::PolicyConfig;
-use hitbox_http::{
-    extractors::NeutralExtractor,
-    predicates::{NeutralRequestPredicate, NeutralResponsePredicate},
-};
-use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 use hurl::http::{Body, RequestSpec};
-
-// #[derive(Clone)]
-// pub struct Settings {
-//     pub policy: PolicyConfig,
-//     pub extractors:
-//         Arc<dyn hitbox::Extractor<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>,
-//     pub request_predicates:
-//         Arc<dyn hitbox::Predicate<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>,
-//     pub response_predicates:
-//         Arc<dyn hitbox::Predicate<Subject = CacheableHttpResponse<axum::body::Body>> + Send + Sync>,
-// }
-//
-// impl CacheConfig<CacheableHttpRequest<axum::body::Body>, CacheableHttpResponse<axum::body::Body>>
-//     for Settings
-// {
-//     type RequestBody = CacheableHttpRequest<axum::body::Body>;
-//     type ResponseBody = CacheableHttpResponse<axum::body::Body>;
-//
-//     fn request_predicates(
-//         &self,
-//     ) -> impl Predicate<Subject = Self::RequestBody> + Send + Sync + 'static {
-//         self.request_predicates.clone()
-//     }
-//
-//     fn response_predicates(
-//         &self,
-//     ) -> impl Predicate<Subject = Self::ResponseBody> + Send + Sync + 'static {
-//         self.response_predicates.clone()
-//     }
-//
-//     fn extractors(&self) -> impl Extractor<Subject = Self::RequestBody> + Send + Sync + 'static {
-//         self.extractors.clone()
-//     }
-//
-//     fn policy(&self) -> PolicyConfig {
-//         self.policy.clone()
-//     }
-// }
-//
-// impl Debug for Settings {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         f.debug_struct("Settings")
-//             .field("policy", &self.policy)
-//             .field("extractors", &self.extractors)
-//             .field("request_predicates", &self.request_predicates)
-//             .field("response_predicates", &self.response_predicates)
-//             .finish()
-//     }
-// }
-//
-// impl Default for Settings {
-//     fn default() -> Self {
-//         Settings {
-//             policy: PolicyConfig::default(),
-//             extractors: Arc::new(NeutralExtractor::new()),
-//             request_predicates: Arc::new(NeutralRequestPredicate::new()),
-//             response_predicates: Arc::new(NeutralResponsePredicate::new()),
-//         }
-//     }
-// }
 
 #[derive(Debug, Default)]
 pub struct State {

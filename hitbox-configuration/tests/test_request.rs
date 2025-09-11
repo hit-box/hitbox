@@ -28,7 +28,7 @@ fn test_expression_tree_serialize() {
     let endpoint = ConfigEndpoint {
         request,
         extractors: vec![],
-        response: Response::default(),
+        response: Some(Response::default()),
         policy: PolicyConfig::default(),
     };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
@@ -52,7 +52,7 @@ policy: !Enabled
 
 #[tokio::test]
 async fn test_expression_into_predicates() {
-    let inner = Box::new(NeutralRequestPredicate::new());
+    let inner = Box::new(NeutralRequestPredicate::new()) as RequestPredicate<_>;
     let method_get = Expression::Predicate(Predicate::Method("GET".to_owned()));
     let method_post = Expression::Predicate(Predicate::Method("POST".to_owned()));
     let method_head = Expression::Predicate(Predicate::Method("HEAD".to_owned()));
@@ -83,7 +83,7 @@ fn test_request_predicate_query_in_serialize() {
     let endpoint = ConfigEndpoint {
         request,
         extractors: vec![],
-        response: Response::default(),
+        response: Some(Response::default()),
         policy: PolicyConfig::default(),
     };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
@@ -115,7 +115,7 @@ request:
 - Query:
     operation: Eq
     cache: 'true'
-response: []
+response: null
 extractors: []
 policy: !Enabled
   ttl: 5

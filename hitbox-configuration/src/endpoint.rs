@@ -5,11 +5,9 @@ use hitbox::{
     config::{BoxExtractor, BoxPredicate, CacheConfig},
     policy::PolicyConfig,
 };
-use hitbox_http::{
-    CacheableHttpRequest, CacheableHttpResponse,
-    extractors::NeutralExtractor,
-    predicates::{NeutralRequestPredicate, NeutralResponsePredicate},
-};
+use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
+
+use crate::ConfigEndpoint;
 
 pub type RequestPredicate<ReqBody> = BoxPredicate<CacheableHttpRequest<ReqBody>>;
 pub type ResponsePredicate<ResBody> = BoxPredicate<CacheableHttpResponse<ResBody>>;
@@ -47,20 +45,15 @@ where
     ResBody: Send + 'static,
 {
     fn default() -> Self {
-        Endpoint {
-            policy: PolicyConfig::default(),
-            extractors: Arc::new(NeutralExtractor::new()),
-            request_predicates: Arc::new(NeutralRequestPredicate::new()),
-            response_predicates: Arc::new(NeutralResponsePredicate::new()),
-        }
+        ConfigEndpoint::default().into_endpoint()
     }
 }
 
 impl<ReqBody, ResBody> CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>
     for Endpoint<ReqBody, ResBody>
 where
-    ReqBody: Send + Sync + 'static,
-    ResBody: Send + Sync + 'static,
+    ReqBody: Send + 'static,
+    ResBody: Send + 'static,
 {
     fn request_predicates(
         &self,
