@@ -1,16 +1,12 @@
-use hitbox_http::{
-    CacheableHttpRequest,
-    predicates::{
-        NeutralRequestPredicate,
-        conditions::Or,
-        request::{Header, Method, Path, Query},
-    },
+use hitbox_http::predicates::{
+    NeutralRequestPredicate,
+    conditions::Or,
+    request::{Header, Method, Path, Query},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-type CorePredicate<ReqBody> =
-    Box<dyn hitbox_core::Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>;
+use crate::RequestPredicate;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(untagged)]
@@ -23,8 +19,8 @@ pub enum HeaderOperation {
 impl HeaderOperation {
     fn into_predicates<ReqBody: Send + 'static>(
         &self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody> {
+        inner: RequestPredicate<ReqBody>,
+    ) -> RequestPredicate<ReqBody> {
         match self {
             HeaderOperation::Eq(params) => params.iter().rfold(inner, |inner, (key, value)| {
                 Box::new(Header::new(
@@ -63,8 +59,8 @@ pub enum QueryOperation {
 impl QueryOperation {
     fn into_predicates<ReqBody: Send + 'static>(
         &self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody> {
+        inner: RequestPredicate<ReqBody>,
+    ) -> RequestPredicate<ReqBody> {
         match self {
             QueryOperation::Eq(params) => params.iter().rfold(inner, |inner, (key, value)| {
                 Box::new(Query::new(
@@ -103,8 +99,8 @@ pub enum Predicate {
 impl Predicate {
     pub fn into_predicates<ReqBody: Send + 'static>(
         &self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody> {
+        inner: RequestPredicate<ReqBody>,
+    ) -> RequestPredicate<ReqBody> {
         match self {
             Predicate::Method(method) => Box::new(Method::new(inner, method.as_str()).unwrap()),
             Predicate::Path(path) => Box::new(Path::new(inner, path.as_str().into())),
@@ -123,8 +119,8 @@ pub enum Operation {
 impl Operation {
     pub fn into_predicates<ReqBody: Send + 'static>(
         &self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody> {
+        inner: RequestPredicate<ReqBody>,
+    ) -> RequestPredicate<ReqBody> {
         match self {
             Operation::Or(predicates) => {
                 if predicates.is_empty() {
@@ -164,8 +160,8 @@ pub enum Expression {
 impl Expression {
     pub fn into_predicates<ReqBody: Send + 'static>(
         &self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody> {
+        inner: RequestPredicate<ReqBody>,
+    ) -> RequestPredicate<ReqBody> {
         match self {
             Self::Predicate(predicate) => predicate.into_predicates(inner),
             Self::Operation(operation) => operation.into_predicates(inner),
@@ -187,7 +183,22 @@ impl Default for Request {
 }
 
 impl Request {
-    pub fn into_predicates<Req>(&self) -> CorePredicate<Req>
+    pub fn into_predicates<Req>(self) -> RequestPredicate<Req>
+    where
+        Req: Send + 'static,
+    {
+        let neutral_predicate = Box::new(NeutralRequestPredicate::<Req>::new());
+        match self {
+            Request::Flat(predicates) => predicates
+                .iter()
+                .rfold(neutral_predicate, |inner, predicate| {
+                    predicate.into_predicates(inner)
+                }),
+            Request::Tree(expression) => expression.into_predicates(neutral_predicate),
+        }
+    }
+
+    pub fn predicates<Req>(&self) -> RequestPredicate<Req>
     where
         Req: Send + 'static,
     {

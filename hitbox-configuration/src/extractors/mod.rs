@@ -1,14 +1,11 @@
-use hitbox_http::CacheableHttpRequest;
 use serde::{Deserialize, Serialize};
 
+use crate::RequestExtractor;
 use crate::extractors::{method::Method, path::Path, query::Query};
 
 pub mod method;
 pub mod path;
 pub mod query;
-
-pub type BoxExtractor<ReqBody> =
-    Box<dyn hitbox_core::Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Extractor {
@@ -18,7 +15,10 @@ pub enum Extractor {
 }
 
 impl Extractor {
-    pub fn into_extractors<ReqBody>(self, inner: BoxExtractor<ReqBody>) -> BoxExtractor<ReqBody>
+    pub fn into_extractors<ReqBody>(
+        self,
+        inner: RequestExtractor<ReqBody>,
+    ) -> RequestExtractor<ReqBody>
     where
         ReqBody: Send + 'static,
     {

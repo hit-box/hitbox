@@ -12,6 +12,19 @@ pub trait Extractor: Debug {
 }
 
 #[async_trait]
+impl<T> Extractor for &T
+where
+    T: Extractor + ?Sized + Sync,
+    T::Subject: Send,
+{
+    type Subject = T::Subject;
+
+    async fn get(&self, subject: T::Subject) -> KeyParts<T::Subject> {
+        self.get(subject).await
+    }
+}
+
+#[async_trait]
 impl<T> Extractor for Box<T>
 where
     T: Extractor + ?Sized + Sync,

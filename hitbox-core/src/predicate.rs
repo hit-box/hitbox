@@ -28,6 +28,19 @@ where
 }
 
 #[async_trait]
+impl<T> Predicate for &T
+where
+    T: Predicate + ?Sized + Sync,
+    T::Subject: Send,
+{
+    type Subject = T::Subject;
+
+    async fn check(&self, subject: T::Subject) -> PredicateResult<T::Subject> {
+        self.check(subject).await
+    }
+}
+
+#[async_trait]
 impl<T> Predicate for Arc<T>
 where
     T: Predicate + Send + Sync + ?Sized,

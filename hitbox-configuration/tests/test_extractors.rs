@@ -1,5 +1,5 @@
 use hitbox_configuration::{
-    Endpoint,
+    ConfigEndpoint,
     extractors::{Extractor, method::Method, path::Path},
 };
 use pretty_assertions::assert_eq;
@@ -10,7 +10,7 @@ fn test_extractors_serialize() {
         Extractor::Method(Method::new()),
         Extractor::Path(Path::new("/greet/{name}")),
     ];
-    let original_endpoint = Endpoint {
+    let original_endpoint = ConfigEndpoint {
         extractors,
         ..Default::default()
     };

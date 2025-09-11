@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use crate::core::{HitboxWorld, StepExt};
-use hitbox_configuration::extractors::{BoxExtractor, Extractor};
-use hitbox_configuration::{Request, Response};
+use hitbox_configuration::{extractors::Extractor, Request, RequestExtractor, Response};
 use hitbox_http::extractors::NeutralExtractor;
 
 use anyhow::{anyhow, Error};
@@ -19,7 +18,7 @@ fn hitbox_with_policy(world: &mut HitboxWorld, step: &Step) -> Result<(), Error>
         .map(serde_yaml::from_str::<PolicyConfig>)
         .transpose()?
         .unwrap_or_default();
-    world.settings.policy = policy;
+    world.config.policy = policy;
     Ok(())
 }
 
@@ -32,7 +31,7 @@ async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), 
     )?;
     let predicates = config.into_predicates();
 
-    world.settings.request_predicates = Arc::new(predicates);
+    world.config.request_predicates = Arc::new(predicates);
     Ok(())
 }
 
@@ -49,7 +48,7 @@ async fn response_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(),
         dbg!(err.location());
     })?;
     let predicates = config.into_predicates();
-    world.settings.response_predicates = Arc::new(predicates);
+    world.config.response_predicates = Arc::new(predicates);
     Ok(())
 }
 
@@ -63,9 +62,9 @@ async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Erro
             .as_str(),
     )?;
     let extractors = config.0.into_iter().rfold(
-        Box::new(NeutralExtractor::<axum::body::Body>::new()) as BoxExtractor<_>,
+        Box::new(NeutralExtractor::<axum::body::Body>::new()) as RequestExtractor<_>,
         |inner, item| item.into_extractors(inner),
     );
-    world.settings.extractors = Arc::new(extractors);
+    world.config.extractors = Arc::new(extractors);
     Ok(())
 }

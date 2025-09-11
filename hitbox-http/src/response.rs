@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::body::FromBytes;
 
+#[derive(Debug)]
 pub enum ResponseBody<ResBody> {
     Pending(ResBody),
     Complete(Bytes),
@@ -29,6 +30,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct CacheableHttpResponse<ResBody> {
     pub parts: Parts,
     pub body: ResponseBody<ResBody>,

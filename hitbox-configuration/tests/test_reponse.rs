@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use hitbox_configuration::{Endpoint, Response, predicates::response::Predicate};
+use hitbox_configuration::{ConfigEndpoint, Response, predicates::response::Predicate};
 use http_body_util::Empty;
 use pretty_assertions::assert_eq;
 
@@ -14,8 +14,8 @@ response:
   - Status: 200
   - Status: 201
 ";
-    let endpoint: Endpoint = serde_yaml::from_str(yaml_str).unwrap();
-    let expected = Endpoint {
+    let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
+    let expected = ConfigEndpoint {
         response: Response::Flat(vec![
             Predicate::Status(200.try_into().unwrap()),
             Predicate::Status(201.try_into().unwrap()),
@@ -41,7 +41,7 @@ response:
     - Status: 202
   - Status: 205
 ";
-    let endpoint: Endpoint = serde_yaml::from_str(yaml_str).unwrap();
+    let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
     dbg!(&endpoint.response);
     let predicates = endpoint.response.into_predicates::<Empty<Bytes>>();
     dbg!(predicates);

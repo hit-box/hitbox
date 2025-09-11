@@ -81,7 +81,7 @@ where
             Arc::new(configuration.request_predicates()),
             Arc::new(configuration.response_predicates()),
             Arc::new(configuration.extractors()),
-            Arc::new(configuration.policy()),
+            Arc::new(configuration.policy().clone()),
         )
     }
 }

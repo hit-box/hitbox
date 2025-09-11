@@ -1,7 +1,7 @@
 use hitbox_http::extractors;
 use serde::{Deserialize, Serialize};
 
-use crate::extractors::BoxExtractor;
+use crate::RequestExtractor;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Path(String);
@@ -13,8 +13,8 @@ impl Path {
 
     pub fn into_extractors<ReqBody: Send + 'static>(
         self,
-        inner: BoxExtractor<ReqBody>,
-    ) -> BoxExtractor<ReqBody> {
+        inner: RequestExtractor<ReqBody>,
+    ) -> RequestExtractor<ReqBody> {
         Box::new(extractors::Path::new(inner, self.0))
     }
 }
