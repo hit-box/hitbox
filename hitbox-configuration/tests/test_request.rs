@@ -6,6 +6,7 @@ use hitbox_configuration::{
         request::{Expression, Operation, Predicate, QueryOperation, Request},
         response::Response,
     },
+    types::MaybeUndefined,
 };
 use hitbox_http::CacheableHttpRequest;
 use hitbox_http::predicates::NeutralRequestPredicate;
@@ -28,7 +29,7 @@ fn test_expression_tree_serialize() {
     let endpoint = ConfigEndpoint {
         request,
         extractors: vec![],
-        response: Some(Response::default()),
+        response: MaybeUndefined::Value(Response::default()),
         policy: PolicyConfig::default(),
     };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
@@ -83,7 +84,7 @@ fn test_request_predicate_query_in_serialize() {
     let endpoint = ConfigEndpoint {
         request,
         extractors: vec![],
-        response: Some(Response::default()),
+        response: MaybeUndefined::Value(Response::default()),
         policy: PolicyConfig::default(),
     };
     let yaml_str = serde_yaml::to_string(&endpoint).unwrap();
@@ -115,7 +116,6 @@ request:
 - Query:
     operation: Eq
     cache: 'true'
-response: null
 extractors: []
 policy: !Enabled
   ttl: 5

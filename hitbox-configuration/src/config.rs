@@ -12,14 +12,15 @@ use crate::{
     Request, Response, ResponsePredicate,
     endpoint::{Endpoint, RequestExtractor},
     extractors::Extractor,
+    types::MaybeUndefined,
 };
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ConfigEndpoint {
     #[serde(with = "serde_yaml::with::singleton_map_recursive")]
     pub request: Request,
-    #[serde(with = "serde_yaml::with::singleton_map_recursive")]
-    pub response: Option<Response>,
+    #[serde(default, with = "serde_yaml::with::singleton_map_recursive")]
+    pub response: MaybeUndefined<Response>,
     #[serde(with = "serde_yaml::with::singleton_map_recursive")]
     pub extractors: Vec<Extractor>,
     pub policy: PolicyConfig,
@@ -42,14 +43,16 @@ impl ConfigEndpoint {
         ResBody: Send + 'static,
     {
         let extractors = Arc::new(self.extractors());
-        let response_predicates = Arc::new(
-            self.response
-                .map(|response| response.into_predicates())
-                .unwrap_or_else(|| {
-                    Box::new(NeutralResponsePredicate::new().status_code(StatusCode::OK))
-                        as ResponsePredicate<ResBody>
-                }),
-        );
+        let response_predicates = Arc::new(match self.response {
+            MaybeUndefined::Value(response) => response.into_predicates(),
+            MaybeUndefined::Null => {
+                Box::new(NeutralResponsePredicate::new()) as ResponsePredicate<ResBody>
+            }
+            MaybeUndefined::Undefined => {
+                Box::new(NeutralResponsePredicate::new().status_code(StatusCode::OK))
+                    as ResponsePredicate<ResBody>
+            }
+        });
         Endpoint {
             extractors,
             request_predicates: Arc::new(self.request.into_predicates()),

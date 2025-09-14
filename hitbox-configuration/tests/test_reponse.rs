@@ -1,5 +1,8 @@
+// @FIX: assert with final `crate::Endpoint`
 use bytes::Bytes;
-use hitbox_configuration::{ConfigEndpoint, Response, predicates::response::Predicate};
+use hitbox_configuration::{
+    ConfigEndpoint, Response, predicates::response::Predicate, types::MaybeUndefined,
+};
 use http_body_util::Empty;
 use pretty_assertions::assert_eq;
 
@@ -16,10 +19,43 @@ response:
 ";
     let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
     let expected = ConfigEndpoint {
-        response: Some(Response::Flat(vec![
+        response: MaybeUndefined::Value(Response::Flat(vec![
             Predicate::Status(200.try_into().unwrap()),
             Predicate::Status(201.try_into().unwrap()),
         ])),
+        ..Default::default()
+    };
+    assert_eq!(endpoint, expected);
+}
+
+#[test]
+fn test_undefined_response_predicates() {
+    let yaml_str = r"
+request: []
+extractors: []
+policy: !Enabled
+  ttl: 5
+";
+    let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
+    let expected = ConfigEndpoint {
+        response: MaybeUndefined::Undefined,
+        ..Default::default()
+    };
+    assert_eq!(endpoint, expected);
+}
+
+#[test]
+fn test_null_response_predicates() {
+    let yaml_str = r"
+response: null
+request: []
+extractors: []
+policy: !Enabled
+  ttl: 5
+";
+    let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
+    let expected = ConfigEndpoint {
+        response: MaybeUndefined::Null,
         ..Default::default()
     };
     assert_eq!(endpoint, expected);
