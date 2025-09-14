@@ -4,7 +4,7 @@ use axum::{routing::get, Router};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::handlers::{get_book, get_books, get_simple};
+use crate::handlers::{get_book, get_books};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize, Ord, PartialOrd)]
 pub(crate) struct AuthorId(String);
@@ -105,7 +105,6 @@ impl AppState {
 
 pub(crate) fn app() -> Router {
     Router::new()
-        .route("/greet/{name}", get(get_simple))
         .route("/v1/authors/{author_id}/books", get(get_books))
         .route("/v1/authors/{author_id}/books/{book_id}", get(get_book))
         .with_state(AppState::new())

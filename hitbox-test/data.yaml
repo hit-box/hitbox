@@ -4,20 +4,208 @@ books:
     author: robert-sheckley
     title: Victim Prime
     description: |
-      Victim Prime is a science fiction novel by American writer Robert Sheckley, 
-      published in 1987. It is the sequel to 1953's "Seventh Victim", 
+      Victim Prime is a science fiction novel by American writer Robert Sheckley,
+      published in 1987. It is the sequel to 1953's "Seventh Victim",
       and is followed by 1988's Hunter/Victim.
+
   journey-beyond-tomorrow:
     id: journey-beyond-tomorrow
     author: robert-sheckley
     title: Journey Beyond Tomorrow
     description: |
-      Journey Beyond Tomorrow is a satirical 1962 science fiction novel 
-      by the American writer Robert Sheckley, originally serialized as The Journey 
-      of Joenes in The Magazine of Fantasy & Science Fiction 
+      Journey Beyond Tomorrow is a satirical 1962 science fiction novel
+      by the American writer Robert Sheckley, originally serialized as The Journey
+      of Joenes in The Magazine of Fantasy & Science Fiction
       in October and November 1962.
+
+  dimension-of-miracles:
+    id: dimension-of-miracles
+    author: robert-sheckley
+    title: Dimension of Miracles
+    description: |
+      Dimension of Miracles is a comedic science fiction novel by Sheckley,
+      involving interdimensional travel and absurdist humor.
+
+  immortality-inc:
+    id: immortality-inc
+    author: robert-sheckley
+    title: Immortality, Inc.
+    description: |
+      This novel explores themes of identity and immortality in a satirical future society.
+
+  the-status-civilization:
+    id: the-status-civilization
+    author: robert-sheckley
+    title: The Status Civilization
+    description: |
+      A classic dystopian science fiction novel about a convict society on another planet.
+
+  foundation:
+    id: foundation
+    author: isaac-asimov
+
+    title: Foundation
+    description: |
+      First published in 1951, Foundation is the opening novel in Asimov's Foundation series,
+      exploring the fall and rise of civilizations through psychohistory.
+
+  i-robot:
+    id: i-robot
+    author: isaac-asimov
+    title: I, Robot
+    description: |
+      A seminal collection of short stories exploring Asimov's famous "Three Laws of Robotics."
+
+  foundation-and-empire:
+    id: foundation-and-empire
+    author: isaac-asimov
+    title: Foundation and Empire
+    description: |
+      The second book in the Foundation series, continuing the saga of the decline of an empire.
+
+  the-caves-of-steel:
+    id: the-caves-of-steel
+    author: isaac-asimov
+    title: The Caves of Steel
+    description: |
+      A science fiction detective novel set in a future Earth with robot-human cooperation.
+
+  the-naked-sun:
+    id: the-naked-sun
+    author: isaac-asimov
+    title: The Naked Sun
+    description: |
+      A sequel to The Caves of Steel, continuing detective Elijah Baley’s adventures.
+
+  lord-of-light:
+    id: lord-of-light
+    author: roger-zelazny
+    title: Lord of Light
+    description: |
+      A Hugo Award-winning novel blending science fiction and mythology, focused on a distant planet.
+
+  nine-princes-in-amber:
+    id: nine-princes-in-amber
+    author: roger-zelazny
+    title: Nine Princes in Amber
+    description: |
+      The first book in The Chronicles of Amber series, a fantasy series about royal intrigue across dimensions.
+
+
+  a-night-in-the-lonesome-october:
+    id: a-night-in-the-lonesome-october
+    author: roger-zelazny
+    title: A Night in the Lonesome October
+    description: |
+      A darkly humorous fantasy narrated by a dog involved in supernatural exploits.
+
+  this-immortal:
+    id: this-immortal
+    author: roger-zelazny
+    title: This Immortal
+    description: |
+      Winner of the Hugo Award, a post-apocalyptic fantasy/science fiction novel set on Earth.
+
+  isle-of-the-dead:
+    id: isle-of-the-dead
+    author: roger-zelazny
+    title: Isle of the Dead
+    description: |
+      A novel blending elements of horror and science fiction, recipient of the Prix Tour-Apollo Award.
+
+  solaris:
+    id: solaris
+    author: stanislaw-lem
+    title: Solaris
+    description: |
+      A classic science fiction novel about human attempts to communicate with an alien intelligence on a strange planet.
+
+  the-invincible:
+    id: the-invincible
+    author: stanislaw-lem
+    title: The Invincible
+    description: |
+      A novel featuring a spaceship crew’s encounter with a strange, lost civilization on a distant planet.
+
+  the-futurological-congress:
+    id: the-futurological-congress
+    author: stanislaw-lem
+    title: The Futurological Congress
+    description: |
+      A satirical science fiction novel envisioning a dystopian future with hallucinogenic realities.
+
+  the-cyberiad:
+    id: the-cyberiad
+    author: stanislaw-lem
+    title: The Cyberiad
+    description: |
+      A collection of whimsical science fiction stories about two inventive robots.
+
+  eden:
+    id: eden
+    author: stanislaw-lem
+    title: Eden
+    description: |
+      A story about astronauts stranded on an alien planet with a mysterious ecosystem.
+
+  city:
+    id: city
+    author: clifford-simak
+    title: City
+    description: |
+      A fix-up novel of interconnected stories about human civilization’s decline and dogs’ rise.
+
+  way-station:
+    id: way-station
+    author: clifford-simak
+    title: Way Station
+    description: |
+      A novel about a man maintaining an interstellar way station on Earth for alien travelers.
+
+  the-goblin-reservation:
+    id: the-goblin-reservation
+    author: clifford-simak
+    title: The Goblin Reservation
+    description: |
+      A novel blending fantasy and science fiction elements centered on a university researching mythical creatures and alien artifacts.
+
+  the-best-science-fiction-stories-of-clifford-simak:
+    id: best-sf-stories-simak
+    author: clifford-simak
+
+    title: Best Science Fiction Stories of Clifford D. Simak
+    description: |
+      A collection of Simak's acclaimed short stories showcasing his unique blend of pastoral and speculative fiction.
+
+  empire:
+    id: empire
+    author: clifford-simak
+    title: Empire
+    description: |
+      A story examining the rise and fall of an interstellar empire and its impact on humanity.
+
 authors:
   robert-sheckley:
     id: robert-sheckley
     name: Robert
     family: Sheckley
+
+  isaac-asimov:
+    id: isaac-asimov
+    name: Isaac
+    family: Asimov
+
+  roger-zelazny:
+    id: roger-zelazny
+    name: Roger
+    family: Zelazny
+
+  stanislaw-lem:
+    id: stanislaw-lem
+    name: Stanisław
+    family: Lem
+
+  clifford-simak:
+    id: clifford-simak
+    name: Clifford
+    family: Simak
