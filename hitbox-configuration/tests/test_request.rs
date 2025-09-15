@@ -27,7 +27,7 @@ fn test_expression_tree_serialize() {
     let or_ = Expression::Operation(Operation::Or(vec![query, method_post, and_]));
     let request = Request::Tree(or_);
     let endpoint = ConfigEndpoint {
-        request,
+        request: MaybeUndefined::Value(request),
         extractors: vec![],
         response: MaybeUndefined::Value(Response::default()),
         policy: PolicyConfig::default(),
@@ -82,7 +82,7 @@ fn test_request_predicate_query_in_serialize() {
     let or_ = Expression::Operation(Operation::Or(vec![query, and_]));
     let request = Request::Tree(or_);
     let endpoint = ConfigEndpoint {
-        request,
+        request: MaybeUndefined::Value(request),
         extractors: vec![],
         response: MaybeUndefined::Value(Response::default()),
         policy: PolicyConfig::default(),
@@ -130,7 +130,7 @@ policy: !Enabled
     let query = Predicate::Query(QueryOperation::Eq(query_params));
     let request = Request::Flat(vec![method, path, query]);
     let expected = ConfigEndpoint {
-        request,
+        request: MaybeUndefined::Value(request),
         ..Default::default()
     };
     assert_eq!(endpoint, expected);

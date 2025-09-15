@@ -17,7 +17,6 @@ fn test_extractors_serialize() {
     let yaml_str = serde_yaml::to_string(&original_endpoint).unwrap();
     println!("{}", &yaml_str);
     let config = r"
-    request: []
     policy: !Enabled
       ttl: 5
     extractors:
