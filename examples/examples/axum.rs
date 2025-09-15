@@ -1,4 +1,5 @@
 use axum::{extract::Path, routing::get, Json, Router};
+use hitbox_configuration::ConfigEndpoint;
 use hitbox_tower::{
     configuration::extractor,
     configuration::predicate::{request, response},
@@ -42,34 +43,59 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let redis_backend = RedisBackend::new().unwrap();
-    // let inmemory_backend = hitbox_stretto::StrettoBackend::builder(10)
+    // let memory_backend = hitbox_stretto::StrettoBackend::builder(10)
     //     .finalize()
     //     .unwrap();
-    let inmemory_backend = hitbox_moka::MokaBackend::builder(1024 * 1024).build();
+    let memory_backend = hitbox_moka::MokaBackend::builder(1024 * 1024).build();
 
-    let json_config = EndpointConfig::builder()
-        .request(
-            request::method(Method::GET)
-                .query("cache", "true")
-                .query("x-cache", "true")
-                .path("/{path}*"),
-        )
-        .response(response::status_code(StatusCode::OK))
-        .cache_key(extractor::method().query("cache").path("/{path}*"))
-        .build();
+    // let json_config = EndpointConfig::builder()
+    //     .request(
+    //         request::method(Method::GET)
+    //             .query("cache", "true")
+    //             .query("x-cache", "true")
+    //             .path("/{path}*"),
+    //     )
+    //     .response(response::status_code(StatusCode::OK))
+    //     .cache_key(extractor::method().query("cache").path("/{path}*"))
+    //     .build();
+    let json_cfg = r#"
+    request:
+    - Method: GET
+    - Path: '/{path}*'
+    - Query:
+        operation: Eq
+        cache: 'true'
+    extractor:
+    - Method
+    - Query: cache
+    - Path: "/{path}*"
+    policy: !Enabled
+    "#;
+    let json_config = serde_yaml::from_str::<ConfigEndpoint>(json_cfg)
+        .unwrap()
+        .into_endpoint();
 
-    let health_config = EndpointConfig::builder()
-        .request(request::path("/health").method(Method::GET))
-        .disable()
-        .build();
+    // let health_config = EndpointConfig::builder()
+    //     .request(request::path("/health").method(Method::GET))
+    //     .disable()
+    //     .build();
+    let health_cfg = r#"
+    request:
+        - Path: "/health"
+        - Method: GET
+    policy: !Disabled
+    "#;
+    let health_config = serde_yaml::from_str::<ConfigEndpoint>(health_cfg)
+        .unwrap()
+        .into_endpoint();
 
     let json_cache = Cache::builder()
-        .backend(inmemory_backend.clone())
+        .backend(memory_backend.clone())
         .config(json_config)
         .build();
 
     let health_check = Cache::builder()
-        .backend(inmemory_backend) // FIX: it should work withod backend
+        .backend(memory_backend) // FIX: it should work without backend
         .config(health_config)
         .build();
 
