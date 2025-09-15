@@ -2,7 +2,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use hitbox::policy::PolicyConfig;
 use hitbox_http::{
-    extractors::NeutralExtractor,
+    extractors::{NeutralExtractor, method::MethodExtractor, path::PathExtractor},
     predicates::{
         NeutralRequestPredicate, NeutralResponsePredicate, request::MethodPredicate,
         response::StatusCodePredicate,
@@ -24,8 +24,8 @@ pub struct ConfigEndpoint {
     pub request: MaybeUndefined<Request>,
     #[serde(default, with = "serde_yaml::with::singleton_map_recursive")]
     pub response: MaybeUndefined<Response>,
-    #[serde(with = "serde_yaml::with::singleton_map_recursive")]
-    pub extractors: Vec<Extractor>,
+    #[serde(default, with = "serde_yaml::with::singleton_map_recursive")]
+    pub extractors: MaybeUndefined<Vec<Extractor>>,
     pub policy: PolicyConfig,
 }
 
@@ -34,10 +34,14 @@ impl ConfigEndpoint {
     where
         ReqBody: Send + Debug + 'static,
     {
-        self.extractors.iter().cloned().rfold(
-            Box::new(NeutralExtractor::<ReqBody>::new()),
-            |inner, item| item.into_extractors(inner),
-        )
+        match &self.extractors {
+            MaybeUndefined::Null => Box::new(NeutralExtractor::new()),
+            MaybeUndefined::Undefined => Box::new(NeutralExtractor::new().method().path("*")),
+            MaybeUndefined::Value(extractors) => extractors.iter().cloned().rfold(
+                Box::new(NeutralExtractor::<ReqBody>::new()),
+                |inner, item| item.into_extractors(inner),
+            ),
+        }
     }
 
     pub fn into_endpoint<ReqBody, ResBody>(self) -> Endpoint<ReqBody, ResBody>

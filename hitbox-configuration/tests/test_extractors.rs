@@ -1,6 +1,7 @@
 use hitbox_configuration::{
     ConfigEndpoint,
     extractors::{Extractor, method::Method, path::Path},
+    types::MaybeUndefined,
 };
 use pretty_assertions::assert_eq;
 
@@ -11,7 +12,7 @@ fn test_extractors_serialize() {
         Extractor::Path(Path::new("/greet/{name}")),
     ];
     let original_endpoint = ConfigEndpoint {
-        extractors,
+        extractors: MaybeUndefined::Value(extractors),
         ..Default::default()
     };
     let yaml_str = serde_yaml::to_string(&original_endpoint).unwrap();

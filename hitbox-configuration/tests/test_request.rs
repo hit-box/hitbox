@@ -28,7 +28,7 @@ fn test_expression_tree_serialize() {
     let request = Request::Tree(or_);
     let endpoint = ConfigEndpoint {
         request: MaybeUndefined::Value(request),
-        extractors: vec![],
+        extractors: MaybeUndefined::Value(vec![]),
         response: MaybeUndefined::Value(Response::default()),
         policy: PolicyConfig::default(),
     };
@@ -83,7 +83,7 @@ fn test_request_predicate_query_in_serialize() {
     let request = Request::Tree(or_);
     let endpoint = ConfigEndpoint {
         request: MaybeUndefined::Value(request),
-        extractors: vec![],
+        extractors: MaybeUndefined::Value(vec![]),
         response: MaybeUndefined::Value(Response::default()),
         policy: PolicyConfig::default(),
     };
@@ -116,7 +116,6 @@ request:
 - Query:
     operation: Eq
     cache: 'true'
-extractors: []
 policy: !Enabled
   ttl: 5
 ";

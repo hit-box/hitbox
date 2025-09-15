@@ -9,7 +9,6 @@ use pretty_assertions::assert_eq;
 #[test]
 fn test_response_expression_flat_deserialize() {
     let yaml_str = r"
-extractors: []
 policy: !Enabled
   ttl: 5
 response:
@@ -30,7 +29,6 @@ response:
 #[test]
 fn test_undefined_response_predicates() {
     let yaml_str = r"
-extractors: []
 policy: !Enabled
   ttl: 5
 ";
@@ -46,7 +44,6 @@ policy: !Enabled
 fn test_null_response_predicates() {
     let yaml_str = r"
 response: null
-extractors: []
 policy: !Enabled
   ttl: 5
 ";
