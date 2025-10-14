@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::core::{HitboxWorld, StepExt};
+use crate::time::{MockTime, MockTimeProvider};
 use hitbox_configuration::{extractors::Extractor, Request, RequestExtractor, Response};
+use hitbox_core::set_mock_time_provider;
 use hitbox_http::extractors::NeutralExtractor;
 
 use anyhow::{anyhow, Error};
@@ -67,4 +69,42 @@ async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Erro
     );
     world.config.extractors = Arc::new(extractors);
     Ok(())
+}
+
+#[given(expr = "mock time is enabled")]
+fn enable_mock_time(world: &mut HitboxWorld) -> Result<(), Error> {
+    // Create mock time and provider
+    let mock_time = MockTime::new();
+    let provider = MockTimeProvider::new(mock_time.clone());
+
+    // Store in world state for scenario access
+    world.time_state.mock_time = Some(mock_time);
+    world.time_state.mock_provider = Some(provider.clone());
+
+    // Set globally for CacheValue to use
+    set_mock_time_provider(Some(Box::new(provider)));
+
+    Ok(())
+}
+
+#[given(expr = "mock time is disabled")]
+fn disable_mock_time(world: &mut HitboxWorld) -> Result<(), Error> {
+    // Clear from world state
+    world.time_state.mock_time = None;
+    world.time_state.mock_provider = None;
+
+    // Clear global provider
+    set_mock_time_provider(None);
+
+    Ok(())
+}
+
+#[given(expr = "mock time is reset")]
+fn reset_mock_time(world: &mut HitboxWorld) -> Result<(), Error> {
+    if let Some(mock_time) = &world.time_state.mock_time {
+        mock_time.reset();
+        Ok(())
+    } else {
+        Err(anyhow!("Mock time is not enabled"))
+    }
 }

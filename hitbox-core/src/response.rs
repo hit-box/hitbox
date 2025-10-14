@@ -25,6 +25,7 @@ pub type ResponseCachePolicy<C> = CachePolicy<CacheValue<<C as CacheableResponse
 pub enum CacheState<Cached> {
     Stale(Cached),
     Actual(Cached),
+    Expired(Cached),
 }
 
 #[async_trait]

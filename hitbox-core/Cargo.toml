@@ -6,7 +6,7 @@ authors = [
     "Andrey Ermilov <andrerm@ya.ru>",
 ]
 license = "MIT"
-edition = "2021"
+edition = "2024"
 description = "Asynchronous caching framework core traits."
 readme = "README.md"
 repository = "https://github.com/hit-box/hitbox/"
@@ -17,6 +17,11 @@ keywords = ["cache", "async", "cache-backend", "hitbox", "tokio"]
 [dependencies]
 async-trait = "0.1.73"
 chrono = { version = "0.4.26", default-features = false, features = ["clock"] }
+
+[features]
+default = []
+# Enable test helpers for integration testing (used by hitbox-test)
+test-helpers = []
 
 [dev-dependencies]
 tokio = { version = "1", default-features = false, features = [

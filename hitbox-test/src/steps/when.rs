@@ -33,7 +33,13 @@ async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Err
 }
 
 #[when(expr = "sleep {int}")]
-async fn sleep(_world: &mut HitboxWorld, secs: u16) -> Result<(), Error> {
-    tokio::time::sleep(tokio::time::Duration::from_secs(secs.into())).await;
+async fn sleep(world: &mut HitboxWorld, secs: u16) -> Result<(), Error> {
+    // If mock time is available, advance it instead of actually sleeping
+    if let Some(mock_time) = &world.time_state.mock_time {
+        mock_time.advance_secs(secs.into());
+    } else {
+        // Fall back to actual sleep if no mock time is set
+        tokio::time::sleep(tokio::time::Duration::from_secs(secs.into())).await;
+    }
     Ok(())
 }

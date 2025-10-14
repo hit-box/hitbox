@@ -35,6 +35,7 @@ where
     // },
     CheckCacheState {
         cache_state: CacheStateFuture<Res>,
+        request: Option<Req>,
     },
     PollUpstream {
         upstream_future: UpstreamFuture<Res>,

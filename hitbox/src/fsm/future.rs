@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{policy::PolicyConfig, CachePolicy, CacheState, CacheableResponse};
+use crate::{policy::PolicyConfig, CachePolicy, CacheState, CacheStatus, CacheableResponse};
 use futures::ready;
 use hitbox_core::{CacheablePolicyData, EntityPolicyConfig};
 use pin_project::pin_project;
@@ -150,7 +150,11 @@ pub trait Transform<Req, Res> {
     type Response;
 
     fn upstream_transform(&self, req: Req) -> Self::Future;
-    fn response_transform(&self, res: Res, cache_status: Option<crate::CacheStatus>) -> Self::Response;
+    fn response_transform(
+        &self,
+        res: Res,
+        cache_status: Option<crate::CacheStatus>,
+    ) -> Self::Response;
 }
 
 #[pin_project]
@@ -288,6 +292,7 @@ where
                     match cached {
                         Some(cached_value) => State::CheckCacheState {
                             cache_state: Box::pin(cached_value.cache_state()),
+                            request: request.take(),
                         },
                         None => {
                             let upstream_future =
@@ -298,9 +303,12 @@ where
                         }
                     }
                 }
-                StateProj::CheckCacheState { cache_state } => {
+                StateProj::CheckCacheState {
+                    cache_state,
+                    request,
+                } => {
                     let state = ready!(cache_state.as_mut().poll(cx));
-                    *this.cache_status = crate::CacheStatus::Hit;
+                    *this.cache_status = CacheStatus::Hit;
                     match state {
                         CacheState::Actual(response) => State::Response {
                             response: Some(response),
@@ -308,6 +316,15 @@ where
                         CacheState::Stale(response) => State::Response {
                             response: Some(response),
                         },
+                        // TODO: remove code duplication with PollCache (upstream_future creation)
+                        CacheState::Expired(_response) => {
+                            *this.cache_status = CacheStatus::Miss;
+                            let upstream_future =
+                                Box::pin(this.transformer.upstream_transform(
+                                    request.take().expect(POLL_AFTER_READY_ERROR),
+                                ));
+                            State::PollUpstream { upstream_future }
+                        }
                     }
                 }
                 StateProj::PollUpstream { upstream_future } => {
@@ -373,12 +390,14 @@ where
                     }
                 }
                 StateProj::Response { response } => {
-                    let response = this
-                        .transformer
-                        .response_transform(
-                            response.take().expect(POLL_AFTER_READY_ERROR), 
-                            if *this.cache_enabled { Some(*this.cache_status) } else { None }
-                        );
+                    let response = this.transformer.response_transform(
+                        response.take().expect(POLL_AFTER_READY_ERROR),
+                        if *this.cache_enabled {
+                            Some(*this.cache_status)
+                        } else {
+                            None
+                        },
+                    );
                     return Poll::Ready(response);
                 }
             };

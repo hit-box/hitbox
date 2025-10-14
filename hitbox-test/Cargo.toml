@@ -17,11 +17,14 @@ keywords = ["cache", "tower", "async", "http", "hitbox"]
 
 [dependencies]
 hitbox = { path = "../hitbox", version = "0.1" }
+hitbox-core = { path = "../hitbox-core", version = "0.1", features = ["test-helpers"] }
 hitbox-http = { path = "../hitbox-http", version = "0.1" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
 hitbox-moka = { path = "../hitbox-moka", version = "0.1" }
 hitbox-tower = { path = "../hitbox-tower", version = "0.1" }
 hitbox-configuration = { path = "../hitbox-configuration", version = "0.1" }
+chrono = "0.4"
+async-trait = "0.1"
 
 futures = "0.3"
 tower = "0.5"
@@ -45,6 +48,7 @@ assert-json-diff = "2.0"
 jaq-core = "2.1.0"
 jaq-std = "2.1.0"
 jaq-json = { version = "1.1.0", features = ["serde_json"] }
+serial_test = "3.2"
 
 [[test]]
 name = "integration"

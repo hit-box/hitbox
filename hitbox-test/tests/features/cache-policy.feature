@@ -8,11 +8,10 @@ Feature: HTTP Response Caching Policy Configuration
       ```
     When execute request
       ```hurl
-			GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
-    Then response status is 200
-		And response body jq '.title=="Victim Prime"'
-		And response headers have no "X-Cache-Status" header
+    Then response status is 200 And response body jq '.title=="Victim Prime"'
+    And response headers have no "X-Cache-Status" header
     And cache has 0 records
 
   @integration
@@ -23,60 +22,61 @@ Feature: HTTP Response Caching Policy Configuration
           ttl: 120
           stale: 60
       ```
-		And key extractors
+    And key extractors
       ```yaml
       - Path: "/v1/authors/{author_id}/books/{book_id}"
       - Method:
       ```
     When execute request
       ```hurl
-			GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then response status is 200
-		And response body jq '.title=="Victim Prime"'
-		And response header "X-Cache-Status" is "MISS"
+    And response body jq '.title=="Victim Prime"'
+    And response header "X-Cache-Status" is "MISS"
     And cache has 1 records
-		And cache key "method=GET:author_id=robert-sheckley:book_id=victim-prime" exists
+    And cache key "method=GET:author_id=robert-sheckley:book_id=victim-prime" exists
     When execute request
       ```hurl
-			GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then response status is 200
-		And response body jq '.title=="Victim Prime"'
-		And response header "X-Cache-Status" is "HIT"
+    And response body jq '.title=="Victim Prime"'
+    And response header "X-Cache-Status" is "HIT"
 
-  @integration
+  @integration @serial
   Scenario: Enabled cache policy should use ttl
+    Given mock time is enabled
     Given hitbox with policy
       ```yaml
       !Enabled
-          ttl: 3
+          ttl: 2
       ```
-		And key extractors
+    And key extractors
       ```yaml
       - Path: "/v1/authors/{author_id}/books/{book_id}"
       - Method:
       ```
     When execute request
       ```hurl
-			GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then response status is 200
-		And response body jq '.title=="Victim Prime"'
-		And response header "X-Cache-Status" is "MISS"
+    And response body jq '.title=="Victim Prime"'
+    And response header "X-Cache-Status" is "MISS"
     And cache has 1 records
-		And cache key "method=GET:author_id=robert-sheckley:book_id=victim-prime" exists
+    And cache key "method=GET:author_id=robert-sheckley:book_id=victim-prime" exists
     When execute request
       ```hurl
-			GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then response status is 200
-		And response body jq '.title=="Victim Prime"'
-		And response header "X-Cache-Status" is "HIT"
-		When sleep 3
+    And response body jq '.title=="Victim Prime"'
+    And response header "X-Cache-Status" is "HIT"
+    When sleep 3
     And execute request
       ```hurl
-			GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then response status is 200
-		And response header "X-Cache-Status" is "MISS"
+    And response header "X-Cache-Status" is "MISS"
