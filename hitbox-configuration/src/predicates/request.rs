@@ -89,8 +89,33 @@ impl QueryOperation {
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum MethodOperation {
+    Eq(String),
+    In(Vec<String>),
+}
+
+impl MethodOperation {
+    fn into_predicates<ReqBody: Send + 'static>(
+        &self,
+        inner: RequestPredicate<ReqBody>,
+    ) -> RequestPredicate<ReqBody> {
+        match self {
+            MethodOperation::Eq(method) => Box::new(Method::new(inner, method.as_str()).unwrap()),
+            MethodOperation::In(methods) => {
+                let methods: Vec<http::Method> = methods
+                    .iter()
+                    .map(|m| m.parse().unwrap())
+                    .collect();
+                Box::new(Method::new_in(inner, methods))
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum Predicate {
-    Method(String),
+    Method(MethodOperation),
     Path(String),
     Query(QueryOperation),
     Header(HeaderOperation),
@@ -102,7 +127,7 @@ impl Predicate {
         inner: RequestPredicate<ReqBody>,
     ) -> RequestPredicate<ReqBody> {
         match self {
-            Predicate::Method(method) => Box::new(Method::new(inner, method.as_str()).unwrap()),
+            Predicate::Method(method_operation) => method_operation.into_predicates(inner),
             Predicate::Path(path) => Box::new(Path::new(inner, path.as_str().into())),
             Predicate::Query(query_operation) => query_operation.into_predicates(inner),
             Predicate::Header(header_operation) => header_operation.into_predicates(inner),

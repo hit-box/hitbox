@@ -3,8 +3,14 @@ use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
 
 #[derive(Debug)]
+pub enum Operation {
+    Eq(http::Method),
+    In(Vec<http::Method>),
+}
+
+#[derive(Debug)]
 pub struct Method<P> {
-    method: http::Method,
+    operation: Operation,
     inner: P,
 }
 
@@ -14,9 +20,16 @@ impl<P> Method<P> {
         T: TryInto<http::Method, Error = E>,
     {
         Ok(Method {
-            method: method.try_into()?,
+            operation: Operation::Eq(method.try_into()?),
             inner,
         })
+    }
+
+    pub fn new_in(inner: P, methods: Vec<http::Method>) -> Self {
+        Method {
+            operation: Operation::In(methods),
+            inner,
+        }
     }
 }
 
@@ -30,7 +43,7 @@ where
 {
     fn method(self, method: http::Method) -> Method<Self> {
         Method {
-            method,
+            operation: Operation::Eq(method),
             inner: self,
         }
     }
@@ -47,7 +60,11 @@ where
     async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
-                if self.method == request.parts().method {
+                let is_cacheable = match &self.operation {
+                    Operation::Eq(method) => *method == request.parts().method,
+                    Operation::In(methods) => methods.contains(&request.parts().method),
+                };
+                if is_cacheable {
                     PredicateResult::Cacheable(request)
                 } else {
                     PredicateResult::NonCacheable(request)
