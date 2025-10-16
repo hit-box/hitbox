@@ -82,10 +82,15 @@ impl HitboxWorld {
         for param in &request_spec.querystring {
             request = request.add_query_param(&param.name, &param.value);
         }
+
+        // Set request body based on content type
+        // Use .text() and .bytes() methods which don't modify headers,
+        // unlike .json() which automatically sets Content-Type: application/json
         let request = match &request_spec.body {
-            Body::Text(body) => request.json(body),
-            Body::File(_body, _name) => request.json("{}"),
-            Body::Binary(_bin) => request.json("{}"),
+            Body::Text(body) if !body.is_empty() => request.text(body),
+            Body::File(body, _name) if !body.is_empty() => request.bytes(body.clone().into()),
+            Body::Binary(bin) if !bin.is_empty() => request.bytes(bin.clone().into()),
+            _ => request, // No body
         };
 
         let response = request.await;

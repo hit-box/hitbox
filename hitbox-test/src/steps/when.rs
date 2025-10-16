@@ -13,6 +13,7 @@ async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Err
     let hurl_request = step
         .docstring_content()
         .ok_or_else(|| anyhow!("request not provided"))?;
+
     let hurl_file = parse_hurl_file(&hurl_request).map_err(|err| {
         anyhow!(
             "hurl request parse error: {}",
@@ -28,6 +29,7 @@ async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Err
         .request;
     let request = eval_request(request, &variables, &ContextDir::default())
         .map_err(|err| anyhow!("hurl request error {:?}", err))?;
+
     world.execute_request(&request).await?;
     Ok(())
 }
