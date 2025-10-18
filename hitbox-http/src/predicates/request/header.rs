@@ -53,14 +53,16 @@ where
                     Operation::Eq(name, value) => request
                         .parts()
                         .headers
-                        .get(name)
-                        .is_some_and(|v| v.eq(value)),
+                        .get_all(name)
+                        .iter()
+                        .any(|header_value| value.eq(header_value)),
                     Operation::Exist(name) => request.parts().headers.get(name).is_some(),
                     Operation::In(name, values) => request
                         .parts()
                         .headers
-                        .get(name)
-                        .is_some_and(|v| values.contains(v)),
+                        .get_all(name)
+                        .iter()
+                        .any(|header_value| values.iter().any(|v| v.eq(header_value))),
                 };
                 if is_cacheable {
                     PredicateResult::Cacheable(request)

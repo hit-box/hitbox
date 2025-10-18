@@ -198,7 +198,7 @@ Feature: Header Predicate Functionality
     And cache has 1 records
 
   @integration
-  Scenario: Standard headers - Authorization and User-Agent
+  Scenario: Additional header doesn't affect cache decision
     Given request predicates
       ```yaml
       - Header: "Authorization"
@@ -208,6 +208,42 @@ Feature: Header Predicate Functionality
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       Authorization: Bearer token123
       User-Agent: Mozilla/5.0
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 1 records
+
+  @integration
+  Scenario: Multiple header values with EQ operation
+    Given request predicates
+      ```yaml
+      - Header:
+          x-custom-header: value2
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      x-custom-header: value1
+      x-custom-header: value2
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 1 records
+
+  @integration
+  Scenario: Multiple header values with IN operation
+    Given request predicates
+      ```yaml
+      - Header:
+          x-custom-header: 
+              - value3
+              - value2
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      x-custom-header: value1
+      x-custom-header: value2
       ```
     Then response status is 200
     And response header "X-Cache-Status" is "MISS"
