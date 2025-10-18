@@ -235,7 +235,7 @@ Feature: Header Predicate Functionality
     Given request predicates
       ```yaml
       - Header:
-          x-custom-header: 
+          x-custom-header:
               - value3
               - value2
       ```
@@ -248,3 +248,173 @@ Feature: Header Predicate Functionality
     Then response status is 200
     And response header "X-Cache-Status" is "MISS"
     And cache has 1 records
+
+  @integration
+  Scenario: Header Eq operation - value case sensitivity
+    Given request predicates
+      ```yaml
+      - Header:
+          x-api-key: "Secret123"
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      x-api-key: secret123
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 0 records
+
+  @integration
+  Scenario: Header Eq operation - header with leading and trailing whitespace trimmed
+    Given request predicates
+      ```yaml
+      - Header:
+          x-token: "mytoken"
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      x-token:  mytoken 
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 1 records
+
+  @integration
+  Scenario: Header Eq operation - missing header not cached
+    Given request predicates
+      ```yaml
+      - Header:
+          x-required-header: "value123"
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 0 records
+
+  @integration
+  Scenario: Header Exist operation - accepts any value
+    Given request predicates
+      ```yaml
+      - Header: "X-Trace-Id"
+      ```
+    And key extractors
+      ```yaml
+      - Method:
+      - Path: "/v1/authors/{author_id}/books/{book_id}"
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      X-Trace-Id: trace-abc-123
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 1 records
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      X-Trace-Id: completely-different-value
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "HIT"
+
+  @integration
+  Scenario: Header Exist operation - case-insensitive header name
+    Given request predicates
+      ```yaml
+      - Header: "Authorization"
+      ```
+    And key extractors
+      ```yaml
+      - Method:
+      - Path: "/v1/authors/{author_id}/books/{book_id}"
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      authorization: Bearer token123
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 1 records
+
+  @integration
+  Scenario: Header In operation - single value in list
+    Given request predicates
+      ```yaml
+      - Header:
+          Accept:
+            - application/json
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      Accept: application/json
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 1 records
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      Accept: application/xml
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 1 records
+
+  @integration
+  Scenario: Header In operation - empty list behavior
+    Given request predicates
+      ```yaml
+      - Header:
+          X-Feature-Flag: []
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      X-Feature-Flag: enabled
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 0 records
+
+  @integration
+  Scenario: Header In operation - value case sensitivity
+    Given request predicates
+      ```yaml
+      - Header:
+          Content-Type:
+            - application/json
+            - application/xml
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      Content-Type: Application/JSON
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 0 records
+
+  @integration
+  Scenario: Header In operation - missing header not cached
+    Given request predicates
+      ```yaml
+      - Header:
+          Accept-Language:
+            - en-US
+            - fr-FR
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 0 records

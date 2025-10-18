@@ -10,7 +10,8 @@ Feature: HTTP Response Caching Policy Configuration
       ```hurl
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
-    Then response status is 200 And response body jq '.title=="Victim Prime"'
+    Then response status is 200
+    And response body jq '.title=="Victim Prime"'
     And response headers have no "X-Cache-Status" header
     And cache has 0 records
 
