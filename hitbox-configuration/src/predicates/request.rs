@@ -49,7 +49,7 @@ impl HeaderOperation {
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-#[serde(tag = "operation")]
+#[serde(tag = "operation", content = "param")]
 pub enum QueryOperation {
     Eq(IndexMap<String, String>),
     Exist(String),

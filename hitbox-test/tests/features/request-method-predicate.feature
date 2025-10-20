@@ -1,4 +1,4 @@
-Feature: Method Predicate Functionality
+Feature: Request Method Predicate Functionality
 
   Background:
     Given hitbox with policy
@@ -8,7 +8,7 @@ Feature: Method Predicate Functionality
       ```
 
   @integration
-  Scenario: Method predicate matches GET requests
+  Scenario: Method Eq operation - match method request
     Given request predicates
       ```yaml
       - Method: GET
@@ -28,21 +28,21 @@ Feature: Method Predicate Functionality
     And response header "X-Cache-Status" is "HIT"
 
   @integration
-  Scenario: Method predicate matches HEAD requests
+  Scenario: Method Eq operation - non-matching method returns non-cacheable
     Given request predicates
       ```yaml
-      - Method: HEAD
+      - Method: POST
       ```
     When execute request
       ```hurl
-      HEAD http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then response status is 200
     And response header "X-Cache-Status" is "MISS"
-    And cache has 1 records
+    And cache has 0 records
 
   @integration
-  Scenario: Method In operation - GET in allowed list cached
+  Scenario: Method In operation - method in allowed list cached
     Given request predicates
       ```yaml
       - Method:
@@ -64,32 +64,15 @@ Feature: Method Predicate Functionality
     And response header "X-Cache-Status" is "HIT"
 
   @integration
-  Scenario: Method In operation - HEAD in allowed list cached
+  Scenario: Method In operation - empty list behavior
     Given request predicates
       ```yaml
-      - Method:
-          - GET
-          - HEAD
+      - Method: []
       ```
     When execute request
       ```hurl
-      HEAD http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then response status is 200
     And response header "X-Cache-Status" is "MISS"
-    And cache has 1 records
-
-  @integration
-  Scenario: Method In operation - POST not in allowed list not cached
-    Given request predicates
-      ```yaml
-      - Method:
-          - GET
-          - HEAD
-      ```
-    When execute request
-      ```hurl
-      POST http://localhost/v1/authors/robert-sheckley/books/victim-prime
-      ```
-    Then response status is 405
     And cache has 0 records

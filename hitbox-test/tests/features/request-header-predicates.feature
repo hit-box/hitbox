@@ -1,11 +1,10 @@
-Feature: Header Predicate Functionality
+Feature: Request Header Predicate Functionality
 
   Background:
     Given hitbox with policy
       ```yaml
       !Enabled
-      ttl: 120
-      stale: 60
+      ttl: 10
       ```
 
   @integration
