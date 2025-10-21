@@ -1,6 +1,6 @@
 use hitbox_http::predicates::{
     NeutralRequestPredicate,
-    conditions::Or,
+    conditions::{Not, Or},
     request::{BodyPredicate as BodyPredicateTrait, Header, Method, Path, Query},
 };
 use hitbox_http::FromBytes;
@@ -193,6 +193,7 @@ impl Predicate {
 pub enum Operation {
     And(Vec<Expression>),
     Or(Vec<Expression>),
+    Not(Box<Expression>),
 }
 
 impl Operation {
@@ -230,6 +231,10 @@ impl Operation {
             Operation::And(predicates) => predicates
                 .iter()
                 .rfold(inner, |inner, predicate| predicate.into_predicates(inner)),
+            Operation::Not(expression) => {
+                let predicate = expression.into_predicates(Box::new(NeutralRequestPredicate::new()));
+                Box::new(Not::new(predicate))
+            }
         }
     }
 }
