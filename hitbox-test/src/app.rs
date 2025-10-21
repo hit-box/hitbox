@@ -4,7 +4,7 @@ use axum::{routing::get, Router};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::handlers::{get_book, get_books};
+use crate::handlers::{get_book, get_books, post_book};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize, Ord, PartialOrd)]
 pub(crate) struct AuthorId(String);
@@ -30,6 +30,17 @@ pub(crate) struct Book {
     author: AuthorId,
     title: String,
     description: String,
+}
+
+impl Book {
+    pub(crate) fn new(id: BookId, author: AuthorId, title: String, description: String) -> Self {
+        Book {
+            id,
+            author,
+            title,
+            description,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -84,6 +95,22 @@ impl Database {
             .get(&book_id)
             .map(|entry| Arc::clone(entry.value()))
     }
+
+    pub(crate) fn create_book(&self, book: Arc<Book>) {
+        // Add to books map
+        self.books.insert(book.id.clone(), Arc::clone(&book));
+
+        // Add to author index
+        self.books_by_author_idx
+            .entry(book.author.clone())
+            .or_default()
+            .push(Arc::clone(&book));
+
+        // Re-sort books for this author
+        if let Some(mut entry) = self.books_by_author_idx.get_mut(&book.author) {
+            entry.value_mut().sort();
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -106,6 +133,9 @@ impl AppState {
 pub(crate) fn app() -> Router {
     Router::new()
         .route("/v1/authors/{author_id}/books", get(get_books))
-        .route("/v1/authors/{author_id}/books/{book_id}", get(get_book))
+        .route(
+            "/v1/authors/{author_id}/books/{book_id}",
+            get(get_book).post(post_book),
+        )
         .with_state(AppState::new())
 }

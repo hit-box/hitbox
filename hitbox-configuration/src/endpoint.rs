@@ -41,8 +41,12 @@ impl<ReqBody, ResBody> Clone for Endpoint<ReqBody, ResBody> {
 
 impl<ReqBody, ResBody> Default for Endpoint<ReqBody, ResBody>
 where
-    ReqBody: Send + Debug + 'static,
-    ResBody: Send + 'static,
+    ReqBody: hyper::body::Body + hitbox_http::FromBytes + Send + Debug + 'static,
+    ReqBody::Error: Debug,
+    ReqBody::Data: Send,
+    ResBody: hyper::body::Body + hitbox_http::FromBytes + Send + 'static,
+    ResBody::Error: Debug,
+    ResBody::Data: Send,
 {
     fn default() -> Self {
         ConfigEndpoint::default().into_endpoint()

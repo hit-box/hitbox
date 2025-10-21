@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use axum::{
+    body::Bytes,
     extract::{Path, Query, State},
     Json,
 };
 use http::StatusCode;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::app::{AppState, AuthorId, Book, BookId};
 
@@ -58,4 +59,45 @@ pub(crate) async fn get_books(
         .collect::<Vec<_>>();
 
     Ok(Json(paginated_books))
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub(crate) struct CreateBookRequest {
+    title: String,
+    description: String,
+}
+
+#[axum::debug_handler]
+pub(crate) async fn post_book(
+    State(state): State<AppState>,
+    Path((author_id, book_id)): Path<(String, String)>,
+    body: Bytes,
+) -> Result<Json<Arc<Book>>, StatusCode> {
+    // Check if book already exists
+    if state
+        .database()
+        .get_book(BookId::new(&book_id))
+        .await
+        .is_some()
+    {
+        return Err(StatusCode::CONFLICT);
+    }
+
+    // Parse the body as CreateBookRequest
+    let request: CreateBookRequest =
+        serde_json::from_slice(&body).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    // Create the book
+    let book = Arc::new(Book::new(
+        BookId::new(book_id),
+        AuthorId::new(author_id),
+        request.title,
+        request.description,
+    ));
+
+    // Store in database
+    state.database().create_book(book.clone());
+
+    // Return the created book
+    Ok(Json(book))
 }

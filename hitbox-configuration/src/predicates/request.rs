@@ -1,8 +1,10 @@
 use hitbox_http::predicates::{
     NeutralRequestPredicate,
     conditions::Or,
-    request::{Header, Method, Path, Query},
+    request::{BodyPredicate as BodyPredicateTrait, Header, Method, Path, Query},
 };
+use hitbox_http::FromBytes;
+use hyper::body::Body as HttpBody;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -114,23 +116,75 @@ impl MethodOperation {
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum BodyPredicate {
+    Jq(String),
+    ProtoBuf {
+        proto: String,
+        message: String,
+        expression: String,
+    },
+}
+
+impl BodyPredicate {
+    fn into_predicates<ReqBody>(
+        &self,
+        inner: RequestPredicate<ReqBody>,
+    ) -> RequestPredicate<ReqBody>
+    where
+        ReqBody: HttpBody + FromBytes + Send + 'static,
+        ReqBody::Error: std::fmt::Debug,
+        ReqBody::Data: Send,
+    {
+        match self {
+            BodyPredicate::Jq(expression) => Box::new(inner.body(
+                hitbox_http::predicates::request::body::ParsingType::Jq,
+                expression.clone(),
+                // For Jq expressions, we expect the expression to evaluate to a boolean
+                // (e.g., '.field == "value"' returns true/false)
+                // We cache when the expression evaluates to true
+                hitbox_http::predicates::request::body::Operation::Eq(
+                    serde_json::Value::Bool(true),
+                ),
+            )),
+            BodyPredicate::ProtoBuf {
+                proto,
+                message,
+                expression: _,
+            } => {
+                // TODO: Load the MessageDescriptor from the proto file path
+                // For now, this will panic if used - needs proper proto file loading
+                todo!("ProtoBuf support requires loading .proto files from path: {} message: {}", proto, message)
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum Predicate {
     Method(MethodOperation),
     Path(String),
     Query(QueryOperation),
     Header(HeaderOperation),
+    Body(BodyPredicate),
 }
 
 impl Predicate {
-    pub fn into_predicates<ReqBody: Send + 'static>(
+    pub fn into_predicates<ReqBody>(
         &self,
         inner: RequestPredicate<ReqBody>,
-    ) -> RequestPredicate<ReqBody> {
+    ) -> RequestPredicate<ReqBody>
+    where
+        ReqBody: HttpBody + FromBytes + Send + 'static,
+        ReqBody::Error: std::fmt::Debug,
+        ReqBody::Data: Send,
+    {
         match self {
             Predicate::Method(method_operation) => method_operation.into_predicates(inner),
             Predicate::Path(path) => Box::new(Path::new(inner, path.as_str().into())),
             Predicate::Query(query_operation) => query_operation.into_predicates(inner),
             Predicate::Header(header_operation) => header_operation.into_predicates(inner),
+            Predicate::Body(body_predicate) => body_predicate.into_predicates(inner),
         }
     }
 }
@@ -142,10 +196,15 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn into_predicates<ReqBody: Send + 'static>(
+    pub fn into_predicates<ReqBody>(
         &self,
         inner: RequestPredicate<ReqBody>,
-    ) -> RequestPredicate<ReqBody> {
+    ) -> RequestPredicate<ReqBody>
+    where
+        ReqBody: HttpBody + FromBytes + Send + 'static,
+        ReqBody::Error: std::fmt::Debug,
+        ReqBody::Data: Send,
+    {
         match self {
             Operation::Or(predicates) => {
                 if predicates.is_empty() {
@@ -183,10 +242,15 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn into_predicates<ReqBody: Send + 'static>(
+    pub fn into_predicates<ReqBody>(
         &self,
         inner: RequestPredicate<ReqBody>,
-    ) -> RequestPredicate<ReqBody> {
+    ) -> RequestPredicate<ReqBody>
+    where
+        ReqBody: HttpBody + FromBytes + Send + 'static,
+        ReqBody::Error: std::fmt::Debug,
+        ReqBody::Data: Send,
+    {
         match self {
             Self::Predicate(predicate) => predicate.into_predicates(inner),
             Self::Operation(operation) => operation.into_predicates(inner),
@@ -210,7 +274,9 @@ impl Default for Request {
 impl Request {
     pub fn into_predicates<Req>(self) -> RequestPredicate<Req>
     where
-        Req: Send + 'static,
+        Req: HttpBody + FromBytes + Send + 'static,
+        Req::Error: std::fmt::Debug,
+        Req::Data: Send,
     {
         let neutral_predicate = Box::new(NeutralRequestPredicate::<Req>::new());
         match self {
@@ -225,7 +291,9 @@ impl Request {
 
     pub fn predicates<Req>(&self) -> RequestPredicate<Req>
     where
-        Req: Send + 'static,
+        Req: HttpBody + FromBytes + Send + 'static,
+        Req::Error: std::fmt::Debug,
+        Req::Data: Send,
     {
         let neutral_predicate = Box::new(NeutralRequestPredicate::<Req>::new());
         match self {

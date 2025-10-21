@@ -77,3 +77,39 @@
 - [x] Value in list cached
 - [x] Value not in list not cached
 - [x] Empty list behavior
+
+#### Body Predicate
+
+##### Operations
+
+###### Eq (Exact Match)
+- [x] Simple field exact match cached
+- [x] Field value mismatch not cached
+- [x] Nested object field match cached
+- [x] Array element match cached
+- [x] Multiple body predicates - all must match
+- [x] Missing field not cached
+- [x] String value match
+- [x] Number value match
+- [x] Boolean value match
+- [x] Null value match
+- [x] Complex jq expression match
+- [x] Missing field equals null
+
+###### Exist (Presence Check)
+- [x] Field exists cached (any value)
+- [x] Different values for same field cache hit
+- [x] Missing field not cached
+- [x] Nested field existence
+- [x] Array element existence
+
+###### In (Multiple Values)
+- [x] Value in list cached with same key
+- [x] Different values in list share cache
+- [x] Value not in list not cached
+- [x] Empty list behavior
+- [x] Multiple data types in list
+
+##### Parsing Types
+- [x] JSON with jq expressions (primary focus)
+- [ ] ProtoBuf parsing (future work)

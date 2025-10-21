@@ -46,8 +46,12 @@ impl ConfigEndpoint {
 
     pub fn into_endpoint<ReqBody, ResBody>(self) -> Endpoint<ReqBody, ResBody>
     where
-        ReqBody: Send + Debug + 'static,
-        ResBody: Send + 'static,
+        ReqBody: hyper::body::Body + hitbox_http::FromBytes + Send + Debug + 'static,
+        ReqBody::Error: Debug,
+        ReqBody::Data: Send,
+        ResBody: hyper::body::Body + hitbox_http::FromBytes + Send + 'static,
+        ResBody::Error: Debug,
+        ResBody::Data: Send,
     {
         let extractors = Arc::new(self.extractors());
         let response_predicates = Arc::new(match self.response {
