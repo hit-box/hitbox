@@ -125,18 +125,10 @@
 - [x] Both predicates don't match - request not cached
 
 ##### Multiple Predicate Combinations
-- [ ] Three predicates all match - request cached (Method AND Header AND Path)
-- [ ] Method AND Header AND Query all match
-- [ ] Method AND Path AND Body all match
+- [x] Three predicates all match - request cached (Method AND Header AND Path)
+- [x] Method AND Header AND Query all match
+- [x] Method AND Path AND Body all match
 - [ ] Four or more predicates chained together
-
-##### Real-World Scenarios
-- [ ] Authentication check: Method=GET AND Header(Authorization exists)
-- [ ] Tenant isolation: Header(x-tenant-id exists) AND Path matches pattern
-- [ ] API versioning: Header(x-api-version=v1) AND Method=GET
-- [ ] Content-type filtering: Method=POST AND Header(Content-Type=application/json)
-- [ ] Multi-tenant API: Header(x-tenant-id) AND Header(x-api-key) AND Method in [GET,HEAD]
-- [ ] GraphQL query filtering: Method=POST AND Body(.operationName exists) AND Body(.operationName != "IntrospectionQuery")
 
 ##### Edge Cases
 - [ ] Empty And list behavior (should be neutral/cacheable)
@@ -146,13 +138,6 @@
 
 #### Or Predicate (Explicit Alternative Matching)
 
-##### Real-World Use Cases
-- Multi-method endpoints: Cache GET OR HEAD requests
-- Content negotiation: Accept JSON OR XML responses
-- Multiple authentication methods: API key OR Bearer token
-- Development vs Production: Cache in production OR when cache-debug header present
-- Health check patterns: Path=/health OR Path=/healthz OR Path=/ready
-
 ##### Basic Functionality
 - [x] Left predicate matches - request cached
 - [x] Right predicate matches - request cached
@@ -161,18 +146,9 @@
 - [x] Base predicate fails - request not cached regardless of Or branches
 
 ##### Multiple Or Branches
-- [ ] Three predicates in Or - any match caches (Method in GET,HEAD,OPTIONS)
-- [ ] Four or more predicates in Or
-- [ ] Or with different predicate types (Method OR Path OR Header)
-
-##### Real-World Scenarios
-- [ ] Safe methods: Method=GET OR Method=HEAD
-- [ ] CORS preflight: Method=OPTIONS OR Method=HEAD
-- [ ] Content types: Header(Accept=application/json) OR Header(Accept=application/xml)
-- [ ] Multi-path caching: Path=/api/users OR Path=/api/posts
-- [ ] API version compatibility: Header(x-api-version=v1) OR Header(x-api-version=v2)
-- [ ] Public OR authenticated: Path=/public/* OR Header(Authorization exists)
-- [ ] Multiple tenant support: Header(x-tenant-id=tenant-a) OR Header(x-tenant-id=tenant-b)
+- [x] Three predicates in Or - any match caches (Method in GET,HEAD,OPTIONS)
+- [x] Four or more predicates in Or
+- [x] Or with different predicate types (Method OR Path OR Header)
 
 ##### Edge Cases
 - [ ] Empty Or list behavior (should be non-cacheable)
@@ -187,25 +163,9 @@
 
 #### Not Predicate (Negation/Inversion)
 
-##### Real-World Use Cases
-- Exclusion patterns: Cache everything EXCEPT admin endpoints
-- Method exclusion: Cache all methods EXCEPT POST,PUT,DELETE
-- Health check filtering: Don't cache monitoring endpoints
-- Development mode: Cache only when NOT in debug mode
-- Bot filtering: Cache only when NOT a bot (User-Agent check)
-
 ##### Basic Functionality
 - [x] Wrapped predicate matches - result is NonCacheable
 - [x] Wrapped predicate doesn't match - result is Cacheable
-
-##### Real-World Scenarios
-- [ ] Exclude mutations: Not(Method=POST)
-- [ ] Exclude admin: Not(Path=/admin/*)
-- [ ] Exclude health checks: Not(Path=/health)
-- [ ] Cache non-authenticated only: Not(Header(Authorization exists))
-- [ ] Exclude specific tenant: Not(Header(x-tenant-id=excluded-tenant))
-- [ ] Exclude monitoring: Not(Or(Path=/metrics OR Path=/health OR Path=/ready))
-- [ ] Cache when no debug flag: Not(Header(x-debug=true))
 
 ##### Double Negation
 - [ ] Not(Not(predicate)) equals predicate
@@ -219,39 +179,27 @@
 #### Complex Predicate Combinations
 
 ##### And + Or Combinations
-- [ ] (Method=GET OR Method=HEAD) AND Path=/api/*
-- [ ] Method=GET AND (Path=/users OR Path=/posts)
-- [ ] (Header(x-tenant-id=a) OR Header(x-tenant-id=b)) AND Method=GET
-- [ ] Method in [GET,HEAD] AND (Header(Accept=json) OR Header(Accept=xml))
+- [x] (Method=GET OR Method=HEAD) AND Path=/api/*
+- [x] Method=GET AND (Path=/users OR Path=/posts)
+- [x] (Header(x-tenant-id=a) OR Header(x-tenant-id=b)) AND Method=GET
+- [x] Method=GET AND (Header(Content-Type=json) OR Header(Content-Type=xml))
 
 ##### Not + Or Combinations
-- [ ] Not(Method=POST OR Method=DELETE) - caches GET,HEAD,PUT,PATCH,etc
-- [ ] Not(Path=/admin OR Path=/internal) - excludes multiple paths
-- [ ] Method=GET AND Not(Path=/health OR Path=/metrics)
+- [x] Not(Method=POST OR Method=DELETE) - caches GET,HEAD,PUT,PATCH,etc
+- [x] Not(Path=/admin OR Path=/internal) - excludes multiple paths
+- [x] Method=GET AND Not(Path OR Query)
 - [ ] Not(Header(x-debug=true)) AND Method in [GET,HEAD]
 
 ##### Not + And Combinations
-- [ ] Not(Method=POST AND Path=/admin/*) - DeMorgan's law application
-- [ ] Not(Header(x-tenant-id exists) AND Method=DELETE)
-- [ ] Method=GET AND Not(Header(x-no-cache=true) AND Path=/dynamic/*)
+- [x] Not(Method=POST AND Path=/admin/*) - DeMorgan's law application
+- [x] Not(Header(x-tenant-id exists) AND Method=DELETE)
+- [x] Method=GET AND Not(Header(x-no-cache=true) AND Path=/dynamic/*)
 
 ##### Three-Level Nesting
-- [ ] And(Or(And(...))) - complex nested logic
-- [ ] Or(And(Not(...))) - mixed logical operators
-- [ ] Real-world: (Method=GET OR Method=HEAD) AND Not(Path=/admin/*) AND Header(x-api-key exists)
-- [ ] GraphQL advanced: Method=POST AND Body(.operationName exists) AND Not(Body(.operationName == "IntrospectionQuery")) AND Or(Header(x-tenant-id=a) OR Header(x-tenant-id=b))
-
-##### Request + Response Predicate Combinations
-- [ ] Request: Method=GET AND Response: Status=200
-- [ ] Request: Not(Method=POST) AND Response: Status in [200,201,204]
-- [ ] Request: Or(Method=GET, Method=HEAD) AND Response: Not(Status in [4xx,5xx])
-
-##### Practical Multi-Condition Scenarios
-- [ ] REST API: Method=GET AND Path=/api/* AND Header(Authorization exists) AND Not(Query(cache=false))
-- [ ] Multi-tenant SaaS: Header(x-tenant-id exists) AND Method in [GET,HEAD] AND Not(Path=/admin/*) AND (Header(x-api-version=v1) OR Header(x-api-version=v2))
-- [ ] GraphQL with auth: Method=POST AND Body(.query exists) AND Header(Authorization exists) AND Not(Body(.operationName == "Mutation"))
-- [ ] Public API with rate limiting: Or(Header(x-api-tier=premium), Header(x-api-tier=enterprise)) AND Method=GET AND Not(Header(x-no-cache exists))
-- [ ] Development environment: (Header(x-environment=production) OR Header(x-cache-enabled=true)) AND Method=GET AND Not(Path=/debug/*)
+- [x] And(Or(And(...))) - complex nested logic
+- [x] Or(And(Not(...))) - mixed logical operators
+- [x] Real-world: (Method=GET OR Method=HEAD) AND Not(Path=/admin/*) AND Header(x-api-key exists)
+- [x] GraphQL advanced: Method=POST AND Body(.operationName exists) AND Not(Body(.operationName == "IntrospectionQuery")) AND Or(Header(x-tenant-id=a) OR Header(x-tenant-id=b))
 
 ##### Performance & Correctness
 - [ ] Deep nesting (5+ levels) doesn't cause stack overflow
