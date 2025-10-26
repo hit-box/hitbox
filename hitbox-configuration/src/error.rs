@@ -3,10 +3,7 @@ use thiserror::Error;
 /// Configuration error with enhanced location information
 #[derive(Debug, Error)]
 #[error("{}", display_with_context(.0, .1))]
-pub struct ConfigError(
-    #[source] serde_yaml::Error,
-    Option<String>,
-);
+pub struct ConfigError(#[source] serde_yaml::Error, Option<String>);
 
 impl ConfigError {
     /// Create a new configuration error from a serde_yaml error
@@ -33,7 +30,6 @@ impl ConfigError {
     pub fn display_with_context(&self) -> String {
         display_with_context(&self.0, &self.1)
     }
-
 }
 
 /// Format the YAML content with context around the error location
@@ -45,16 +41,16 @@ fn format_context(yaml: &str, error_line: usize, error_column: usize) -> String 
 /// Check if we should use colored output (if stdout is a terminal)
 fn should_use_color() -> bool {
     // Check environment variable first (allows forcing colors on/off)
-    if let Ok(val) = std::env::var("NO_COLOR") {
-        if !val.is_empty() {
-            return false;
-        }
+    if let Ok(val) = std::env::var("NO_COLOR")
+        && !val.is_empty()
+    {
+        return false;
     }
 
-    if let Ok(val) = std::env::var("FORCE_COLOR") {
-        if !val.is_empty() {
-            return true;
-        }
+    if let Ok(val) = std::env::var("FORCE_COLOR")
+        && !val.is_empty()
+    {
+        return true;
     }
 
     // Default to true for now (user can disable with NO_COLOR env var)
@@ -63,7 +59,12 @@ fn should_use_color() -> bool {
 }
 
 /// Format context with optional ANSI colors
-fn format_context_with_color(yaml: &str, error_line: usize, error_column: usize, use_colors: bool) -> String {
+fn format_context_with_color(
+    yaml: &str,
+    error_line: usize,
+    error_column: usize,
+    use_colors: bool,
+) -> String {
     let lines: Vec<&str> = yaml.lines().collect();
     let mut output = String::new();
 
@@ -92,8 +93,10 @@ fn format_context_with_color(yaml: &str, error_line: usize, error_column: usize,
     // Location indicator (like hurl: --> line X, column Y)
     output.push_str(&format!(
         "  {blue}-->{reset} line {}, column {}\n",
-        error_line, error_column,
-        blue = blue, reset = reset
+        error_line,
+        error_column,
+        blue = blue,
+        reset = reset
     ));
 
     for (idx, line) in lines.iter().enumerate().take(end).skip(start) {
@@ -157,11 +160,7 @@ fn display_with_context(error: &serde_yaml::Error, yaml_content: &Option<String>
         // Show context if yaml_content is available
         if let Some(yaml) = yaml_content {
             output.push('\n');
-            output.push_str(&format_context(
-                yaml,
-                location.line(),
-                location.column(),
-            ));
+            output.push_str(&format_context(yaml, location.line(), location.column()));
         } else {
             // Fallback: just show location without context
             output.push_str(&format!(

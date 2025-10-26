@@ -1,10 +1,13 @@
 // @FIX: assert with final `crate::Endpoint`
 use bytes::Bytes;
 use hitbox_configuration::{
-    ConfigEndpoint, Response, predicates::response::Predicate, types::MaybeUndefined,
+    ConfigEndpoint, Response,
+    predicates::response::{Predicate, status},
+    types::MaybeUndefined,
 };
 use http_body_util::Empty;
 use pretty_assertions::assert_eq;
+use std::num::NonZeroU16;
 
 #[test]
 fn test_response_expression_flat_deserialize() {
@@ -18,8 +21,8 @@ response:
     let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Status(200.try_into().unwrap()),
-            Predicate::Status(201.try_into().unwrap()),
+            Predicate::Status(status::Operation::Eq(NonZeroU16::new(200).unwrap())),
+            Predicate::Status(status::Operation::Eq(NonZeroU16::new(201).unwrap())),
         ])),
         ..Default::default()
     };

@@ -246,9 +246,7 @@ Feature: Logical Or Predicate Functionality
         - Header:
             x-admin: "true"
         - Query:
-            operation: Eq
-            param:
-              cache: "force"
+            cache: "force"
       ```
     When execute request
       ```hurl

@@ -1,8 +1,9 @@
-use std::num::NonZeroU16;
+pub mod body;
+pub mod status;
 
 use hitbox_http::predicates::NeutralResponsePredicate;
-use hitbox_http::predicates::response::{BodyPredicate as BodyPredicateTrait, StatusCode};
-use hitbox_http::{CacheableHttpResponse, FromBytes, predicates::conditions::Or};
+use hitbox_http::predicates::conditions::Or;
+use hitbox_http::{CacheableHttpResponse, FromBytes};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
@@ -10,54 +11,9 @@ type CorePredicate<ReqBody> =
     Box<dyn hitbox_core::Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync>;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-#[serde(untagged)]
-pub enum BodyPredicate {
-    Jq(String),
-    ProtoBuf {
-        proto: String,
-        message: String,
-        expression: String,
-    },
-}
-
-impl BodyPredicate {
-    fn into_predicates<ReqBody>(
-        &self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody>
-    where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
-        ReqBody::Data: Send,
-    {
-        match self {
-            BodyPredicate::Jq(expression) => Box::new(inner.body(
-                hitbox_http::predicates::response::body::ParsingType::Jq,
-                expression.clone(),
-                // For Jq expressions, we expect the expression to evaluate to a boolean
-                // (e.g., '.field == "value"' returns true/false)
-                // We cache when the expression evaluates to true
-                hitbox_http::predicates::response::body::Operation::Eq(
-                    serde_json::Value::Bool(true),
-                ),
-            )),
-            BodyPredicate::ProtoBuf {
-                proto,
-                message,
-                expression: _,
-            } => {
-                // TODO: Load the MessageDescriptor from the proto file path
-                // For now, this will panic if used - needs proper proto file loading
-                todo!("ProtoBuf support requires loading .proto files from path: {} message: {}", proto, message)
-            }
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum Predicate {
-    Status(NonZeroU16),
-    Body(BodyPredicate),
+    Status(status::Operation),
+    Body(body::Operation),
 }
 
 impl Predicate {
@@ -71,10 +27,8 @@ impl Predicate {
         ReqBody::Data: Send,
     {
         match self {
-            Predicate::Status(code) => {
-                Box::new(StatusCode::new(inner, code.get().try_into().unwrap()))
-            }
-            Predicate::Body(body_predicate) => body_predicate.into_predicates(inner),
+            Predicate::Status(status_op) => status_op.into_predicates(inner),
+            Predicate::Body(body_op) => body_op.into_predicates(inner),
         }
     }
 }
@@ -97,34 +51,25 @@ impl Operation {
     {
         match self {
             Operation::Or(predicates) => {
-                let mut predicates = predicates.into_iter();
-                let left = predicates
-                    .next()
-                    .map(|expression| {
-                        expression.into_predicates(
+                let mut iter = predicates.into_iter();
+                match iter.next() {
+                    None => inner,
+                    Some(first) => {
+                        let first_predicate = first.into_predicates(
                             Box::new(NeutralResponsePredicate::new()) as CorePredicate<ReqBody>
-                        )
-                    })
-                    .unwrap_or(Box::new(NeutralResponsePredicate::new()));
-                // FIX: use Not(NeutralResponsePredicate) instead of NeutralResponsePredicate
-                let right = predicates
-                    .next()
-                    .map(|expression| {
-                        expression.into_predicates(
-                            Box::new(NeutralResponsePredicate::new()) as CorePredicate<ReqBody>
-                        )
-                    })
-                    .unwrap_or(Box::new(NeutralResponsePredicate::new()));
-                let acc = Box::new(Or::new(left, right, inner));
-                predicates.rfold(acc, |acc, expression| {
-                    Box::new(Or::new(
-                        acc,
-                        expression.into_predicates(
-                            Box::new(NeutralResponsePredicate::new()) as CorePredicate<ReqBody>
-                        ),
-                        Box::new(NeutralResponsePredicate::new()),
-                    ))
-                })
+                        );
+                        iter.fold(first_predicate, |acc, expression| {
+                            let predicate = expression.into_predicates(
+                                Box::new(NeutralResponsePredicate::new()) as CorePredicate<ReqBody>
+                            );
+                            Box::new(Or::new(
+                                predicate,
+                                acc,
+                                Box::new(NeutralResponsePredicate::new()),
+                            ))
+                        })
+                    }
+                }
             }
             Operation::And(predicates) => predicates
                 .into_iter()

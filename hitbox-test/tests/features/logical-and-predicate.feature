@@ -112,9 +112,7 @@ Feature: Logical And Predicate Functionality
         - Header:
             x-tenant-id: "tenant-a"
         - Query:
-            operation: Eq
-            param:
-              page: "1"
+            page: !eq "1"
       ```
     When execute request
       ```hurl
@@ -234,9 +232,7 @@ Feature: Logical And Predicate Functionality
         - Header:
             x-tenant-id: "tenant-a"
         - Query:
-            operation: Eq
-            param:
-              page: "1"
+            page: !eq "1"
       ```
     When execute request
       ```hurl

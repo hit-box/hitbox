@@ -20,7 +20,7 @@ use crate::{
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ConfigEndpoint {
-    #[serde(default, with = "serde_yaml::with::singleton_map_recursive")]
+    #[serde(default)]
     pub request: MaybeUndefined<Request>,
     #[serde(default, with = "serde_yaml::with::singleton_map_recursive")]
     pub response: MaybeUndefined<Response>,

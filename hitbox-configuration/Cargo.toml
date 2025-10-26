@@ -14,6 +14,11 @@ serde = { version = "1", features = ["derive", "alloc"] }
 serde_json = "1"
 serde_yaml = "0.9"
 indexmap = { version = "2.10", features = ["serde"] }
+thiserror = "2"
+marked-yaml = { version = "0.8.0", optional = true }
+serde_yml = { version = "0.0.12", optional = true }
+yaml-rust2 = { version = "0.10.4", optional = true }
+serde_yaml_ng = { version = "0.10.0", optional = true }
 
 
 [dev-dependencies]
@@ -25,3 +30,9 @@ tokio = { version = "1", features = [
 bytes = "1"
 hitbox = { path = "../hitbox", version = "0.1" }
 http-body-util = "0.1"
+
+[features]
+marked-yaml = ["dep:marked-yaml"]
+serde_yml = ["dep:serde_yml"]
+yaml-rust2 = ["dep:yaml-rust2"]
+serde_yaml_ng = ["dep:serde_yaml_ng"]

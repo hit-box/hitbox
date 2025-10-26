@@ -185,9 +185,7 @@ Feature: Logical Complex Predicate Combinations
             Or:
               - Path: /v1/authors/robert-sheckley/books/invalid-book-id
               - Query:
-                  operation: Eq
-                  param:
-                    page: "999"
+                  page: "999"
       ```
     When execute request
       ```hurl
@@ -283,9 +281,7 @@ Feature: Logical Complex Predicate Combinations
               - Header:
                   x-no-cache: "true"
               - Query:
-                  operation: Eq
-                  param:
-                    debug: "1"
+                  debug: "1"
       ```
     When execute request
       ```hurl
@@ -309,9 +305,7 @@ Feature: Logical Complex Predicate Combinations
               - Header:
                   x-no-cache: "true"
               - Query:
-                  operation: Eq
-                  param:
-                    debug: "1"
+                  debug: "1"
       ```
     When execute request
       ```hurl
@@ -343,9 +337,7 @@ Feature: Logical Complex Predicate Combinations
             - Method: HEAD
         - Not:
             Query:
-              operation: Eq
-              param:
-                nocache: "true"
+              nocache: "true"
         - Header:
             x-api-key: "secret123"
       ```
@@ -375,9 +367,7 @@ Feature: Logical Complex Predicate Combinations
             - Method: PUT
         - Not:
             Query:
-              operation: Eq
-              param:
-                skip-cache: "yes"
+              skip-cache: "yes"
         - Header:
             x-test-header: "test-value"
       ```
@@ -670,9 +660,7 @@ Feature: Logical Complex Predicate Combinations
             - Method: DELETE
         - Not:
             Query:
-              operation: Eq
-              param:
-                nocache: "true"
+              nocache: "true"
         - Header:
             x-api-key: "secret123"
       ```
@@ -695,9 +683,7 @@ Feature: Logical Complex Predicate Combinations
             - Method: PUT
         - Not:
             Query:
-              operation: Eq
-              param:
-                skip: "yes"
+              skip: "yes"
         - Header:
             x-special-key: "special-value"
       ```

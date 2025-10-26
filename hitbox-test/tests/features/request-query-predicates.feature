@@ -12,9 +12,7 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          operation: Eq
-          param:
-            cache: "true"
+          cache: !eq "true"
       ```
     When execute request
       ```hurl
@@ -39,10 +37,8 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          operation: Eq
-          param:
-            page: "1"
-            per_page: "10"
+          page: "1"
+          per_page: "10"
       ```
     When execute request
       ```hurl
@@ -69,9 +65,7 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          operation: Eq
-          param:
-            page: "1"
+          page: "1"
       ```
     When execute request
       ```hurl
@@ -88,9 +82,7 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          operation: Eq
-          param:
-            empty: ""
+          empty: ""
       ```
     When execute request
       ```hurl
@@ -107,11 +99,9 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          operation: In
-          param:
-            page:
-              - "1"
-              - "2"
+          page: !in
+            - "1"
+            - "2"
       ```
     When execute request
       ```hurl
@@ -136,11 +126,9 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          operation: In
-          param:
-            page:
-              - "1"
-              - "2"
+          page:
+            - "1"
+            - "2"
       ```
     When execute request
       ```hurl
@@ -157,9 +145,7 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          operation: In
-          param:
-            page: []
+          page: []
       ```
     When execute request
       ```hurl
@@ -176,8 +162,7 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          operation: Exist
-          param: page
+          page: !exists
       ```
     And key extractors
       ```yaml
@@ -207,8 +192,7 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          operation: Exist
-          param: page
+          page: !exists
       ```
     When execute request
       ```hurl
