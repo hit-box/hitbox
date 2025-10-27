@@ -64,7 +64,7 @@ impl Database {
             .or_else(|_| std::fs::read_to_string("hitbox-test/data.yaml"))
             .expect("Failed to read data.yaml from current directory or hitbox-test/");
         let database: Database =
-            serde_yaml::from_str(&data_content).expect("Failed to parse data.yaml");
+            serde_saphyr::from_str(&data_content).expect("Failed to parse data.yaml");
 
         // Build books_by_author_idx from books data
         for book_entry in database.books.iter() {

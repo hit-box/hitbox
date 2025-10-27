@@ -22,9 +22,9 @@ use crate::{
 pub struct ConfigEndpoint {
     #[serde(default)]
     pub request: MaybeUndefined<Request>,
-    #[serde(default, with = "serde_yaml::with::singleton_map_recursive")]
+    #[serde(default)]
     pub response: MaybeUndefined<Response>,
-    #[serde(default, with = "serde_yaml::with::singleton_map_recursive")]
+    #[serde(default)]
     pub extractors: MaybeUndefined<Vec<Extractor>>,
     pub policy: PolicyConfig,
 }

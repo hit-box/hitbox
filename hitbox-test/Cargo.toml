@@ -34,7 +34,7 @@ axum = { version = "0.8", features = ["macros"] }
 axum-test = "17.3"
 reqwest = "0.12"
 cucumber = { version = "0.21" }
-serde_yaml = "0.9"
+serde-saphyr = "0.0.6"
 anyhow = "1"
 hurl_core = { path = "../../hurl/packages/hurl_core/" }
 hurl = { path = "../../hurl/packages/hurl/" }

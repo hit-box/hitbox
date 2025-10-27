@@ -15,16 +15,17 @@ fn test_extractors_serialize() {
         extractors: MaybeUndefined::Value(extractors),
         ..Default::default()
     };
-    let yaml_str = serde_yaml::to_string(&original_endpoint).unwrap();
+    let yaml_str = serde_saphyr::to_string(&original_endpoint).unwrap();
     println!("{}", &yaml_str);
     let config = r"
-    policy: !Enabled
-      ttl: 5
-    extractors:
-      - Method:
-      - Path: /greet/{name}
-    ";
-    let endpoint = serde_yaml::from_str(config).unwrap();
+policy:
+  Enabled:
+    ttl: 5
+extractors:
+  - Method: {}
+  - Path: /greet/{name}
+";
+    let endpoint = serde_saphyr::from_str(config).unwrap();
     dbg!(&endpoint);
     assert_eq!(original_endpoint, endpoint);
 }

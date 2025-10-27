@@ -17,7 +17,7 @@ fn hitbox_with_policy(world: &mut HitboxWorld, step: &Step) -> Result<(), Error>
     let policy = step
         .docstring_content()
         .as_deref()
-        .map(serde_yaml::from_str::<PolicyConfig>)
+        .map(serde_saphyr::from_str::<PolicyConfig>)
         .transpose()?
         .unwrap_or_default();
     world.config.policy = policy;
@@ -26,7 +26,7 @@ fn hitbox_with_policy(world: &mut HitboxWorld, step: &Step) -> Result<(), Error>
 
 #[given(expr = "request predicates")]
 async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    let config = serde_yaml::from_str::<Request>(
+    let config = serde_saphyr::from_str::<Request>(
         step.docstring_content()
             .ok_or(anyhow!("Missing predicates configuration"))?
             .as_str(),
@@ -39,7 +39,7 @@ async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), 
 
 #[given(expr = "response predicates")]
 async fn response_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    let config = serde_yaml::from_str::<Response>(
+    let config = serde_saphyr::from_str::<Response>(
         step.docstring_content()
             .ok_or(anyhow!("Missing predicates configuration"))?
             .as_str(),
@@ -57,8 +57,8 @@ async fn response_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(),
 #[given(expr = "key extractors")]
 async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
     #[derive(Serialize, Deserialize)]
-    struct Config(#[serde(with = "serde_yaml::with::singleton_map_recursive")] Vec<Extractor>);
-    let config = serde_yaml::from_str::<Config>(
+    struct Config(Vec<Extractor>);
+    let config = serde_saphyr::from_str::<Config>(
         step.docstring_content()
             .ok_or(anyhow!("Missing extractors configuration"))?
             .as_str(),

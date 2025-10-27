@@ -3,8 +3,8 @@ Feature: Logical Complex Predicate Combinations
   Background:
     Given hitbox with policy
       ```yaml
-      !Enabled
-      ttl: 10
+      Enabled:
+        ttl: 10
       ```
 
   # And + Or Combinations

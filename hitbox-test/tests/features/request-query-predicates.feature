@@ -3,8 +3,8 @@ Feature: Request Query Predicate Functionality
   Background:
     Given hitbox with policy
       ```yaml
-      !Enabled
-      ttl: 10
+      Enabled:
+        ttl: 10
       ```
 
   @integration
@@ -12,7 +12,7 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          cache: !eq "true"
+          cache: { eq: "true" }
       ```
     When execute request
       ```hurl
@@ -162,7 +162,7 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          page: !exists
+          page: { exists: }
       ```
     And key extractors
       ```yaml
@@ -192,7 +192,7 @@ Feature: Request Query Predicate Functionality
     Given request predicates
       ```yaml
       - Query:
-          page: !exists
+          page: { exists: }
       ```
     When execute request
       ```hurl

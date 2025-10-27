@@ -12,13 +12,14 @@ use std::num::NonZeroU16;
 #[test]
 fn test_response_expression_flat_deserialize() {
     let yaml_str = r"
-policy: !Enabled
-  ttl: 5
+policy:
+  Enabled:
+    ttl: 5
 response:
   - Status: 200
   - Status: 201
 ";
-    let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
+    let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
             Predicate::Status(status::Operation::Eq(NonZeroU16::new(200).unwrap())),
@@ -32,10 +33,11 @@ response:
 #[test]
 fn test_undefined_response_predicates() {
     let yaml_str = r"
-policy: !Enabled
-  ttl: 5
+policy:
+  Enabled:
+    ttl: 5
 ";
-    let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
+    let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Undefined,
         ..Default::default()
@@ -47,10 +49,11 @@ policy: !Enabled
 fn test_null_response_predicates() {
     let yaml_str = r"
 response: null
-policy: !Enabled
-  ttl: 5
+policy:
+  Enabled:
+    ttl: 5
 ";
-    let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
+    let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Null,
         ..Default::default()
@@ -62,8 +65,9 @@ policy: !Enabled
 fn test_response_expression_into_predicates() {
     let yaml_str = r"
 extractors: []
-policy: !Enabled
-  ttl: 5
+policy:
+  Enabled:
+    ttl: 5
 response:
   And:
   - Status: 203
@@ -73,7 +77,7 @@ response:
     - Status: 202
   - Status: 205
 ";
-    let endpoint: ConfigEndpoint = serde_yaml::from_str(yaml_str).unwrap();
+    let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
     dbg!(&endpoint.response);
     let predicates = endpoint
         .response

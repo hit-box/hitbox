@@ -3,8 +3,8 @@ Feature: Logical And Predicate Functionality
   Background:
     Given hitbox with policy
       ```yaml
-      !Enabled
-      ttl: 10
+      Enabled:
+        ttl: 10
       ```
 
   @integration
@@ -112,7 +112,7 @@ Feature: Logical And Predicate Functionality
         - Header:
             x-tenant-id: "tenant-a"
         - Query:
-            page: !eq "1"
+            page: { eq: "1" }
       ```
     When execute request
       ```hurl
@@ -232,7 +232,7 @@ Feature: Logical And Predicate Functionality
         - Header:
             x-tenant-id: "tenant-a"
         - Query:
-            page: !eq "1"
+            page: { eq: "1" }
       ```
     When execute request
       ```hurl

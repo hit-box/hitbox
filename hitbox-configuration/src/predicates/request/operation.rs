@@ -7,83 +7,13 @@ use serde::{Deserialize, Serialize};
 use crate::RequestPredicate;
 use super::Expression;
 
-#[derive(Debug, Eq, PartialEq)]
+// Use standard externally-tagged enum (serde default)
+// YAML syntax: And: [...], Or: [...], Not: {...}
+#[derive(Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub enum Operation {
     And(Vec<Expression>),
     Or(Vec<Expression>),
     Not(Box<Expression>),
-}
-
-// Custom serialization for Operation to use map-key format (And:, Or:, Not:)
-impl Serialize for Operation {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeMap;
-
-        let mut map = serializer.serialize_map(Some(1))?;
-
-        match self {
-            Operation::And(expressions) => {
-                map.serialize_entry("And", expressions)?;
-            }
-            Operation::Or(expressions) => {
-                map.serialize_entry("Or", expressions)?;
-            }
-            Operation::Not(expression) => {
-                map.serialize_entry("Not", expression)?;
-            }
-        }
-
-        map.end()
-    }
-}
-
-// Custom deserialization for Operation to handle YAML map-key syntax (And:, Or:, Not:)
-impl<'de> Deserialize<'de> for Operation {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de;
-
-        let value = serde_yaml::Value::deserialize(deserializer)?;
-
-        let mapping = value
-            .as_mapping()
-            .ok_or_else(|| de::Error::custom("expected a mapping for Operation"))?;
-
-        if mapping.len() != 1 {
-            return Err(de::Error::custom(
-                "Operation must have exactly one variant",
-            ));
-        }
-
-        let (key, val) = mapping.iter().next().unwrap();
-        let variant = key
-            .as_str()
-            .ok_or_else(|| de::Error::custom("expected string key for Operation variant"))?;
-
-        match variant {
-            "And" => {
-                let expressions: Vec<Expression> = serde_yaml::from_value(val.clone())
-                    .map_err(|e| de::Error::custom(format!("And: {}", e)))?;
-                Ok(Operation::And(expressions))
-            }
-            "Or" => {
-                let expressions: Vec<Expression> = serde_yaml::from_value(val.clone())
-                    .map_err(|e| de::Error::custom(format!("Or: {}", e)))?;
-                Ok(Operation::Or(expressions))
-            }
-            "Not" => {
-                let expression: Expression = serde_yaml::from_value(val.clone())
-                    .map_err(|e| de::Error::custom(format!("Not: {}", e)))?;
-                Ok(Operation::Not(Box::new(expression)))
-            }
-            _ => Err(de::Error::custom(format!("Unknown Operation variant: {}", variant))),
-        }
-    }
 }
 
 impl Operation {
