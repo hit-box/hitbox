@@ -8,6 +8,7 @@ use crate::CacheableHttpRequest;
 pub use method::Method;
 pub use path::Path;
 
+pub mod body;
 pub mod header;
 pub mod method;
 pub mod path;

@@ -32,7 +32,9 @@ pub struct ConfigEndpoint {
 impl ConfigEndpoint {
     pub fn extractors<ReqBody>(&self) -> RequestExtractor<ReqBody>
     where
-        ReqBody: Send + Debug + 'static,
+        ReqBody: hyper::body::Body + hitbox_http::FromBytes + Send + Debug + 'static,
+        ReqBody::Error: Debug,
+        ReqBody::Data: Send,
     {
         match &self.extractors {
             MaybeUndefined::Null => Box::new(NeutralExtractor::new()),

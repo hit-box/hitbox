@@ -191,7 +191,7 @@ async fn check_cache_record_count(
 #[then(expr = "cache key {string} exists")]
 async fn check_cache_key_exists(world: &mut HitboxWorld, key_pattern: String) -> Result<(), Error> {
     // Parse key pattern like "method=GET:author_id=robert-sheckley:book_id=victim-prime"
-    let key_value_pairs: Vec<(&str, &str)> = key_pattern
+    let mut key_value_pairs: Vec<(&str, &str)> = key_pattern
         .split(':')
         .filter_map(|part| {
             let mut split = part.split('=');
@@ -200,6 +200,9 @@ async fn check_cache_key_exists(world: &mut HitboxWorld, key_pattern: String) ->
             Some((key, value))
         })
         .collect();
+
+    // Keep the original order
+    key_value_pairs.reverse();
 
     let cache_key = CacheKey::from_slice(&key_value_pairs);
 
