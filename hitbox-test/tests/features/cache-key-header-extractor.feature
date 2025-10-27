@@ -3,8 +3,8 @@ Feature: Request Header Cache Key Extractor
   Background:
     Given hitbox with policy
       ```yaml
-      !Enabled
-      ttl: 10
+      Enabled:
+        ttl: 10
       ```
 
   @integration
