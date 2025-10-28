@@ -201,7 +201,7 @@ async fn check_cache_key_exists(world: &mut HitboxWorld, key_pattern: String) ->
         })
         .collect();
 
-    // Keep the original order
+    // Reverse to match the order that extractors build KeyParts
     key_value_pairs.reverse();
 
     let cache_key = CacheKey::from_slice(&key_value_pairs);

@@ -23,3 +23,55 @@ Feature: Request Body Cache Key Extractor
       {"title":"Test Book","description":"Test Description"}
       ```
     Then cache key ".title='Test Book'" exists
+
+  @integration
+  Scenario: Extract nested JSON field
+    Given request predicates
+      ```yaml
+      - Method: GET
+      ```
+    And key extractors
+      ```yaml
+      - Body: '.user.email'
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      {"user":{"email":"test@example.com","name":"John Doe"},"action":"update"}
+      ```
+    Then cache key ".user.email='test@example.com'" exists
+
+  @integration
+  Scenario: Extract array element by index
+    Given request predicates
+      ```yaml
+      - Method: GET
+      ```
+    And key extractors
+      ```yaml
+      - Body: '.tags[0]'
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      {"tags":["fiction","scifi","classic"],"title":"Book"}
+      ```
+    Then cache key ".tags[0]='fiction'" exists
+
+  @integration
+  Scenario: Extract null value
+    Given request predicates
+      ```yaml
+      - Method: GET
+      ```
+    And key extractors
+      ```yaml
+      - Method:
+      - Body: '.metadata'
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      {"title":"Test","metadata":null}
+      ```
+    Then cache key "method=GET:.metadata=null" exists

@@ -55,7 +55,7 @@ fn apply(expression: &str, input: Value) -> Option<Value> {
     let out = filter.run((Ctx::new([], &inputs), Val::from(input)));
     let results: Result<Vec<_>, _> = out.collect();
     match results {
-        Ok(values) if values.eq(&vec![Val::Null]) => None,
+        Ok(values) if values.eq(&vec![Val::Null]) => Some(Value::Null),
         Ok(values) if !values.is_empty() => {
             let values: Vec<Value> = values.into_iter().map(|v| v.into()).collect();
             if values.len() == 1 {
@@ -99,7 +99,9 @@ where
         );
 
         let mut key_parts = self.inner.get(request).await;
-        key_parts.push(KeyPart::new(self.expression.clone(), value_string));
+        if let Some(value) = value_string {
+            key_parts.push(KeyPart::new(self.expression.clone(), Some(value)));
+        }
         key_parts
     }
 }

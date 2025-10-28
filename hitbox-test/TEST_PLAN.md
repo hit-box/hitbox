@@ -228,3 +228,101 @@
 - [ ] YAML parsing of deeply nested logical structures
 - [ ] Malformed logical predicate configuration
 - [ ] Circular or recursive predicate references (should not be possible)
+
+### Response Predicates
+
+#### Status Predicate
+
+##### Operations
+
+###### Eq (Exact Match)
+- [x] Status code exact match cached
+- [x] Different status code not cached
+
+###### In (Multiple Status Codes)
+- [x] Status in list cached
+- [x] Status not in list not cached
+- [x] Empty list behavior
+- [x] Single status in list
+- [x] Multiple status codes (2-4 codes)
+
+###### Class (Status Code Class)
+- [x] Success class (2xx) cached
+- [x] ClientError class (4xx) cached
+- [x] Redirect class (3xx)
+- [x] ServerError class (5xx)
+
+## Cache Key Extractors
+
+### Request Extractors
+
+#### Body Extractor
+
+##### Basic Functionality
+- [x] Extract JSON field from request body for cache key
+- [ ] Extract nested JSON field
+- [ ] Extract array element
+- [ ] Extract multiple fields
+- [x] String values wrapped in single quotes
+- [ ] Null values handling
+- [x] Simple field extraction (.title)
+- [ ] Array index (.items[0])
+- [ ] Array filter (.items[] | select(.active))
+- [ ] Boolean jq expressions
+
+#### Header Extractor
+
+##### Basic Functionality
+- [x] Extract header value for cache key
+- [ ] Multiple header extractors
+- [ ] Case-insensitive header names
+- [ ] Missing header (no cache key part)
+- [ ] Header with empty value
+- [ ] Multiple header values (comma-separated)
+- [ ] Header with special characters
+- [ ] Header value trimming
+
+#### Method Extractor
+
+##### Basic Functionality
+- [x] Extract HTTP method for cache key
+
+#### Path Extractor
+
+##### Basic Functionality
+- [x] Extract path parameters for cache key
+- [ ] Wildcard patterns
+- [ ] Missing path parameters
+- [ ] URL-encoded path parameters
+- [ ] Non-matching path patterns
+
+#### Query Extractor
+
+##### Basic Functionality
+- [x] Extract query parameter for cache key
+- [ ] Multiple query parameters
+- [ ] Query parameter with array values
+- [ ] Missing query parameter (no cache key part)
+- [ ] Query parameter with empty value
+- [ ] Query parameter with special characters
+- [ ] URL-encoded query values
+- [ ] Multiple values for same parameter
+
+### Extractor Combinations
+
+#### Multiple Extractors
+- [ ] Method + Path extractors
+- [ ] Method + Query extractors
+- [ ] Header + Body extractors
+- [ ] All extractors combined
+
+#### Extractor Order
+- [ ] Extractor order affects cache key
+- [ ] Same extractors different order produce same key
+
+### Extractor Edge Cases
+
+#### Configuration
+- [ ] Empty extractor list (default behavior)
+- [ ] Single extractor
+- [ ] Many extractors (10+)
