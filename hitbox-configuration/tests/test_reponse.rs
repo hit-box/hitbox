@@ -22,8 +22,8 @@ response:
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Status(status::Operation::Eq(NonZeroU16::new(200).unwrap())),
-            Predicate::Status(status::Operation::Eq(NonZeroU16::new(201).unwrap())),
+            Predicate::Status(status::Operation::Eq(status::Eq::Implicit(NonZeroU16::new(200).unwrap()))),
+            Predicate::Status(status::Operation::Eq(status::Eq::Implicit(NonZeroU16::new(201).unwrap()))),
         ])),
         ..Default::default()
     };
@@ -92,4 +92,35 @@ response:
     //     ..Default::default()
     // };
     // assert_eq!(endpoint, expected);
+}
+
+#[test]
+fn test_invalid_status_range_rejected() {
+    let yaml_str = r"
+policy:
+  Enabled:
+    ttl: 5
+response:
+  - Status:
+      range: [299, 200]
+";
+    let result = serde_saphyr::from_str::<ConfigEndpoint>(yaml_str);
+    assert!(
+        result.is_err(),
+        "Invalid range (start > end) should be rejected during deserialization"
+    );
+}
+
+#[test]
+fn test_valid_status_range_accepted() {
+    let yaml_str = r"
+policy:
+  Enabled:
+    ttl: 5
+response:
+  - Status:
+      range: [200, 299]
+";
+    let result = serde_saphyr::from_str::<ConfigEndpoint>(yaml_str);
+    assert!(result.is_ok(), "Valid range should be accepted: {:?}", result.err());
 }

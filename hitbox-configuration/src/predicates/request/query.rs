@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use hitbox_http::predicates::request::Query;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -20,12 +22,12 @@ enum QueryParamValue {
     Boolean(bool),
 }
 
-impl QueryParamValue {
-    fn to_string(&self) -> String {
+impl Display for QueryParamValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            QueryParamValue::String(s) => s.clone(),
-            QueryParamValue::Integer(i) => i.to_string(),
-            QueryParamValue::Boolean(b) => b.to_string(),
+            QueryParamValue::String(s) => f.write_str(s),
+            QueryParamValue::Integer(i) => write!(f, "{}", i),
+            QueryParamValue::Boolean(b) => write!(f, "{}", b),
         }
     }
 }
@@ -41,9 +43,9 @@ enum ParamOperation {
     ExplicitExists { exists: serde_json::Value },
 
     // Fallback to implicit shortcuts
-    ImplicitIn(Vec<QueryParamValue>),      // Array → In
-    ImplicitEq(QueryParamValue),            // Scalar → Eq (string, number, bool, etc.)
-    // Note: No ImplicitExists - must use explicit {exists:}
+    ImplicitIn(Vec<QueryParamValue>), // Array → In
+    ImplicitEq(QueryParamValue),      // Scalar → Eq (string, number, bool, etc.)
+                                      // Note: No ImplicitExists - must use explicit {exists:}
 }
 
 impl ParamOperation {
@@ -52,8 +54,12 @@ impl ParamOperation {
         match self {
             ParamOperation::ExplicitEq { eq } => Operation::Eq(eq.to_string()),
             ParamOperation::ImplicitEq(eq) => Operation::Eq(eq.to_string()),
-            ParamOperation::ExplicitIn { r#in } => Operation::In(r#in.iter().map(|v| v.to_string()).collect()),
-            ParamOperation::ImplicitIn(r#in) => Operation::In(r#in.iter().map(|v| v.to_string()).collect()),
+            ParamOperation::ExplicitIn { r#in } => {
+                Operation::In(r#in.iter().map(|v| v.to_string()).collect())
+            }
+            ParamOperation::ImplicitIn(r#in) => {
+                Operation::In(r#in.iter().map(|v| v.to_string()).collect())
+            }
             ParamOperation::ExplicitExists { .. } => Operation::Exists,
         }
     }
@@ -77,17 +83,11 @@ impl QueryOperation {
             match op {
                 Operation::Eq(value) => Box::new(Query::new(
                     inner,
-                    hitbox_http::predicates::request::query::Operation::Eq(
-                        key.clone(),
-                        value,
-                    ),
+                    hitbox_http::predicates::request::query::Operation::Eq(key.clone(), value),
                 )),
                 Operation::In(values) => Box::new(Query::new(
                     inner,
-                    hitbox_http::predicates::request::query::Operation::In(
-                        key.clone(),
-                        values,
-                    ),
+                    hitbox_http::predicates::request::query::Operation::In(key.clone(), values),
                 )),
                 Operation::Exists => Box::new(Query::new(
                     inner,

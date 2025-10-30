@@ -81,7 +81,8 @@ Feature: Response Status Predicate Functionality
   Scenario: Status Range operation - status in range - response cached
     Given response predicates
       ```yaml
-      - Status: [200, 299]
+      - Status:
+          range: [200, 299]
       ```
     When execute request
       ```hurl
@@ -101,7 +102,8 @@ Feature: Response Status Predicate Functionality
   Scenario: Status Range operation - status outside range - response not cached
     Given response predicates
       ```yaml
-      - Status: [201, 299]
+      - Status:
+          range: [201, 299]
       ```
     When execute request
       ```hurl
@@ -115,7 +117,8 @@ Feature: Response Status Predicate Functionality
   Scenario: Status Range operation - lower boundary inclusive - response cached
     Given response predicates
       ```yaml
-      - Status: [200, 299]
+      - Status:
+          range: [200, 299]
       ```
     When execute request
       ```hurl
@@ -129,7 +132,8 @@ Feature: Response Status Predicate Functionality
   Scenario: Status Range operation - upper boundary inclusive - response cached
     Given response predicates
       ```yaml
-      - Status: [100, 200]
+      - Status:
+          range: [100, 200]
       ```
     When execute request
       ```hurl
@@ -143,7 +147,8 @@ Feature: Response Status Predicate Functionality
   Scenario: Status Range operation - single value range - response cached
     Given response predicates
       ```yaml
-      - Status: [200, 200]
+      - Status:
+          range: [200, 200]
       ```
     When execute request
       ```hurl
@@ -322,3 +327,80 @@ Feature: Response Status Predicate Functionality
     Then response status is 200
     And response header "X-Cache-Status" is "MISS"
     And cache has 0 records
+
+  @integration
+  Scenario: Status Class operation - Informational class (1xx) - no informational responses in test
+    Given response predicates
+      ```yaml
+      - Status: Informational
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 0 records
+
+  @integration
+  Scenario: Status Eq operation - explicit syntax - response cached
+    Given response predicates
+      ```yaml
+      - Status:
+          eq: 200
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 1 records
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "HIT"
+
+  @integration
+  Scenario: Status In operation - explicit syntax - response cached
+    Given response predicates
+      ```yaml
+      - Status:
+          in: [200, 201, 204]
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 1 records
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "HIT"
+
+  @integration
+  Scenario: Status Class operation - explicit syntax - response cached
+    Given response predicates
+      ```yaml
+      - Status:
+          class: Success
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And cache has 1 records
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "HIT"
