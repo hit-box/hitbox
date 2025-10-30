@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use hitbox_backend::{serializer::Raw, Backend, BackendResult, CacheBackend};
+use hitbox_backend::{serializer::Raw, Backend, BackendResult, CacheBackend, CacheKeyFormat};
 use hitbox_core::{CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -29,7 +29,8 @@ impl MemBackend {
 impl Backend for MemBackend {
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         let lock = self.storage.read().await;
-        let value = lock.get(&key.serialize()).cloned();
+        let key_str = String::from_utf8(CacheKeyFormat::String.serialize(key)?).unwrap();
+        let value = lock.get(&key_str).cloned();
         dbg!(String::from_utf8(value.as_ref().unwrap().clone()).unwrap());
         Ok(value.map(|value| CacheValue::new(value, Some(Utc::now()), Some(Utc::now()))))
     }
@@ -41,7 +42,8 @@ impl Backend for MemBackend {
         _ttl: Option<std::time::Duration>,
     ) -> BackendResult<()> {
         let mut lock = self.storage.write().await;
-        lock.insert(key.serialize(), value.data);
+        let key_str = String::from_utf8(CacheKeyFormat::String.serialize(key)?).unwrap();
+        lock.insert(key_str, value.data);
         Ok(())
     }
 

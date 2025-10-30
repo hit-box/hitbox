@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CacheKey {
     parts: Vec<KeyPart>,
     version: u32,
@@ -6,24 +6,16 @@ pub struct CacheKey {
 }
 
 impl CacheKey {
-    pub fn serialize(&self) -> String {
-        let key = self
-            .parts
-            .iter()
-            .map(|part| {
-                format!(
-                    "{}:{}",
-                    part.key,
-                    part.value.clone().unwrap_or("null".to_owned())
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("::");
-        format!("{}::{}::{}", self.prefix, self.version, key)
-    }
-
     pub fn parts(&self) -> impl Iterator<Item = &KeyPart> {
         self.parts.iter()
+    }
+
+    pub fn version(&self) -> u32 {
+        self.version
+    }
+
+    pub fn prefix(&self) -> &str {
+        &self.prefix
     }
 
     pub fn from_str(key: &str, value: &str) -> Self {
@@ -53,7 +45,7 @@ impl CacheKey {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct KeyPart {
     key: String,
     value: Option<String>,

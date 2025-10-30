@@ -5,7 +5,7 @@ use chrono::Utc;
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::{
     serializer::{Format, Raw},
-    Backend, BackendError, BackendResult, DeleteStatus, KeySerializer, UrlEncodedKeySerializer,
+    Backend, BackendError, BackendResult, CacheKeyFormat, DeleteStatus,
 };
 use redis::{aio::ConnectionManager, Client};
 use tokio::sync::OnceCell;
@@ -23,6 +23,7 @@ pub struct RedisBackend {
     client: Client,
     connection: OnceCell<ConnectionManager>,
     format: Format,
+    key_format: CacheKeyFormat,
 }
 
 impl RedisBackend {
@@ -65,6 +66,7 @@ impl RedisBackend {
 pub struct RedisBackendBuilder {
     connection_info: String,
     format: Format,
+    key_format: CacheKeyFormat,
 }
 
 impl Default for RedisBackendBuilder {
@@ -72,6 +74,7 @@ impl Default for RedisBackendBuilder {
         Self {
             connection_info: "redis://127.0.0.1/".to_owned(),
             format: Format::default(),
+            key_format: CacheKeyFormat::default(),
         }
     }
 }
@@ -83,12 +86,25 @@ impl RedisBackendBuilder {
         self
     }
 
+    /// Set value serialization format (JSON, Bincode, etc.)
+    pub fn value_format(mut self, format: Format) -> Self {
+        self.format = format;
+        self
+    }
+
+    /// Set key serialization format (String, JSON, Bincode, UrlEncoded)
+    pub fn key_format(mut self, key_format: CacheKeyFormat) -> Self {
+        self.key_format = key_format;
+        self
+    }
+
     /// Create new instance of Redis backend with passed settings.
     pub fn build(self) -> Result<RedisBackend, Error> {
         Ok(RedisBackend {
             client: Client::open(self.connection_info)?,
             connection: OnceCell::new(),
             format: self.format,
+            key_format: self.key_format,
         })
     }
 }
@@ -97,7 +113,7 @@ impl RedisBackendBuilder {
 impl Backend for RedisBackend {
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         let client = self.client.clone();
-        let cache_key = UrlEncodedKeySerializer::serialize(key)?;
+        let cache_key = self.key_format.serialize(key)?;
         let mut con = client
             .get_tokio_connection_manager()
             .await
@@ -123,8 +139,12 @@ impl Backend for RedisBackend {
         todo!()
     }
 
-    fn format(&self) -> &Format {
+    fn value_format(&self) -> &Format {
         &self.format
+    }
+
+    fn key_format(&self) -> &CacheKeyFormat {
+        &self.key_format
     }
 
     // async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {

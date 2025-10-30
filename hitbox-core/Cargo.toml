@@ -17,6 +17,7 @@ keywords = ["cache", "async", "cache-backend", "hitbox", "tokio"]
 [dependencies]
 async-trait = "0.1.73"
 chrono = { version = "0.4.26", default-features = false, features = ["clock"] }
+serde = { version = "1.0", features = ["derive"] }
 
 [features]
 default = []

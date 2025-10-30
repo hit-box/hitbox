@@ -6,7 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     serializer::{Format, Raw},
-    BackendError, DeleteStatus,
+    BackendError, CacheKeyFormat, DeleteStatus,
 };
 
 pub type BackendResult<T> = Result<T, BackendError>;
@@ -24,8 +24,12 @@ pub trait Backend: Sync + Send {
 
     async fn remove(&self, key: &CacheKey) -> BackendResult<DeleteStatus>;
 
-    fn format(&self) -> &Format {
+    fn value_format(&self) -> &Format {
         &Format::Json
+    }
+
+    fn key_format(&self) -> &CacheKeyFormat {
+        &CacheKeyFormat::String
     }
 }
 
@@ -51,8 +55,12 @@ impl Backend for &dyn Backend {
         (*self).delete(key).await
     }
 
-    fn format(&self) -> &Format {
-        (*self).format()
+    fn value_format(&self) -> &Format {
+        (*self).value_format()
+    }
+
+    fn key_format(&self) -> &CacheKeyFormat {
+        (*self).key_format()
     }
 }
 
@@ -75,8 +83,12 @@ impl Backend for Box<dyn Backend> {
         (**self).remove(key).await
     }
 
-    fn format(&self) -> &Format {
-        (**self).format()
+    fn value_format(&self) -> &Format {
+        (**self).value_format()
+    }
+
+    fn key_format(&self) -> &CacheKeyFormat {
+        (**self).key_format()
     }
 }
 
@@ -99,8 +111,12 @@ impl Backend for Arc<dyn Backend + Send + 'static> {
         (**self).remove(key).await
     }
 
-    fn format(&self) -> &Format {
-        (**self).format()
+    fn value_format(&self) -> &Format {
+        (**self).value_format()
+    }
+
+    fn key_format(&self) -> &CacheKeyFormat {
+        (**self).key_format()
     }
 }
 
@@ -135,7 +151,7 @@ pub trait CacheBackend: Backend {
                 .await?
                 .map(|value| {
                     let (meta, value) = value.into_parts();
-                    self.format()
+                    self.value_format()
                         .deserialize(&value)
                         .map(|value| CacheValue::new(value, meta.expire, meta.stale))
                 })
@@ -154,7 +170,7 @@ pub trait CacheBackend: Backend {
         T::Cached: Serialize + Send + Sync,
     {
         async move {
-            let serialized_value = self.format().serialize(&value.data)?;
+            let serialized_value = self.value_format().serialize(&value.data)?;
             self.write(
                 key,
                 CacheValue::new(serialized_value, value.expire, value.stale),
