@@ -89,9 +89,11 @@ where
 
         // Convert the extracted value to a string for the cache key
         // String values are wrapped in single quotes, other types use their string representation
-        let value_string = found_value.map(|v| match v {
-            Value::String(s) => format!("'{}'", s),
-            other => other.to_string(),
+        // Null values are represented as None
+        let value_string = found_value.and_then(|v| match v {
+            Value::Null => None,
+            Value::String(s) => Some(format!("'{}'", s)),
+            other => Some(other.to_string()),
         });
 
         let request = CacheableHttpRequest::from_request(
@@ -99,9 +101,7 @@ where
         );
 
         let mut key_parts = self.inner.get(request).await;
-        if let Some(value) = value_string {
-            key_parts.push(KeyPart::new(self.expression.clone(), Some(value)));
-        }
+        key_parts.push(KeyPart::new(self.expression.clone(), value_string));
         key_parts
     }
 }

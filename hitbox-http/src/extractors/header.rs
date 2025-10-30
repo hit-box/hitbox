@@ -42,9 +42,7 @@ where
             .flatten()
             .map(str::to_string);
         let mut parts = self.inner.get(subject).await;
-        if let Some(v) = value {
-            parts.push(KeyPart::new(self.name.clone(), Some(v)));
-        }
+        parts.push(KeyPart::new(self.name.clone(), value));
         parts
     }
 }

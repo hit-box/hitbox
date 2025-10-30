@@ -14,7 +14,7 @@ impl CacheKey {
                 format!(
                     "{}:{}",
                     part.key,
-                    part.value.clone().unwrap_or("None".to_owned())
+                    part.value.clone().unwrap_or("null".to_owned())
                 )
             })
             .collect::<Vec<_>>()
@@ -38,7 +38,14 @@ impl CacheKey {
         CacheKey {
             parts: parts
                 .iter()
-                .map(|(key, value)| KeyPart::new(key, Some(value)))
+                .map(|(key, value)| {
+                    let val = if *value == "null" {
+                        None
+                    } else {
+                        Some(*value)
+                    };
+                    KeyPart::new(key, val)
+                })
                 .collect(),
             version: 0,
             prefix: "".to_owned(),

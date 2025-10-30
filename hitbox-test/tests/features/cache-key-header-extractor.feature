@@ -39,7 +39,7 @@ Feature: Request Header Cache Key Extractor
       ```hurl
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
-    Then cache key "method=GET" exists
+    Then cache key "method=GET:X-Tenant-Id=null" exists
 
   @integration
   Scenario: Multiple header extractors

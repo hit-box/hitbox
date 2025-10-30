@@ -22,3 +22,19 @@ Feature: Request Path Cache Key Extractor
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then cache key "book_id=victim-prime:author_id=robert-sheckley" exists
+
+  @integration
+  Scenario: ???
+    Given request predicates
+      ```yaml
+      - Method: GET
+      ```
+    And key extractors
+      ```yaml
+      - Path: "v1/authors/robert-sheckley/books/victim-prime"
+      ```
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then cache key "v1/authors/robert-sheckley/books/victim-prime" exists
