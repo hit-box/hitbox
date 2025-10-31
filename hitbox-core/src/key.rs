@@ -18,6 +18,14 @@ impl CacheKey {
         &self.prefix
     }
 
+    pub fn new(prefix: String, version: u32, parts: Vec<KeyPart>) -> Self {
+        CacheKey {
+            parts,
+            version,
+            prefix,
+        }
+    }
+
     pub fn from_str(key: &str, value: &str) -> Self {
         CacheKey {
             parts: vec![KeyPart::new(key, Some(value))],
@@ -26,18 +34,11 @@ impl CacheKey {
         }
     }
 
-    pub fn from_slice(parts: &[(&str, &str)]) -> Self {
+    pub fn from_slice(parts: &[(&str, Option<&str>)]) -> Self {
         CacheKey {
             parts: parts
                 .iter()
-                .map(|(key, value)| {
-                    let val = if *value == "null" {
-                        None
-                    } else {
-                        Some(*value)
-                    };
-                    KeyPart::new(key, val)
-                })
+                .map(|(key, value)| KeyPart::new(key, *value))
                 .collect(),
             version: 0,
             prefix: "".to_owned(),

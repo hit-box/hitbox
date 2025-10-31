@@ -22,7 +22,10 @@ Feature: Request Body Cache Key Extractor
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       {"title":"Test Book","description":"Test Description"}
       ```
-    Then cache key ".title='Test Book'" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":".title","value":"'Test Book'"}],"version":0,"prefix":""}
+      """
 
   @integration
   Scenario: Extract nested JSON field
@@ -39,7 +42,10 @@ Feature: Request Body Cache Key Extractor
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       {"user":{"email":"test@example.com","name":"John Doe"},"action":"update"}
       ```
-    Then cache key ".user.email='test@example.com'" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":".user.email","value":"'test@example.com'"}],"version":0,"prefix":""}
+      """
 
   @integration
   Scenario: Extract array element by index
@@ -56,7 +62,10 @@ Feature: Request Body Cache Key Extractor
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       {"tags":["fiction","scifi","classic"],"title":"Book"}
       ```
-    Then cache key ".tags[0]='fiction'" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":".tags[0]","value":"'fiction'"}],"version":0,"prefix":""}
+      """
 
   @integration
   Scenario: Extract null value
@@ -74,4 +83,7 @@ Feature: Request Body Cache Key Extractor
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       {"title":"Test","metadata":null}
       ```
-    Then cache key "method=GET:.metadata=null" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":".metadata","value":null},{"key":"method","value":"GET"}],"version":0,"prefix":""}
+      """

@@ -21,4 +21,7 @@ Feature: Request Method Cache Key Extractor
       ```hurl
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
-    Then cache key "method=GET" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":"method","value":"GET"}],"version":0,"prefix":""}
+      """

@@ -7,6 +7,7 @@ fn test_key_format_json_roundtrip() {
     let format = CacheKeyFormat::Json;
 
     let serialized = format.serialize(&key).expect("Failed to serialize");
+    println!("JSON format: {}", String::from_utf8_lossy(&serialized));
     let deserialized = format.deserialize(&serialized).expect("Failed to deserialize");
 
     assert_eq!(key, deserialized);
@@ -14,7 +15,7 @@ fn test_key_format_json_roundtrip() {
 
 #[test]
 fn test_key_format_bincode_roundtrip() {
-    let key = CacheKey::from_slice(&[("method", "GET"), ("path", "/users")]);
+    let key = CacheKey::from_slice(&[("method", Some("GET")), ("path", Some("/users"))]);
     let format = CacheKeyFormat::Bincode;
 
     let serialized = format.serialize(&key).expect("Failed to serialize");
@@ -38,9 +39,9 @@ fn test_key_format_string_serialize() {
 #[test]
 fn test_key_format_json_vs_bincode_size() {
     let key = CacheKey::from_slice(&[
-        ("method", "GET"),
-        ("path", "/api/v1/users"),
-        ("tenant", "acme-corp"),
+        ("method", Some("GET")),
+        ("path", Some("/api/v1/users")),
+        ("tenant", Some("acme-corp")),
     ]);
 
     let json_serialized = CacheKeyFormat::Json.serialize(&key).expect("Failed to serialize as JSON");
@@ -55,10 +56,11 @@ fn test_key_format_json_vs_bincode_size() {
 
 #[test]
 fn test_key_format_with_null_values() {
-    let key = CacheKey::from_slice(&[("method", "GET"), ("header", "null")]);
+    let key = CacheKey::from_slice(&[("method", Some("GET")), (".metadata", None)]);
     let format = CacheKeyFormat::Json;
 
     let serialized = format.serialize(&key).expect("Failed to serialize");
+    println!("JSON with null: {}", String::from_utf8_lossy(&serialized));
     let deserialized = format.deserialize(&serialized).expect("Failed to deserialize");
 
     assert_eq!(key, deserialized);

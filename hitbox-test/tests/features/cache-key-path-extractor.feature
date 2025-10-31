@@ -21,10 +21,13 @@ Feature: Request Path Cache Key Extractor
       ```hurl
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
-    Then cache key "book_id=victim-prime:author_id=robert-sheckley" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":"author_id","value":"robert-sheckley"},{"key":"book_id","value":"victim-prime"}],"version":0,"prefix":""}
+      """
 
   @integration
-  Scenario: ???
+  Scenario: Path with no parameters extracts nothing
     Given request predicates
       ```yaml
       - Method: GET
@@ -37,4 +40,7 @@ Feature: Request Path Cache Key Extractor
       ```hurl
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
-    Then cache key "v1/authors/robert-sheckley/books/victim-prime" exists
+    Then cache key exists
+      """
+      {"parts":[],"version":0,"prefix":""}
+      """

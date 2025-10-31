@@ -76,14 +76,39 @@ impl CacheKeyFormat {
     pub fn deserialize(&self, data: &[u8]) -> Result<CacheKey, SerializerError> {
         match self {
             CacheKeyFormat::String => {
-                let _s = String::from_utf8_lossy(data);
-                // TODO: Implement parsing of "prefix::version::key:value" format
-                Err(SerializerError::Deserialize(Box::new(
-                    std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "String format deserialization not implemented",
-                    ),
-                )))
+                let s = String::from_utf8_lossy(data);
+                let mut sections = s.split("::");
+
+                let prefix = sections.next()
+                    .ok_or_else(|| SerializerError::Deserialize(Box::new(
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing prefix")
+                    )))?
+                    .to_string();
+
+                let version = sections.next()
+                    .ok_or_else(|| SerializerError::Deserialize(Box::new(
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing version")
+                    )))?
+                    .parse::<u32>()
+                    .map_err(|err| SerializerError::Deserialize(Box::new(err)))?;
+
+                let mut parts = Vec::new();
+                for section in sections {
+                    let mut kv = section.split(':');
+                    let key = kv.next()
+                        .ok_or_else(|| SerializerError::Deserialize(Box::new(
+                            std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing key")
+                        )))?;
+                    let value = kv.next()
+                        .ok_or_else(|| SerializerError::Deserialize(Box::new(
+                            std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing value")
+                        )))?;
+
+                    let value = if value == "null" { None } else { Some(value.to_string()) };
+                    parts.push(hitbox_core::KeyPart::new(key, value));
+                }
+
+                Ok(CacheKey::new(prefix, version, parts))
             }
             CacheKeyFormat::Json => serde_json::from_slice(data)
                 .map_err(|err| SerializerError::Deserialize(Box::new(err))),

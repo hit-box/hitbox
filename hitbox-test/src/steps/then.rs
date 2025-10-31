@@ -1,7 +1,6 @@
 use crate::core::HitboxWorld;
 use anyhow::{anyhow, Error};
-use cucumber::then;
-use hitbox::CacheKey;
+use cucumber::{gherkin::Step, then};
 use jaq_core::{
     load::{Arena, File, Loader},
     Ctx, RcIter,
@@ -188,23 +187,17 @@ async fn check_cache_record_count(
     Ok(())
 }
 
-#[then(expr = "cache key {string} exists")]
-async fn check_cache_key_exists(world: &mut HitboxWorld, key_pattern: String) -> Result<(), Error> {
-    // Parse key pattern like "method=GET:author_id=robert-sheckley:book_id=victim-prime"
-    let mut key_value_pairs: Vec<(&str, &str)> = key_pattern
-        .split(':')
-        .filter_map(|part| {
-            let mut split = part.split('=');
-            let key = split.next()?;
-            let value = split.next()?;
-            Some((key, value))
-        })
-        .collect();
+#[then(expr = "cache key exists")]
+async fn check_cache_key_exists(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+    use hitbox_backend::CacheKeyFormat;
 
-    // Reverse to match the order that extractors build KeyParts
-    key_value_pairs.reverse();
+    let key_pattern = step.docstring.as_ref()
+        .ok_or_else(|| anyhow!("Expected JSON docstring for cache key"))?;
 
-    let cache_key = CacheKey::from_slice(&key_value_pairs);
+    // Parse key pattern using CacheKeyFormat::Json deserialize
+    let cache_key = CacheKeyFormat::Json
+        .deserialize(key_pattern.as_bytes())
+        .map_err(|e| anyhow!("Failed to parse cache key pattern '{}': {}", key_pattern, e))?;
 
     let exists = world.backend.cache.get(&cache_key).await.is_some();
 

@@ -22,7 +22,10 @@ Feature: Cache Key Extractor Combinations
       ```hurl
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
-    Then cache key "method=GET:book_id=victim-prime:author_id=robert-sheckley" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":"author_id","value":"robert-sheckley"},{"key":"book_id","value":"victim-prime"},{"key":"method","value":"GET"}],"version":0,"prefix":""}
+      """
 
   @integration
   Scenario: Method + Query extractors combined
@@ -43,7 +46,10 @@ Feature: Cache Key Extractor Combinations
       page: 1
       limit: 10
       ```
-    Then cache key "method=GET:page=1:limit=10" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":"limit","value":"10"},{"key":"page","value":"1"},{"key":"method","value":"GET"}],"version":0,"prefix":""}
+      """
 
   @integration
   Scenario: Header + Body extractors combined
@@ -62,7 +68,10 @@ Feature: Cache Key Extractor Combinations
       x-tenant-id: tenant-123
       {"userId":"user-456","action":"update"}
       ```
-    Then cache key "X-Tenant-Id=tenant-123:.userId='user-456'" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":".userId","value":"'user-456'"},{"key":"X-Tenant-Id","value":"tenant-123"}],"version":0,"prefix":""}
+      """
 
   @integration
   Scenario: All extractors combined (Method + Path + Query + Header + Body)
@@ -86,4 +95,7 @@ Feature: Cache Key Extractor Combinations
       includeDeleted: false
       {"role":"admin","name":"John Doe"}
       ```
-    Then cache key "method=GET:book_id=victim-prime:author_id=robert-sheckley:includeDeleted=false:X-Api-Version=v2:.role='admin'" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":".role","value":"'admin'"},{"key":"X-Api-Version","value":"v2"},{"key":"includeDeleted","value":"false"},{"key":"author_id","value":"robert-sheckley"},{"key":"book_id","value":"victim-prime"},{"key":"method","value":"GET"}],"version":0,"prefix":""}
+      """

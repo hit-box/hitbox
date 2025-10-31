@@ -23,7 +23,10 @@ Feature: Request Query Cache Key Extractor
       [Query]
       page: 1
       ```
-    Then cache key "page=1" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":"page","value":"1"}],"version":0,"prefix":""}
+      """
 
   @integration
   Scenario: Missing query parameter creates cache key without that part
@@ -40,7 +43,10 @@ Feature: Request Query Cache Key Extractor
       ```hurl
       GET http://localhost/v1/authors/robert-sheckley/books
       ```
-    Then cache key "method=GET" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":"method","value":"GET"}],"version":0,"prefix":""}
+      """
 
   @integration
   Scenario: Multiple query parameters
@@ -62,4 +68,7 @@ Feature: Request Query Cache Key Extractor
       limit: 20
       sort: title
       ```
-    Then cache key "page=2:limit=20:sort=title" exists
+    Then cache key exists
+      """
+      {"parts":[{"key":"sort","value":"title"},{"key":"limit","value":"20"},{"key":"page","value":"2"}],"version":0,"prefix":""}
+      """
