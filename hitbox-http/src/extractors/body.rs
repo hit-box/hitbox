@@ -88,11 +88,10 @@ where
         let found_value = apply(&self.expression, json_value);
 
         // Convert the extracted value to a string for the cache key
-        // String values are wrapped in single quotes, other types use their string representation
         // Null values are represented as None
         let value_string = found_value.and_then(|v| match v {
             Value::Null => None,
-            Value::String(s) => Some(format!("'{}'", s)),
+            Value::String(s) => Some(s),
             other => Some(other.to_string()),
         });
 

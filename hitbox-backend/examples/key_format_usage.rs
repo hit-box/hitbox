@@ -4,9 +4,9 @@ use hitbox_core::CacheKey;
 fn main() {
     // Create a cache key
     let key = CacheKey::from_slice(&[
-        ("method", "GET"),
-        ("path", "/api/users/123"),
-        ("tenant", "acme-corp"),
+        ("method", Some("GET")),
+        ("path", Some("/api/users/123")),
+        ("tenant", Some("acme-corp")),
     ]);
 
     println!("Original CacheKey: {:?}\n", key);
@@ -14,8 +14,8 @@ fn main() {
     // Demonstrate different serialization formats
 
     // 1. String format (default, human-readable)
-    let string_format = CacheKeyFormat::String;
-    let string_serialized = string_format.serialize(&key).unwrap();
+    let debug_format = CacheKeyFormat::Debug;
+    let string_serialized = debug_format.serialize(&key).unwrap();
     println!(
         "String format ({} bytes):\n  {}",
         string_serialized.len(),

@@ -63,7 +63,7 @@ async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Erro
             .ok_or(anyhow!("Missing extractors configuration"))?
             .as_str(),
     )?;
-    let extractors = config.0.into_iter().rfold(
+    let extractors = config.0.into_iter().rev().rfold(
         Box::new(NeutralExtractor::<axum::body::Body>::new()) as RequestExtractor<_>,
         |inner, item| item.into_extractors(inner),
     );

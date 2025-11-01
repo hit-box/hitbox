@@ -53,15 +53,15 @@ fn main() {
 
     // Demonstrate key serialization with different formats
     let key = CacheKey::from_slice(&[
-        ("method", "GET"),
-        ("path", "/api/users/123"),
-        ("tenant", "acme-corp"),
+        ("method", Some("GET")),
+        ("path", Some("/api/users/123")),
+        ("tenant", Some("acme-corp")),
     ]);
 
     println!("=== Same CacheKey, Different Serializations ===");
     println!("CacheKey: {:?}\n", key);
 
-    let string_key = CacheKeyFormat::String.serialize(&key).unwrap();
+    let string_key = CacheKeyFormat::Debug.serialize(&key).unwrap();
     let json_key = CacheKeyFormat::Json.serialize(&key).unwrap();
     let bincode_key = CacheKeyFormat::Bincode.serialize(&key).unwrap();
     let urlencoded_key = CacheKeyFormat::UrlEncoded.serialize(&key).unwrap();

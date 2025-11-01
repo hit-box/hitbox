@@ -23,9 +23,9 @@ Feature: Request Header Cache Key Extractor
       x-api-key: secret123
       ```
     Then cache key exists
-      """
-      {"parts":[{"key":"X-Api-Key","value":"secret123"}],"version":0,"prefix":""}
-      """
+      ```
+      X-Api-Key: "secret123"
+      ```
 
   @integration
   Scenario: Missing header creates cache key without that part
@@ -43,9 +43,10 @@ Feature: Request Header Cache Key Extractor
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then cache key exists
-      """
-      {"parts":[{"key":"X-Tenant-Id","value":null},{"key":"method","value":"GET"}],"version":0,"prefix":""}
-      """
+      ```
+      method: "GET"
+      X-Tenant-Id: null
+      ```
 
   @integration
   Scenario: Multiple header extractors
@@ -65,6 +66,7 @@ Feature: Request Header Cache Key Extractor
       x-user-id: user-456
       ```
     Then cache key exists
-      """
-      {"parts":[{"key":"X-User-Id","value":"user-456"},{"key":"X-Tenant-Id","value":"tenant-123"}],"version":0,"prefix":""}
-      """
+      ```
+      X-Tenant-Id: "tenant-123"
+      X-User-Id: "user-456"
+      ```

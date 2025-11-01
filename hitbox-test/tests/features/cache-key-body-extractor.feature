@@ -23,9 +23,9 @@ Feature: Request Body Cache Key Extractor
       {"title":"Test Book","description":"Test Description"}
       ```
     Then cache key exists
-      """
-      {"parts":[{"key":".title","value":"'Test Book'"}],"version":0,"prefix":""}
-      """
+      ```
+      .title: "Test Book"
+      ```
 
   @integration
   Scenario: Extract nested JSON field
@@ -43,9 +43,9 @@ Feature: Request Body Cache Key Extractor
       {"user":{"email":"test@example.com","name":"John Doe"},"action":"update"}
       ```
     Then cache key exists
-      """
-      {"parts":[{"key":".user.email","value":"'test@example.com'"}],"version":0,"prefix":""}
-      """
+      ```
+      .user.email: "test@example.com"
+      ```
 
   @integration
   Scenario: Extract array element by index
@@ -63,9 +63,9 @@ Feature: Request Body Cache Key Extractor
       {"tags":["fiction","scifi","classic"],"title":"Book"}
       ```
     Then cache key exists
-      """
-      {"parts":[{"key":".tags[0]","value":"'fiction'"}],"version":0,"prefix":""}
-      """
+      ```
+      .tags[0]: "fiction"
+      ```
 
   @integration
   Scenario: Extract null value
@@ -84,6 +84,7 @@ Feature: Request Body Cache Key Extractor
       {"title":"Test","metadata":null}
       ```
     Then cache key exists
-      """
-      {"parts":[{"key":".metadata","value":null},{"key":"method","value":"GET"}],"version":0,"prefix":""}
-      """
+      ```
+      method: "GET"
+      .metadata: null
+      ```

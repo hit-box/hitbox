@@ -63,7 +63,7 @@ fn main() {
     println!("⚡ Scenario 4: Hybrid (String keys + Bincode values)");
     let hybrid_backend = RedisBackend::builder()
         .server("redis://127.0.0.1:6379/3".to_string())
-        .key_format(CacheKeyFormat::String)     // Simple string keys
+        .key_format(CacheKeyFormat::Debug)      // Human-readable debug keys
         .value_format(Format::Json)               // Would use Bincode when implemented
         .build()
         .expect("Failed to create hybrid backend");

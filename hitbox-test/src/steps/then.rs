@@ -192,10 +192,10 @@ async fn check_cache_key_exists(world: &mut HitboxWorld, step: &Step) -> Result<
     use hitbox_backend::CacheKeyFormat;
 
     let key_pattern = step.docstring.as_ref()
-        .ok_or_else(|| anyhow!("Expected JSON docstring for cache key"))?;
+        .ok_or_else(|| anyhow!("Expected Debug format docstring for cache key"))?;
 
-    // Parse key pattern using CacheKeyFormat::Json deserialize
-    let cache_key = CacheKeyFormat::Json
+    // Parse key pattern using CacheKeyFormat::Debug deserialize
+    let cache_key = CacheKeyFormat::Debug
         .deserialize(key_pattern.as_bytes())
         .map_err(|e| anyhow!("Failed to parse cache key pattern '{}': {}", key_pattern, e))?;
 

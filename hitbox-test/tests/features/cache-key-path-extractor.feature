@@ -22,9 +22,10 @@ Feature: Request Path Cache Key Extractor
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then cache key exists
-      """
-      {"parts":[{"key":"author_id","value":"robert-sheckley"},{"key":"book_id","value":"victim-prime"}],"version":0,"prefix":""}
-      """
+      ```
+      author_id: "robert-sheckley"
+      book_id: "victim-prime"
+      ```
 
   @integration
   Scenario: Path with no parameters extracts nothing
@@ -41,6 +42,6 @@ Feature: Request Path Cache Key Extractor
       GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
       ```
     Then cache key exists
-      """
-      {"parts":[],"version":0,"prefix":""}
-      """
+      ```
+      
+      ```

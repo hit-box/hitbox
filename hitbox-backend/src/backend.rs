@@ -29,7 +29,7 @@ pub trait Backend: Sync + Send {
     }
 
     fn key_format(&self) -> &CacheKeyFormat {
-        &CacheKeyFormat::String
+        &CacheKeyFormat::Debug
     }
 }
 
