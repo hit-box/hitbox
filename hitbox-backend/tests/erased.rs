@@ -15,8 +15,9 @@ struct MemBackend {
 impl MemBackend {
     fn new() -> Self {
         let mut storage = HashMap::new();
+        // YAML format: key1: '' (empty string in YAML)
         storage.insert(
-            "key1: \"\"\n".to_owned(),
+            "key1: ''\n".to_owned(),
             b"{\"name\": \"test\", \"index\": 42}".to_vec(),
         );
         MemBackend {

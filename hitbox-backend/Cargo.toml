@@ -24,6 +24,7 @@ bincode = "1"
 thiserror = "2"
 serde_urlencoded = { version = "0.7.1", default-features = false }
 flate2 = { version = "1" }
+indexmap = { version = "2", features = ["serde"] }
 
 [dev-dependencies]
 tokio = { version = "1", default-features = false, features = [

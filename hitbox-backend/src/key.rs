@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 
 use hitbox_core::CacheKey;
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 
 use crate::serializer::SerializerError;
 
@@ -26,10 +28,56 @@ impl KeySerializer for UrlEncodedKeySerializer<String> {
     }
 }
 
+/// Helper struct for flattened YAML serialization
+#[derive(Serialize, Deserialize)]
+struct FlatCacheKey {
+    #[serde(skip_serializing_if = "is_default_version")]
+    #[serde(default)]
+    version: u32,
+
+    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(default)]
+    prefix: String,
+
+    #[serde(flatten)]
+    parts: IndexMap<String, Option<String>>,
+}
+
+fn is_default_version(v: &u32) -> bool {
+    *v == 0
+}
+
+impl From<&CacheKey> for FlatCacheKey {
+    fn from(key: &CacheKey) -> Self {
+        let mut parts = IndexMap::new();
+        for part in key.parts() {
+            parts.insert(part.key().clone(), part.value().clone());
+        }
+
+        FlatCacheKey {
+            version: key.version(),
+            prefix: key.prefix().to_string(),
+            parts,
+        }
+    }
+}
+
+impl From<FlatCacheKey> for CacheKey {
+    fn from(flat: FlatCacheKey) -> Self {
+        let parts = flat
+            .parts
+            .into_iter()
+            .map(|(key, value)| hitbox_core::KeyPart::new(key, value))
+            .collect();
+
+        CacheKey::new(flat.prefix, flat.version, parts)
+    }
+}
+
 #[derive(Default, Clone, Copy, Debug)]
 pub enum CacheKeyFormat {
-    /// Debug format: human-readable key-value pairs with quoted values
-    /// Format: version: 0\nprefix: ""\nkey: "value"\nkey2: null
+    /// Debug format: human-readable YAML with flattened key-value pairs
+    /// Format: key: "value"\nkey2: null\nversion: 1 (optional)\nprefix: "api" (optional)
     #[default]
     Debug,
     /// JSON format (structured, debugging)
@@ -44,33 +92,10 @@ impl CacheKeyFormat {
     pub fn serialize(&self, key: &CacheKey) -> Result<Vec<u8>, SerializerError> {
         match self {
             CacheKeyFormat::Debug => {
-                // Format: key: "value"\nkey2: null
-                // Optional: version: N (if not 0) and prefix: "..." (if not empty)
-                let mut output = String::new();
-
-                // Only include version if non-default (not 0)
-                if key.version() != 0 {
-                    output.push_str(&format!("version: {}\n", key.version()));
-                }
-
-                // Only include prefix if non-default (not empty)
-                if !key.prefix().is_empty() {
-                    let prefix_json = serde_json::to_string(key.prefix())
-                        .map_err(|e| SerializerError::Serialize(Box::new(e)))?;
-                    output.push_str(&format!("prefix: {}\n", prefix_json));
-                }
-
-                // Each part: key: "value" or key: null
-                for part in key.parts() {
-                    let value_str = match part.value() {
-                        None => "null".to_string(),
-                        Some(v) => serde_json::to_string(v)
-                            .map_err(|e| SerializerError::Serialize(Box::new(e)))?,
-                    };
-                    output.push_str(&format!("{}: {}\n", part.key(), value_str));
-                }
-
-                Ok(output.into_bytes())
+                let flat: FlatCacheKey = key.into();
+                let yaml_string = serde_yaml::to_string(&flat)
+                    .map_err(|e| SerializerError::Serialize(Box::new(e)))?;
+                Ok(yaml_string.into_bytes())
             }
             CacheKeyFormat::Json => serde_json::to_vec(key)
                 .map_err(|err| SerializerError::Serialize(Box::new(err))),
@@ -91,60 +116,9 @@ impl CacheKeyFormat {
     pub fn deserialize(&self, data: &[u8]) -> Result<CacheKey, SerializerError> {
         match self {
             CacheKeyFormat::Debug => {
-                // Parse format: key: "value"\nkey2: null
-                // Optional: version: N and prefix: "..."
-                let s = String::from_utf8_lossy(data).trim().to_string();
-                let mut lines = s.lines().peekable();
-
-                // Defaults
-                let mut version = 0u32;
-                let mut prefix = String::new();
-
-                // Try to parse version line (optional)
-                if let Some(first_line) = lines.peek() {
-                    if let Some(version_str) = first_line.strip_prefix("version: ") {
-                        version = version_str.parse::<u32>()
-                            .map_err(|e| SerializerError::Deserialize(Box::new(e)))?;
-                        lines.next(); // Consume the version line
-                    }
-                }
-
-                // Try to parse prefix line (optional)
-                if let Some(second_line) = lines.peek() {
-                    if let Some(prefix_json) = second_line.strip_prefix("prefix: ") {
-                        prefix = serde_json::from_str(prefix_json)
-                            .map_err(|e| SerializerError::Deserialize(Box::new(e)))?;
-                        lines.next(); // Consume the prefix line
-                    }
-                }
-
-                // Parse key-value pairs
-                let mut parts = Vec::new();
-                for line in lines {
-                    if line.trim().is_empty() {
-                        continue;
-                    }
-
-                    // Split on first ': ' to get key and value
-                    let (key, value_str) = line
-                        .split_once(": ")
-                        .ok_or_else(|| SerializerError::Deserialize(Box::new(
-                            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid key-value format")
-                        )))?;
-
-                    // Parse value - either "null" or JSON-encoded string
-                    let value = if value_str == "null" {
-                        None
-                    } else {
-                        let v: String = serde_json::from_str(value_str)
-                            .map_err(|e| SerializerError::Deserialize(Box::new(e)))?;
-                        Some(v)
-                    };
-
-                    parts.push(hitbox_core::KeyPart::new(key, value));
-                }
-
-                Ok(CacheKey::new(prefix, version, parts))
+                let flat: FlatCacheKey = serde_yaml::from_slice(data)
+                    .map_err(|e| SerializerError::Deserialize(Box::new(e)))?;
+                Ok(flat.into())
             }
             CacheKeyFormat::Json => serde_json::from_slice(data)
                 .map_err(|err| SerializerError::Deserialize(Box::new(err))),
