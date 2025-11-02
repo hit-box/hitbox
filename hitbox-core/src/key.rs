@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize, bitcode::Encode, bitcode::Decode)]
 pub struct CacheKey {
     parts: Vec<KeyPart>,
     version: u32,
@@ -46,7 +46,7 @@ impl CacheKey {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize, bitcode::Encode, bitcode::Decode)]
 pub struct KeyPart {
     key: String,
     value: Option<String>,

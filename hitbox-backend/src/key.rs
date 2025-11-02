@@ -31,6 +31,8 @@ pub enum CacheKeyFormat {
     /// Bincode format (compact binary)
     #[default]
     Bincode,
+    /// Bitcode format (most compact binary)
+    Bitcode,
     /// URL-encoded format
     UrlEncoded,
 }
@@ -40,6 +42,7 @@ impl CacheKeyFormat {
         match self {
             CacheKeyFormat::Bincode => bincode::serialize(key)
                 .map_err(|err| SerializerError::Serialize(Box::new(err))),
+            CacheKeyFormat::Bitcode => Ok(bitcode::encode(key)),
             CacheKeyFormat::UrlEncoded => {
                 let parts = key
                     .parts()
@@ -55,6 +58,8 @@ impl CacheKeyFormat {
     pub fn deserialize(&self, data: &[u8]) -> Result<CacheKey, SerializerError> {
         match self {
             CacheKeyFormat::Bincode => bincode::deserialize(data)
+                .map_err(|err| SerializerError::Deserialize(Box::new(err))),
+            CacheKeyFormat::Bitcode => bitcode::decode(data)
                 .map_err(|err| SerializerError::Deserialize(Box::new(err))),
             CacheKeyFormat::UrlEncoded => {
                 // URL-encoded is one-way for cache keys (used for storage key, not round-trip)

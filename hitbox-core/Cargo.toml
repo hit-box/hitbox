@@ -18,6 +18,7 @@ keywords = ["cache", "async", "cache-backend", "hitbox", "tokio"]
 async-trait = "0.1.73"
 chrono = { version = "0.4.26", default-features = false, features = ["clock"] }
 serde = { version = "1.0", features = ["derive"] }
+bitcode = { version = "0.6", features = ["derive"] }
 
 [features]
 default = []
