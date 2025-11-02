@@ -17,7 +17,6 @@
 - [x] Empty status list behavior
 - [x] Single status code in list
 - [x] Multiple status codes in list (2-4 codes)
-- [ ] Large status code list (10+ codes)
 
 ##### Range (Status Code Range)
 - [x] Status in range cached

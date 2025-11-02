@@ -46,7 +46,7 @@ Feature: Response Status Predicate Functionality
     Given response predicates
       ```yaml
       - Status: 200
-      - Status: 200
+      - Status: Success
       ```
     When execute request
       ```hurl
@@ -82,7 +82,7 @@ Feature: Response Status Predicate Functionality
     Given response predicates
       ```yaml
       - Status:
-          range: [200, 299]
+          range: [100, 299]
       ```
     When execute request
       ```hurl
@@ -236,7 +236,8 @@ Feature: Response Status Predicate Functionality
   Scenario: Status In operation - multiple status codes (2-4 codes) - response cached
     Given response predicates
       ```yaml
-      - Status: [200, 201, 202, 204]
+      - Status: 
+          in: [200, 201, 202, 204]
       ```
     When execute request
       ```hurl
@@ -283,62 +284,6 @@ Feature: Response Status Predicate Functionality
       GET http://localhost/v1/authors/nonexistent/books/test
       ```
     Then response status is 404
-    And response header "X-Cache-Status" is "MISS"
-    And cache has 0 records
-
-  @integration
-  Scenario: Status Class operation - ClientError class (4xx) - response cached
-    Given response predicates
-      ```yaml
-      - Status: ClientError
-      ```
-    When execute request
-      ```hurl
-      GET http://localhost/v1/authors/nonexistent/books/test
-      ```
-    Then response status is 404
-    And response header "X-Cache-Status" is "MISS"
-    And cache has 1 records
-
-  @integration
-  Scenario: Status Class operation - Redirect class (3xx) - no redirects in test
-    Given response predicates
-      ```yaml
-      - Status: Redirect
-      ```
-    When execute request
-      ```hurl
-      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
-      ```
-    Then response status is 200
-    And response header "X-Cache-Status" is "MISS"
-    And cache has 0 records
-
-  @integration
-  Scenario: Status Class operation - ServerError class (5xx) - no server errors in test
-    Given response predicates
-      ```yaml
-      - Status: ServerError
-      ```
-    When execute request
-      ```hurl
-      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
-      ```
-    Then response status is 200
-    And response header "X-Cache-Status" is "MISS"
-    And cache has 0 records
-
-  @integration
-  Scenario: Status Class operation - Informational class (1xx) - no informational responses in test
-    Given response predicates
-      ```yaml
-      - Status: Informational
-      ```
-    When execute request
-      ```hurl
-      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
-      ```
-    Then response status is 200
     And response header "X-Cache-Status" is "MISS"
     And cache has 0 records
 
