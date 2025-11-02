@@ -35,11 +35,13 @@ axum-test = "17.3"
 reqwest = "0.12"
 cucumber = { version = "0.21" }
 serde-saphyr = "0.0.6"
+serde_yaml = "0.9"
+indexmap = { version = "2", features = ["serde"] }
+serde = { version = "1", features = ["derive", "rc"] }
 anyhow = "1"
 hurl_core = { path = "../../hurl/packages/hurl_core/" }
 hurl = { path = "../../hurl/packages/hurl/" }
 http-body-util = "0.1"
-serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 tokio = { version = "1", features = ["time", "rt-multi-thread"] }
 dashmap = { version = "6.1", features = ["serde"] }

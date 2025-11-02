@@ -189,14 +189,11 @@ async fn check_cache_record_count(
 
 #[then(expr = "cache key exists")]
 async fn check_cache_key_exists(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    use hitbox_backend::CacheKeyFormat;
-
     let key_pattern = step.docstring.as_ref()
         .ok_or_else(|| anyhow!("Expected Debug format docstring for cache key"))?;
 
-    // Parse key pattern using CacheKeyFormat::Debug deserialize
-    let cache_key = CacheKeyFormat::Debug
-        .deserialize(key_pattern.as_bytes())
+    // Parse key pattern using debug format deserialize
+    let cache_key = crate::cache_key::deserialize_debug(key_pattern.as_bytes())
         .map_err(|e| anyhow!("Failed to parse cache key pattern '{}': {}", key_pattern, e))?;
 
     let exists = world.backend.cache.get(&cache_key).await.is_some();

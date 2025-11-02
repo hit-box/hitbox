@@ -15,9 +15,9 @@ struct MemBackend {
 impl MemBackend {
     fn new() -> Self {
         let mut storage = HashMap::new();
-        // YAML format: key1: '' (empty string in YAML)
+        // URL-encoded format: key1=
         storage.insert(
-            "key1: ''\n".to_owned(),
+            "key1=".to_owned(),
             b"{\"name\": \"test\", \"index\": 42}".to_vec(),
         );
         MemBackend {
@@ -30,9 +30,8 @@ impl MemBackend {
 impl Backend for MemBackend {
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         let lock = self.storage.read().await;
-        let key_str = String::from_utf8(CacheKeyFormat::Debug.serialize(key)?).unwrap();
+        let key_str = String::from_utf8(CacheKeyFormat::UrlEncoded.serialize(key)?).unwrap();
         let value = lock.get(&key_str).cloned();
-        dbg!(String::from_utf8(value.as_ref().unwrap().clone()).unwrap());
         Ok(value.map(|value| CacheValue::new(value, Some(Utc::now()), Some(Utc::now()))))
     }
 
@@ -43,7 +42,7 @@ impl Backend for MemBackend {
         _ttl: Option<std::time::Duration>,
     ) -> BackendResult<()> {
         let mut lock = self.storage.write().await;
-        let key_str = String::from_utf8(CacheKeyFormat::Debug.serialize(key)?).unwrap();
+        let key_str = String::from_utf8(CacheKeyFormat::UrlEncoded.serialize(key)?).unwrap();
         lock.insert(key_str, value.data);
         Ok(())
     }
