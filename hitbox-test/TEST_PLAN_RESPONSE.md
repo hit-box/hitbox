@@ -45,3 +45,21 @@
 - Implicit array syntax `[values]` always resolves to **In** operation (not Range)
 - **Range validation**: Invalid ranges (start > end) are rejected at configuration parse time with clear error messages
 - Unit tests for range validation are in `hitbox-configuration/tests/test_reponse.rs`
+
+### Response Header Predicate
+
+#### Operations
+
+##### Eq (Exact Match)
+- [ ] Single header exact match cached
+- [ ] Single header mismatch not cached
+- [ ] Multiple headers - all must match
+
+##### Exist (Header Presence)
+- [ ] Header exists cached
+- [ ] Header absent not cached
+
+##### In (Multiple Values)
+- [ ] Header value in list cached
+- [ ] Header value not in list not cached
+- [ ] Multiple headers with value lists

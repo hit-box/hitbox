@@ -2,10 +2,11 @@
 use bytes::Bytes;
 use hitbox_configuration::{
     ConfigEndpoint, Response,
-    predicates::response::{Predicate, status},
+    predicates::response::{Predicate, status, header},
     types::MaybeUndefined,
 };
 use http_body_util::Empty;
+use indexmap::IndexMap;
 use pretty_assertions::assert_eq;
 use std::num::NonZeroU16;
 
@@ -123,4 +124,111 @@ response:
 ";
     let result = serde_saphyr::from_str::<ConfigEndpoint>(yaml_str);
     assert!(result.is_ok(), "Valid range should be accepted: {:?}", result.err());
+}
+
+#[test]
+fn test_response_header_eq_deserialize() {
+    let yaml_str = r"
+policy:
+  Enabled:
+    ttl: 5
+response:
+  - Header:
+      content-type: application/json
+      cache-control: max-age=3600
+";
+    let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
+
+    let mut expected_headers = IndexMap::new();
+    expected_headers.insert("content-type".to_string(), "application/json".to_string());
+    expected_headers.insert("cache-control".to_string(), "max-age=3600".to_string());
+
+    let expected = ConfigEndpoint {
+        response: MaybeUndefined::Value(Response::Flat(vec![
+            Predicate::Header(header::HeaderOperation::Eq(expected_headers)),
+        ])),
+        ..Default::default()
+    };
+    assert_eq!(endpoint, expected);
+}
+
+#[test]
+fn test_response_header_exist_deserialize() {
+    let yaml_str = r"
+policy:
+  Enabled:
+    ttl: 5
+response:
+  - Header: x-custom-header
+";
+    let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
+    let expected = ConfigEndpoint {
+        response: MaybeUndefined::Value(Response::Flat(vec![
+            Predicate::Header(header::HeaderOperation::Exist("x-custom-header".to_string())),
+        ])),
+        ..Default::default()
+    };
+    assert_eq!(endpoint, expected);
+}
+
+#[test]
+fn test_response_header_in_deserialize() {
+    let yaml_str = r"
+policy:
+  Enabled:
+    ttl: 5
+response:
+  - Header:
+      content-type:
+        - application/json
+        - application/xml
+      accept:
+        - text/html
+        - text/plain
+";
+    let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
+
+    let mut expected_headers = IndexMap::new();
+    expected_headers.insert(
+        "content-type".to_string(),
+        vec!["application/json".to_string(), "application/xml".to_string()]
+    );
+    expected_headers.insert(
+        "accept".to_string(),
+        vec!["text/html".to_string(), "text/plain".to_string()]
+    );
+
+    let expected = ConfigEndpoint {
+        response: MaybeUndefined::Value(Response::Flat(vec![
+            Predicate::Header(header::HeaderOperation::In(expected_headers)),
+        ])),
+        ..Default::default()
+    };
+    assert_eq!(endpoint, expected);
+}
+
+#[test]
+fn test_response_header_combined_with_status() {
+    let yaml_str = r"
+policy:
+  Enabled:
+    ttl: 5
+response:
+  - Status: 200
+  - Header:
+      content-type: application/json
+";
+    let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
+
+    let mut expected_headers = IndexMap::new();
+    expected_headers.insert("content-type".to_string(), "application/json".to_string());
+
+    let expected = ConfigEndpoint {
+        response: MaybeUndefined::Value(Response::Flat(vec![
+            Predicate::Status(status::Operation::Eq(status::Eq::Implicit(NonZeroU16::new(200).unwrap()))),
+            Predicate::Header(header::HeaderOperation::Eq(expected_headers)),
+        ])),
+        ..Default::default()
+    };
+    assert_eq!(endpoint, expected);
 }

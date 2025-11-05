@@ -1,4 +1,5 @@
 pub mod body;
+pub mod header;
 pub mod status;
 
 use hitbox_http::predicates::NeutralResponsePredicate;
@@ -14,6 +15,7 @@ type CorePredicate<ReqBody> =
 pub enum Predicate {
     Status(status::Operation),
     Body(body::Operation),
+    Header(header::HeaderOperation),
 }
 
 impl Predicate {
@@ -29,6 +31,7 @@ impl Predicate {
         match self {
             Predicate::Status(status_op) => status_op.into_predicates(inner),
             Predicate::Body(body_op) => body_op.into_predicates(inner),
+            Predicate::Header(header_op) => header_op.into_predicates(inner),
         }
     }
 }
