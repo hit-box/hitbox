@@ -251,7 +251,9 @@ Feature: Logical Complex Predicate Combinations
       ```yaml
       Not:
         And:
-          - Header: "x-tenant-id"
+          - Header:
+              x-tenant-id:
+                exist: true
           - Method: DELETE
       ```
     When execute request

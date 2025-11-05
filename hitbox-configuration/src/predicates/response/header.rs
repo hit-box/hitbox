@@ -12,75 +12,90 @@ type CorePredicate<ReqBody> =
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(untagged)]
-pub enum HeaderOperation {
-    // Explicit-only operations (must come first to match correctly)
-    Contains { contains: IndexMap<String, String> },
-    Regex { regex: IndexMap<String, String> },
-
-    // Implicit + explicit operations
-    Eq(IndexMap<String, String>),
-    In(IndexMap<String, Vec<String>>),
-
-    // Single string = Exist (must be last)
-    Exist(String),
+pub enum HeaderValue {
+    Eq(String),
+    In(Vec<String>),
+    Operation(HeaderValueOperation),
 }
 
-impl HeaderOperation {
-    pub fn into_predicates<ReqBody>(
-        &self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody>
-    where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
-        ReqBody::Data: Send,
-    {
-        match self {
-            HeaderOperation::Eq(params) => params.iter().rfold(inner, |inner, (key, value)| {
-                Box::new(Header::new(
-                    inner,
-                    hitbox_http::predicates::response::header::Operation::Eq(
-                        key.parse().unwrap(),
-                        value.parse().unwrap(),
-                    ),
-                ))
-            }),
-            HeaderOperation::Exist(param) => Box::new(Header::new(
-                inner,
-                hitbox_http::predicates::response::header::Operation::Exist(
-                    param.parse().unwrap(),
-                ),
-            )),
-            HeaderOperation::In(params) => params.iter().rfold(inner, |inner, (key, values)| {
-                Box::new(Header::new(
-                    inner,
-                    hitbox_http::predicates::response::header::Operation::In(
-                        key.parse().unwrap(),
-                        values.iter().map(|v| v.parse().unwrap()).collect(),
-                    ),
-                ))
-            }),
-            HeaderOperation::Contains { contains } => {
-                contains.iter().rfold(inner, |inner, (key, value)| {
-                    Box::new(Header::new(
-                        inner,
-                        hitbox_http::predicates::response::header::Operation::Contains(
-                            key.parse().unwrap(),
-                            value.clone(),
-                        ),
-                    ))
-                })
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum HeaderValueOperation {
+    Eq(String),
+    In(Vec<String>),
+    Contains(String),
+    Regex(String),
+    #[serde(deserialize_with = "deserialize_exist")]
+    Exist,
+}
+
+fn deserialize_exist<'de, D>(deserializer: D) -> Result<(), D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::IgnoredAny;
+    IgnoredAny::deserialize(deserializer)?;
+    Ok(())
+}
+
+pub type HeaderOperation = IndexMap<String, HeaderValue>;
+
+pub fn into_predicates<ReqBody>(
+    headers: &HeaderOperation,
+    inner: CorePredicate<ReqBody>,
+) -> CorePredicate<ReqBody>
+where
+    ReqBody: HttpBody + FromBytes + Send + 'static,
+    ReqBody::Error: std::fmt::Debug,
+    ReqBody::Data: Send,
+{
+    headers.iter().rfold(inner, |inner, (header_name, header_value)| {
+        let operation = match header_value {
+            HeaderValue::Eq(value) => {
+                hitbox_http::predicates::response::header::Operation::Eq(
+                    header_name.parse().unwrap(),
+                    value.parse().unwrap(),
+                )
             }
-            HeaderOperation::Regex { regex } => regex.iter().rfold(inner, |inner, (key, pattern)| {
-                let compiled_regex = Regex::new(pattern).expect("Invalid regex pattern");
-                Box::new(Header::new(
-                    inner,
+            HeaderValue::In(values) => {
+                hitbox_http::predicates::response::header::Operation::In(
+                    header_name.parse().unwrap(),
+                    values.iter().map(|v| v.parse().unwrap()).collect(),
+                )
+            }
+            HeaderValue::Operation(op) => match op {
+                HeaderValueOperation::Eq(value) => {
+                    hitbox_http::predicates::response::header::Operation::Eq(
+                        header_name.parse().unwrap(),
+                        value.parse().unwrap(),
+                    )
+                }
+                HeaderValueOperation::In(values) => {
+                    hitbox_http::predicates::response::header::Operation::In(
+                        header_name.parse().unwrap(),
+                        values.iter().map(|v| v.parse().unwrap()).collect(),
+                    )
+                }
+                HeaderValueOperation::Contains(substring) => {
+                    hitbox_http::predicates::response::header::Operation::Contains(
+                        header_name.parse().unwrap(),
+                        substring.clone(),
+                    )
+                }
+                HeaderValueOperation::Regex(pattern) => {
+                    let compiled_regex = Regex::new(pattern).expect("Invalid regex pattern");
                     hitbox_http::predicates::response::header::Operation::Regex(
-                        key.parse().unwrap(),
+                        header_name.parse().unwrap(),
                         compiled_regex,
-                    ),
-                ))
-            }),
-        }
-    }
+                    )
+                }
+                HeaderValueOperation::Exist => {
+                    hitbox_http::predicates::response::header::Operation::Exist(
+                        header_name.parse().unwrap(),
+                    )
+                }
+            },
+        };
+        Box::new(Header::new(inner, operation))
+    })
 }

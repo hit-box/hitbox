@@ -140,12 +140,12 @@ response:
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
 
     let mut expected_headers = IndexMap::new();
-    expected_headers.insert("content-type".to_string(), "application/json".to_string());
-    expected_headers.insert("cache-control".to_string(), "max-age=3600".to_string());
+    expected_headers.insert("content-type".to_string(), header::HeaderValue::Eq("application/json".to_string()));
+    expected_headers.insert("cache-control".to_string(), header::HeaderValue::Eq("max-age=3600".to_string()));
 
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Header(header::HeaderOperation::Eq(expected_headers)),
+            Predicate::Header(expected_headers),
         ])),
         ..Default::default()
     };
@@ -159,12 +159,18 @@ policy:
   Enabled:
     ttl: 5
 response:
-  - Header: x-custom-header
+  - Header:
+      x-custom-header:
+        exist: true
 ";
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
+
+    let mut expected_headers = IndexMap::new();
+    expected_headers.insert("x-custom-header".to_string(), header::HeaderValue::Operation(header::HeaderValueOperation::Exist));
+
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Header(header::HeaderOperation::Exist("x-custom-header".to_string())),
+            Predicate::Header(expected_headers),
         ])),
         ..Default::default()
     };
@@ -191,16 +197,16 @@ response:
     let mut expected_headers = IndexMap::new();
     expected_headers.insert(
         "content-type".to_string(),
-        vec!["application/json".to_string(), "application/xml".to_string()]
+        header::HeaderValue::In(vec!["application/json".to_string(), "application/xml".to_string()])
     );
     expected_headers.insert(
         "accept".to_string(),
-        vec!["text/html".to_string(), "text/plain".to_string()]
+        header::HeaderValue::In(vec!["text/html".to_string(), "text/plain".to_string()])
     );
 
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Header(header::HeaderOperation::In(expected_headers)),
+            Predicate::Header(expected_headers),
         ])),
         ..Default::default()
     };
@@ -221,12 +227,12 @@ response:
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
 
     let mut expected_headers = IndexMap::new();
-    expected_headers.insert("content-type".to_string(), "application/json".to_string());
+    expected_headers.insert("content-type".to_string(), header::HeaderValue::Eq("application/json".to_string()));
 
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
             Predicate::Status(status::Operation::Eq(status::Eq::Implicit(NonZeroU16::new(200).unwrap()))),
-            Predicate::Header(header::HeaderOperation::Eq(expected_headers)),
+            Predicate::Header(expected_headers),
         ])),
         ..Default::default()
     };
@@ -241,19 +247,20 @@ policy:
     ttl: 5
 response:
   - Header:
-      contains:
-        content-type: json
-        accept: html
+      content-type:
+        contains: json
+      accept:
+        contains: html
 ";
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
 
     let mut expected_headers = IndexMap::new();
-    expected_headers.insert("content-type".to_string(), "json".to_string());
-    expected_headers.insert("accept".to_string(), "html".to_string());
+    expected_headers.insert("content-type".to_string(), header::HeaderValue::Operation(header::HeaderValueOperation::Contains("json".to_string())));
+    expected_headers.insert("accept".to_string(), header::HeaderValue::Operation(header::HeaderValueOperation::Contains("html".to_string())));
 
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Header(header::HeaderOperation::Contains { contains: expected_headers }),
+            Predicate::Header(expected_headers),
         ])),
         ..Default::default()
     };
@@ -268,19 +275,20 @@ policy:
     ttl: 5
 response:
   - Header:
-      regex:
-        content-type: 'application/(json|xml)'
-        x-version: '^v\d+\.\d+\.\d+$'
+      content-type:
+        regex: 'application/(json|xml)'
+      x-version:
+        regex: '^v\d+\.\d+\.\d+$'
 ";
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
 
     let mut expected_headers = IndexMap::new();
-    expected_headers.insert("content-type".to_string(), "application/(json|xml)".to_string());
-    expected_headers.insert("x-version".to_string(), r"^v\d+\.\d+\.\d+$".to_string());
+    expected_headers.insert("content-type".to_string(), header::HeaderValue::Operation(header::HeaderValueOperation::Regex("application/(json|xml)".to_string())));
+    expected_headers.insert("x-version".to_string(), header::HeaderValue::Operation(header::HeaderValueOperation::Regex(r"^v\d+\.\d+\.\d+$".to_string())));
 
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Header(header::HeaderOperation::Regex { regex: expected_headers }),
+            Predicate::Header(expected_headers),
         ])),
         ..Default::default()
     };
@@ -295,8 +303,8 @@ policy:
     ttl: 5
 response:
   - Header:
-      regex:
-        content-type: '[invalid(regex'
+      content-type:
+        regex: '[invalid(regex'
 ";
     let result = serde_saphyr::from_str::<ConfigEndpoint>(yaml_str);
 
@@ -323,8 +331,8 @@ policy:
     ttl: 5
 response:
   - Header:
-      regex:
-        content-type: '^application/json.*$'
+      content-type:
+        regex: '^application/json.*$'
 ";
     let result = serde_saphyr::from_str::<ConfigEndpoint>(yaml_str);
     assert!(result.is_ok(), "Valid regex pattern should be accepted: {:?}", result.err());

@@ -64,8 +64,6 @@
 ##### Exist (Presence Check)
 - [x] Header exists cached
 - [x] Header missing not cached
-- [x] Additional header doesn't affect cache decision
-- [x] Header with any value matches
 - [x] Case-insensitive header name in Exist
 
 ##### In (Multiple Values)

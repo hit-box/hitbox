@@ -31,7 +31,7 @@ impl Predicate {
         match self {
             Predicate::Status(status_op) => status_op.into_predicates(inner),
             Predicate::Body(body_op) => body_op.into_predicates(inner),
-            Predicate::Header(header_op) => header_op.into_predicates(inner),
+            Predicate::Header(header_op) => header::into_predicates(header_op, inner),
         }
     }
 }

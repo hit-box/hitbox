@@ -4,7 +4,7 @@ use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
 use crate::RequestPredicate;
-use super::{BodyPredicate, HeaderOperation, MethodOperation, QueryOperation};
+use super::{BodyPredicate, HeaderOperation, MethodOperation, QueryOperation, header};
 
 // Use standard externally-tagged enum (serde default)
 // YAML syntax: Method: {...}, Path: "...", Query: {...}, etc.
@@ -31,7 +31,7 @@ impl Predicate {
             Predicate::Method(method_operation) => method_operation.into_predicates(inner),
             Predicate::Path(path) => Box::new(Path::new(inner, path.as_str().into())),
             Predicate::Query(query_operation) => query_operation.into_predicates(inner),
-            Predicate::Header(header_operation) => header_operation.into_predicates(inner),
+            Predicate::Header(header_operation) => header::into_predicates(header_operation, inner),
             Predicate::Body(body_predicate) => body_predicate.into_predicates(inner),
         }
     }
