@@ -21,13 +21,15 @@ async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Err
                 .to_string(Format::Ansi)
         )
     })?;
+
     let variables = VariableSet::new();
-    let request = &hurl_file
+    let parsed_request = &hurl_file
         .entries
         .first()
         .ok_or_else(|| anyhow!("request not found"))?
         .request;
-    let request = eval_request(request, &variables, &ContextDir::default())
+
+    let request = eval_request(parsed_request, &variables, &ContextDir::default())
         .map_err(|err| anyhow!("hurl request error {:?}", err))?;
 
     world.execute_request(&request).await?;

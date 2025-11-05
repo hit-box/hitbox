@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -6,7 +6,7 @@ use chrono::Utc;
 use hitbox::{
     predicate::PredicateResult, CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig,
 };
-use http::{response::Parts, Response};
+use http::{response::Parts, HeaderMap, Response};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +64,8 @@ pub struct SerializableHttpResponse {
     version: String,
     #[serde(with = "serde_bytes")]
     body: Vec<u8>,
-    headers: HashMap<String, String>,
+    #[serde(with = "http_serde::header_map")]
+    headers: HeaderMap,
 }
 
 #[async_trait]
@@ -109,26 +110,27 @@ where
             .unwrap()
             .to_bytes()
             .to_vec();
+
+        // We can store the HeaderMap directly, including pseudo-headers
+        // HeaderMap is designed to handle pseudo-headers and http-serde will serialize them correctly
         CachePolicy::Cacheable(SerializableHttpResponse {
             status: self.parts.status.as_u16(),
             version: format!("{:?}", self.parts.version),
             body,
-            headers: self
-                .parts
-                .headers
-                .into_iter()
-                .map(|(h, v)| (h.unwrap().to_string(), v.to_str().unwrap().to_string()))
-                .collect(),
+            headers: self.parts.headers,
         })
     }
 
     async fn from_cached(cached: Self::Cached) -> Self {
-        let mut inner = Response::builder();
-        for (key, value) in cached.headers.into_iter() {
-            inner = inner.header(key, value)
-        }
         let body = ResBody::from_bytes(Bytes::from(cached.body));
-        let inner = inner.status(cached.status).body(body).unwrap();
-        CacheableHttpResponse::from_response(inner)
+        let mut response = Response::builder()
+            .status(cached.status)
+            .body(body)
+            .unwrap();
+
+        // Replace the headers with the cached HeaderMap
+        *response.headers_mut() = cached.headers;
+
+        CacheableHttpResponse::from_response(response)
     }
 }

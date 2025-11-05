@@ -15,6 +15,7 @@ serde_json = "1"
 serde-saphyr = "0.0.6"
 indexmap = { version = "2.10", features = ["serde"] }
 thiserror = "2"
+regex = "1"
 
 
 [dev-dependencies]

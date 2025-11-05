@@ -45,3 +45,9 @@ where
         Empty::new()
     }
 }
+
+impl FromBytes for String {
+    fn from_bytes(bytes: Bytes) -> Self {
+        String::from_utf8_lossy(&bytes).to_string()
+    }
+}

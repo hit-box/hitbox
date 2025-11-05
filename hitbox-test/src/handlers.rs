@@ -4,8 +4,9 @@ use axum::{
     body::Bytes,
     extract::{Path, Query, State},
     Json,
+    response::{IntoResponse, Response},
 };
-use http::StatusCode;
+use http::{StatusCode, HeaderValue};
 use serde::{Deserialize, Serialize};
 
 use crate::app::{AppState, AuthorId, Book, BookId};
@@ -18,20 +19,41 @@ pub struct Pagination {
     per_page: Option<usize>,
 }
 
+#[derive(Deserialize, Debug, Default)]
+pub struct TestHeadersQuery {
+    test_headers: Option<String>,
+}
+
 #[axum::debug_handler]
 pub(crate) async fn get_book(
     State(state): State<AppState>,
     Path((_author_id, book_id)): Path<(String, String)>,
-) -> Result<Json<Arc<Book>>, StatusCode> {
+    Query(query): Query<TestHeadersQuery>,
+) -> Result<Response, StatusCode> {
     match book_id.as_str() {
         "invalid-book-id" => Err(StatusCode::INTERNAL_SERVER_ERROR),
         _ => {
             let book = state
                 .database()
-                .get_book(BookId::new(book_id))
+                .get_book(BookId::new(&book_id))
                 .await
                 .ok_or(StatusCode::NOT_FOUND)?;
-            Ok(Json(book))
+
+            // Add custom headers for testing if test_headers=true query param is present
+            if query.test_headers.as_deref() == Some("true") {
+                let json_response = Json(book).into_response();
+                let (mut parts, body) = json_response.into_parts();
+
+                parts.headers.insert("server", HeaderValue::from_static("hitbox-test"));
+                parts.headers.insert("x-empty", HeaderValue::from_static(""));
+                parts.headers.insert("x-custom", HeaderValue::from_static("  value  "));
+                parts.headers.insert("set-cookie", HeaderValue::from_static("session=abc123"));
+                parts.headers.append("set-cookie", HeaderValue::from_static("token=xyz789"));
+
+                Ok(Response::from_parts(parts, body))
+            } else {
+                Ok(Json(book).into_response())
+            }
         }
     }
 }

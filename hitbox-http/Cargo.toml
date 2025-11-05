@@ -39,11 +39,14 @@ jaq-json = { version = "1.1.0", features = ["serde_json"] }
 prost = "0.13"
 prost-reflect = { version = "0.15", features = ["serde", "derive"] }
 protox = "0.8"
+regex = "1"
 
 # test for axum body
 axum = "0.8"
+http-serde = "2.1.1"
 
 [dev-dependencies]
+bincode = { version = "2", features = ["serde"] }
 tokio = { version = "1", features = [
     "test-util",
     "macros",

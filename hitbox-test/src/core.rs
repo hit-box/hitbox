@@ -107,6 +107,8 @@ pub trait StepExt {
 impl StepExt for Step {
     fn docstring_content(&self) -> Option<String> {
         self.docstring()
-            .map(|docstring| docstring.lines().skip(1).collect::<Vec<_>>().join("\n"))
+            .map(|docstring| {
+                docstring.lines().skip(1).collect::<Vec<_>>().join("\n")
+            })
     }
 }

@@ -390,8 +390,9 @@ where
                     }
                 }
                 StateProj::Response { response } => {
+                    let upstream_response = response.take().expect(POLL_AFTER_READY_ERROR);
                     let response = this.transformer.response_transform(
-                        response.take().expect(POLL_AFTER_READY_ERROR),
+                        upstream_response,
                         if *this.cache_enabled {
                             Some(*this.cache_status)
                         } else {

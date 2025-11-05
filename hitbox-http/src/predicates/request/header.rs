@@ -2,12 +2,15 @@ use crate::CacheableHttpRequest;
 use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
 use http::{HeaderName, HeaderValue};
+use regex::Regex;
 
 #[derive(Debug)]
 pub enum Operation {
     Eq(HeaderName, HeaderValue),
     Exist(HeaderName),
     In(HeaderName, Vec<HeaderValue>),
+    Contains(HeaderName, String),
+    Regex(HeaderName, Regex),
 }
 
 #[derive(Debug)]
@@ -63,6 +66,28 @@ where
                         .get_all(name)
                         .iter()
                         .any(|header_value| values.iter().any(|v| v.eq(header_value))),
+                    Operation::Contains(name, substring) => request
+                        .parts()
+                        .headers
+                        .get_all(name)
+                        .iter()
+                        .any(|header_value| {
+                            header_value
+                                .to_str()
+                                .map(|s| s.contains(substring.as_str()))
+                                .unwrap_or(false)
+                        }),
+                    Operation::Regex(name, regex) => request
+                        .parts()
+                        .headers
+                        .get_all(name)
+                        .iter()
+                        .any(|header_value| {
+                            header_value
+                                .to_str()
+                                .map(|s| regex.is_match(s))
+                                .unwrap_or(false)
+                        }),
                 };
                 if is_cacheable {
                     PredicateResult::Cacheable(request)

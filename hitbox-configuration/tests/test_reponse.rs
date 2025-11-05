@@ -232,3 +232,106 @@ response:
     };
     assert_eq!(endpoint, expected);
 }
+
+#[test]
+fn test_response_header_contains_deserialize() {
+    let yaml_str = r"
+policy:
+  Enabled:
+    ttl: 5
+response:
+  - Header:
+      contains:
+        content-type: json
+        accept: html
+";
+    let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
+
+    let mut expected_headers = IndexMap::new();
+    expected_headers.insert("content-type".to_string(), "json".to_string());
+    expected_headers.insert("accept".to_string(), "html".to_string());
+
+    let expected = ConfigEndpoint {
+        response: MaybeUndefined::Value(Response::Flat(vec![
+            Predicate::Header(header::HeaderOperation::Contains { contains: expected_headers }),
+        ])),
+        ..Default::default()
+    };
+    assert_eq!(endpoint, expected);
+}
+
+#[test]
+fn test_response_header_regex_deserialize() {
+    let yaml_str = r"
+policy:
+  Enabled:
+    ttl: 5
+response:
+  - Header:
+      regex:
+        content-type: 'application/(json|xml)'
+        x-version: '^v\d+\.\d+\.\d+$'
+";
+    let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
+
+    let mut expected_headers = IndexMap::new();
+    expected_headers.insert("content-type".to_string(), "application/(json|xml)".to_string());
+    expected_headers.insert("x-version".to_string(), r"^v\d+\.\d+\.\d+$".to_string());
+
+    let expected = ConfigEndpoint {
+        response: MaybeUndefined::Value(Response::Flat(vec![
+            Predicate::Header(header::HeaderOperation::Regex { regex: expected_headers }),
+        ])),
+        ..Default::default()
+    };
+    assert_eq!(endpoint, expected);
+}
+
+#[test]
+fn test_invalid_regex_pattern_rejected() {
+    let yaml_str = r"
+policy:
+  Enabled:
+    ttl: 5
+response:
+  - Header:
+      regex:
+        content-type: '[invalid(regex'
+";
+    let result = serde_saphyr::from_str::<ConfigEndpoint>(yaml_str);
+
+    // The deserialization itself should succeed, but converting to predicates should fail
+    // because regex compilation happens during into_predicates()
+    if let Ok(endpoint) = result {
+        let predicates_result = std::panic::catch_unwind(|| {
+            endpoint.response.unwrap_or_default().into_predicates::<Empty<Bytes>>()
+        });
+        assert!(
+            predicates_result.is_err(),
+            "Invalid regex pattern should cause panic during into_predicates()"
+        );
+    } else {
+        panic!("Deserialization should succeed; regex validation happens during into_predicates()");
+    }
+}
+
+#[test]
+fn test_valid_regex_pattern_accepted() {
+    let yaml_str = r"
+policy:
+  Enabled:
+    ttl: 5
+response:
+  - Header:
+      regex:
+        content-type: '^application/json.*$'
+";
+    let result = serde_saphyr::from_str::<ConfigEndpoint>(yaml_str);
+    assert!(result.is_ok(), "Valid regex pattern should be accepted: {:?}", result.err());
+
+    // Also verify that into_predicates() works
+    let endpoint = result.unwrap();
+    let predicates = endpoint.response.unwrap_or_default().into_predicates::<Empty<Bytes>>();
+    // If we got here without panic, the regex compiled successfully
+    drop(predicates);
+}
