@@ -2,6 +2,7 @@
 name = "hitbox-configuration"
 version = "0.1.0"
 edition = "2024"
+rust-version.workspace = true
 
 [dependencies]
 hitbox = { path = "../hitbox/" }

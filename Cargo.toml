@@ -15,6 +15,9 @@ members = [
     "hitbox-configuration",
 ]
 
+[workspace.package]
+rust-version = "1.89"
+
 [workspace.dependencies]
 # Core async and trait dependencies
 async-trait = "0.1"
