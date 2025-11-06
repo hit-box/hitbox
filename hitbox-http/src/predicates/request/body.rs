@@ -4,15 +4,27 @@ use async_trait::async_trait;
 use hitbox::predicate::{Predicate, PredicateResult};
 use http::Request;
 use hyper::body::Body as HttpBody;
+use jaq_core::{
+    self, Ctx, RcIter,
+    load::{Arena, File, Loader},
+};
+use jaq_json::{self, Val};
+use prost_reflect::{DynamicMessage, MessageDescriptor, SerializeOptions};
 use serde_json::Value;
 
-use crate::{CacheableHttpRequest, FromBytes, MAX_BODY_SIZE, ParsingType, body_processing};
+use crate::{CacheableHttpRequest, FromBytes};
 
 #[derive(Debug)]
 pub enum Operation {
     Eq(Value),
     Exist,
     In(Vec<Value>), // TODO: Add key-value pairs
+}
+
+#[derive(Debug)]
+pub enum ParsingType {
+    Jq,
+    ProtoBuf(MessageDescriptor),
 }
 
 #[derive(Debug)]
@@ -51,6 +63,36 @@ where
     }
 }
 
+fn apply(expression: &str, input: Value) -> Option<Value> {
+    // TODO: Handle the errors.
+    let program = File {
+        code: expression,
+        path: (),
+    };
+    let loader = Loader::new(jaq_std::defs().chain(jaq_json::defs()));
+    let arena = Arena::default();
+    let modules = loader.load(&arena, program).unwrap();
+    let filter = jaq_core::Compiler::default()
+        .with_funs(jaq_std::funs().chain(jaq_json::funs()))
+        .compile(modules)
+        .unwrap();
+    let inputs = RcIter::new(core::iter::empty());
+    let out = filter.run((Ctx::new([], &inputs), Val::from(input)));
+    let results: Result<Vec<_>, _> = out.collect();
+    match results {
+        Ok(values) if values.eq(&vec![Val::Null]) => None,
+        Ok(values) if !values.is_empty() => {
+            let values: Vec<Value> = values.into_iter().map(|v| v.into()).collect();
+            if values.len() == 1 {
+                Some(values.into_iter().next().unwrap())
+            } else {
+                Some(Value::Array(values))
+            }
+        }
+        _ => None,
+    }
+}
+
 #[async_trait]
 impl<P, ReqBody> Predicate for Body<P>
 where
@@ -66,12 +108,24 @@ where
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
                 let (parts, body) = request.into_parts();
-                let payload = body_processing::collect_body(body, MAX_BODY_SIZE)
-                    .await
-                    .unwrap();
-                let json_value = body_processing::parse_body(&payload, &self.parsing_type).unwrap();
-                let found_value =
-                    body_processing::apply_jq_expression(&self.expression, json_value).unwrap();
+                use http_body_util::BodyExt;
+                let payload = body.collect().await.unwrap().to_bytes();
+                // let payload = to_bytes(body).await.unwrap();
+                let body_str = String::from_utf8_lossy(&payload);
+                let json_value = match &self.parsing_type {
+                    ParsingType::Jq => serde_json::from_str(&body_str).unwrap_or(Value::Null),
+                    ParsingType::ProtoBuf(message) => {
+                        let dynamic_message =
+                            DynamicMessage::decode(message.clone(), payload.as_ref()).unwrap();
+                        let mut serializer = serde_json::Serializer::new(vec![]);
+                        let options = SerializeOptions::new().skip_default_fields(false);
+                        dynamic_message
+                            .serialize_with_options(&mut serializer, &options)
+                            .unwrap();
+                        serde_json::from_slice(&serializer.into_inner()).unwrap()
+                    }
+                };
+                let found_value = apply(&self.expression, json_value);
 
                 let is_cacheable = match &self.operation {
                     Operation::Eq(expected) => {

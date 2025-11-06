@@ -3,9 +3,14 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use hitbox::{Extractor, KeyPart, KeyParts};
 use hyper::body::Body as HttpBody;
+use jaq_core::{
+    self, Ctx, RcIter,
+    load::{Arena, File, Loader},
+};
+use jaq_json::{self, Val};
 use serde_json::Value;
 
-use crate::{CacheableHttpRequest, FromBytes, MAX_BODY_SIZE, body_processing};
+use crate::{CacheableHttpRequest, FromBytes};
 
 #[derive(Debug)]
 pub struct Body<E> {
@@ -35,6 +40,36 @@ where
     }
 }
 
+fn apply(expression: &str, input: Value) -> Option<Value> {
+    // TODO: Handle the errors.
+    let program = File {
+        code: expression,
+        path: (),
+    };
+    let loader = Loader::new(jaq_std::defs().chain(jaq_json::defs()));
+    let arena = Arena::default();
+    let modules = loader.load(&arena, program).unwrap();
+    let filter = jaq_core::Compiler::default()
+        .with_funs(jaq_std::funs().chain(jaq_json::funs()))
+        .compile(modules)
+        .unwrap();
+    let inputs = RcIter::new(core::iter::empty());
+    let out = filter.run((Ctx::new([], &inputs), Val::from(input)));
+    let results: Result<Vec<_>, _> = out.collect();
+    match results {
+        Ok(values) if values.eq(&vec![Val::Null]) => Some(Value::Null),
+        Ok(values) if !values.is_empty() => {
+            let values: Vec<Value> = values.into_iter().map(|v| v.into()).collect();
+            if values.len() == 1 {
+                Some(values.into_iter().next().unwrap())
+            } else {
+                Some(Value::Array(values))
+            }
+        }
+        _ => None,
+    }
+}
+
 #[async_trait]
 impl<ReqBody, E> Extractor for Body<E>
 where
@@ -47,14 +82,12 @@ where
 
     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
         let (parts, body) = subject.into_parts();
-        let payload = body_processing::collect_body(body, MAX_BODY_SIZE)
-            .await
-            .unwrap();
+        use http_body_util::BodyExt;
+        let payload = body.collect().await.unwrap().to_bytes();
         let body_str = String::from_utf8_lossy(&payload);
         let json_value = serde_json::from_str(&body_str).unwrap_or(Value::Null);
 
-        let found_value =
-            body_processing::apply_jq_expression(&self.expression, json_value).unwrap();
+        let found_value = apply(&self.expression, json_value);
 
         // Convert the extracted value to a string for the cache key
         // Null values are represented as None

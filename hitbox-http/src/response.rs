@@ -10,7 +10,7 @@ use http::{HeaderMap, Response, response::Parts};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
-use crate::{MAX_BODY_SIZE, body::FromBytes, body_processing};
+use crate::body::FromBytes;
 
 #[derive(Debug)]
 pub enum ResponseBody<ResBody> {
@@ -101,9 +101,14 @@ where
     }
 
     async fn into_cached(self) -> CachePolicy<Self::Cached, Self> {
-        let body = body_processing::collect_body(self.body.into_inner_body(), MAX_BODY_SIZE)
+        use http_body_util::BodyExt;
+        let body = self
+            .body
+            .into_inner_body()
+            .collect()
             .await
             .unwrap()
+            .to_bytes()
             .to_vec();
 
         // We can store the HeaderMap directly, including pseudo-headers
