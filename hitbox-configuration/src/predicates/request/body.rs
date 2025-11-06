@@ -1,6 +1,6 @@
 use crate::error::ConfigError;
-use hitbox_http::FromBytes;
 use hitbox_http::predicates::request::BodyPredicate as _;
+use hitbox_http::{FromBytes, ParsingType};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +29,7 @@ impl BodyPredicate {
     {
         match self {
             BodyPredicate::Jq(expression) => Ok(Box::new(inner.body(
-                hitbox_http::predicates::request::body::ParsingType::Jq,
+                ParsingType::Jq,
                 expression,
                 // For Jq expressions, we expect the expression to evaluate to a boolean
                 // (e.g., '.field == "value"' returns true/false)
