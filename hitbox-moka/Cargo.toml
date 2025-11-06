@@ -6,18 +6,13 @@ edition = "2024"
 [dependencies]
 hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
 hitbox = { path = "../hitbox", version = "0.1.0" }
-async-trait = "0.1"
-serde = "1"
-tokio = "1"
-tracing = { version = "0.1", default-features = false }
+async-trait = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
 moka = { version = "0.12.10", features = ["future"]  }
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
+chrono = { workspace = true, features = ["clock"] }
 
 [dev-dependencies]
-chrono = "0.4"
-tokio = { version = "1", features = [
-    "time",
-    "macros",
-    "test-util",
-    "rt-multi-thread",
-] }
+chrono = { workspace = true }
+tokio = { workspace = true, features = ["time", "macros", "test-util", "rt-multi-thread"] }

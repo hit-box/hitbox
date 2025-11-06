@@ -4,10 +4,12 @@ use hitbox_core::CacheKey;
 #[test]
 fn test_key_format_bincode_roundtrip() {
     let key = CacheKey::from_slice(&[("method", Some("GET")), ("path", Some("/users"))]);
-    let format = CacheKeyFormat::Bincode;
+    let format = CacheKeyFormat::Bitcode;
 
     let serialized = format.serialize(&key).expect("Failed to serialize");
-    let deserialized = format.deserialize(&serialized).expect("Failed to deserialize");
+    let deserialized = format
+        .deserialize(&serialized)
+        .expect("Failed to deserialize");
 
     assert_eq!(key, deserialized);
 }
@@ -15,10 +17,12 @@ fn test_key_format_bincode_roundtrip() {
 #[test]
 fn test_key_format_bincode_with_null_values() {
     let key = CacheKey::from_slice(&[("method", Some("GET")), (".metadata", None)]);
-    let format = CacheKeyFormat::Bincode;
+    let format = CacheKeyFormat::Bitcode;
 
     let serialized = format.serialize(&key).expect("Failed to serialize");
-    let deserialized = format.deserialize(&serialized).expect("Failed to deserialize");
+    let deserialized = format
+        .deserialize(&serialized)
+        .expect("Failed to deserialize");
 
     assert_eq!(key, deserialized);
 }

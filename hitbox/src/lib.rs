@@ -3,10 +3,9 @@
 //! # A quick tour of hitbox
 //!
 //! Our crates consist of next main part:
-//! * [Cacheable] trait.
 //! * [Backend] trait and its implementation ([RedisBackend]).
 //! * [CacheableResponse] trait.
-//! * Cache implementation. ([hitbox-actix])
+//! * Cache implementation and framework integrations.
 //!
 //! ## Features
 //! - [x] Automatic cache key generation.
@@ -22,7 +21,7 @@
 //! - [ ] Detailed metrics out of the box.
 //!
 //! ## Feature flags
-//! * derive - Support for [Cacheable] trait derive macros.
+//! * derive - Support for deriving cache-related traits.
 //! * metrics - Support for metrics.
 //!
 //! ## Restrictions
@@ -30,32 +29,9 @@
 //! and have some [restrictions](https://docs.rs/serde_qs/latest/serde_qs/#supported-types).
 //!
 //! ## Example
-//! First of all, you should derive [Cacheable] trait for your struct or enum:
+//! See the [examples](https://github.com/hit-box/hitbox/tree/main/examples) directory for
+//! complete usage examples with Tower, Axum, and various backends.
 //!
-//! ```rust
-//! use hitbox::prelude::*;
-//! use serde::{Deserialize, Serialize};
-//!
-//! #[derive(Cacheable, Serialize)] // With features=["derive"]
-//! struct Ping {
-//!     id: i32,
-//! }
-//! ```
-//! Or implement that trait manually:
-//!
-//! ```rust
-//! # use hitbox::{Cacheable, CacheError};
-//! # struct Ping { id: i32 }
-//! impl Cacheable for Ping {
-//!     fn cache_key(&self) -> Result<String, CacheError> {
-//!         Ok(format!("{}::{}", self.cache_key_prefix(), self.id))
-//!     }
-//!
-//!     fn cache_key_prefix(&self) -> String { "Ping".to_owned() }
-//! }
-//! ```
-//!
-//! [Cacheable]: crate::Cacheable
 //! [CacheableResponse]: crate::CacheableResponse
 //! [Backend]: hitbox_backend::Backend
 //! [RedisBackend]: https://docs.rs/hitbox_redis/

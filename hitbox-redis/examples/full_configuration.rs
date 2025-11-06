@@ -1,28 +1,27 @@
+use hitbox_backend::serializer::Format;
 /// Complete example showing how to configure both key and value serialization formats
 /// for optimal Redis backend performance.
-
 use hitbox_backend::{Backend, CacheKeyFormat};
-use hitbox_backend::serializer::Format;
 use hitbox_redis::RedisBackend;
 
 fn main() {
     println!("=== Complete Backend Configuration Guide ===\n");
 
     // Scenario 1: Development/Debugging Configuration
-    // - Human-readable keys and values
-    // - Easy to inspect in Redis CLI
+    // - URL-encoded keys for readability
+    // - JSON values for easy inspection
     println!("📝 Scenario 1: Development/Debugging");
     let dev_backend = RedisBackend::builder()
         .server("redis://127.0.0.1:6379/0".to_string())
-        .key_format(CacheKeyFormat::Json)      // Human-readable keys
-        .value_format(Format::Json)              // Human-readable values
+        .key_format(CacheKeyFormat::UrlEncoded) // Human-readable keys
+        .value_format(Format::Json) // Human-readable values
         .build()
         .expect("Failed to create dev backend");
 
     println!("   Key format:   {:?}", dev_backend.key_format());
     println!("   Value format: {:?}", dev_backend.value_format());
     println!("   Benefit: Easy debugging with redis-cli");
-    println!("   Trade-off: Higher memory usage\n");
+    println!("   Trade-off: Slightly larger keys than Bitcode\n");
 
     // Scenario 2: Production High-Performance Configuration
     // - Compact binary keys and values
@@ -31,8 +30,8 @@ fn main() {
     println!("🚀 Scenario 2: Production (High Performance)");
     let prod_backend = RedisBackend::builder()
         .server("redis://127.0.0.1:6379/1".to_string())
-        .key_format(CacheKeyFormat::Bincode)   // Compact binary keys
-        .value_format(Format::Json)              // Standard JSON values (or Bincode for max performance)
+        .key_format(CacheKeyFormat::Bitcode) // Compact binary keys
+        .value_format(Format::Json) // Standard JSON values (or Bincode for max performance)
         .build()
         .expect("Failed to create prod backend");
 
@@ -48,7 +47,7 @@ fn main() {
     let cdn_backend = RedisBackend::builder()
         .server("redis://127.0.0.1:6379/2".to_string())
         .key_format(CacheKeyFormat::UrlEncoded) // HTTP-safe keys
-        .value_format(Format::Json)               // Cross-platform values
+        .value_format(Format::Json) // Cross-platform values
         .build()
         .expect("Failed to create CDN backend");
 
@@ -57,35 +56,33 @@ fn main() {
     println!("   Benefit: Keys safe for Vary headers, CDN integration");
     println!("   Use case: Edge caching, HTTP cache control\n");
 
-    // Scenario 4: Mixed Configuration
-    // - String keys for simple lookups
-    // - Bincode values for maximum space efficiency
-    println!("⚡ Scenario 4: Hybrid (String keys + Bincode values)");
-    let hybrid_backend = RedisBackend::builder()
+    // Scenario 4: Maximum Efficiency Configuration
+    // - Bitcode keys for minimal memory
+    // - Bencode values for compact storage
+    println!("⚡ Scenario 4: Maximum Efficiency (Bitcode keys + Bencode values)");
+    let efficient_backend = RedisBackend::builder()
         .server("redis://127.0.0.1:6379/3".to_string())
-        .key_format(CacheKeyFormat::Debug)      // Human-readable debug keys
-        .value_format(Format::Json)               // Would use Bincode when implemented
+        .key_format(CacheKeyFormat::Bitcode) // Most compact keys
+        .value_format(Format::Bencode) // Compact values
         .build()
-        .expect("Failed to create hybrid backend");
+        .expect("Failed to create efficient backend");
 
-    println!("   Key format:   {:?}", hybrid_backend.key_format());
-    println!("   Value format: {:?}", hybrid_backend.value_format());
-    println!("   Benefit: Readable keys, compact values");
-    println!("   Use case: Balance between debugging and performance\n");
+    println!("   Key format:   {:?}", efficient_backend.key_format());
+    println!("   Value format: {:?}", efficient_backend.value_format());
+    println!("   Benefit: Minimal memory footprint, fast serialization");
+    println!("   Use case: High-scale production, limited memory\n");
 
     println!("=== Format Comparison Table ===");
     println!("┌─────────────┬────────────┬──────────────┬───────────────────┐");
     println!("│ Format      │ Key Size   │ Readable     │ Best For          │");
     println!("├─────────────┼────────────┼──────────────┼───────────────────┤");
-    println!("│ String      │ Medium     │ ✓ Yes        │ Logging, Simple   │");
-    println!("│ JSON        │ Large      │ ✓ Yes        │ Debug, Multi-lang │");
-    println!("│ Bincode     │ Small      │ ✗ No         │ Production, Speed │");
-    println!("│ UrlEncoded  │ Small      │ ✓ Partial    │ HTTP, CDN         │");
+    println!("│ Bitcode     │ Smallest   │ ✗ No         │ Production, Speed │");
+    println!("│ UrlEncoded  │ Medium     │ ✓ Yes        │ HTTP, CDN, Debug  │");
     println!("└─────────────┴────────────┴──────────────┴───────────────────┘\n");
 
     println!("=== Recommendations ===");
-    println!("• Development:   JSON keys + JSON values");
-    println!("• Production:    Bincode keys + JSON values (or Bincode when implemented)");
+    println!("• Development:   UrlEncoded keys + JSON values");
+    println!("• Production:    Bitcode keys + Bencode values (maximum efficiency)");
     println!("• CDN/Edge:      UrlEncoded keys + JSON values");
-    println!("• Logging:       String keys + JSON values");
+    println!("• High-scale:    Bitcode keys + Bencode values");
 }

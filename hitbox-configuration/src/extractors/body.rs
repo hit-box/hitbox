@@ -1,5 +1,5 @@
-use hitbox_http::extractors;
 use hitbox_http::FromBytes;
+use hitbox_http::extractors;
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 

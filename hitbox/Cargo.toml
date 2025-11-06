@@ -16,15 +16,15 @@ keywords = ["cache", "async", "cache-backend", "hitbox", "tokio"]
 [dependencies]
 hitbox-core = { path = "../hitbox-core", version = "0.1.0" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
-serde = { version = "1", features = ["derive"] }
-chrono = { version = "0.4", features = ["serde"], default-features = false }
-thiserror = "1"
-metrics = { version = "0.23", optional = true }
+serde = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+thiserror = { workspace = true }
+metrics = { version = "0.24", optional = true }
 lazy_static = { version = "1", optional = true }
-tracing = "0.1"
-async-trait = "0.1.52"
-pin-project = "1"
-futures = { version = "0.3", features = ["alloc"], default-features = false }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+pin-project = { workspace = true }
+futures = { workspace = true, features = ["alloc"] }
 
 [features]
 default = []

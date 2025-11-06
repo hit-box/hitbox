@@ -28,10 +28,8 @@ impl KeySerializer for UrlEncodedKeySerializer<String> {
 
 #[derive(Default, Clone, Copy, Debug)]
 pub enum CacheKeyFormat {
-    /// Bincode format (compact binary)
-    #[default]
-    Bincode,
     /// Bitcode format (most compact binary)
+    #[default]
     Bitcode,
     /// URL-encoded format
     UrlEncoded,
@@ -40,8 +38,6 @@ pub enum CacheKeyFormat {
 impl CacheKeyFormat {
     pub fn serialize(&self, key: &CacheKey) -> Result<Vec<u8>, SerializerError> {
         match self {
-            CacheKeyFormat::Bincode => bincode::serialize(key)
-                .map_err(|err| SerializerError::Serialize(Box::new(err))),
             CacheKeyFormat::Bitcode => Ok(bitcode::encode(key)),
             CacheKeyFormat::UrlEncoded => {
                 let parts = key
@@ -57,18 +53,15 @@ impl CacheKeyFormat {
 
     pub fn deserialize(&self, data: &[u8]) -> Result<CacheKey, SerializerError> {
         match self {
-            CacheKeyFormat::Bincode => bincode::deserialize(data)
-                .map_err(|err| SerializerError::Deserialize(Box::new(err))),
-            CacheKeyFormat::Bitcode => bitcode::decode(data)
-                .map_err(|err| SerializerError::Deserialize(Box::new(err))),
+            CacheKeyFormat::Bitcode => {
+                bitcode::decode(data).map_err(|err| SerializerError::Deserialize(Box::new(err)))
+            }
             CacheKeyFormat::UrlEncoded => {
                 // URL-encoded is one-way for cache keys (used for storage key, not round-trip)
-                Err(SerializerError::Deserialize(Box::new(
-                    std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "UrlEncoded format deserialization not implemented",
-                    ),
-                )))
+                Err(SerializerError::Deserialize(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "UrlEncoded format deserialization not implemented",
+                ))))
             }
         }
     }

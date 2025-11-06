@@ -57,7 +57,9 @@ where
                     hitbox::CacheStatus::Hit => "HIT",
                     hitbox::CacheStatus::Miss => "MISS",
                 };
-                response.headers_mut().insert("X-Cache-Status", status_value.parse().unwrap());
+                response
+                    .headers_mut()
+                    .insert("X-Cache-Status", status_value.parse().unwrap());
             }
             response
         })

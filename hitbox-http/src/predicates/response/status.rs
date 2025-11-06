@@ -83,11 +83,7 @@ impl<P> StatusCode<P> {
 pub trait StatusCodePredicate: Sized {
     fn status_code(self, status_code: http::StatusCode) -> StatusCode<Self>;
     fn status_code_in(self, codes: Vec<http::StatusCode>) -> StatusCode<Self>;
-    fn status_code_range(
-        self,
-        start: http::StatusCode,
-        end: http::StatusCode,
-    ) -> StatusCode<Self>;
+    fn status_code_range(self, start: http::StatusCode, end: http::StatusCode) -> StatusCode<Self>;
     fn status_code_class(self, class: StatusClass) -> StatusCode<Self>;
 }
 
@@ -103,11 +99,7 @@ where
         StatusCode::new_in(self, codes)
     }
 
-    fn status_code_range(
-        self,
-        start: http::StatusCode,
-        end: http::StatusCode,
-    ) -> StatusCode<Self> {
+    fn status_code_range(self, start: http::StatusCode, end: http::StatusCode) -> StatusCode<Self> {
         StatusCode::new_range(self, start, end)
     }
 

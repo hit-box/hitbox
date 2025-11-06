@@ -19,10 +19,7 @@ pub enum Predicate {
 }
 
 impl Predicate {
-    pub fn into_predicates<ReqBody>(
-        &self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(&self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
@@ -43,10 +40,7 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn into_predicates<ReqBody>(
-        self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
@@ -58,13 +52,14 @@ impl Operation {
                 match iter.next() {
                     None => inner,
                     Some(first) => {
-                        let first_predicate = first.into_predicates(
-                            Box::new(NeutralResponsePredicate::new()) as CorePredicate<ReqBody>
-                        );
-                        iter.fold(first_predicate, |acc, expression| {
-                            let predicate = expression.into_predicates(
+                        let first_predicate = first
+                            .into_predicates(
                                 Box::new(NeutralResponsePredicate::new()) as CorePredicate<ReqBody>
                             );
+                        iter.fold(first_predicate, |acc, expression| {
+                            let predicate = expression
+                                .into_predicates(Box::new(NeutralResponsePredicate::new())
+                                    as CorePredicate<ReqBody>);
                             Box::new(Or::new(
                                 predicate,
                                 acc,
@@ -89,10 +84,7 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn into_predicates<ReqBody>(
-        self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,

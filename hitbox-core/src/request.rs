@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{extractor::Extractor, predicate::Predicate, CacheKey, CachePolicy};
+use crate::{CacheKey, CachePolicy, extractor::Extractor, predicate::Predicate};
 
 pub struct CacheablePolicyData<T> {
     pub key: CacheKey,

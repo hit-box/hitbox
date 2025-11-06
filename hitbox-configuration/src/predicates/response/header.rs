@@ -49,53 +49,53 @@ where
     ReqBody::Error: std::fmt::Debug,
     ReqBody::Data: Send,
 {
-    headers.iter().rfold(inner, |inner, (header_name, header_value)| {
-        let operation = match header_value {
-            HeaderValue::Eq(value) => {
-                hitbox_http::predicates::response::header::Operation::Eq(
+    headers
+        .iter()
+        .rfold(inner, |inner, (header_name, header_value)| {
+            let operation = match header_value {
+                HeaderValue::Eq(value) => hitbox_http::predicates::response::header::Operation::Eq(
                     header_name.parse().unwrap(),
                     value.parse().unwrap(),
-                )
-            }
-            HeaderValue::In(values) => {
-                hitbox_http::predicates::response::header::Operation::In(
-                    header_name.parse().unwrap(),
-                    values.iter().map(|v| v.parse().unwrap()).collect(),
-                )
-            }
-            HeaderValue::Operation(op) => match op {
-                HeaderValueOperation::Eq(value) => {
-                    hitbox_http::predicates::response::header::Operation::Eq(
-                        header_name.parse().unwrap(),
-                        value.parse().unwrap(),
-                    )
-                }
-                HeaderValueOperation::In(values) => {
+                ),
+                HeaderValue::In(values) => {
                     hitbox_http::predicates::response::header::Operation::In(
                         header_name.parse().unwrap(),
                         values.iter().map(|v| v.parse().unwrap()).collect(),
                     )
                 }
-                HeaderValueOperation::Contains(substring) => {
-                    hitbox_http::predicates::response::header::Operation::Contains(
-                        header_name.parse().unwrap(),
-                        substring.clone(),
-                    )
-                }
-                HeaderValueOperation::Regex(pattern) => {
-                    let compiled_regex = Regex::new(pattern).expect("Invalid regex pattern");
-                    hitbox_http::predicates::response::header::Operation::Regex(
-                        header_name.parse().unwrap(),
-                        compiled_regex,
-                    )
-                }
-                HeaderValueOperation::Exist => {
-                    hitbox_http::predicates::response::header::Operation::Exist(
-                        header_name.parse().unwrap(),
-                    )
-                }
-            },
-        };
-        Box::new(Header::new(inner, operation))
-    })
+                HeaderValue::Operation(op) => match op {
+                    HeaderValueOperation::Eq(value) => {
+                        hitbox_http::predicates::response::header::Operation::Eq(
+                            header_name.parse().unwrap(),
+                            value.parse().unwrap(),
+                        )
+                    }
+                    HeaderValueOperation::In(values) => {
+                        hitbox_http::predicates::response::header::Operation::In(
+                            header_name.parse().unwrap(),
+                            values.iter().map(|v| v.parse().unwrap()).collect(),
+                        )
+                    }
+                    HeaderValueOperation::Contains(substring) => {
+                        hitbox_http::predicates::response::header::Operation::Contains(
+                            header_name.parse().unwrap(),
+                            substring.clone(),
+                        )
+                    }
+                    HeaderValueOperation::Regex(pattern) => {
+                        let compiled_regex = Regex::new(pattern).expect("Invalid regex pattern");
+                        hitbox_http::predicates::response::header::Operation::Regex(
+                            header_name.parse().unwrap(),
+                            compiled_regex,
+                        )
+                    }
+                    HeaderValueOperation::Exist => {
+                        hitbox_http::predicates::response::header::Operation::Exist(
+                            header_name.parse().unwrap(),
+                        )
+                    }
+                },
+            };
+            Box::new(Header::new(inner, operation))
+        })
 }

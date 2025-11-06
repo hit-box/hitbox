@@ -14,13 +14,13 @@ fn main() {
     // Demonstrate different serialization formats
 
     // 1. Bincode format (default, compact, fast for Redis/Tarantool)
-    let bincode_format = CacheKeyFormat::Bincode;
-    let bincode_serialized = bincode_format.serialize(&key).unwrap();
+    let bitcode_format = CacheKeyFormat::Bitcode;
+    let bincode_serialized = bitcode_format.serialize(&key).unwrap();
     println!("Bincode format ({} bytes):", bincode_serialized.len());
     println!("  (binary data, not human-readable)");
 
     // Can deserialize back
-    let bincode_deserialized = bincode_format.deserialize(&bincode_serialized).unwrap();
+    let bincode_deserialized = bitcode_format.deserialize(&bincode_serialized).unwrap();
     assert_eq!(key, bincode_deserialized);
     println!("  ✓ Roundtrip successful!");
 

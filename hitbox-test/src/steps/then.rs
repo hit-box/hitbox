@@ -189,7 +189,9 @@ async fn check_cache_record_count(
 
 #[then(expr = "cache key exists")]
 async fn check_cache_key_exists(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    let key_pattern = step.docstring.as_ref()
+    let key_pattern = step
+        .docstring
+        .as_ref()
         .ok_or_else(|| anyhow!("Expected Debug format docstring for cache key"))?;
 
     // Parse key pattern using debug format deserialize

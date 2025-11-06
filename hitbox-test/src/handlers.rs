@@ -3,10 +3,10 @@ use std::sync::Arc;
 use axum::{
     body::Bytes,
     extract::{Path, Query, State},
-    Json,
     response::{IntoResponse, Response},
+    Json,
 };
-use http::{StatusCode, HeaderValue};
+use http::{HeaderValue, StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::app::{AppState, AuthorId, Book, BookId};
@@ -44,11 +44,21 @@ pub(crate) async fn get_book(
                 let json_response = Json(book).into_response();
                 let (mut parts, body) = json_response.into_parts();
 
-                parts.headers.insert("server", HeaderValue::from_static("hitbox-test"));
-                parts.headers.insert("x-empty", HeaderValue::from_static(""));
-                parts.headers.insert("x-custom", HeaderValue::from_static("  value  "));
-                parts.headers.insert("set-cookie", HeaderValue::from_static("session=abc123"));
-                parts.headers.append("set-cookie", HeaderValue::from_static("token=xyz789"));
+                parts
+                    .headers
+                    .insert("server", HeaderValue::from_static("hitbox-test"));
+                parts
+                    .headers
+                    .insert("x-empty", HeaderValue::from_static(""));
+                parts
+                    .headers
+                    .insert("x-custom", HeaderValue::from_static("  value  "));
+                parts
+                    .headers
+                    .insert("set-cookie", HeaderValue::from_static("session=abc123"));
+                parts
+                    .headers
+                    .append("set-cookie", HeaderValue::from_static("token=xyz789"));
 
                 Ok(Response::from_parts(parts, body))
             } else {

@@ -34,7 +34,10 @@ where
     E: Extractor,
 {
     fn body(self, expression: String) -> Body<Self> {
-        Body { inner: self, expression }
+        Body {
+            inner: self,
+            expression,
+        }
     }
 }
 
@@ -95,9 +98,10 @@ where
             other => Some(other.to_string()),
         });
 
-        let request = CacheableHttpRequest::from_request(
-            http::Request::from_parts(parts, ReqBody::from_bytes(payload))
-        );
+        let request = CacheableHttpRequest::from_request(http::Request::from_parts(
+            parts,
+            ReqBody::from_bytes(payload),
+        ));
 
         let mut key_parts = self.inner.get(request).await;
         key_parts.push(KeyPart::new(self.expression.clone(), value_string));

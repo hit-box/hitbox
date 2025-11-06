@@ -121,8 +121,14 @@ async fn test_multiple_header_values() {
         .unwrap();
 
     let headers = original.headers_mut();
-    headers.append("set-cookie", HeaderValue::from_static("session=abc123; Path=/"));
-    headers.append("set-cookie", HeaderValue::from_static("token=xyz789; Secure"));
+    headers.append(
+        "set-cookie",
+        HeaderValue::from_static("session=abc123; Path=/"),
+    );
+    headers.append(
+        "set-cookie",
+        HeaderValue::from_static("token=xyz789; Secure"),
+    );
     headers.append("set-cookie", HeaderValue::from_static("user_id=42"));
 
     let mut original_clone = Response::builder()
@@ -131,8 +137,14 @@ async fn test_multiple_header_values() {
         .body(r#"{"status":"ok"}"#.to_string())
         .unwrap();
     let headers_clone = original_clone.headers_mut();
-    headers_clone.append("set-cookie", HeaderValue::from_static("session=abc123; Path=/"));
-    headers_clone.append("set-cookie", HeaderValue::from_static("token=xyz789; Secure"));
+    headers_clone.append(
+        "set-cookie",
+        HeaderValue::from_static("session=abc123; Path=/"),
+    );
+    headers_clone.append(
+        "set-cookie",
+        HeaderValue::from_static("token=xyz789; Secure"),
+    );
     headers_clone.append("set-cookie", HeaderValue::from_static("user_id=42"));
 
     let restored = roundtrip_test(original).await;

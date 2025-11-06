@@ -4,8 +4,8 @@ use hitbox_http::predicates::conditions::{Not, Or};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
-use crate::RequestPredicate;
 use super::Expression;
+use crate::RequestPredicate;
 
 // Use standard externally-tagged enum (serde default)
 // YAML syntax: And: [...], Or: [...], Not: {...}

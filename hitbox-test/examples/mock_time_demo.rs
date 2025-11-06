@@ -28,7 +28,10 @@ fn main() {
     let mock_time2 = mock_time.clone();
     println!("   mock_time1 now: {:?}", mock_time.now());
     println!("   mock_time2 now: {:?}", mock_time2.now());
-    println!("   Both times are equal: {}\n", mock_time.now() == mock_time2.now());
+    println!(
+        "   Both times are equal: {}\n",
+        mock_time.now() == mock_time2.now()
+    );
 
     // Advancing one affects both
     println!("5. Advancing mock_time2 by 1 hour...");

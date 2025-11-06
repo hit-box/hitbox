@@ -4,9 +4,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 
 use crate::{
+    CachePolicy, EntityPolicyConfig,
     predicate::{Predicate, PredicateResult},
     value::CacheValue,
-    CachePolicy, EntityPolicyConfig,
 };
 
 /// This trait determines which types should be cached or not.

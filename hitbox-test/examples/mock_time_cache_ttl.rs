@@ -64,7 +64,9 @@ fn main() {
     println!("   Expire time:  {}", expire_time);
 
     // Function to check cache state
-    let check_state = |provider: &MockTimeProvider, stale: chrono::DateTime<Utc>, expire: chrono::DateTime<Utc>| {
+    let check_state = |provider: &MockTimeProvider,
+                       stale: chrono::DateTime<Utc>,
+                       expire: chrono::DateTime<Utc>| {
         let current = provider.now();
         if current >= expire {
             "Expired"

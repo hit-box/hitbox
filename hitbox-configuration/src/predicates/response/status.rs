@@ -102,37 +102,34 @@ pub enum Operation {
     // Forms with both explicit and implicit syntax
     Class(Class),
     Eq(Eq),
-    In(In),  // Must be last: implicit form matches any array
+    In(In), // Must be last: implicit form matches any array
 }
 
 impl Operation {
-    pub fn into_predicates<ReqBody>(
-        &self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(&self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
         ReqBody::Data: Send,
     {
         match self {
-            Operation::Eq(eq) => {
-                Box::new(StatusCode::new(inner, eq.status().get().try_into().unwrap()))
-            }
+            Operation::Eq(eq) => Box::new(StatusCode::new(
+                inner,
+                eq.status().get().try_into().unwrap(),
+            )),
             Operation::In(r#in) => {
-                let status_codes: Vec<HttpStatusCode> = r#in.statuses()
+                let status_codes: Vec<HttpStatusCode> = r#in
+                    .statuses()
                     .iter()
                     .map(|c| c.get().try_into().unwrap())
                     .collect();
                 Box::new(StatusCode::new_in(inner, status_codes))
             }
-            Operation::Range { range } => {
-                Box::new(StatusCode::new_range(
-                    inner,
-                    range.start().get().try_into().unwrap(),
-                    range.end().get().try_into().unwrap(),
-                ))
-            }
+            Operation::Range { range } => Box::new(StatusCode::new_range(
+                inner,
+                range.start().get().try_into().unwrap(),
+                range.end().get().try_into().unwrap(),
+            )),
             Operation::Class(class) => Box::new(StatusCode::new_class(inner, class.class())),
         }
     }

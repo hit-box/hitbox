@@ -2,8 +2,8 @@ use hitbox_http::FromBytes;
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
-use crate::RequestPredicate;
 use super::{Operation, Predicate};
+use crate::RequestPredicate;
 
 // Use untagged enum - serde tries Operation first, then Predicate
 #[derive(Debug, Eq, PartialEq, Deserialize, Serialize)]

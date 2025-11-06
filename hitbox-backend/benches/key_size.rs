@@ -41,10 +41,7 @@ fn create_very_complex_key() -> CacheKey {
         ("method", Some("GET")),
         ("path", Some("/api/v3/search/advanced/results/paginated")),
         ("tenant", Some("enterprise-customer-2024")),
-        (
-            "user_id",
-            Some("user-d4f5g6h7-i8j9-k0l1-m2n3-o4p5q6r7s8t9"),
-        ),
+        ("user_id", Some("user-d4f5g6h7-i8j9-k0l1-m2n3-o4p5q6r7s8t9")),
         ("region", Some("us-east-1")),
         ("datacenter", Some("dc-01")),
         ("environment", Some("production")),
@@ -72,7 +69,7 @@ fn bench_size_comparison(c: &mut Criterion) {
     for (name, key) in &test_cases {
         // Bincode
         group.bench_with_input(BenchmarkId::new("bincode", name), key, |b, key| {
-            let format = CacheKeyFormat::Bincode;
+            let format = CacheKeyFormat::Bitcode;
             b.iter(|| {
                 let bytes = format.serialize(black_box(key)).unwrap();
                 black_box(bytes.len())
@@ -102,18 +99,22 @@ fn bench_size_comparison(c: &mut Criterion) {
 
     // Print size and time comparison table
     println!("\n=== Size & Time Comparison ===\n");
-    println!("{:<20} {:>10} {:>10} {:>12} {:>10} {:>10} {:>10} {:>12}",
-             "Key Type", "Bincode", "Bitcode", "UrlEncoded", "B/U", "Bit/U", "B(ns)", "Bit(ns)");
-    println!("{:<20} {:>10} {:>10} {:>12} {:>10} {:>10} {:>10} {:>12}",
-             "", "(bytes)", "(bytes)", "(bytes)", "Ratio", "Ratio", "", "");
+    println!(
+        "{:<20} {:>10} {:>10} {:>12} {:>10} {:>10} {:>10} {:>12}",
+        "Key Type", "Bincode", "Bitcode", "UrlEncoded", "B/U", "Bit/U", "B(ns)", "Bit(ns)"
+    );
+    println!(
+        "{:<20} {:>10} {:>10} {:>12} {:>10} {:>10} {:>10} {:>12}",
+        "", "(bytes)", "(bytes)", "(bytes)", "Ratio", "Ratio", "", ""
+    );
     println!("{:-<114}", "");
 
     for (name, key) in test_cases {
-        let bincode_bytes = CacheKeyFormat::Bincode.serialize(&key).unwrap();
+        let bitcode_bytes = CacheKeyFormat::Bitcode.serialize(&key).unwrap();
         let bitcode_bytes = CacheKeyFormat::Bitcode.serialize(&key).unwrap();
         let urlencoded_bytes = CacheKeyFormat::UrlEncoded.serialize(&key).unwrap();
 
-        let bincode_ratio = bincode_bytes.len() as f64 / urlencoded_bytes.len() as f64;
+        let bincode_ratio = bitcode_bytes.len() as f64 / urlencoded_bytes.len() as f64;
         let bitcode_ratio = bitcode_bytes.len() as f64 / urlencoded_bytes.len() as f64;
 
         // Measure time (average of 10000 iterations)
@@ -121,7 +122,7 @@ fn bench_size_comparison(c: &mut Criterion) {
 
         let start = Instant::now();
         for _ in 0..iterations {
-            let _ = black_box(CacheKeyFormat::Bincode.serialize(black_box(&key)).unwrap());
+            let _ = black_box(CacheKeyFormat::Bitcode.serialize(black_box(&key)).unwrap());
         }
         let bincode_time_ns = start.elapsed().as_nanos() / iterations;
 
@@ -134,7 +135,7 @@ fn bench_size_comparison(c: &mut Criterion) {
         println!(
             "{:<20} {:>10} {:>10} {:>12} {:>9.2}x {:>9.2}x {:>10} {:>12}",
             name,
-            bincode_bytes.len(),
+            bitcode_bytes.len(),
             bitcode_bytes.len(),
             urlencoded_bytes.len(),
             bincode_ratio,

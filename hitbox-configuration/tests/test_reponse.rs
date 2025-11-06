@@ -2,7 +2,7 @@
 use bytes::Bytes;
 use hitbox_configuration::{
     ConfigEndpoint, Response,
-    predicates::response::{Predicate, status, header},
+    predicates::response::{Predicate, header, status},
     types::MaybeUndefined,
 };
 use http_body_util::Empty;
@@ -23,8 +23,12 @@ response:
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Status(status::Operation::Eq(status::Eq::Implicit(NonZeroU16::new(200).unwrap()))),
-            Predicate::Status(status::Operation::Eq(status::Eq::Implicit(NonZeroU16::new(201).unwrap()))),
+            Predicate::Status(status::Operation::Eq(status::Eq::Implicit(
+                NonZeroU16::new(200).unwrap(),
+            ))),
+            Predicate::Status(status::Operation::Eq(status::Eq::Implicit(
+                NonZeroU16::new(201).unwrap(),
+            ))),
         ])),
         ..Default::default()
     };
@@ -123,7 +127,11 @@ response:
       range: [200, 299]
 ";
     let result = serde_saphyr::from_str::<ConfigEndpoint>(yaml_str);
-    assert!(result.is_ok(), "Valid range should be accepted: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Valid range should be accepted: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -140,13 +148,17 @@ response:
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
 
     let mut expected_headers = IndexMap::new();
-    expected_headers.insert("content-type".to_string(), header::HeaderValue::Eq("application/json".to_string()));
-    expected_headers.insert("cache-control".to_string(), header::HeaderValue::Eq("max-age=3600".to_string()));
+    expected_headers.insert(
+        "content-type".to_string(),
+        header::HeaderValue::Eq("application/json".to_string()),
+    );
+    expected_headers.insert(
+        "cache-control".to_string(),
+        header::HeaderValue::Eq("max-age=3600".to_string()),
+    );
 
     let expected = ConfigEndpoint {
-        response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Header(expected_headers),
-        ])),
+        response: MaybeUndefined::Value(Response::Flat(vec![Predicate::Header(expected_headers)])),
         ..Default::default()
     };
     assert_eq!(endpoint, expected);
@@ -166,12 +178,13 @@ response:
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
 
     let mut expected_headers = IndexMap::new();
-    expected_headers.insert("x-custom-header".to_string(), header::HeaderValue::Operation(header::HeaderValueOperation::Exist));
+    expected_headers.insert(
+        "x-custom-header".to_string(),
+        header::HeaderValue::Operation(header::HeaderValueOperation::Exist),
+    );
 
     let expected = ConfigEndpoint {
-        response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Header(expected_headers),
-        ])),
+        response: MaybeUndefined::Value(Response::Flat(vec![Predicate::Header(expected_headers)])),
         ..Default::default()
     };
     assert_eq!(endpoint, expected);
@@ -197,17 +210,18 @@ response:
     let mut expected_headers = IndexMap::new();
     expected_headers.insert(
         "content-type".to_string(),
-        header::HeaderValue::In(vec!["application/json".to_string(), "application/xml".to_string()])
+        header::HeaderValue::In(vec![
+            "application/json".to_string(),
+            "application/xml".to_string(),
+        ]),
     );
     expected_headers.insert(
         "accept".to_string(),
-        header::HeaderValue::In(vec!["text/html".to_string(), "text/plain".to_string()])
+        header::HeaderValue::In(vec!["text/html".to_string(), "text/plain".to_string()]),
     );
 
     let expected = ConfigEndpoint {
-        response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Header(expected_headers),
-        ])),
+        response: MaybeUndefined::Value(Response::Flat(vec![Predicate::Header(expected_headers)])),
         ..Default::default()
     };
     assert_eq!(endpoint, expected);
@@ -227,11 +241,16 @@ response:
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
 
     let mut expected_headers = IndexMap::new();
-    expected_headers.insert("content-type".to_string(), header::HeaderValue::Eq("application/json".to_string()));
+    expected_headers.insert(
+        "content-type".to_string(),
+        header::HeaderValue::Eq("application/json".to_string()),
+    );
 
     let expected = ConfigEndpoint {
         response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Status(status::Operation::Eq(status::Eq::Implicit(NonZeroU16::new(200).unwrap()))),
+            Predicate::Status(status::Operation::Eq(status::Eq::Implicit(
+                NonZeroU16::new(200).unwrap(),
+            ))),
             Predicate::Header(expected_headers),
         ])),
         ..Default::default()
@@ -255,13 +274,17 @@ response:
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
 
     let mut expected_headers = IndexMap::new();
-    expected_headers.insert("content-type".to_string(), header::HeaderValue::Operation(header::HeaderValueOperation::Contains("json".to_string())));
-    expected_headers.insert("accept".to_string(), header::HeaderValue::Operation(header::HeaderValueOperation::Contains("html".to_string())));
+    expected_headers.insert(
+        "content-type".to_string(),
+        header::HeaderValue::Operation(header::HeaderValueOperation::Contains("json".to_string())),
+    );
+    expected_headers.insert(
+        "accept".to_string(),
+        header::HeaderValue::Operation(header::HeaderValueOperation::Contains("html".to_string())),
+    );
 
     let expected = ConfigEndpoint {
-        response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Header(expected_headers),
-        ])),
+        response: MaybeUndefined::Value(Response::Flat(vec![Predicate::Header(expected_headers)])),
         ..Default::default()
     };
     assert_eq!(endpoint, expected);
@@ -283,13 +306,21 @@ response:
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
 
     let mut expected_headers = IndexMap::new();
-    expected_headers.insert("content-type".to_string(), header::HeaderValue::Operation(header::HeaderValueOperation::Regex("application/(json|xml)".to_string())));
-    expected_headers.insert("x-version".to_string(), header::HeaderValue::Operation(header::HeaderValueOperation::Regex(r"^v\d+\.\d+\.\d+$".to_string())));
+    expected_headers.insert(
+        "content-type".to_string(),
+        header::HeaderValue::Operation(header::HeaderValueOperation::Regex(
+            "application/(json|xml)".to_string(),
+        )),
+    );
+    expected_headers.insert(
+        "x-version".to_string(),
+        header::HeaderValue::Operation(header::HeaderValueOperation::Regex(
+            r"^v\d+\.\d+\.\d+$".to_string(),
+        )),
+    );
 
     let expected = ConfigEndpoint {
-        response: MaybeUndefined::Value(Response::Flat(vec![
-            Predicate::Header(expected_headers),
-        ])),
+        response: MaybeUndefined::Value(Response::Flat(vec![Predicate::Header(expected_headers)])),
         ..Default::default()
     };
     assert_eq!(endpoint, expected);
@@ -312,7 +343,10 @@ response:
     // because regex compilation happens during into_predicates()
     if let Ok(endpoint) = result {
         let predicates_result = std::panic::catch_unwind(|| {
-            endpoint.response.unwrap_or_default().into_predicates::<Empty<Bytes>>()
+            endpoint
+                .response
+                .unwrap_or_default()
+                .into_predicates::<Empty<Bytes>>()
         });
         assert!(
             predicates_result.is_err(),
@@ -335,11 +369,18 @@ response:
         regex: '^application/json.*$'
 ";
     let result = serde_saphyr::from_str::<ConfigEndpoint>(yaml_str);
-    assert!(result.is_ok(), "Valid regex pattern should be accepted: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Valid regex pattern should be accepted: {:?}",
+        result.err()
+    );
 
     // Also verify that into_predicates() works
     let endpoint = result.unwrap();
-    let predicates = endpoint.response.unwrap_or_default().into_predicates::<Empty<Bytes>>();
+    let predicates = endpoint
+        .response
+        .unwrap_or_default()
+        .into_predicates::<Empty<Bytes>>();
     // If we got here without panic, the regex compiled successfully
     drop(predicates);
 }

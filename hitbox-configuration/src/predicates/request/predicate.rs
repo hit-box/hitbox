@@ -3,8 +3,8 @@ use hitbox_http::predicates::request::Path;
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
-use crate::RequestPredicate;
 use super::{BodyPredicate, HeaderOperation, MethodOperation, QueryOperation, header};
+use crate::RequestPredicate;
 
 // Use standard externally-tagged enum (serde default)
 // YAML syntax: Method: {...}, Path: "...", Query: {...}, etc.

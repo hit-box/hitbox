@@ -41,9 +41,12 @@ policy:
 #[tokio::test]
 async fn test_expression_into_predicates() {
     let inner = Box::new(NeutralRequestPredicate::new()) as RequestPredicate<_>;
-    let method_get = Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
-    let method_post = Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
-    let method_head = Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
+    let method_get =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
+    let method_post =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
+    let method_head =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get, method_post, method_head]));
     let predicate_or = or_.into_predicates(inner);
     dbg!(&predicate_or);
@@ -113,9 +116,12 @@ policy:
 #[tokio::test]
 async fn test_or_with_matching_first_predicate() {
     let inner = Box::new(NeutralRequestPredicate::new()) as RequestPredicate<_>;
-    let method_get = Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
-    let method_post = Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
-    let method_head = Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
+    let method_get =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
+    let method_post =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
+    let method_head =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get, method_post, method_head]));
     let predicate_or = or_.into_predicates(inner);
 
@@ -132,9 +138,12 @@ async fn test_or_with_matching_first_predicate() {
 #[tokio::test]
 async fn test_or_with_matching_middle_predicate() {
     let inner = Box::new(NeutralRequestPredicate::new()) as RequestPredicate<_>;
-    let method_get = Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
-    let method_post = Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
-    let method_head = Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
+    let method_get =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
+    let method_post =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
+    let method_head =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get, method_post, method_head]));
     let predicate_or = or_.into_predicates(inner);
 
@@ -151,9 +160,12 @@ async fn test_or_with_matching_middle_predicate() {
 #[tokio::test]
 async fn test_or_with_matching_last_predicate() {
     let inner = Box::new(NeutralRequestPredicate::new()) as RequestPredicate<_>;
-    let method_get = Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
-    let method_post = Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
-    let method_head = Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
+    let method_get =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
+    let method_post =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
+    let method_head =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get, method_post, method_head]));
     let predicate_or = or_.into_predicates(inner);
 
@@ -170,9 +182,12 @@ async fn test_or_with_matching_last_predicate() {
 #[tokio::test]
 async fn test_or_with_no_matching_predicates() {
     let inner = Box::new(NeutralRequestPredicate::new()) as RequestPredicate<_>;
-    let method_get = Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
-    let method_post = Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
-    let method_head = Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
+    let method_get =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
+    let method_post =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
+    let method_head =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get, method_post, method_head]));
     let predicate_or = or_.into_predicates(inner);
 
@@ -189,7 +204,8 @@ async fn test_or_with_no_matching_predicates() {
 #[tokio::test]
 async fn test_or_with_single_predicate_matching() {
     let inner = Box::new(NeutralRequestPredicate::new()) as RequestPredicate<_>;
-    let method_get = Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
+    let method_get =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get]));
     let predicate_or = or_.into_predicates(inner);
 
@@ -206,7 +222,8 @@ async fn test_or_with_single_predicate_matching() {
 #[tokio::test]
 async fn test_or_with_single_predicate_not_matching() {
     let inner = Box::new(NeutralRequestPredicate::new()) as RequestPredicate<_>;
-    let method_get = Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
+    let method_get =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get]));
     let predicate_or = or_.into_predicates(inner);
 
@@ -223,7 +240,8 @@ async fn test_or_with_single_predicate_not_matching() {
 #[tokio::test]
 async fn test_or_with_mixed_predicate_types() {
     let inner = Box::new(NeutralRequestPredicate::new()) as RequestPredicate<_>;
-    let method_post = Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
+    let method_post =
+        Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
     let path_books = Expression::Predicate(Predicate::Path("/books".to_owned()));
     let or_ = Expression::Operation(Operation::Or(vec![method_post, path_books]));
     let predicate_or = or_.into_predicates(inner);

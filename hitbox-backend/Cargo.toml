@@ -15,24 +15,20 @@ keywords = ["cache", "actix", "async", "cache-backend", "hitbox"]
 
 [dependencies]
 hitbox-core = { path = "../hitbox-core", version = "0.1.0" }
-async-trait = "0.1"
-chrono = { version = "0.4", features = ["serde"], default-features = false }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-serde-saphyr = "0.0.6"
-bincode = "1"
-bitcode = { version = "0.6", features = ["serde"] }
-thiserror = "2"
+async-trait = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-saphyr = { workspace = true }
+bincode = { workspace = true }
+bitcode = { workspace = true }
+thiserror = { workspace = true }
 serde_urlencoded = { version = "0.7.1", default-features = false }
 flate2 = { version = "1" }
 
 [dev-dependencies]
-tokio = { version = "1", default-features = false, features = [
-    "macros",
-    "rt-multi-thread",
-    "sync",
-] }
-criterion = { version = "0.5", features = ["html_reports"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
+criterion = { workspace = true, features = ["html_reports"] }
 
 [[bench]]
 name = "key_size"

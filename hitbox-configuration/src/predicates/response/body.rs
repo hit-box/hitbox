@@ -21,10 +21,7 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn into_predicates<ReqBody>(
-        &self,
-        inner: CorePredicate<ReqBody>,
-    ) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(&self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,

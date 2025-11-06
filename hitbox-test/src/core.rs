@@ -17,19 +17,10 @@ pub struct State {
     pub response: Option<TestResponse>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TimeState {
     pub mock_time: Option<MockTime>,
     pub mock_provider: Option<MockTimeProvider>,
-}
-
-impl Default for TimeState {
-    fn default() -> Self {
-        Self {
-            mock_time: None,
-            mock_provider: None,
-        }
-    }
 }
 
 #[derive(Debug, World)]
@@ -107,8 +98,6 @@ pub trait StepExt {
 impl StepExt for Step {
     fn docstring_content(&self) -> Option<String> {
         self.docstring()
-            .map(|docstring| {
-                docstring.lines().skip(1).collect::<Vec<_>>().join("\n")
-            })
+            .map(|docstring| docstring.lines().skip(1).collect::<Vec<_>>().join("\n"))
     }
 }
