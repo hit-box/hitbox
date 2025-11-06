@@ -7,6 +7,8 @@ use hitbox::{
 use http::{Request, request::Parts};
 use hyper::body::Body as HttpBody;
 
+use crate::{FromBytes, predicates::body::HttpPartition};
+
 #[derive(Debug)]
 pub struct CacheableHttpRequest<ReqBody> {
     parts: Parts,
@@ -54,5 +56,21 @@ where
             }
             PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),
         }
+    }
+}
+
+impl<ReqBody> HttpPartition for CacheableHttpRequest<ReqBody>
+where
+    ReqBody: HttpBody + FromBytes,
+{
+    type Body = ReqBody;
+    type Parts = Parts;
+
+    fn into_parts_and_body(self) -> (Self::Parts, Self::Body) {
+        self.into_parts()
+    }
+
+    fn from_parts_and_body(parts: Self::Parts, body: Self::Body) -> Self {
+        Self::from_request(Request::from_parts(parts, body))
     }
 }

@@ -29,14 +29,12 @@ impl BodyPredicate {
     {
         match self {
             BodyPredicate::Jq(expression) => Ok(Box::new(inner.body(
-                hitbox_http::predicates::request::body::ParsingType::Jq,
+                hitbox_http::ParsingType::Jq,
                 expression,
                 // For Jq expressions, we expect the expression to evaluate to a boolean
                 // (e.g., '.field == "value"' returns true/false)
                 // We cache when the expression evaluates to true
-                hitbox_http::predicates::request::body::Operation::Eq(serde_json::Value::Bool(
-                    true,
-                )),
+                hitbox_http::Operation::Eq(serde_json::Value::Bool(true)),
             ))),
             BodyPredicate::ProtoBuf {
                 proto,

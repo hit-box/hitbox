@@ -10,7 +10,7 @@ use http::{HeaderMap, Response, response::Parts};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
-use crate::body::FromBytes;
+use crate::{body::FromBytes, predicates::body::HttpPartition};
 
 #[derive(Debug)]
 pub enum ResponseBody<ResBody> {
@@ -132,5 +132,21 @@ where
         *response.headers_mut() = cached.headers;
 
         CacheableHttpResponse::from_response(response)
+    }
+}
+
+impl<ResBody> HttpPartition for CacheableHttpResponse<ResBody>
+where
+    ResBody: HttpBody + FromBytes,
+{
+    type Body = ResBody;
+    type Parts = Parts;
+
+    fn into_parts_and_body(self) -> (Self::Parts, Self::Body) {
+        self.into_response().into_parts()
+    }
+
+    fn from_parts_and_body(parts: Self::Parts, body: Self::Body) -> Self {
+        Self::from_response(Response::from_parts(parts, body))
     }
 }
