@@ -1,2 +1,9 @@
 [alias]
 bdd = "test -p hitbox-test --test integration -- --tags @integration --fail-fast"
+
+# Local development: use path dependencies for hurl when available
+# This overrides the git dependencies defined in Cargo.toml
+# In CI (where ../hurl doesn't exist), these patches are simply ignored
+# [patch."https://github.com/hit-box/hurl.git"]
+# hurl = { path = "../hurl/packages/hurl" }
+# hurl_core = { path = "../hurl/packages/hurl_core" }

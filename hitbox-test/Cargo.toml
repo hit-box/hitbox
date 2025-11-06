@@ -41,8 +41,8 @@ serde_yaml = "0.9"
 indexmap = { version = "2", features = ["serde"] }
 serde = { workspace = true, features = ["rc"] }
 anyhow = "1"
-hurl_core = { path = "../../hurl/packages/hurl_core/" }
-hurl = { path = "../../hurl/packages/hurl/" }
+hurl_core = { workspace = true }
+hurl = { workspace = true }
 http-body-util = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["time", "rt-multi-thread"] }

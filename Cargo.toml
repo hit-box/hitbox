@@ -48,3 +48,7 @@ regex = "1"
 
 # Benchmarking (dev dependencies)
 criterion = "0.7"
+
+# Hurl dependencies - our fork
+hurl = { git = "https://github.com/hit-box/hurl.git", branch = "master" }
+hurl_core = { git = "https://github.com/hit-box/hurl.git", branch = "master" }
