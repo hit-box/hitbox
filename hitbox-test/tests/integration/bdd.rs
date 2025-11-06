@@ -4,7 +4,7 @@ use hitbox_test::core::HitboxWorld;
 use std::path::PathBuf;
 
 #[tokio::main]
-async fn main() {
+pub async fn main() {
     // Use workspace root target directory
     // CARGO_MANIFEST_DIR points to hitbox-test, so we go up one level to workspace root
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

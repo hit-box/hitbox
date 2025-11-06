@@ -1,0 +1,38 @@
+[package]
+name = "hitbox-feoxdb"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+authors = ["Hitbox Contributors"]
+license = "MIT"
+description = "FeOxDB backend for Hitbox cache with per-key TTL support"
+repository = "https://github.com/hit-box/hitbox"
+keywords = ["cache", "http", "backend", "feoxdb"]
+categories = ["caching", "web-programming"]
+
+[dependencies]
+# Hitbox dependencies
+hitbox-backend = { path = "../hitbox-backend", version = "0.1.0" }
+hitbox-core = { path = "../hitbox-core", version = "0.1.0" }
+
+# FeOxDB - Pure Rust embedded DB with TTL
+feoxdb = "0.5"
+
+# Async support
+async-trait.workspace = true
+tokio = { workspace = true, features = ["sync", "rt"] }
+
+# Time handling
+chrono.workspace = true
+
+# Serialization
+serde = { workspace = true }
+serde_bytes = "0.11"
+bincode.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+tempfile = "3"

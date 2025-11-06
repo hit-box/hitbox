@@ -24,6 +24,8 @@ hitbox-core = { path = "../hitbox-core", version = "0.1", features = [
 hitbox-http = { path = "../hitbox-http", version = "0.1" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
 hitbox-moka = { path = "../hitbox-moka", version = "0.1" }
+hitbox-feoxdb = { path = "../hitbox-feoxdb", version = "0.1" }
+hitbox-redis = { path = "../hitbox-redis", version = "0.1" }
 hitbox-tower = { path = "../hitbox-tower", version = "0.1" }
 hitbox-configuration = { path = "../hitbox-configuration", version = "0.1" }
 chrono = { workspace = true }
@@ -54,7 +56,11 @@ jaq-core = "2.1.0"
 jaq-std = "2.1.0"
 jaq-json = { version = "1.1.0", features = ["serde_json"] }
 serial_test = "3.2"
+tempfile = "3"
+testcontainers = "0.23"
+testcontainers-modules = { version = "0.11", features = ["redis"] }
 
 [[test]]
 name = "integration"
+path = "tests/integration/bdd.rs"
 harness = false

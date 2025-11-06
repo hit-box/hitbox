@@ -125,15 +125,41 @@ impl Backend for RedisBackend {
 
     async fn write(
         &self,
-        _key: &CacheKey,
-        _value: CacheValue<Raw>,
-        _ttl: Option<std::time::Duration>,
+        key: &CacheKey,
+        value: CacheValue<Raw>,
+        ttl: Option<std::time::Duration>,
     ) -> BackendResult<()> {
-        todo!()
+        let mut con = self.connection().await?.clone();
+        let cache_key = self.key_format.serialize(key)?;
+
+        let mut request = redis::cmd("SET");
+        request.arg(cache_key).arg(value.data);
+
+        ttl.map(|ttl_duration| request.arg("EX").arg(ttl_duration.as_secs()));
+
+        request
+            .query_async(&mut con)
+            .await
+            .map_err(Error::from)
+            .map_err(BackendError::from)
     }
 
-    async fn remove(&self, _key: &CacheKey) -> BackendResult<DeleteStatus> {
-        todo!()
+    async fn remove(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
+        let client = self.client.clone();
+        let cache_key = self.key_format.serialize(key)?;
+        let mut con = client.get_connection_manager().await.map_err(Error::from)?;
+
+        let deleted: i32 = redis::cmd("DEL")
+            .arg(cache_key)
+            .query_async(&mut con)
+            .await
+            .map_err(Error::from)?;
+
+        if deleted > 0 {
+            Ok(DeleteStatus::Deleted(deleted as u32))
+        } else {
+            Ok(DeleteStatus::Missing)
+        }
     }
 
     fn value_format(&self) -> &Format {
