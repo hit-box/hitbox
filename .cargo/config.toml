@@ -1,2 +1,2 @@
 [alias]
-bdd = "test -p hitbox-test --test integration -- --tags @integration -vv --fail-fast"
+bdd = "test -p hitbox-test --test integration -- --tags @integration --fail-fast"

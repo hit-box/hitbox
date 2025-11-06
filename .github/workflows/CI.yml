@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-    - master
+      - main
   pull_request: {}
 
 jobs:
@@ -12,71 +12,99 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.70.0, stable]
+        rust: [1.85.0, stable]
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: ${{ matrix.rust }}
-        profile: minimal
-        override: true
-    - name: Check
-      uses: actions-rs/cargo@v1
-      with:
-        command: check
-        args: --all --bins --tests --benches
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        run: cargo check --all --bins --tests --benches
 
   test:
     needs: check
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.70.0, stable, beta]
-        redis-version: [6]
+        rust: [1.85.0, stable, beta]
+        redis-version: [6, 7]
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: ${{ matrix.rust }}
-        profile: minimal
-        override: true
-    # Starts Redis server needed by hitbox-redis for integration tests.
-    - name: Start Redis
-      uses: supercharge/redis-github-action@1.4.0
-      with:
-        redis-version: ${{ matrix.redis-version }}
-    - name: Run tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: --workspace --all-features -- --test-threads=1
-  
-    - name: Generate coverage file
-      if: >
-        matrix.rust == 'stable'
-      run: |
-        cargo install cargo-tarpaulin
-        cargo tarpaulin --out Xml --verbose --workspace --all-features --ignore-tests -- --test-threads=1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+      # Starts Redis server needed by hitbox-redis for integration tests.
+      - name: Start Redis
+        uses: supercharge/redis-github-action@1.8.0
+        with:
+          redis-version: ${{ matrix.redis-version }}
+      - name: Run tests
+        run: cargo test --workspace --all-features -- --test-threads=1
 
-    - name: Upload to Codecov
-      if: >
-        matrix.rust == 'stable'
-      uses: codecov/codecov-action@v3
-      with:
-        file: cobertura.xml
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.rust }}-redis${{ matrix.redis-version }}
+          path: target/cucumber-junit.xml
+          if-no-files-found: ignore
+
+      - name: Publish test report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: "target/cucumber-junit.xml"
+          check_name: "Test Report (${{ matrix.rust }}, Redis ${{ matrix.redis-version }})"
+          fail_on_failure: true
+          include_passed: true
+          detailed_summary: true
+
+      - name: Install llvm-cov
+        if: matrix.rust == 'stable' && matrix.redis-version == 7
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate coverage file
+        if: matrix.rust == 'stable' && matrix.redis-version == 7
+        run: |
+          cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info --ignore-filename-regex 'hurl/' -- --test-threads=1
+
+      - name: Upload to Codecov
+        if: matrix.rust == 'stable' && matrix.redis-version == 7
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
 
   clippy:
-    # Check for any warnings. This is informational and thus is allowed to fail.
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        components: clippy
-        profile: minimal
-    - name: Clippy
-      uses: actions-rs/clippy-check@v1
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        args: --workspace --all-features --bins --examples --tests --benches -- -D warnings
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy
+        run: cargo clippy --workspace --all-features --bins --examples --tests --benches -- -D warnings
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Documentation
+        run: cargo doc --workspace --all-features --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
