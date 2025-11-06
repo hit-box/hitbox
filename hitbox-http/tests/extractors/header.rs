@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use hitbox::Extractor;
-use hitbox_http::extractors::{header::HeaderExtractor, NeutralExtractor};
 use hitbox_http::CacheableHttpRequest;
+use hitbox_http::extractors::{NeutralExtractor, header::HeaderExtractor};
 use http::Request;
 use http_body_util::Empty;
 

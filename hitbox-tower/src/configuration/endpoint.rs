@@ -1,19 +1,19 @@
-use crate::configuration::{
-    builder::EndpointConfigBuilder, RequestExtractor, RequestPredicate, ResponsePredicate,
-};
 use crate::CacheConfig;
+use crate::configuration::{
+    RequestExtractor, RequestPredicate, ResponsePredicate, builder::EndpointConfigBuilder,
+};
+use hitbox::Extractor;
 use hitbox::policy::PolicyConfig;
 use hitbox::predicate::Predicate;
-use hitbox::Extractor;
 use hitbox_http::extractors::NeutralExtractor;
 use hitbox_http::extractors::{
     header::HeaderExtractor, method::MethodExtractor, path::PathExtractor, query::QueryExtractor,
 };
 use hitbox_http::predicates::request::{header, query};
 use hitbox_http::predicates::{
+    NeutralRequestPredicate, NeutralResponsePredicate,
     request::{HeaderPredicate, MethodPredicate, PathPredicate, QueryPredicate},
     response::StatusCodePredicate,
-    NeutralRequestPredicate, NeutralResponsePredicate,
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 use http::{HeaderName, HeaderValue};

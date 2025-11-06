@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
+use crate::Extractor;
 use crate::policy::PolicyConfig;
 use crate::predicate::Predicate;
-use crate::Extractor;
 
 pub type BoxPredicate<R> = Box<dyn Predicate<Subject = R> + Send + Sync>;
 pub type BoxExtractor<Req> = Box<dyn Extractor<Subject = Req> + Send + Sync>;

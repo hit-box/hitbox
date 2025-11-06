@@ -1,9 +1,10 @@
-use hitbox_http::predicates::request::Header;
+use hitbox_http::predicates::request::{Header, header::Operation};
+use http::header::{HeaderName, HeaderValue as HttpHeaderValue};
 use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::RequestPredicate;
+use crate::{RequestPredicate, error::ConfigError};
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(untagged)]
@@ -38,52 +39,60 @@ pub type HeaderOperation = IndexMap<String, HeaderValue>;
 pub fn into_predicates<ReqBody: Send + 'static>(
     headers: HeaderOperation,
     inner: RequestPredicate<ReqBody>,
-) -> RequestPredicate<ReqBody> {
-    headers
-        .into_iter()
-        .rfold(inner, |inner, (header_name, header_value)| {
+) -> Result<RequestPredicate<ReqBody>, ConfigError> {
+    headers.into_iter().try_rfold(
+        inner,
+        |inner, (header_name, header_value)| -> Result<RequestPredicate<ReqBody>, ConfigError> {
+            let name = parse_header_name(&header_name)?;
+
             let operation = match header_value {
-                HeaderValue::Eq(value) => hitbox_http::predicates::request::header::Operation::Eq(
-                    header_name.parse().unwrap(),
-                    value.parse().unwrap(),
-                ),
-                HeaderValue::In(values) => hitbox_http::predicates::request::header::Operation::In(
-                    header_name.parse().unwrap(),
-                    values.into_iter().map(|v| v.parse().unwrap()).collect(),
-                ),
+                HeaderValue::Eq(value) => {
+                    let val = parse_header_value(&value)?;
+                    Operation::Eq(name, val)
+                }
+                HeaderValue::In(values) => {
+                    let vals = parse_header_values(&values)?;
+                    Operation::In(name, vals)
+                }
                 HeaderValue::Operation(op) => match op {
                     HeaderValueOperation::Eq(value) => {
-                        hitbox_http::predicates::request::header::Operation::Eq(
-                            header_name.parse().unwrap(),
-                            value.parse().unwrap(),
-                        )
+                        let val = parse_header_value(&value)?;
+                        Operation::Eq(name, val)
                     }
                     HeaderValueOperation::In(values) => {
-                        hitbox_http::predicates::request::header::Operation::In(
-                            header_name.parse().unwrap(),
-                            values.into_iter().map(|v| v.parse().unwrap()).collect(),
-                        )
+                        let vals = parse_header_values(&values)?;
+                        Operation::In(name, vals)
                     }
                     HeaderValueOperation::Contains(substring) => {
-                        hitbox_http::predicates::request::header::Operation::Contains(
-                            header_name.parse().unwrap(),
-                            substring,
-                        )
+                        Operation::Contains(name, substring)
                     }
                     HeaderValueOperation::Regex(pattern) => {
-                        let compiled_regex = Regex::new(&pattern).expect("Invalid regex pattern");
-                        hitbox_http::predicates::request::header::Operation::Regex(
-                            header_name.parse().unwrap(),
-                            compiled_regex,
-                        )
+                        let compiled_regex =
+                            Regex::new(&pattern).map_err(|e| ConfigError::InvalidRegex {
+                                pattern: pattern.clone(),
+                                error: e,
+                            })?;
+                        Operation::Regex(name, compiled_regex)
                     }
-                    HeaderValueOperation::Exist => {
-                        hitbox_http::predicates::request::header::Operation::Exist(
-                            header_name.parse().unwrap(),
-                        )
-                    }
+                    HeaderValueOperation::Exist => Operation::Exist(name),
                 },
             };
-            Box::new(Header::new(inner, operation))
-        })
+            Ok(Box::new(Header::new(inner, operation)))
+        },
+    )
+}
+
+fn parse_header_name(name: &str) -> Result<HeaderName, ConfigError> {
+    name.parse()
+        .map_err(|e| ConfigError::InvalidHeaderName(name.to_string(), e))
+}
+
+fn parse_header_value(value: &str) -> Result<HttpHeaderValue, ConfigError> {
+    value
+        .parse()
+        .map_err(|e| ConfigError::InvalidHeaderValue(value.to_string(), e))
+}
+
+fn parse_header_values(values: &[String]) -> Result<Vec<HttpHeaderValue>, ConfigError> {
+    values.iter().map(|v| parse_header_value(v)).collect()
 }

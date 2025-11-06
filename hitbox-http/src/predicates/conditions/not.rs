@@ -1,7 +1,7 @@
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
-use hitbox::predicate::PredicateResult;
 use hitbox::Predicate;
+use hitbox::predicate::PredicateResult;
 
 #[derive(Debug)]
 pub struct Not<T> {

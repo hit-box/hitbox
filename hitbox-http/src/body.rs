@@ -1,6 +1,6 @@
 use axum::body::Body;
 use bytes::{Buf, Bytes};
-use http_body_util::{combinators::UnsyncBoxBody, BodyExt, Empty, Full};
+use http_body_util::{BodyExt, Empty, Full, combinators::UnsyncBoxBody};
 
 pub trait FromBytes {
     fn from_bytes(bytes: Bytes) -> Self;

@@ -8,6 +8,8 @@ use hitbox_http::{CacheableHttpResponse, FromBytes};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
+use crate::error::ConfigError;
+
 type CorePredicate<ReqBody> =
     Box<dyn hitbox_core::Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync>;
 
@@ -19,7 +21,10 @@ pub enum Predicate {
 }
 
 impl Predicate {
-    pub fn into_predicates<ReqBody>(self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(
+        self,
+        inner: CorePredicate<ReqBody>,
+    ) -> Result<CorePredicate<ReqBody>, ConfigError>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
@@ -40,7 +45,10 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn into_predicates<ReqBody>(self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(
+        self,
+        inner: CorePredicate<ReqBody>,
+    ) -> Result<CorePredicate<ReqBody>, ConfigError>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
@@ -50,28 +58,28 @@ impl Operation {
             Operation::Or(predicates) => {
                 let mut iter = predicates.into_iter();
                 match iter.next() {
-                    None => inner,
+                    None => Ok(inner),
                     Some(first) => {
                         let first_predicate = first
                             .into_predicates(
                                 Box::new(NeutralResponsePredicate::new()) as CorePredicate<ReqBody>
-                            );
-                        iter.fold(first_predicate, |acc, expression| {
+                            )?;
+                        iter.try_fold(first_predicate, |acc, expression| {
                             let predicate = expression
                                 .into_predicates(Box::new(NeutralResponsePredicate::new())
-                                    as CorePredicate<ReqBody>);
-                            Box::new(Or::new(
+                                    as CorePredicate<ReqBody>)?;
+                            Ok(Box::new(Or::new(
                                 predicate,
                                 acc,
                                 Box::new(NeutralResponsePredicate::new()),
-                            ))
+                            )) as CorePredicate<ReqBody>)
                         })
                     }
                 }
             }
             Operation::And(predicates) => predicates
                 .into_iter()
-                .fold(inner, |inner, predicate| predicate.into_predicates(inner)),
+                .try_fold(inner, |inner, predicate| predicate.into_predicates(inner)),
         }
     }
 }
@@ -84,7 +92,10 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn into_predicates<ReqBody>(self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(
+        self,
+        inner: CorePredicate<ReqBody>,
+    ) -> Result<CorePredicate<ReqBody>, ConfigError>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
@@ -111,19 +122,21 @@ impl Default for Response {
 }
 
 impl Response {
-    pub fn into_predicates<Req>(self) -> CorePredicate<Req>
+    pub fn into_predicates<Req>(self) -> Result<CorePredicate<Req>, ConfigError>
     where
         Req: HttpBody + FromBytes + Send + 'static,
         Req::Error: std::fmt::Debug,
         Req::Data: Send,
     {
-        let neutral_predicate = Box::new(NeutralResponsePredicate::<Req>::new());
+        let neutral_predicate: CorePredicate<Req> =
+            Box::new(NeutralResponsePredicate::<Req>::new());
         match self {
-            Response::Flat(predicates) => predicates
-                .into_iter()
-                .rfold(neutral_predicate, |inner, predicate| {
+            Response::Flat(predicates) => predicates.into_iter().try_rfold(
+                neutral_predicate,
+                |inner, predicate| -> Result<CorePredicate<Req>, ConfigError> {
                     predicate.into_predicates(inner)
-                }),
+                },
+            ),
             Response::Tree(expression) => expression.into_predicates(neutral_predicate),
         }
     }

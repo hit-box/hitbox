@@ -48,7 +48,7 @@ async fn test_expression_into_predicates() {
     let method_head =
         Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get, method_post, method_head]));
-    let predicate_or = or_.into_predicates(inner);
+    let predicate_or = or_.into_predicates(inner).unwrap();
     dbg!(&predicate_or);
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
@@ -123,7 +123,7 @@ async fn test_or_with_matching_first_predicate() {
     let method_head =
         Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get, method_post, method_head]));
-    let predicate_or = or_.into_predicates(inner);
+    let predicate_or = or_.into_predicates(inner).unwrap();
 
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
@@ -145,7 +145,7 @@ async fn test_or_with_matching_middle_predicate() {
     let method_head =
         Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get, method_post, method_head]));
-    let predicate_or = or_.into_predicates(inner);
+    let predicate_or = or_.into_predicates(inner).unwrap();
 
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
@@ -167,7 +167,7 @@ async fn test_or_with_matching_last_predicate() {
     let method_head =
         Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get, method_post, method_head]));
-    let predicate_or = or_.into_predicates(inner);
+    let predicate_or = or_.into_predicates(inner).unwrap();
 
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
@@ -189,7 +189,7 @@ async fn test_or_with_no_matching_predicates() {
     let method_head =
         Expression::Predicate(Predicate::Method(MethodOperation::Eq("HEAD".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get, method_post, method_head]));
-    let predicate_or = or_.into_predicates(inner);
+    let predicate_or = or_.into_predicates(inner).unwrap();
 
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
@@ -207,7 +207,7 @@ async fn test_or_with_single_predicate_matching() {
     let method_get =
         Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get]));
-    let predicate_or = or_.into_predicates(inner);
+    let predicate_or = or_.into_predicates(inner).unwrap();
 
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
@@ -225,7 +225,7 @@ async fn test_or_with_single_predicate_not_matching() {
     let method_get =
         Expression::Predicate(Predicate::Method(MethodOperation::Eq("GET".to_owned())));
     let or_ = Expression::Operation(Operation::Or(vec![method_get]));
-    let predicate_or = or_.into_predicates(inner);
+    let predicate_or = or_.into_predicates(inner).unwrap();
 
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
@@ -244,7 +244,7 @@ async fn test_or_with_mixed_predicate_types() {
         Expression::Predicate(Predicate::Method(MethodOperation::Eq("POST".to_owned())));
     let path_books = Expression::Predicate(Predicate::Path("/books".to_owned()));
     let or_ = Expression::Operation(Operation::Or(vec![method_post, path_books]));
-    let predicate_or = or_.into_predicates(inner);
+    let predicate_or = or_.into_predicates(inner).unwrap();
 
     // Test request that matches the path but not the method
     let request = CacheableHttpRequest::from_request(

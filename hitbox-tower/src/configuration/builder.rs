@@ -1,8 +1,8 @@
+use crate::EndpointConfig;
 use crate::configuration::{
     ExtractorBuilder, RequestExtractor, RequestPredicate, RequestPredicateBuilder,
     ResponsePredicate, ResponsePredicateBuilder,
 };
-use crate::EndpointConfig;
 use hitbox::policy::PolicyConfig;
 
 #[derive(Debug)]

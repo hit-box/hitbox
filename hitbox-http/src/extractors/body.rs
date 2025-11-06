@@ -4,9 +4,8 @@ use async_trait::async_trait;
 use hitbox::{Extractor, KeyPart, KeyParts};
 use hyper::body::Body as HttpBody;
 use jaq_core::{
-    self,
+    self, Ctx, RcIter,
     load::{Arena, File, Loader},
-    Ctx, RcIter,
 };
 use jaq_json::{self, Val};
 use serde_json::Value;

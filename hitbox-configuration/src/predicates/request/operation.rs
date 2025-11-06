@@ -5,7 +5,7 @@ use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
 use super::Expression;
-use crate::RequestPredicate;
+use crate::{RequestPredicate, error::ConfigError};
 
 // Use standard externally-tagged enum (serde default)
 // YAML syntax: And: [...], Or: [...], Not: {...}
@@ -20,7 +20,7 @@ impl Operation {
     pub fn into_predicates<ReqBody>(
         self,
         inner: RequestPredicate<ReqBody>,
-    ) -> RequestPredicate<ReqBody>
+    ) -> Result<RequestPredicate<ReqBody>, ConfigError>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
@@ -30,32 +30,32 @@ impl Operation {
             Operation::Or(predicates) => {
                 let mut iter = predicates.into_iter();
                 match iter.next() {
-                    None => inner,
+                    None => Ok(inner),
                     Some(first) => {
                         let first_predicate =
-                            first.into_predicates(Box::new(NeutralRequestPredicate::new()));
-                        iter.fold(first_predicate, |acc, predicate| {
+                            first.into_predicates(Box::new(NeutralRequestPredicate::new()))?;
+                        iter.try_fold(first_predicate, |acc, predicate| {
                             let predicate =
                                 predicate
                                     .into_predicates(Box::new(
                                         NeutralRequestPredicate::<ReqBody>::new(),
-                                    ));
-                            Box::new(Or::new(
+                                    ))?;
+                            Ok(Box::new(Or::new(
                                 predicate,
                                 acc,
                                 Box::new(NeutralRequestPredicate::new()),
-                            ))
+                            )) as RequestPredicate<ReqBody>)
                         })
                     }
                 }
             }
             Operation::And(predicates) => predicates
                 .into_iter()
-                .rfold(inner, |inner, predicate| predicate.into_predicates(inner)),
+                .try_rfold(inner, |inner, predicate| predicate.into_predicates(inner)),
             Operation::Not(expression) => {
                 let predicate =
-                    expression.into_predicates(Box::new(NeutralRequestPredicate::new()));
-                Box::new(Not::new(predicate))
+                    expression.into_predicates(Box::new(NeutralRequestPredicate::new()))?;
+                Ok(Box::new(Not::new(predicate)))
             }
         }
     }

@@ -87,7 +87,8 @@ response:
     let predicates = endpoint
         .response
         .unwrap_or_default()
-        .into_predicates::<Empty<Bytes>>();
+        .into_predicates::<Empty<Bytes>>()
+        .unwrap();
     dbg!(predicates);
     // let expected = Endpoint {
     //     response: Response::Flat(vec![
@@ -342,15 +343,13 @@ response:
     // The deserialization itself should succeed, but converting to predicates should fail
     // because regex compilation happens during into_predicates()
     if let Ok(endpoint) = result {
-        let predicates_result = std::panic::catch_unwind(|| {
-            endpoint
-                .response
-                .unwrap_or_default()
-                .into_predicates::<Empty<Bytes>>()
-        });
+        let predicates_result = endpoint
+            .response
+            .unwrap_or_default()
+            .into_predicates::<Empty<Bytes>>();
         assert!(
             predicates_result.is_err(),
-            "Invalid regex pattern should cause panic during into_predicates()"
+            "Invalid regex pattern should cause error during into_predicates()"
         );
     } else {
         panic!("Deserialization should succeed; regex validation happens during into_predicates()");
@@ -380,7 +379,8 @@ response:
     let predicates = endpoint
         .response
         .unwrap_or_default()
-        .into_predicates::<Empty<Bytes>>();
+        .into_predicates::<Empty<Bytes>>()
+        .unwrap();
     // If we got here without panic, the regex compiled successfully
     drop(predicates);
 }

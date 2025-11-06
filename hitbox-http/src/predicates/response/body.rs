@@ -5,9 +5,8 @@ use hitbox::predicate::{Predicate, PredicateResult};
 use http::Response;
 use hyper::body::Body as HttpBody;
 use jaq_core::{
-    self,
+    self, Ctx, RcIter,
     load::{Arena, File, Loader},
-    Ctx, RcIter,
 };
 use jaq_json::{self, Val};
 use prost_reflect::{DynamicMessage, MessageDescriptor, SerializeOptions};

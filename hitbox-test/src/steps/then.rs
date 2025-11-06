@@ -1,9 +1,9 @@
 use crate::core::HitboxWorld;
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use cucumber::{gherkin::Step, then};
 use jaq_core::{
-    load::{Arena, File, Loader},
     Ctx, RcIter,
+    load::{Arena, File, Loader},
 };
 use jaq_json::Val;
 use serde_json::Value;

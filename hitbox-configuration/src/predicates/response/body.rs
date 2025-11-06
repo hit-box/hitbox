@@ -1,3 +1,4 @@
+use crate::error::ConfigError;
 use hitbox_core::Predicate;
 use hitbox_http::predicates::response::BodyPredicate;
 use hitbox_http::predicates::response::body::{Operation as BodyOperation, ParsingType};
@@ -21,21 +22,24 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn into_predicates<ReqBody>(&self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(
+        &self,
+        inner: CorePredicate<ReqBody>,
+    ) -> Result<CorePredicate<ReqBody>, ConfigError>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
         ReqBody::Data: Send,
     {
         match self {
-            Operation::Jq(expression) => Box::new(inner.body(
+            Operation::Jq(expression) => Ok(Box::new(inner.body(
                 ParsingType::Jq,
                 expression.clone(),
                 // For Jq expressions, we expect the expression to evaluate to a boolean
                 // (e.g., '.field == "value"' returns true/false)
                 // We cache when the expression evaluates to true
                 BodyOperation::Eq(JsonValue::Bool(true)),
-            )),
+            ))),
             Operation::ProtoBuf {
                 proto,
                 message,

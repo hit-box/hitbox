@@ -3,7 +3,7 @@ use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
 use super::{Operation, Predicate};
-use crate::RequestPredicate;
+use crate::{RequestPredicate, error::ConfigError};
 
 // Use untagged enum - serde tries Operation first, then Predicate
 #[derive(Debug, Eq, PartialEq, Deserialize, Serialize)]
@@ -17,7 +17,7 @@ impl Expression {
     pub fn into_predicates<ReqBody>(
         self,
         inner: RequestPredicate<ReqBody>,
-    ) -> RequestPredicate<ReqBody>
+    ) -> Result<RequestPredicate<ReqBody>, ConfigError>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,

@@ -2,11 +2,11 @@ use std::{future::Future, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use hitbox_core::{CacheKey, CacheValue, CacheableResponse};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    serializer::{Format, Raw},
     BackendError, CacheKeyFormat, DeleteStatus,
+    serializer::{Format, Raw},
 };
 
 pub type BackendResult<T> = Result<T, BackendError>;

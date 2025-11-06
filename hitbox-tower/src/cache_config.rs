@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
+use hitbox::Extractor;
 use hitbox::policy::PolicyConfig;
 use hitbox::predicate::Predicate;
-use hitbox::Extractor;
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 
 type RequestPredicate<ReqBody> =

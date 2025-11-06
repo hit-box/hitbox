@@ -12,7 +12,7 @@ use http::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Request, RequestPredicate, Response, ResponsePredicate,
+    ConfigError, Request, RequestPredicate, Response, ResponsePredicate,
     endpoint::{Endpoint, RequestExtractor},
     extractors::Extractor,
     types::MaybeUndefined,
@@ -46,7 +46,7 @@ impl ConfigEndpoint {
         }
     }
 
-    pub fn into_endpoint<ReqBody, ResBody>(self) -> Endpoint<ReqBody, ResBody>
+    pub fn into_endpoint<ReqBody, ResBody>(self) -> Result<Endpoint<ReqBody, ResBody>, ConfigError>
     where
         ReqBody: hyper::body::Body + hitbox_http::FromBytes + Send + Debug + 'static,
         ReqBody::Error: Debug,
@@ -57,7 +57,7 @@ impl ConfigEndpoint {
     {
         let extractors = Arc::new(self.extractors());
         let response_predicates = Arc::new(match self.response {
-            MaybeUndefined::Value(response) => response.into_predicates(),
+            MaybeUndefined::Value(response) => response.into_predicates()?,
             MaybeUndefined::Null => {
                 Box::new(NeutralResponsePredicate::new()) as ResponsePredicate<ResBody>
             }
@@ -67,7 +67,7 @@ impl ConfigEndpoint {
             }
         });
         let request_predicates = Arc::new(match self.request {
-            MaybeUndefined::Value(request) => request.into_predicates(),
+            MaybeUndefined::Value(request) => request.into_predicates()?,
             MaybeUndefined::Null => {
                 Box::new(NeutralRequestPredicate::new()) as RequestPredicate<ReqBody>
             }
@@ -76,11 +76,11 @@ impl ConfigEndpoint {
                     as RequestPredicate<ReqBody>
             }
         });
-        Endpoint {
+        Ok(Endpoint {
             extractors,
             request_predicates,
             response_predicates,
             policy: self.policy,
-        }
+        })
     }
 }

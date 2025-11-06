@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use hitbox::Extractor;
-use hitbox_http::extractors::{query::QueryExtractor, NeutralExtractor};
 use hitbox_http::CacheableHttpRequest;
+use hitbox_http::extractors::{NeutralExtractor, query::QueryExtractor};
 use http::Request;
 use http_body_util::Empty;
 

@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
-use hitbox_http::predicates::request::header::Operation;
-use hitbox_http::predicates::request::HeaderPredicate;
-use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::CacheableHttpRequest;
+use hitbox_http::predicates::NeutralRequestPredicate;
+use hitbox_http::predicates::request::HeaderPredicate;
+use hitbox_http::predicates::request::header::Operation;
 use http::{HeaderName, HeaderValue, Request};
 use http_body_util::Empty;
 

@@ -4,10 +4,10 @@ use async_trait::async_trait;
 use chrono::Utc;
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::{
-    serializer::{Format, Raw},
     Backend, BackendError, BackendResult, CacheKeyFormat, DeleteStatus,
+    serializer::{Format, Raw},
 };
-use redis::{aio::ConnectionManager, Client};
+use redis::{Client, aio::ConnectionManager};
 use tokio::sync::OnceCell;
 use tracing::trace;
 

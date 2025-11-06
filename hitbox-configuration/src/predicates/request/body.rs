@@ -1,3 +1,4 @@
+use crate::error::ConfigError;
 use hitbox_http::FromBytes;
 use hitbox_http::predicates::request::BodyPredicate as _;
 use hyper::body::Body as HttpBody;
@@ -20,14 +21,14 @@ impl BodyPredicate {
     pub(crate) fn into_predicates<ReqBody>(
         self,
         inner: RequestPredicate<ReqBody>,
-    ) -> RequestPredicate<ReqBody>
+    ) -> Result<RequestPredicate<ReqBody>, ConfigError>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
         ReqBody::Data: Send,
     {
         match self {
-            BodyPredicate::Jq(expression) => Box::new(inner.body(
+            BodyPredicate::Jq(expression) => Ok(Box::new(inner.body(
                 hitbox_http::predicates::request::body::ParsingType::Jq,
                 expression,
                 // For Jq expressions, we expect the expression to evaluate to a boolean
@@ -36,7 +37,7 @@ impl BodyPredicate {
                 hitbox_http::predicates::request::body::Operation::Eq(serde_json::Value::Bool(
                     true,
                 )),
-            )),
+            ))),
             BodyPredicate::ProtoBuf {
                 proto,
                 message,

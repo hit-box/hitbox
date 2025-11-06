@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use hitbox::Extractor;
-use hitbox_http::extractors::{
-    header::HeaderExtractor, method::MethodExtractor, path::PathExtractor, NeutralExtractor,
-};
 use hitbox_http::CacheableHttpRequest;
+use hitbox_http::extractors::{
+    NeutralExtractor, header::HeaderExtractor, method::MethodExtractor, path::PathExtractor,
+};
 use http::{Method, Request};
 use http_body_util::Empty;
 

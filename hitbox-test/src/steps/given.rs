@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use crate::core::{HitboxWorld, StepExt};
 use crate::time::{MockTime, MockTimeProvider};
-use hitbox_configuration::{extractors::Extractor, Request, RequestExtractor, Response};
+use hitbox_configuration::{Request, RequestExtractor, Response, extractors::Extractor};
 use hitbox_core::set_mock_time_provider;
 use hitbox_http::extractors::NeutralExtractor;
 
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use cucumber::gherkin::Step;
 use cucumber::given;
 use hitbox::policy::PolicyConfig;
@@ -31,7 +31,7 @@ async fn request_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(), 
             .ok_or(anyhow!("Missing predicates configuration"))?
             .as_str(),
     )?;
-    let predicates = config.into_predicates();
+    let predicates = config.into_predicates()?;
 
     world.config.request_predicates = Arc::new(predicates);
     Ok(())
@@ -49,7 +49,7 @@ async fn response_predicates(world: &mut HitboxWorld, step: &Step) -> Result<(),
         dbg!(&err.source());
         dbg!(err.location());
     })?;
-    let predicates = config.into_predicates();
+    let predicates = config.into_predicates()?;
     world.config.response_predicates = Arc::new(predicates);
     Ok(())
 }

@@ -49,7 +49,9 @@ where
     ResBody::Data: Send,
 {
     fn default() -> Self {
-        ConfigEndpoint::default().into_endpoint()
+        ConfigEndpoint::default()
+            .into_endpoint()
+            .expect("Default endpoint configuration should never fail")
     }
 }
 

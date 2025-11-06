@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use hitbox_backend::{serializer::Raw, Backend, BackendResult, CacheBackend, CacheKeyFormat};
+use hitbox_backend::{Backend, BackendResult, CacheBackend, CacheKeyFormat, serializer::Raw};
 use hitbox_core::{CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -108,11 +108,12 @@ where
             .set::<Value>(&CacheKey::from_str("key3", ""), &value, None)
             .await
             .unwrap();
-        dbg!(self
-            .backend
-            .get::<Value>(&CacheKey::from_str("key3", ""))
-            .await
-            .unwrap());
+        dbg!(
+            self.backend
+                .get::<Value>(&CacheKey::from_str("key3", ""))
+                .await
+                .unwrap()
+        );
     }
 }
 

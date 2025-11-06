@@ -1,4 +1,4 @@
-use axum::{extract::Path, routing::get, Json, Router};
+use axum::{Json, Router, extract::Path, routing::get};
 use hitbox_configuration::ConfigEndpoint;
 use hitbox_tower::StatusCode;
 
@@ -69,7 +69,8 @@ async fn main() {
     "#;
     let json_config = serde_yaml::from_str::<ConfigEndpoint>(json_cfg)
         .unwrap()
-        .into_endpoint();
+        .into_endpoint()
+        .unwrap();
 
     // let health_config = EndpointConfig::builder()
     //     .request(request::path("/health").method(Method::GET))
@@ -83,7 +84,8 @@ async fn main() {
     "#;
     let health_config = serde_yaml::from_str::<ConfigEndpoint>(health_cfg)
         .unwrap()
-        .into_endpoint();
+        .into_endpoint()
+        .unwrap();
 
     let json_cache = Cache::builder()
         .backend(memory_backend.clone())

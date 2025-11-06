@@ -1,8 +1,8 @@
 use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
-use hitbox_http::predicates::request::PathPredicate;
-use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::CacheableHttpRequest;
+use hitbox_http::predicates::NeutralRequestPredicate;
+use hitbox_http::predicates::request::PathPredicate;
 use http::Request;
 use http_body_util::Empty;
 

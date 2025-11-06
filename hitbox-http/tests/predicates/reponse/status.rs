@@ -1,8 +1,8 @@
 use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
 use hitbox_http::{
-    predicates::{response::StatusCodePredicate, NeutralResponsePredicate},
     CacheableHttpResponse,
+    predicates::{NeutralResponsePredicate, response::StatusCodePredicate},
 };
 use http::{Response, StatusCode};
 use http_body_util::Empty;

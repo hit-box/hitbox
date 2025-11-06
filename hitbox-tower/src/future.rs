@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{future::BoxFuture, Future};
+use futures::{Future, future::BoxFuture};
 use hitbox::fsm::Transform;
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, FromBytes};
 use http::{Request, Response};
@@ -34,7 +34,6 @@ where
     S::Future: Send,
     ReqBody: Send + 'static,
     ResBody: FromBytes,
-
     // debug bounds
     S::Error: Debug,
 {
@@ -78,7 +77,6 @@ impl<ResBody, E> UpstreamFuture<ResBody, E> {
         S::Future: Send,
         ReqBody: Send + 'static,
         ResBody: FromBytes,
-
         // debug bounds
         S::Error: Debug,
     {

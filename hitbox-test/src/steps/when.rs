@@ -1,9 +1,9 @@
 use crate::core::{HitboxWorld, StepExt};
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use cucumber::gherkin::Step;
 use cucumber::when;
 use hurl::{
-    runner::{request::eval_request, VariableSet},
+    runner::{VariableSet, request::eval_request},
     util::path::ContextDir,
 };
 use hurl_core::{error::DisplaySourceError, parser::parse_hurl_file, text::Format};

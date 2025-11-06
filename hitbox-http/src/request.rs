@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use hitbox::{
+    CacheablePolicyData, RequestCachePolicy,
     predicate::{Predicate, PredicateResult},
-    CacheablePolicyData, RequestCachePolicy, {CachePolicy, CacheableRequest, Extractor},
+    {CachePolicy, CacheableRequest, Extractor},
 };
-use http::{request::Parts, Request};
+use http::{Request, request::Parts};
 use hyper::body::Body as HttpBody;
 
 #[derive(Debug)]

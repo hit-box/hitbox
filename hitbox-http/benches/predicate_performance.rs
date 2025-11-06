@@ -1,18 +1,18 @@
 use bytes::Bytes;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use hitbox::predicate::Predicate;
+use hitbox_http::CacheableHttpRequest;
 use hitbox_http::predicates::{
+    NeutralRequestPredicate,
     conditions::{NotPredicate, OrPredicate},
     request::{
+        HeaderPredicate,
         header::Operation as HeaderOperation,
         method::MethodPredicate,
         path::PathPredicate,
         query::{Operation as QueryOperation, QueryPredicate},
-        HeaderPredicate,
     },
-    NeutralRequestPredicate,
 };
-use hitbox_http::CacheableHttpRequest;
 use http::{Method, Request};
 use http_body_util::Empty;
 use std::hint::black_box;

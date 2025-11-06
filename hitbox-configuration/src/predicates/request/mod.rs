@@ -3,7 +3,7 @@ use hitbox_http::predicates::NeutralRequestPredicate;
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
-use crate::RequestPredicate;
+use crate::{RequestPredicate, error::ConfigError};
 
 mod body;
 mod expression;
@@ -36,19 +36,21 @@ impl Default for Request {
 }
 
 impl Request {
-    pub fn into_predicates<Req>(self) -> RequestPredicate<Req>
+    pub fn into_predicates<Req>(self) -> Result<RequestPredicate<Req>, ConfigError>
     where
         Req: HttpBody + FromBytes + Send + 'static,
         Req::Error: std::fmt::Debug,
         Req::Data: Send,
     {
-        let neutral_predicate = Box::new(NeutralRequestPredicate::<Req>::new());
+        let neutral_predicate: RequestPredicate<Req> =
+            Box::new(NeutralRequestPredicate::<Req>::new());
         match self {
-            Request::Flat(predicates) => predicates
-                .into_iter()
-                .rfold(neutral_predicate, |inner, predicate| {
+            Request::Flat(predicates) => predicates.into_iter().try_rfold(
+                neutral_predicate,
+                |inner, predicate| -> Result<RequestPredicate<Req>, ConfigError> {
                     predicate.into_predicates(inner)
-                }),
+                },
+            ),
             Request::Tree(expression) => expression.into_predicates(neutral_predicate),
         }
     }

@@ -4,7 +4,7 @@ use hitbox_http::predicates::request::Query;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-use crate::RequestPredicate;
+use crate::{RequestPredicate, error::ConfigError};
 
 #[derive(Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct QueryOperation {
@@ -77,8 +77,9 @@ impl QueryOperation {
     pub(crate) fn into_predicates<ReqBody: Send + 'static>(
         self,
         inner: RequestPredicate<ReqBody>,
-    ) -> RequestPredicate<ReqBody> {
-        self.params
+    ) -> Result<RequestPredicate<ReqBody>, ConfigError> {
+        Ok(self
+            .params
             .into_iter()
             .rfold(inner, |inner, (key, param_op)| {
                 let op = param_op.to_operation();
@@ -96,6 +97,6 @@ impl QueryOperation {
                         hitbox_http::predicates::request::query::Operation::Exist(key),
                     )),
                 }
-            })
+            }))
     }
 }

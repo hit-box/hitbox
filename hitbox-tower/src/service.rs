@@ -46,7 +46,6 @@ where
     B: CacheBackend + Clone + Send + Sync + 'static,
     S::Future: Send,
     C: CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>,
-
     // debug bounds
     ReqBody: Debug + HttpBody + Send + 'static,
     // Body: From<ReqBody>,

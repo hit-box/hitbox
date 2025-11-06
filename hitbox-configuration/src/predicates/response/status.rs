@@ -7,6 +7,8 @@ use http::StatusCode as HttpStatusCode;
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
+use crate::error::ConfigError;
+
 type CorePredicate<ReqBody> =
     Box<dyn Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync>;
 
@@ -106,31 +108,38 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn into_predicates<ReqBody>(&self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(
+        &self,
+        inner: CorePredicate<ReqBody>,
+    ) -> Result<CorePredicate<ReqBody>, ConfigError>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
         ReqBody::Data: Send,
     {
         match self {
-            Operation::Eq(eq) => Box::new(StatusCode::new(
-                inner,
-                eq.status().get().try_into().unwrap(),
-            )),
-            Operation::In(r#in) => {
-                let status_codes: Vec<HttpStatusCode> = r#in
-                    .statuses()
-                    .iter()
-                    .map(|c| c.get().try_into().unwrap())
-                    .collect();
-                Box::new(StatusCode::new_in(inner, status_codes))
+            Operation::Eq(eq) => {
+                let status = parse_status_code(eq.status().get())?;
+                Ok(Box::new(StatusCode::new(inner, status)))
             }
-            Operation::Range { range } => Box::new(StatusCode::new_range(
-                inner,
-                range.start().get().try_into().unwrap(),
-                range.end().get().try_into().unwrap(),
-            )),
-            Operation::Class(class) => Box::new(StatusCode::new_class(inner, class.class())),
+            Operation::In(r#in) => {
+                let status_codes = parse_status_codes(r#in.statuses())?;
+                Ok(Box::new(StatusCode::new_in(inner, status_codes)))
+            }
+            Operation::Range { range } => {
+                let start = parse_status_code(range.start().get())?;
+                let end = parse_status_code(range.end().get())?;
+                Ok(Box::new(StatusCode::new_range(inner, start, end)))
+            }
+            Operation::Class(class) => Ok(Box::new(StatusCode::new_class(inner, class.class()))),
         }
     }
+}
+
+fn parse_status_code(code: u16) -> Result<HttpStatusCode, ConfigError> {
+    HttpStatusCode::from_u16(code).map_err(|_| ConfigError::InvalidStatusCode(code))
+}
+
+fn parse_status_codes(codes: &[NonZeroU16]) -> Result<Vec<HttpStatusCode>, ConfigError> {
+    codes.iter().map(|c| parse_status_code(c.get())).collect()
 }

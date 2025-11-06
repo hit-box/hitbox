@@ -1,5 +1,5 @@
 use crate::app::app;
-use crate::time::{clear_mock_time_provider, MockTime, MockTimeProvider};
+use crate::time::{MockTime, MockTimeProvider, clear_mock_time_provider};
 use hitbox_configuration::Endpoint;
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
@@ -8,8 +8,8 @@ use std::str::FromStr;
 
 use anyhow::Error;
 use axum_test::{TestResponse, TestServer};
-use cucumber::gherkin::Step;
 use cucumber::World;
+use cucumber::gherkin::Step;
 use hurl::http::{Body, RequestSpec};
 
 #[derive(Debug, Default)]

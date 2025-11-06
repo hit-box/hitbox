@@ -4,9 +4,9 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Utc;
 use hitbox::{
-    predicate::PredicateResult, CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig,
+    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, predicate::PredicateResult,
 };
-use http::{response::Parts, HeaderMap, Response};
+use http::{HeaderMap, Response, response::Parts};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 

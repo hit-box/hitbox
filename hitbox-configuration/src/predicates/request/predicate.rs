@@ -4,7 +4,7 @@ use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
 use super::{BodyPredicate, HeaderOperation, MethodOperation, QueryOperation, header};
-use crate::RequestPredicate;
+use crate::{RequestPredicate, error::ConfigError};
 
 // Use standard externally-tagged enum (serde default)
 // YAML syntax: Method: {...}, Path: "...", Query: {...}, etc.
@@ -21,7 +21,7 @@ impl Predicate {
     pub fn into_predicates<ReqBody>(
         self,
         inner: RequestPredicate<ReqBody>,
-    ) -> RequestPredicate<ReqBody>
+    ) -> Result<RequestPredicate<ReqBody>, ConfigError>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
@@ -29,7 +29,7 @@ impl Predicate {
     {
         match self {
             Predicate::Method(method_operation) => method_operation.into_predicates(inner),
-            Predicate::Path(path) => Box::new(Path::new(inner, path.into())),
+            Predicate::Path(path) => Ok(Box::new(Path::new(inner, path.into()))),
             Predicate::Query(query_operation) => query_operation.into_predicates(inner),
             Predicate::Header(header_operation) => header::into_predicates(header_operation, inner),
             Predicate::Body(body_predicate) => body_predicate.into_predicates(inner),

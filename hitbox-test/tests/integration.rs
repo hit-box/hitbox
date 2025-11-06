@@ -1,4 +1,4 @@
-use cucumber::writer::{basic::Coloring, Verbosity};
+use cucumber::writer::{Verbosity, basic::Coloring};
 use cucumber::{World, WriterExt};
 use hitbox_test::core::HitboxWorld;
 use std::path::PathBuf;

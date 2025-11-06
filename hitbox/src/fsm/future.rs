@@ -7,17 +7,17 @@ use std::{
     time::Duration,
 };
 
-use crate::{policy::PolicyConfig, CachePolicy, CacheState, CacheStatus, CacheableResponse};
+use crate::{CachePolicy, CacheState, CacheStatus, CacheableResponse, policy::PolicyConfig};
 use futures::ready;
 use hitbox_core::{CacheablePolicyData, EntityPolicyConfig};
 use pin_project::pin_project;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use tracing::debug;
 
 use crate::{
-    backend::CacheBackend,
-    fsm::{states::StateProj, PollCacheFuture, State},
     CacheKey, CacheableRequest, Extractor, Predicate,
+    backend::CacheBackend,
+    fsm::{PollCacheFuture, State, states::StateProj},
 };
 
 const POLL_AFTER_READY_ERROR: &str = "CacheFuture can't be polled after finishing";
@@ -225,7 +225,6 @@ where
     Res: CacheableResponse,
     Res::Cached: Serialize + DeserializeOwned + Send + Sync,
     Req: CacheableRequest + Send + 'static,
-
     // Debug bounds
     Req: Debug,
     Res::Cached: Debug,
