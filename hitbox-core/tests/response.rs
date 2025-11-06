@@ -6,7 +6,9 @@ use hitbox_core::{
 
 #[derive(Clone, Debug)]
 struct TestResponse {
+    #[allow(dead_code)]
     field1: String,
+    #[allow(dead_code)]
     field2: u8,
 }
 

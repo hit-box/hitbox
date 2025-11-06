@@ -12,14 +12,14 @@ pub enum MethodOperation {
 
 impl MethodOperation {
     pub(crate) fn into_predicates<ReqBody: Send + 'static>(
-        &self,
+        self,
         inner: RequestPredicate<ReqBody>,
     ) -> RequestPredicate<ReqBody> {
         match self {
             MethodOperation::Eq(method) => Box::new(Method::new(inner, method.as_str()).unwrap()),
             MethodOperation::In(methods) => {
                 let methods: Vec<http::Method> =
-                    methods.iter().map(|m| m.parse().unwrap()).collect();
+                    methods.into_iter().map(|m| m.parse().unwrap()).collect();
                 Box::new(Method::new_in(inner, methods))
             }
         }

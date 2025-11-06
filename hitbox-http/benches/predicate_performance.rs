@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use hitbox::predicate::Predicate;
 use hitbox_http::predicates::{
     conditions::{NotPredicate, OrPredicate},
@@ -15,6 +15,7 @@ use hitbox_http::predicates::{
 use hitbox_http::CacheableHttpRequest;
 use http::{Method, Request};
 use http_body_util::Empty;
+use std::hint::black_box;
 
 // ============================================================================
 // Helper functions to create test requests

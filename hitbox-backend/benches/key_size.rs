@@ -1,6 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use hitbox_backend::CacheKeyFormat;
 use hitbox_core::CacheKey;
+use std::hint::black_box;
 use std::time::Instant;
 
 fn create_small_key() -> CacheKey {
@@ -67,15 +68,6 @@ fn bench_size_comparison(c: &mut Criterion) {
     ];
 
     for (name, key) in &test_cases {
-        // Bincode
-        group.bench_with_input(BenchmarkId::new("bincode", name), key, |b, key| {
-            let format = CacheKeyFormat::Bitcode;
-            b.iter(|| {
-                let bytes = format.serialize(black_box(key)).unwrap();
-                black_box(bytes.len())
-            });
-        });
-
         // Bitcode
         group.bench_with_input(BenchmarkId::new("bitcode", name), key, |b, key| {
             let format = CacheKeyFormat::Bitcode;
@@ -100,21 +92,19 @@ fn bench_size_comparison(c: &mut Criterion) {
     // Print size and time comparison table
     println!("\n=== Size & Time Comparison ===\n");
     println!(
-        "{:<20} {:>10} {:>10} {:>12} {:>10} {:>10} {:>10} {:>12}",
-        "Key Type", "Bincode", "Bitcode", "UrlEncoded", "B/U", "Bit/U", "B(ns)", "Bit(ns)"
+        "{:<20} {:>10} {:>12} {:>10} {:>10}",
+        "Key Type", "Bitcode", "UrlEncoded", "Bit/U", "Bit(ns)"
     );
     println!(
-        "{:<20} {:>10} {:>10} {:>12} {:>10} {:>10} {:>10} {:>12}",
-        "", "(bytes)", "(bytes)", "(bytes)", "Ratio", "Ratio", "", ""
+        "{:<20} {:>10} {:>12} {:>10} {:>10}",
+        "", "(bytes)", "(bytes)", "Ratio", ""
     );
-    println!("{:-<114}", "");
+    println!("{:-<72}", "");
 
     for (name, key) in test_cases {
         let bitcode_bytes = CacheKeyFormat::Bitcode.serialize(&key).unwrap();
-        let bitcode_bytes = CacheKeyFormat::Bitcode.serialize(&key).unwrap();
         let urlencoded_bytes = CacheKeyFormat::UrlEncoded.serialize(&key).unwrap();
 
-        let bincode_ratio = bitcode_bytes.len() as f64 / urlencoded_bytes.len() as f64;
         let bitcode_ratio = bitcode_bytes.len() as f64 / urlencoded_bytes.len() as f64;
 
         // Measure time (average of 10000 iterations)
@@ -124,23 +114,14 @@ fn bench_size_comparison(c: &mut Criterion) {
         for _ in 0..iterations {
             let _ = black_box(CacheKeyFormat::Bitcode.serialize(black_box(&key)).unwrap());
         }
-        let bincode_time_ns = start.elapsed().as_nanos() / iterations;
-
-        let start = Instant::now();
-        for _ in 0..iterations {
-            let _ = black_box(CacheKeyFormat::Bitcode.serialize(black_box(&key)).unwrap());
-        }
         let bitcode_time_ns = start.elapsed().as_nanos() / iterations;
 
         println!(
-            "{:<20} {:>10} {:>10} {:>12} {:>9.2}x {:>9.2}x {:>10} {:>12}",
+            "{:<20} {:>10} {:>12} {:>9.2}x {:>10}",
             name,
             bitcode_bytes.len(),
-            bitcode_bytes.len(),
             urlencoded_bytes.len(),
-            bincode_ratio,
             bitcode_ratio,
-            bincode_time_ns,
             bitcode_time_ns,
         );
     }

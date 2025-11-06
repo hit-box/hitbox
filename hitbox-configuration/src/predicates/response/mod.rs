@@ -19,7 +19,7 @@ pub enum Predicate {
 }
 
 impl Predicate {
-    pub fn into_predicates<ReqBody>(&self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
+    pub fn into_predicates<ReqBody>(self, inner: CorePredicate<ReqBody>) -> CorePredicate<ReqBody>
     where
         ReqBody: HttpBody + FromBytes + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
@@ -120,7 +120,7 @@ impl Response {
         let neutral_predicate = Box::new(NeutralResponsePredicate::<Req>::new());
         match self {
             Response::Flat(predicates) => predicates
-                .iter()
+                .into_iter()
                 .rfold(neutral_predicate, |inner, predicate| {
                     predicate.into_predicates(inner)
                 }),

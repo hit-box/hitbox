@@ -58,10 +58,9 @@ impl CacheKeyFormat {
             }
             CacheKeyFormat::UrlEncoded => {
                 // URL-encoded is one-way for cache keys (used for storage key, not round-trip)
-                Err(SerializerError::Deserialize(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "UrlEncoded format deserialization not implemented",
-                ))))
+                Err(SerializerError::Deserialize(Box::new(
+                    std::io::Error::other("UrlEncoded format deserialization not implemented"),
+                )))
             }
         }
     }

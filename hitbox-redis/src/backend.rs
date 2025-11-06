@@ -54,7 +54,7 @@ impl RedisBackend {
             .connection
             .get_or_try_init(|| {
                 trace!("Initialize new redis connection manager");
-                self.client.get_tokio_connection_manager()
+                self.client.get_connection_manager()
             })
             .await
             .map_err(Error::from)?;
@@ -114,10 +114,7 @@ impl Backend for RedisBackend {
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         let client = self.client.clone();
         let cache_key = self.key_format.serialize(key)?;
-        let mut con = client
-            .get_tokio_connection_manager()
-            .await
-            .map_err(Error::from)?;
+        let mut con = client.get_connection_manager().await.map_err(Error::from)?;
         let result: Option<Vec<u8>> = redis::cmd("GET")
             .arg(cache_key)
             .query_async(&mut con)

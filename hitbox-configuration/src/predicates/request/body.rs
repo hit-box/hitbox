@@ -18,7 +18,7 @@ pub enum BodyPredicate {
 
 impl BodyPredicate {
     pub(crate) fn into_predicates<ReqBody>(
-        &self,
+        self,
         inner: RequestPredicate<ReqBody>,
     ) -> RequestPredicate<ReqBody>
     where
@@ -29,7 +29,7 @@ impl BodyPredicate {
         match self {
             BodyPredicate::Jq(expression) => Box::new(inner.body(
                 hitbox_http::predicates::request::body::ParsingType::Jq,
-                expression.clone(),
+                expression,
                 // For Jq expressions, we expect the expression to evaluate to a boolean
                 // (e.g., '.field == "value"' returns true/false)
                 // We cache when the expression evaluates to true

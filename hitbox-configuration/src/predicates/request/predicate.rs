@@ -19,7 +19,7 @@ pub enum Predicate {
 
 impl Predicate {
     pub fn into_predicates<ReqBody>(
-        &self,
+        self,
         inner: RequestPredicate<ReqBody>,
     ) -> RequestPredicate<ReqBody>
     where
@@ -29,7 +29,7 @@ impl Predicate {
     {
         match self {
             Predicate::Method(method_operation) => method_operation.into_predicates(inner),
-            Predicate::Path(path) => Box::new(Path::new(inner, path.as_str().into())),
+            Predicate::Path(path) => Box::new(Path::new(inner, path.into())),
             Predicate::Query(query_operation) => query_operation.into_predicates(inner),
             Predicate::Header(header_operation) => header::into_predicates(header_operation, inner),
             Predicate::Body(body_predicate) => body_predicate.into_predicates(inner),

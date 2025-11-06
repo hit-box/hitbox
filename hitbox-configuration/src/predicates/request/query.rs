@@ -75,25 +75,27 @@ enum Operation {
 
 impl QueryOperation {
     pub(crate) fn into_predicates<ReqBody: Send + 'static>(
-        &self,
+        self,
         inner: RequestPredicate<ReqBody>,
     ) -> RequestPredicate<ReqBody> {
-        self.params.iter().rfold(inner, |inner, (key, param_op)| {
-            let op = param_op.to_operation();
-            match op {
-                Operation::Eq(value) => Box::new(Query::new(
-                    inner,
-                    hitbox_http::predicates::request::query::Operation::Eq(key.clone(), value),
-                )),
-                Operation::In(values) => Box::new(Query::new(
-                    inner,
-                    hitbox_http::predicates::request::query::Operation::In(key.clone(), values),
-                )),
-                Operation::Exists => Box::new(Query::new(
-                    inner,
-                    hitbox_http::predicates::request::query::Operation::Exist(key.clone()),
-                )),
-            }
-        })
+        self.params
+            .into_iter()
+            .rfold(inner, |inner, (key, param_op)| {
+                let op = param_op.to_operation();
+                match op {
+                    Operation::Eq(value) => Box::new(Query::new(
+                        inner,
+                        hitbox_http::predicates::request::query::Operation::Eq(key, value),
+                    )),
+                    Operation::In(values) => Box::new(Query::new(
+                        inner,
+                        hitbox_http::predicates::request::query::Operation::In(key, values),
+                    )),
+                    Operation::Exists => Box::new(Query::new(
+                        inner,
+                        hitbox_http::predicates::request::query::Operation::Exist(key),
+                    )),
+                }
+            })
     }
 }

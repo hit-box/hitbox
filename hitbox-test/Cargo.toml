@@ -35,7 +35,7 @@ bytes = { workspace = true }
 axum = { workspace = true, features = ["macros"] }
 axum-test = "18.2"
 reqwest = "0.12"
-cucumber = { version = "0.21", features = ["output-junit"] }
+cucumber = { version = "0.21", features = ["output-junit", "libtest"] }
 serde-saphyr = { workspace = true }
 serde_yaml = "0.9"
 indexmap = { version = "2", features = ["serde"] }

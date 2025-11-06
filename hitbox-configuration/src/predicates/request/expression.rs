@@ -15,7 +15,7 @@ pub enum Expression {
 
 impl Expression {
     pub fn into_predicates<ReqBody>(
-        &self,
+        self,
         inner: RequestPredicate<ReqBody>,
     ) -> RequestPredicate<ReqBody>
     where

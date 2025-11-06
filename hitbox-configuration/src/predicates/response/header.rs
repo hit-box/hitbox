@@ -41,7 +41,7 @@ where
 pub type HeaderOperation = IndexMap<String, HeaderValue>;
 
 pub fn into_predicates<ReqBody>(
-    headers: &HeaderOperation,
+    headers: HeaderOperation,
     inner: CorePredicate<ReqBody>,
 ) -> CorePredicate<ReqBody>
 where
@@ -50,7 +50,7 @@ where
     ReqBody::Data: Send,
 {
     headers
-        .iter()
+        .into_iter()
         .rfold(inner, |inner, (header_name, header_value)| {
             let operation = match header_value {
                 HeaderValue::Eq(value) => hitbox_http::predicates::response::header::Operation::Eq(
@@ -60,7 +60,7 @@ where
                 HeaderValue::In(values) => {
                     hitbox_http::predicates::response::header::Operation::In(
                         header_name.parse().unwrap(),
-                        values.iter().map(|v| v.parse().unwrap()).collect(),
+                        values.into_iter().map(|v| v.parse().unwrap()).collect(),
                     )
                 }
                 HeaderValue::Operation(op) => match op {
@@ -73,17 +73,17 @@ where
                     HeaderValueOperation::In(values) => {
                         hitbox_http::predicates::response::header::Operation::In(
                             header_name.parse().unwrap(),
-                            values.iter().map(|v| v.parse().unwrap()).collect(),
+                            values.into_iter().map(|v| v.parse().unwrap()).collect(),
                         )
                     }
                     HeaderValueOperation::Contains(substring) => {
                         hitbox_http::predicates::response::header::Operation::Contains(
                             header_name.parse().unwrap(),
-                            substring.clone(),
+                            substring,
                         )
                     }
                     HeaderValueOperation::Regex(pattern) => {
-                        let compiled_regex = Regex::new(pattern).expect("Invalid regex pattern");
+                        let compiled_regex = Regex::new(&pattern).expect("Invalid regex pattern");
                         hitbox_http::predicates::response::header::Operation::Regex(
                             header_name.parse().unwrap(),
                             compiled_regex,

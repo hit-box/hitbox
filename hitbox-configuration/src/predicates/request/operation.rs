@@ -18,7 +18,7 @@ pub enum Operation {
 
 impl Operation {
     pub fn into_predicates<ReqBody>(
-        &self,
+        self,
         inner: RequestPredicate<ReqBody>,
     ) -> RequestPredicate<ReqBody>
     where
@@ -28,7 +28,7 @@ impl Operation {
     {
         match self {
             Operation::Or(predicates) => {
-                let mut iter = predicates.iter();
+                let mut iter = predicates.into_iter();
                 match iter.next() {
                     None => inner,
                     Some(first) => {
@@ -50,7 +50,7 @@ impl Operation {
                 }
             }
             Operation::And(predicates) => predicates
-                .iter()
+                .into_iter()
                 .rfold(inner, |inner, predicate| predicate.into_predicates(inner)),
             Operation::Not(expression) => {
                 let predicate =

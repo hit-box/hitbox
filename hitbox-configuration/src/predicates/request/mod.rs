@@ -45,24 +45,7 @@ impl Request {
         let neutral_predicate = Box::new(NeutralRequestPredicate::<Req>::new());
         match self {
             Request::Flat(predicates) => predicates
-                .iter()
-                .rfold(neutral_predicate, |inner, predicate| {
-                    predicate.into_predicates(inner)
-                }),
-            Request::Tree(expression) => expression.into_predicates(neutral_predicate),
-        }
-    }
-
-    pub fn predicates<Req>(&self) -> RequestPredicate<Req>
-    where
-        Req: HttpBody + FromBytes + Send + 'static,
-        Req::Error: std::fmt::Debug,
-        Req::Data: Send,
-    {
-        let neutral_predicate = Box::new(NeutralRequestPredicate::<Req>::new());
-        match self {
-            Request::Flat(predicates) => predicates
-                .iter()
+                .into_iter()
                 .rfold(neutral_predicate, |inner, predicate| {
                     predicate.into_predicates(inner)
                 }),

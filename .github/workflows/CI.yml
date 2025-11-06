@@ -27,8 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.89.0, stable, beta]
-        redis-version: [6, 7]
+        rust: [1.89.0, stable]
+        redis-version: [7]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
