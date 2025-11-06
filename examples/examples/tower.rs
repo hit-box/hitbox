@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // let inmemory = StrettoBackend::builder(10_000_000).finalize().unwrap();
     // let redis = RedisBackend::builder().build().unwrap();
 
-    let service = tower::ServiceBuilder::new()
+    let _service = tower::ServiceBuilder::new()
         .layer(Cache::builder().backend(inmemory).build())
         // .layer(Cache::builder().backend(redis).build())
         // .layer(
@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .service_fn(handle);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    let listener = TcpListener::bind(addr).await?;
+    let _listener = TcpListener::bind(addr).await?;
 
     // loop {
     //     let (stream, _) = listener.accept().await?;

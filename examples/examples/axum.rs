@@ -1,13 +1,9 @@
 use axum::{extract::Path, routing::get, Json, Router};
 use hitbox_configuration::ConfigEndpoint;
-use hitbox_tower::{
-    configuration::extractor,
-    configuration::predicate::{request, response},
-    Method, StatusCode,
-};
+use hitbox_tower::StatusCode;
 
 use hitbox_redis::RedisBackend;
-use hitbox_tower::{Cache, EndpointConfig};
+use hitbox_tower::Cache;
 
 async fn handler_result(Path(name): Path<String>) -> Result<String, StatusCode> {
     dbg!("axum::handler_result");
@@ -42,7 +38,7 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let redis_backend = RedisBackend::new().unwrap();
+    let _redis_backend = RedisBackend::new().unwrap();
     // let memory_backend = hitbox_stretto::StrettoBackend::builder(10)
     //     .finalize()
     //     .unwrap();

@@ -41,7 +41,7 @@ jobs:
         with:
           redis-version: ${{ matrix.redis-version }}
       - name: Run tests
-        run: cargo test --workspace --all-features -- --test-threads=1
+        run: cargo test --workspace --all-features
 
       - name: Upload test results
         if: always()
@@ -68,7 +68,7 @@ jobs:
       - name: Generate coverage file
         if: matrix.rust == 'stable' && matrix.redis-version == 7
         run: |
-          cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info --ignore-filename-regex 'hurl/' -- --test-threads=1
+          cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info --ignore-filename-regex 'hurl/'
 
       - name: Upload to Codecov
         if: matrix.rust == 'stable' && matrix.redis-version == 7

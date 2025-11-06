@@ -4,7 +4,7 @@
 //! integrate this with your specific caching implementation.
 
 use chrono::Utc;
-use hitbox_core::{CacheValue, TimeProvider};
+use hitbox_core::TimeProvider;
 use hitbox_test::time::{MockTime, MockTimeProvider};
 use std::time::Duration;
 
