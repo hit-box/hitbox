@@ -19,7 +19,7 @@ async fn test_request_query_predicates_positive() {
     let predicate = NeutralRequestPredicate::new()
         .query(query::Operation::Eq("name".to_owned(), "value".to_owned()));
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -36,7 +36,7 @@ async fn test_request_query_predicates_multiple() {
         vec!["value".to_owned(), "second-value".to_owned()],
     ));
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -53,5 +53,5 @@ async fn test_request_query_predicates_negative() {
         "wrong-value".to_owned(),
     ));
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
 }

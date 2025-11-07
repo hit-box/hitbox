@@ -18,7 +18,7 @@ async fn test_request_path_predicates_full_match() {
     );
     let predicate = NeutralRequestPredicate::new().path(expression.into());
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -33,7 +33,7 @@ async fn test_request_path_predicates_use_expression() {
     );
     let predicate = NeutralRequestPredicate::new().path(expression.into());
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -48,5 +48,5 @@ async fn test_request_path_predicates_non_match() {
     );
     let predicate = NeutralRequestPredicate::new().path(expression.into());
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
 }

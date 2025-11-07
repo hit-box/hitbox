@@ -26,7 +26,7 @@ async fn test_conditions_or_cacheable() {
         .or(correct_predicate, wrong_predicate)
         .check(request)
         .await;
-    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -44,7 +44,7 @@ async fn test_conditions_or_noncacheable_base() {
         .or(correct_predicate, wrong_predicate)
         .check(request)
         .await;
-    assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
 }
 
 #[tokio::test]
@@ -62,7 +62,7 @@ async fn test_conditions_or_noncacheable() {
         .or(wrong_predicate_one, wrong_predicate_two)
         .check(request)
         .await;
-    assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
 }
 
 #[tokio::test]
@@ -90,5 +90,5 @@ async fn test_conditions_not() {
         .not(wrong_header_predicate)
         .check(request)
         .await;
-    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
 }

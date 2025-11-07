@@ -22,7 +22,7 @@ mod eq_tests {
         let value: HeaderValue = "test-value".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Eq(name, value));
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
     }
 
     #[tokio::test]
@@ -36,7 +36,7 @@ mod eq_tests {
         let value: HeaderValue = "wrong-value".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Eq(name, value));
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
     }
 
     #[tokio::test]
@@ -50,7 +50,7 @@ mod eq_tests {
         let value: HeaderValue = "test-value".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Eq(name, value));
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
     }
 }
 
@@ -68,7 +68,7 @@ mod exist_tests {
         let name: HeaderName = "x-test".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Exist(name));
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
     }
 
     #[tokio::test]
@@ -78,7 +78,7 @@ mod exist_tests {
         let name: HeaderName = "x-test".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Exist(name));
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
     }
 }
 
@@ -100,7 +100,7 @@ mod in_tests {
         ];
         let predicate = NeutralRequestPredicate::new().header(Operation::In(name, values));
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
     }
 
     #[tokio::test]
@@ -117,6 +117,6 @@ mod in_tests {
         ];
         let predicate = NeutralRequestPredicate::new().header(Operation::In(name, values));
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
     }
 }

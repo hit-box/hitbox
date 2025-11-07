@@ -19,7 +19,7 @@ async fn test_response_predicates_match() {
     let predicate =
         NeutralResponsePredicate::new().status_code(StatusCode::from_u16(status).unwrap());
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -35,5 +35,5 @@ async fn test_response_predicates_not_match() {
     let predicate = NeutralResponsePredicate::new()
         .status_code(StatusCode::from_u16(predicate_status).unwrap());
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
 }
