@@ -63,6 +63,22 @@ where
             response
         })
     }
+
+    fn error_transform(&self, error: hitbox::PredicateError) -> Self::Response {
+        use bytes::Bytes;
+
+        // Convert predicate error to HTTP 500 response
+        let error_message = error.to_string();
+        let body = ResBody::from_bytes(Bytes::from(error_message));
+
+        let response = Response::builder()
+            .status(500)
+            .header("Content-Type", "text/plain")
+            .body(body)
+            .expect("Failed to build error response");
+
+        Ok(response)
+    }
 }
 
 #[pin_project]

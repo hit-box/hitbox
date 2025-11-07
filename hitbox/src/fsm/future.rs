@@ -155,6 +155,10 @@ pub trait Transform<Req, Res> {
         res: Res,
         cache_status: Option<crate::CacheStatus>,
     ) -> Self::Response;
+
+    /// Transform a predicate error into a response.
+    /// This is called when request or response predicates fail.
+    fn error_transform(&self, error: hitbox_core::PredicateError) -> Self::Response;
 }
 
 #[pin_project]
@@ -260,9 +264,9 @@ where
                 StateProj::CheckRequestCachePolicy {
                     cache_policy_future,
                 } => {
-                    let policy = ready!(cache_policy_future.poll(cx));
-                    match policy {
-                        CachePolicy::Cacheable(CacheablePolicyData { key, request }) => {
+                    let policy_result = ready!(cache_policy_future.poll(cx));
+                    match policy_result {
+                        Ok(CachePolicy::Cacheable(CacheablePolicyData { key, request })) => {
                             let backend = this.backend.clone();
                             let cache_key = key.clone();
                             let _ = this.cache_key.insert(key);
@@ -273,10 +277,15 @@ where
                                 request: Some(request),
                             }
                         }
-                        CachePolicy::NonCacheable(request) => {
+                        Ok(CachePolicy::NonCacheable(request)) => {
                             let upstream_future =
                                 Box::pin(this.transformer.upstream_transform(request));
                             State::PollUpstream { upstream_future }
+                        }
+                        Err(predicate_error) => {
+                            // Predicate failed - convert to error response
+                            let error_response = this.transformer.error_transform(predicate_error);
+                            return Poll::Ready(error_response);
                         }
                     }
                 }
@@ -358,25 +367,34 @@ where
                     }
                 }
                 StateProj::CheckResponseCachePolicy { cache_policy } => {
-                    let policy = ready!(cache_policy.poll(cx));
-                    let backend = this.backend.clone();
-                    let cache_key = this.cache_key.take().expect("CacheKey not found");
-                    match policy {
-                        CachePolicy::Cacheable(cache_value) => {
-                            let update_cache_future = Box::pin(async move {
-                                let update_cache_result =
-                                    backend.set::<Res>(&cache_key, &cache_value, None).await;
-                                let upstream_result =
-                                    Res::from_cached(cache_value.into_inner()).await;
-                                (update_cache_result, upstream_result)
-                            });
-                            State::UpdateCache {
-                                update_cache_future,
+                    let policy_result = ready!(cache_policy.poll(cx));
+                    match policy_result {
+                        Ok(policy) => {
+                            let backend = this.backend.clone();
+                            let cache_key = this.cache_key.take().expect("CacheKey not found");
+                            match policy {
+                                CachePolicy::Cacheable(cache_value) => {
+                                    let update_cache_future = Box::pin(async move {
+                                        let update_cache_result =
+                                            backend.set::<Res>(&cache_key, &cache_value, None).await;
+                                        let upstream_result =
+                                            Res::from_cached(cache_value.into_inner()).await;
+                                        (update_cache_result, upstream_result)
+                                    });
+                                    State::UpdateCache {
+                                        update_cache_future,
+                                    }
+                                }
+                                CachePolicy::NonCacheable(response) => State::Response {
+                                    response: Some(response),
+                                },
                             }
                         }
-                        CachePolicy::NonCacheable(response) => State::Response {
-                            response: Some(response),
-                        },
+                        Err(predicate_error) => {
+                            // Response predicate failed - convert to error response
+                            let error_response = this.transformer.error_transform(predicate_error);
+                            return Poll::Ready(error_response);
+                        }
                     }
                 }
                 StateProj::UpdateCache {
