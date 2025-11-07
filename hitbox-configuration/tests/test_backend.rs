@@ -1,4 +1,7 @@
-use hitbox_configuration::backend::{Backend, BackendConfig, Compression, KeyFormat, KeySerialization, Moka, ValueFormat, ValueSerialization};
+use hitbox_configuration::backend::{
+    Backend, BackendConfig, Compression, KeyFormat, KeySerialization, Moka, ValueFormat,
+    ValueSerialization,
+};
 
 #[test]
 fn test_moka_backend_deserialize() {
@@ -84,9 +87,7 @@ fn test_backend_serialize_roundtrip() {
             format: ValueSerialization::Json,
             compression: Compression::Zstd,
         },
-        backend: Moka {
-            max_capacity: 5000,
-        },
+        backend: Moka { max_capacity: 5000 },
     });
 
     let yaml = serde_saphyr::to_string(&backend).expect("failed to serialize");

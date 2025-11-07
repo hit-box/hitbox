@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use hitbox_backend::{Backend, CacheBackend, CacheKeyFormat, DeleteStatus};
 use hitbox_backend::serializer::Format;
+use hitbox_backend::{Backend, CacheBackend, CacheKeyFormat, DeleteStatus};
 use hitbox_core::{
     CacheKey, CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, ResponseCachePolicy,
 };
@@ -290,8 +290,8 @@ pub async fn test_url_encoded_key_json_value<B: Backend + CacheBackend>(backend:
         .expect("value should exist");
 
     // Verify it's valid JSON
-    let as_string = String::from_utf8(raw_value.data.clone())
-        .expect("Value should be valid UTF-8 JSON");
+    let as_string =
+        String::from_utf8(raw_value.data.clone()).expect("Value should be valid UTF-8 JSON");
     assert!(
         as_string.contains("\"id\"") || as_string.contains("id"),
         "Value should contain JSON fields"
@@ -381,8 +381,8 @@ pub async fn test_bitcode_key_json_value<B: Backend + CacheBackend>(backend: &B)
         .expect("value should exist");
 
     // Verify value is JSON
-    let as_string = String::from_utf8(raw_value.data.clone())
-        .expect("Value should be valid UTF-8 JSON");
+    let as_string =
+        String::from_utf8(raw_value.data.clone()).expect("Value should be valid UTF-8 JSON");
     assert!(
         as_string.contains("\"id\"") || as_string.contains("id"),
         "Value should be in JSON format"

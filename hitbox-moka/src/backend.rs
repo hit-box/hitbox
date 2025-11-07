@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::Backend;
-use hitbox_backend::{BackendResult, DeleteStatus, CacheKeyFormat};
 use hitbox_backend::serializer::Format;
+use hitbox_backend::{BackendResult, CacheKeyFormat, DeleteStatus};
 use moka::{Expiry, future::Cache};
 use std::time::{Duration, Instant};
 

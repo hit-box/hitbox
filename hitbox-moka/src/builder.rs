@@ -1,7 +1,7 @@
 use crate::backend::{Expiration, MokaBackend};
 use hitbox::{CacheKey, CacheValue};
-use hitbox_backend::serializer::{Format, Raw};
 use hitbox_backend::CacheKeyFormat;
+use hitbox_backend::serializer::{Format, Raw};
 use moka::future::{Cache, CacheBuilder};
 
 pub struct MokaBackendBuilder {

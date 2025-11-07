@@ -56,10 +56,8 @@ impl Format {
         match self {
             Format::Json => serde_json::to_vec(value)
                 .map_err(|error| SerializerError::Serialize(Box::new(error))),
-            Format::Bincode => {
-                bincode::serde::encode_to_vec(value, bincode::config::standard())
-                    .map_err(|error| SerializerError::Serialize(Box::new(error)))
-            }
+            Format::Bincode => bincode::serde::encode_to_vec(value, bincode::config::standard())
+                .map_err(|error| SerializerError::Serialize(Box::new(error))),
         }
     }
 

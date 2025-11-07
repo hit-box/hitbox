@@ -7,8 +7,8 @@ use bincode::{
 };
 use chrono::{DateTime, Utc};
 use feoxdb::{FeoxError, FeoxStore};
-use hitbox_backend::{Backend, BackendError, BackendResult, CacheKeyFormat, DeleteStatus};
 use hitbox_backend::serializer::Format;
+use hitbox_backend::{Backend, BackendError, BackendResult, CacheKeyFormat, DeleteStatus};
 use hitbox_core::{CacheKey, CacheValue};
 use serde::{Deserialize, Serialize};
 
@@ -154,26 +154,24 @@ impl Backend for FeOxDbBackend {
         let key_bytes = encode_to_vec(key, bincode_config())
             .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
-        tokio::task::spawn_blocking(move || {
-            match store.get(&key_bytes) {
-                Ok(encoded) => {
-                    let (serializable, _): (SerializableCacheValue, _) =
-                        decode_from_slice(&encoded, bincode_config())
-                            .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+        tokio::task::spawn_blocking(move || match store.get(&key_bytes) {
+            Ok(encoded) => {
+                let (serializable, _): (SerializableCacheValue, _) =
+                    decode_from_slice(&encoded, bincode_config())
+                        .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
-                    let cache_value: CacheValue<Raw> = serializable.into();
+                let cache_value: CacheValue<Raw> = serializable.into();
 
-                    if let Some(expire_time) = cache_value.expire {
-                        if expire_time < Utc::now() {
-                            return Ok(None);
-                        }
+                if let Some(expire_time) = cache_value.expire {
+                    if expire_time < Utc::now() {
+                        return Ok(None);
                     }
-
-                    Ok(Some(cache_value))
                 }
-                Err(FeoxError::KeyNotFound) => Ok(None),
-                Err(e) => Err(BackendError::InternalError(Box::new(e))),
+
+                Ok(Some(cache_value))
             }
+            Err(FeoxError::KeyNotFound) => Ok(None),
+            Err(e) => Err(BackendError::InternalError(Box::new(e))),
         })
         .await
         .map_err(|e| BackendError::InternalError(Box::new(e)))?
