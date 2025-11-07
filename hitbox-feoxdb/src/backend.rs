@@ -7,7 +7,8 @@ use bincode::{
 };
 use chrono::{DateTime, Utc};
 use feoxdb::{FeoxError, FeoxStore};
-use hitbox_backend::{Backend, BackendError, BackendResult, DeleteStatus};
+use hitbox_backend::{Backend, BackendError, BackendResult, CacheKeyFormat, DeleteStatus};
+use hitbox_backend::serializer::Format;
 use hitbox_core::{CacheKey, CacheValue};
 use serde::{Deserialize, Serialize};
 
@@ -42,6 +43,8 @@ impl From<SerializableCacheValue> for CacheValue<Raw> {
 #[derive(Clone)]
 pub struct FeOxDbBackend {
     store: Arc<FeoxStore>,
+    key_format: CacheKeyFormat,
+    value_format: Format,
 }
 
 impl FeOxDbBackend {
@@ -60,12 +63,20 @@ impl FeOxDbBackend {
 
         Ok(Self {
             store: Arc::new(store),
+            key_format: CacheKeyFormat::Bitcode,
+            value_format: Format::Json,
         })
+    }
+
+    pub fn builder() -> FeOxDbBackendBuilder {
+        FeOxDbBackendBuilder::default()
     }
 
     pub fn from_store(store: FeoxStore) -> Self {
         Self {
             store: Arc::new(store),
+            key_format: CacheKeyFormat::Bitcode,
+            value_format: Format::Json,
         }
     }
 
@@ -74,6 +85,63 @@ impl FeOxDbBackend {
 
         Ok(Self {
             store: Arc::new(store),
+            key_format: CacheKeyFormat::Bitcode,
+            value_format: Format::Json,
+        })
+    }
+}
+
+pub struct FeOxDbBackendBuilder {
+    path: Option<String>,
+    key_format: CacheKeyFormat,
+    value_format: Format,
+}
+
+impl Default for FeOxDbBackendBuilder {
+    fn default() -> Self {
+        Self {
+            path: None,
+            key_format: CacheKeyFormat::Bitcode,
+            value_format: Format::Json,
+        }
+    }
+}
+
+impl FeOxDbBackendBuilder {
+    pub fn path(mut self, path: String) -> Self {
+        self.path = Some(path);
+        self
+    }
+
+    pub fn key_format(mut self, format: CacheKeyFormat) -> Self {
+        self.key_format = format;
+        self
+    }
+
+    pub fn value_format(mut self, format: Format) -> Self {
+        self.value_format = format;
+        self
+    }
+
+    pub fn build(self) -> Result<FeOxDbBackend, FeOxDbError> {
+        let store = if let Some(path) = self.path {
+            let mut path_buf = std::path::PathBuf::from(path);
+            if path_buf.is_dir() {
+                path_buf.push("cache.db");
+            }
+            let path_str = path_buf.to_string_lossy().to_string();
+            FeoxStore::builder()
+                .device_path(path_str)
+                .enable_ttl(true)
+                .build()?
+        } else {
+            FeoxStore::builder().enable_ttl(true).build()?
+        };
+
+        Ok(FeOxDbBackend {
+            store: Arc::new(store),
+            key_format: self.key_format,
+            value_format: self.value_format,
         })
     }
 }
@@ -157,6 +225,14 @@ impl Backend for FeOxDbBackend {
         })
         .await
         .map_err(|e| BackendError::InternalError(Box::new(e)))?
+    }
+
+    fn value_format(&self) -> &Format {
+        &self.value_format
+    }
+
+    fn key_format(&self) -> &CacheKeyFormat {
+        &self.key_format
     }
 }
 

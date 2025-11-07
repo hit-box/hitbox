@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::Backend;
-use hitbox_backend::{BackendResult, DeleteStatus};
+use hitbox_backend::{BackendResult, DeleteStatus, CacheKeyFormat};
+use hitbox_backend::serializer::Format;
 use moka::{Expiry, future::Cache};
 use std::time::{Duration, Instant};
 
@@ -28,6 +29,8 @@ impl Expiry<CacheKey, CacheValue<Raw>> for Expiration {
 #[derive(Clone, Debug)]
 pub struct MokaBackend {
     pub cache: Cache<CacheKey, CacheValue<Raw>>,
+    pub key_format: CacheKeyFormat,
+    pub value_format: Format,
 }
 
 impl MokaBackend {
@@ -59,5 +62,13 @@ impl Backend for MokaBackend {
             Some(_) => Ok(DeleteStatus::Deleted(1)),
             None => Ok(DeleteStatus::Missing),
         }
+    }
+
+    fn value_format(&self) -> &Format {
+        &self.value_format
+    }
+
+    fn key_format(&self) -> &CacheKeyFormat {
+        &self.key_format
     }
 }

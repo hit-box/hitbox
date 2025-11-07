@@ -58,12 +58,12 @@ fn main() {
 
     // Scenario 4: Maximum Efficiency Configuration
     // - Bitcode keys for minimal memory
-    // - Bencode values for compact storage
-    println!("⚡ Scenario 4: Maximum Efficiency (Bitcode keys + Bencode values)");
+    // - Bincode values for compact storage
+    println!("⚡ Scenario 4: Maximum Efficiency (Bitcode keys + Bincode values)");
     let efficient_backend = RedisBackend::builder()
         .server("redis://127.0.0.1:6379/3".to_string())
         .key_format(CacheKeyFormat::Bitcode) // Most compact keys
-        .value_format(Format::Bencode) // Compact values
+        .value_format(Format::Bincode) // Compact values
         .build()
         .expect("Failed to create efficient backend");
 

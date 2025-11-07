@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use hitbox_backend::{CacheBackend, DeleteStatus};
+use hitbox_backend::{Backend, CacheBackend, CacheKeyFormat, DeleteStatus};
+use hitbox_backend::serializer::Format;
 use hitbox_core::{
     CacheKey, CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, ResponseCachePolicy,
 };
@@ -255,4 +256,186 @@ async fn test_binary_data<B: CacheBackend>(backend: &B) {
         cached.data.data, binary_data,
         "binary data should match exactly"
     );
+}
+
+/// Test UrlEncoded key + JSON value format
+pub async fn test_url_encoded_key_json_value<B: Backend + CacheBackend>(backend: &B) {
+    // Verify backend format configuration
+    assert_eq!(
+        backend.key_format(),
+        &CacheKeyFormat::UrlEncoded,
+        "backend should use UrlEncoded key format"
+    );
+    assert_eq!(
+        backend.value_format(),
+        &Format::Json,
+        "backend should use Json value format"
+    );
+
+    let key = CacheKey::from_str("format-test", "url-json");
+    let response = TestResponse::new(100, "url-json-test", vec![1, 2, 3]);
+    let value = CacheValue::new(response.clone(), None, None);
+
+    // Write and read
+    backend
+        .set::<TestResponse>(&key, &value, Some(Duration::from_secs(3600)))
+        .await
+        .expect("failed to write");
+
+    // Read raw to verify format
+    let raw_value = backend
+        .read(&key)
+        .await
+        .expect("failed to read raw")
+        .expect("value should exist");
+
+    // Verify it's valid JSON
+    let as_string = String::from_utf8(raw_value.data.clone())
+        .expect("Value should be valid UTF-8 JSON");
+    assert!(
+        as_string.contains("\"id\"") || as_string.contains("id"),
+        "Value should contain JSON fields"
+    );
+
+    // Verify can deserialize
+    let result: Option<CacheValue<TestResponse>> = backend
+        .get::<TestResponse>(&key)
+        .await
+        .expect("failed to deserialize");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().data, response);
+}
+
+/// Test UrlEncoded key + Bincode value format
+pub async fn test_url_encoded_key_bincode_value<B: Backend + CacheBackend>(backend: &B) {
+    assert_eq!(
+        backend.key_format(),
+        &CacheKeyFormat::UrlEncoded,
+        "backend should use UrlEncoded key format"
+    );
+    assert_eq!(
+        backend.value_format(),
+        &Format::Bincode,
+        "backend should use Bincode value format"
+    );
+
+    let key = CacheKey::from_str("format-test", "url-bincode");
+    let response = TestResponse::new(101, "url-bincode-test", vec![4, 5, 6]);
+    let value = CacheValue::new(response.clone(), None, None);
+
+    backend
+        .set::<TestResponse>(&key, &value, Some(Duration::from_secs(3600)))
+        .await
+        .expect("failed to write");
+
+    // Read raw to verify format
+    let raw_value = backend
+        .read(&key)
+        .await
+        .expect("failed to read raw")
+        .expect("value should exist");
+
+    // Verify it's NOT readable JSON (binary format)
+    let as_string = String::from_utf8(raw_value.data.clone());
+    assert!(
+        as_string.is_err() || !as_string.unwrap().contains("\"id\""),
+        "Value should be in Bincode format (binary), not JSON"
+    );
+
+    // Verify can deserialize
+    let result: Option<CacheValue<TestResponse>> = backend
+        .get::<TestResponse>(&key)
+        .await
+        .expect("failed to deserialize");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().data, response);
+}
+
+/// Test Bitcode key + JSON value format
+pub async fn test_bitcode_key_json_value<B: Backend + CacheBackend>(backend: &B) {
+    assert_eq!(
+        backend.key_format(),
+        &CacheKeyFormat::Bitcode,
+        "backend should use Bitcode key format"
+    );
+    assert_eq!(
+        backend.value_format(),
+        &Format::Json,
+        "backend should use Json value format"
+    );
+
+    let key = CacheKey::from_str("format-test", "bitcode-json");
+    let response = TestResponse::new(102, "bitcode-json-test", vec![7, 8, 9]);
+    let value = CacheValue::new(response.clone(), None, None);
+
+    backend
+        .set::<TestResponse>(&key, &value, Some(Duration::from_secs(3600)))
+        .await
+        .expect("failed to write");
+
+    // Read raw to verify value format
+    let raw_value = backend
+        .read(&key)
+        .await
+        .expect("failed to read raw")
+        .expect("value should exist");
+
+    // Verify value is JSON
+    let as_string = String::from_utf8(raw_value.data.clone())
+        .expect("Value should be valid UTF-8 JSON");
+    assert!(
+        as_string.contains("\"id\"") || as_string.contains("id"),
+        "Value should be in JSON format"
+    );
+
+    let result: Option<CacheValue<TestResponse>> = backend
+        .get::<TestResponse>(&key)
+        .await
+        .expect("failed to deserialize");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().data, response);
+}
+
+/// Test Bitcode key + Bincode value format
+pub async fn test_bitcode_key_bincode_value<B: Backend + CacheBackend>(backend: &B) {
+    assert_eq!(
+        backend.key_format(),
+        &CacheKeyFormat::Bitcode,
+        "backend should use Bitcode key format"
+    );
+    assert_eq!(
+        backend.value_format(),
+        &Format::Bincode,
+        "backend should use Bincode value format"
+    );
+
+    let key = CacheKey::from_str("format-test", "bitcode-bincode");
+    let response = TestResponse::new(103, "bitcode-bincode-test", vec![10, 11, 12]);
+    let value = CacheValue::new(response.clone(), None, None);
+
+    backend
+        .set::<TestResponse>(&key, &value, Some(Duration::from_secs(3600)))
+        .await
+        .expect("failed to write");
+
+    // Read raw to verify value format
+    let raw_value = backend
+        .read(&key)
+        .await
+        .expect("failed to read raw")
+        .expect("value should exist");
+
+    // Verify value is binary Bincode
+    let as_string = String::from_utf8(raw_value.data.clone());
+    assert!(
+        as_string.is_err() || !as_string.unwrap().contains("\"id\""),
+        "Value should be in Bincode format (binary), not JSON"
+    );
+
+    let result: Option<CacheValue<TestResponse>> = backend
+        .get::<TestResponse>(&key)
+        .await
+        .expect("failed to deserialize");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().data, response);
 }

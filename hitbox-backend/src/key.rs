@@ -26,7 +26,7 @@ impl KeySerializer for UrlEncodedKeySerializer<String> {
     }
 }
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CacheKeyFormat {
     /// Bitcode format (most compact binary)
     #[default]

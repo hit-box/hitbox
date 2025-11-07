@@ -30,6 +30,10 @@ pub enum ConfigError {
         #[source]
         error: regex::Error,
     },
+
+    /// Backend not available (feature not enabled)
+    #[error("Backend '{0}' is not available. Enable the corresponding feature flag.")]
+    BackendNotAvailable(String),
 }
 
 impl From<http::method::InvalidMethod> for ConfigError {

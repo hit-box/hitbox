@@ -41,12 +41,11 @@ impl Serializer for Json {
     }
 }
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {
     #[default]
     Json,
-    FlexBuffers,
-    Bencode,
+    Bincode,
 }
 
 impl Format {
@@ -57,8 +56,10 @@ impl Format {
         match self {
             Format::Json => serde_json::to_vec(value)
                 .map_err(|error| SerializerError::Serialize(Box::new(error))),
-            Format::FlexBuffers => unimplemented!(),
-            Format::Bencode => unimplemented!(),
+            Format::Bincode => {
+                bincode::serde::encode_to_vec(value, bincode::config::standard())
+                    .map_err(|error| SerializerError::Serialize(Box::new(error)))
+            }
         }
     }
 
@@ -69,8 +70,11 @@ impl Format {
         match self {
             Format::Json => serde_json::from_slice(value.as_slice())
                 .map_err(|error| SerializerError::Deserialize(Box::new(error))),
-            Format::FlexBuffers => todo!(),
-            Format::Bencode => todo!(),
+            Format::Bincode => {
+                bincode::serde::decode_from_slice(value.as_slice(), bincode::config::standard())
+                    .map(|(result, _)| result)
+                    .map_err(|error| SerializerError::Deserialize(Box::new(error)))
+            }
         }
     }
 }

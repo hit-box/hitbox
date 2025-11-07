@@ -8,6 +8,10 @@ rust-version.workspace = true
 hitbox = { path = "../hitbox/" }
 hitbox-core = { path = "../hitbox-core/" }
 hitbox-http = { path = "../hitbox-http/" }
+hitbox-backend = { path = "../hitbox-backend/" }
+hitbox-moka = { path = "../hitbox-moka/", optional = true }
+hitbox-feoxdb = { path = "../hitbox-feoxdb/", optional = true }
+hitbox-redis = { path = "../hitbox-redis/", optional = true }
 http = { workspace = true }
 hyper = { workspace = true }
 async-trait = { workspace = true }
@@ -17,6 +21,12 @@ serde-saphyr = { workspace = true }
 indexmap = { version = "2.10", features = ["serde"] }
 thiserror = { workspace = true }
 regex = { workspace = true }
+
+[features]
+default = []
+moka = ["hitbox-moka"]
+feoxdb = ["hitbox-feoxdb"]
+redis = ["hitbox-redis"]
 
 
 [dev-dependencies]
