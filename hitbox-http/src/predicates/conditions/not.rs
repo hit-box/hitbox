@@ -22,10 +22,10 @@ where
 {
     type Subject = CacheableHttpRequest<ReqBody>;
 
-    async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.predicate.check(request).await {
-            PredicateResult::Cacheable(request) => PredicateResult::NonCacheable(request),
-            PredicateResult::NonCacheable(request) => PredicateResult::Cacheable(request),
+    async fn check(&self, request: Self::Subject) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
+        match self.predicate.check(request).await? {
+            PredicateResult::Cacheable(request) => Ok(PredicateResult::NonCacheable(request)),
+            PredicateResult::NonCacheable(request) => Ok(PredicateResult::Cacheable(request)),
         }
     }
 }

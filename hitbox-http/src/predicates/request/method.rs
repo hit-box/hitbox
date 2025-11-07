@@ -57,20 +57,20 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.inner.check(request).await {
+    async fn check(&self, request: Self::Subject) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
+        match self.inner.check(request).await? {
             PredicateResult::Cacheable(request) => {
                 let is_cacheable = match &self.operation {
                     Operation::Eq(method) => *method == request.parts().method,
                     Operation::In(methods) => methods.contains(&request.parts().method),
                 };
                 if is_cacheable {
-                    PredicateResult::Cacheable(request)
+                    Ok(PredicateResult::Cacheable(request))
                 } else {
-                    PredicateResult::NonCacheable(request)
+                    Ok(PredicateResult::NonCacheable(request))
                 }
             }
-            PredicateResult::NonCacheable(request) => PredicateResult::NonCacheable(request),
+            PredicateResult::NonCacheable(request) => Ok(PredicateResult::NonCacheable(request)),
         }
     }
 }

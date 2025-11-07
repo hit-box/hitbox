@@ -25,17 +25,17 @@ where
 {
     type Subject = Subject;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        let inner_result = self.inner.check(subject).await;
+    async fn check(&self, subject: Self::Subject) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
+        let inner_result = self.inner.check(subject).await?;
         match inner_result {
             PredicateResult::Cacheable(subject) => {
-                let left = self.left.check(subject).await;
+                let left = self.left.check(subject).await?;
                 match left {
-                    PredicateResult::Cacheable(request) => PredicateResult::Cacheable(request),
+                    PredicateResult::Cacheable(request) => Ok(PredicateResult::Cacheable(request)),
                     PredicateResult::NonCacheable(request) => self.right.check(request).await,
                 }
             }
-            PredicateResult::NonCacheable(_) => inner_result,
+            PredicateResult::NonCacheable(_) => Ok(inner_result),
         }
     }
 }

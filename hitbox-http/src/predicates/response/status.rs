@@ -116,16 +116,16 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, response: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.inner.check(response).await {
+    async fn check(&self, response: Self::Subject) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
+        match self.inner.check(response).await? {
             PredicateResult::Cacheable(response) => {
                 if self.operation.matches(response.parts.status) {
-                    PredicateResult::Cacheable(response)
+                    Ok(PredicateResult::Cacheable(response))
                 } else {
-                    PredicateResult::NonCacheable(response)
+                    Ok(PredicateResult::NonCacheable(response))
                 }
             }
-            PredicateResult::NonCacheable(response) => PredicateResult::NonCacheable(response),
+            PredicateResult::NonCacheable(response) => Ok(PredicateResult::NonCacheable(response)),
         }
     }
 }

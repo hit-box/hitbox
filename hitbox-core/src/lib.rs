@@ -10,7 +10,7 @@ mod value;
 pub use extractor::Extractor;
 pub use key::{CacheKey, KeyPart, KeyParts};
 pub use policy::{CachePolicy, EntityPolicyConfig};
-pub use predicate::{Predicate, PredicateResult};
+pub use predicate::{Predicate, PredicateError, PredicateResult};
 pub use request::{CacheablePolicyData, CacheableRequest, RequestCachePolicy};
 pub use response::{CacheState, CacheableResponse, ResponseCachePolicy};
 pub use time_provider::TimeProvider;
