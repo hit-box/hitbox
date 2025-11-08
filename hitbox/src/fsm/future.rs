@@ -375,8 +375,9 @@ where
                             match policy {
                                 CachePolicy::Cacheable(cache_value) => {
                                     let update_cache_future = Box::pin(async move {
-                                        let update_cache_result =
-                                            backend.set::<Res>(&cache_key, &cache_value, None).await;
+                                        let update_cache_result = backend
+                                            .set::<Res>(&cache_key, &cache_value, None)
+                                            .await;
                                         let upstream_result =
                                             Res::from_cached(cache_value.into_inner()).await;
                                         (update_cache_result, upstream_result)

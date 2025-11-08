@@ -39,7 +39,10 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, request: Self::Subject) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
+    async fn check(
+        &self,
+        request: Self::Subject,
+    ) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
         match self.inner.check(request).await? {
             PredicateResult::Cacheable(request) => {
                 if self.resource.is_match(request.parts().uri.path()) {

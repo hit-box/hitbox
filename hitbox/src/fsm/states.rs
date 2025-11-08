@@ -10,8 +10,10 @@ use crate::{CacheState, CacheValue, CacheableResponse};
 pub type CacheResult<T> = Result<Option<CacheValue<T>>, BackendError>;
 pub type PollCacheFuture<T> = BoxFuture<'static, CacheResult<T>>;
 pub type UpdateCache<T> = BoxFuture<'static, (Result<(), BackendError>, T)>;
-pub type RequestCachePolicyFuture<T> = BoxFuture<'static, Result<RequestCachePolicy<T>, hitbox_core::PredicateError>>;
-pub type ResponseCachePolicyFuture<T> = BoxFuture<'static, Result<ResponseCachePolicy<T>, hitbox_core::PredicateError>>;
+pub type RequestCachePolicyFuture<T> =
+    BoxFuture<'static, Result<RequestCachePolicy<T>, hitbox_core::PredicateError>>;
+pub type ResponseCachePolicyFuture<T> =
+    BoxFuture<'static, Result<ResponseCachePolicy<T>, hitbox_core::PredicateError>>;
 pub type CacheStateFuture<T> = BoxFuture<'static, CacheState<T>>;
 pub type UpstreamFuture<T> = BoxFuture<'static, T>;
 

@@ -42,7 +42,11 @@ impl<ReqBody> CacheableRequest for CacheableHttpRequest<ReqBody>
 where
     ReqBody: Send + 'static,
 {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> Result<RequestCachePolicy<Self>, hitbox::PredicateError>
+    async fn cache_policy<P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Result<RequestCachePolicy<Self>, hitbox::PredicateError>
     where
         P: Predicate<Subject = Self> + Send + Sync,
         E: Extractor<Subject = Self> + Send + Sync,

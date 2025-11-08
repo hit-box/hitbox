@@ -41,7 +41,11 @@ impl CacheableResponse for TestResponse {
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
     {
         // Always cacheable for testing
-        Ok(CachePolicy::Cacheable(CacheValue::new(self.clone(), None, None)))
+        Ok(CachePolicy::Cacheable(CacheValue::new(
+            self.clone(),
+            None,
+            None,
+        )))
     }
 
     async fn into_cached(self) -> CachePolicy<Self::Cached, Self> {

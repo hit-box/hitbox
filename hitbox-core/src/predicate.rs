@@ -23,7 +23,10 @@ pub enum PredicateError {
 #[async_trait]
 pub trait Predicate: Debug {
     type Subject;
-    async fn check(&self, subject: Self::Subject) -> Result<PredicateResult<Self::Subject>, PredicateError>;
+    async fn check(
+        &self,
+        subject: Self::Subject,
+    ) -> Result<PredicateResult<Self::Subject>, PredicateError>;
 }
 
 #[async_trait]
@@ -34,7 +37,10 @@ where
 {
     type Subject = T::Subject;
 
-    async fn check(&self, subject: T::Subject) -> Result<PredicateResult<T::Subject>, PredicateError> {
+    async fn check(
+        &self,
+        subject: T::Subject,
+    ) -> Result<PredicateResult<T::Subject>, PredicateError> {
         self.as_ref().check(subject).await
     }
 }
@@ -47,7 +53,10 @@ where
 {
     type Subject = T::Subject;
 
-    async fn check(&self, subject: T::Subject) -> Result<PredicateResult<T::Subject>, PredicateError> {
+    async fn check(
+        &self,
+        subject: T::Subject,
+    ) -> Result<PredicateResult<T::Subject>, PredicateError> {
         (*self).check(subject).await
     }
 }
@@ -60,7 +69,10 @@ where
 {
     type Subject = T::Subject;
 
-    async fn check(&self, subject: T::Subject) -> Result<PredicateResult<T::Subject>, PredicateError> {
+    async fn check(
+        &self,
+        subject: T::Subject,
+    ) -> Result<PredicateResult<T::Subject>, PredicateError> {
         self.as_ref().check(subject).await
     }
 }

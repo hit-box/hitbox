@@ -45,7 +45,10 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, request: Self::Subject) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
+    async fn check(
+        &self,
+        request: Self::Subject,
+    ) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
         match self.inner.check(request).await? {
             PredicateResult::Cacheable(request) => {
                 let is_cacheable = match request.parts().uri.query().map(crate::query::parse) {

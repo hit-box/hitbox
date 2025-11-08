@@ -116,7 +116,10 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, message: Self::Subject) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
+    async fn check(
+        &self,
+        message: Self::Subject,
+    ) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
         use http_body_util::BodyExt;
 
         match self.inner.check(message).await? {

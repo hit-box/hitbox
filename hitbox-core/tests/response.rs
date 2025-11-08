@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use hitbox_core::{
-    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, Predicate, PredicateError, PredicateResult,
+    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, Predicate, PredicateError,
+    PredicateResult,
 };
 
 #[derive(Clone, Debug)]
@@ -36,9 +37,11 @@ impl CacheableResponse for TestResponse {
     {
         match predicates.check(self).await? {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                CachePolicy::Cacheable(res) => {
-                    Ok(CachePolicy::Cacheable(CacheValue::new(res, Some(Utc::now()), Some(Utc::now()))))
-                }
+                CachePolicy::Cacheable(res) => Ok(CachePolicy::Cacheable(CacheValue::new(
+                    res,
+                    Some(Utc::now()),
+                    Some(Utc::now()),
+                ))),
                 CachePolicy::NonCacheable(res) => Ok(CachePolicy::NonCacheable(res)),
             },
             PredicateResult::NonCacheable(res) => Ok(CachePolicy::NonCacheable(res)),
@@ -66,7 +69,10 @@ impl NeuralPredicate {
 impl Predicate for NeuralPredicate {
     type Subject = TestResponse;
 
-    async fn check(&self, subject: Self::Subject) -> Result<PredicateResult<Self::Subject>, PredicateError> {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+    ) -> Result<PredicateResult<Self::Subject>, PredicateError> {
         Ok(PredicateResult::Cacheable(subject))
     }
 }
