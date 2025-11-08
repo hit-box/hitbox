@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use hitbox_core::{
-    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, Predicate, PredicateResult,
+    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, Predicate, PredicateError,
+    PredicateResult,
 };
 
 #[derive(Clone, Debug)]
@@ -30,18 +31,20 @@ impl CacheableResponse for TestResponse {
         self,
         predicates: P,
         _config: &EntityPolicyConfig,
-    ) -> hitbox_core::ResponseCachePolicy<Self>
+    ) -> Result<hitbox_core::ResponseCachePolicy<Self>, PredicateError>
     where
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        match predicates.check(self).await {
+        match predicates.check(self).await? {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                CachePolicy::Cacheable(res) => {
-                    CachePolicy::Cacheable(CacheValue::new(res, Some(Utc::now()), Some(Utc::now())))
-                }
-                CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
+                CachePolicy::Cacheable(res) => Ok(CachePolicy::Cacheable(CacheValue::new(
+                    res,
+                    Some(Utc::now()),
+                    Some(Utc::now()),
+                ))),
+                CachePolicy::NonCacheable(res) => Ok(CachePolicy::NonCacheable(res)),
             },
-            PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
+            PredicateResult::NonCacheable(res) => Ok(CachePolicy::NonCacheable(res)),
         }
     }
 
@@ -66,8 +69,11 @@ impl NeuralPredicate {
 impl Predicate for NeuralPredicate {
     type Subject = TestResponse;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        PredicateResult::Cacheable(subject)
+    async fn check(
+        &self,
+        subject: Self::Subject,
+    ) -> Result<PredicateResult<Self::Subject>, PredicateError> {
+        Ok(PredicateResult::Cacheable(subject))
     }
 }
 
@@ -76,12 +82,14 @@ async fn test_cacheable_result() {
     let response: Result<TestResponse, ()> = Ok(TestResponse::new());
     let policy = response
         .cache_policy(NeuralPredicate::new(), &EntityPolicyConfig::default())
-        .await;
+        .await
+        .unwrap();
     dbg!(&policy);
 
     let response: Result<TestResponse, ()> = Err(());
     let policy = response
         .cache_policy(NeuralPredicate::new(), &EntityPolicyConfig::default())
-        .await;
+        .await
+        .unwrap();
     dbg!(&policy);
 }

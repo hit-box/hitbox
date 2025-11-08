@@ -116,13 +116,24 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, message: Self::Subject) -> PredicateResult<Self::Subject> {
+    async fn check(
+        &self,
+        message: Self::Subject,
+    ) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
         use http_body_util::BodyExt;
 
-        match self.inner.check(message).await {
+        match self.inner.check(message).await? {
             PredicateResult::Cacheable(message) => {
                 let (parts, body) = message.into_parts_and_body();
-                let payload = body.collect().await.unwrap().to_bytes();
+                let payload = match body.collect().await {
+                    Ok(collected) => collected.to_bytes(),
+                    Err(e) => {
+                        // Convert error to string since body error types don't always implement std::error::Error
+                        let error_msg = format!("Failed to collect HTTP body: {:?}", e);
+                        let io_error = std::io::Error::new(std::io::ErrorKind::Other, error_msg);
+                        return Err(hitbox::PredicateError::Internal(Box::new(io_error)));
+                    }
+                };
                 let body_str = String::from_utf8_lossy(&payload);
 
                 let json_value = match &self.parsing_type {
@@ -153,12 +164,12 @@ where
 
                 let message = M::from_parts_and_body(parts, M::Body::from_bytes(payload));
                 if is_cacheable {
-                    PredicateResult::Cacheable(message)
+                    Ok(PredicateResult::Cacheable(message))
                 } else {
-                    PredicateResult::NonCacheable(message)
+                    Ok(PredicateResult::NonCacheable(message))
                 }
             }
-            PredicateResult::NonCacheable(message) => PredicateResult::NonCacheable(message),
+            PredicateResult::NonCacheable(message) => Ok(PredicateResult::NonCacheable(message)),
         }
     }
 }

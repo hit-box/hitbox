@@ -42,7 +42,11 @@ impl<ReqBody> CacheableRequest for CacheableHttpRequest<ReqBody>
 where
     ReqBody: Send + 'static,
 {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    async fn cache_policy<P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Result<RequestCachePolicy<Self>, hitbox::PredicateError>
     where
         P: Predicate<Subject = Self> + Send + Sync,
         E: Extractor<Subject = Self> + Send + Sync,
@@ -50,11 +54,11 @@ where
         //dbg!("CacheableHttpRequest::cache_policy");
         let (request, key) = extractors.get(self).await.into_cache_key();
 
-        match predicates.check(request).await {
+        match predicates.check(request).await? {
             PredicateResult::Cacheable(request) => {
-                CachePolicy::Cacheable(CacheablePolicyData { key, request })
+                Ok(CachePolicy::Cacheable(CacheablePolicyData { key, request }))
             }
-            PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),
+            PredicateResult::NonCacheable(request) => Ok(CachePolicy::NonCacheable(request)),
         }
     }
 }

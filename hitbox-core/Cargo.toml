@@ -20,6 +20,7 @@ async-trait = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 serde = { workspace = true }
 bitcode = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
 
 [features]
 default = []

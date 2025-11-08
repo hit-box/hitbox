@@ -57,7 +57,7 @@ async fn test_expression_into_predicates() {
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
-    assert!(matches!(cacheable, PredicateResult::NonCacheable(_)));
+    assert!(matches!(cacheable, Ok(PredicateResult::NonCacheable(_))));
 }
 
 #[test]
@@ -132,7 +132,7 @@ async fn test_or_with_matching_first_predicate() {
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
-    assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
+    assert!(matches!(cacheable, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -154,7 +154,7 @@ async fn test_or_with_matching_middle_predicate() {
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
-    assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
+    assert!(matches!(cacheable, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -176,7 +176,7 @@ async fn test_or_with_matching_last_predicate() {
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
-    assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
+    assert!(matches!(cacheable, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -198,7 +198,7 @@ async fn test_or_with_no_matching_predicates() {
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
-    assert!(matches!(cacheable, PredicateResult::NonCacheable(_)));
+    assert!(matches!(cacheable, Ok(PredicateResult::NonCacheable(_))));
 }
 
 #[tokio::test]
@@ -216,7 +216,7 @@ async fn test_or_with_single_predicate_matching() {
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
-    assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
+    assert!(matches!(cacheable, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -234,7 +234,7 @@ async fn test_or_with_single_predicate_not_matching() {
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
-    assert!(matches!(cacheable, PredicateResult::NonCacheable(_)));
+    assert!(matches!(cacheable, Ok(PredicateResult::NonCacheable(_))));
 }
 
 #[tokio::test]
@@ -255,7 +255,7 @@ async fn test_or_with_mixed_predicate_types() {
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
-    assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
+    assert!(matches!(cacheable, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[test]

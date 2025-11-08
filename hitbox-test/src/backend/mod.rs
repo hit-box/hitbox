@@ -36,12 +36,16 @@ impl CacheableResponse for TestResponse {
         self,
         _predicates: P,
         _config: &EntityPolicyConfig,
-    ) -> ResponseCachePolicy<Self>
+    ) -> Result<ResponseCachePolicy<Self>, hitbox_core::PredicateError>
     where
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
     {
         // Always cacheable for testing
-        CachePolicy::Cacheable(CacheValue::new(self.clone(), None, None))
+        Ok(CachePolicy::Cacheable(CacheValue::new(
+            self.clone(),
+            None,
+            None,
+        )))
     }
 
     async fn into_cached(self) -> CachePolicy<Self::Cached, Self> {

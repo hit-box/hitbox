@@ -49,7 +49,7 @@ pub mod metrics;
 pub use error::CacheError;
 pub use hitbox_core::{
     CacheKey, CachePolicy, CacheState, CacheValue, CacheablePolicyData, CacheableRequest,
-    CacheableResponse, EntityPolicyConfig, Extractor, KeyPart, KeyParts, Predicate,
+    CacheableResponse, EntityPolicyConfig, Extractor, KeyPart, KeyParts, Predicate, PredicateError,
     RequestCachePolicy, ResponseCachePolicy,
 };
 
@@ -62,7 +62,7 @@ pub mod config;
 pub mod policy;
 
 pub mod predicate {
-    pub use hitbox_core::{Predicate, PredicateResult};
+    pub use hitbox_core::{Predicate, PredicateError, PredicateResult};
 }
 
 pub mod extractor {

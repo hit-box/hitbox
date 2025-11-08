@@ -83,20 +83,20 @@ where
         self,
         predicates: P,
         config: &EntityPolicyConfig,
-    ) -> hitbox::ResponseCachePolicy<Self>
+    ) -> Result<hitbox::ResponseCachePolicy<Self>, hitbox::PredicateError>
     where
         P: hitbox::Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        match predicates.check(self).await {
+        match predicates.check(self).await? {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
+                CachePolicy::Cacheable(res) => Ok(CachePolicy::Cacheable(CacheValue::new(
                     res,
                     config.ttl.map(|duration| Utc::now() + duration),
                     config.stale_ttl.map(|duration| Utc::now() + duration),
-                )),
-                CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
+                ))),
+                CachePolicy::NonCacheable(res) => Ok(CachePolicy::NonCacheable(res)),
             },
-            PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
+            PredicateResult::NonCacheable(res) => Ok(CachePolicy::NonCacheable(res)),
         }
     }
 

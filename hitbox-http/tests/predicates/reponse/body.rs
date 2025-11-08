@@ -27,7 +27,7 @@ mod eq_tests {
         );
 
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
     }
 
     #[tokio::test]
@@ -44,7 +44,7 @@ mod eq_tests {
         );
 
         let prediction = predicate.check(response).await;
-        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
     }
 
     #[tokio::test]
@@ -61,7 +61,7 @@ mod eq_tests {
         );
 
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
     }
 }
 
@@ -84,7 +84,7 @@ mod exist_tests {
         );
 
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
     }
 
     #[tokio::test]
@@ -101,7 +101,7 @@ mod exist_tests {
         );
 
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
     }
 }
 
@@ -125,7 +125,7 @@ mod in_tests {
         );
 
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
     }
 
     #[tokio::test]
@@ -143,7 +143,7 @@ mod in_tests {
         );
 
         let prediction = predicate.check(request).await;
-        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+        assert!(matches!(prediction, Ok(PredicateResult::NonCacheable(_))));
     }
 }
 
@@ -160,7 +160,7 @@ async fn test_request_body_predicates_positive_basic() {
     );
 
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -180,7 +180,7 @@ async fn test_request_body_predicates_positive_array() {
     );
 
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
 }
 
 #[tokio::test]
@@ -201,5 +201,5 @@ async fn test_request_body_predicates_positive_multiple_value() {
     );
 
     let prediction = predicate.check(request).await;
-    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    assert!(matches!(prediction, Ok(PredicateResult::Cacheable(_))));
 }

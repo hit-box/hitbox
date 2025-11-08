@@ -5,7 +5,7 @@ use chrono::Utc;
 
 use crate::{
     CachePolicy, EntityPolicyConfig,
-    predicate::{Predicate, PredicateResult},
+    predicate::{Predicate, PredicateError, PredicateResult},
     value::CacheValue,
 };
 
@@ -41,7 +41,7 @@ where
         self,
         predicates: P,
         config: &EntityPolicyConfig,
-    ) -> ResponseCachePolicy<Self>
+    ) -> Result<ResponseCachePolicy<Self>, PredicateError>
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync;
 
@@ -64,23 +64,23 @@ where
         self,
         predicates: P,
         config: &EntityPolicyConfig,
-    ) -> ResponseCachePolicy<Self>
+    ) -> Result<ResponseCachePolicy<Self>, PredicateError>
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
     {
         match self {
-            Ok(response) => match predicates.check(response).await {
+            Ok(response) => match predicates.check(response).await? {
                 PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                    CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
+                    CachePolicy::Cacheable(res) => Ok(CachePolicy::Cacheable(CacheValue::new(
                         res,
                         config.ttl.map(|duration| Utc::now() + duration),
                         config.stale_ttl.map(|duration| Utc::now() + duration),
-                    )),
-                    CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
+                    ))),
+                    CachePolicy::NonCacheable(res) => Ok(CachePolicy::NonCacheable(Ok(res))),
                 },
-                PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
+                PredicateResult::NonCacheable(res) => Ok(CachePolicy::NonCacheable(Ok(res))),
             },
-            Err(error) => ResponseCachePolicy::NonCacheable(Err(error)),
+            Err(error) => Ok(ResponseCachePolicy::NonCacheable(Err(error))),
         }
     }
 

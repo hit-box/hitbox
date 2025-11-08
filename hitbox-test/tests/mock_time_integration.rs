@@ -28,16 +28,16 @@ impl hitbox_core::CacheableResponse for TestResponse {
         self,
         _predicates: P,
         config: &hitbox_core::EntityPolicyConfig,
-    ) -> hitbox_core::ResponseCachePolicy<Self>
+    ) -> Result<hitbox_core::ResponseCachePolicy<Self>, hitbox_core::PredicateError>
     where
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
     {
         let cached = self.data.clone();
-        hitbox_core::CachePolicy::Cacheable(CacheValue::new(
+        Ok(hitbox_core::CachePolicy::Cacheable(CacheValue::new(
             cached,
             config.ttl.map(|d| Utc::now() + d),
             config.stale_ttl.map(|d| Utc::now() + d),
-        ))
+        )))
     }
 
     async fn into_cached(self) -> hitbox_core::CachePolicy<Self::Cached, Self> {

@@ -35,8 +35,11 @@ where
 {
     type Subject = CacheableHttpRequest<ReqBody>;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        PredicateResult::Cacheable(subject)
+    async fn check(
+        &self,
+        subject: Self::Subject,
+    ) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
+        Ok(PredicateResult::Cacheable(subject))
     }
 }
 
@@ -72,8 +75,11 @@ where
 {
     type Subject = CacheableHttpResponse<ResBody>;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        PredicateResult::Cacheable(subject)
+    async fn check(
+        &self,
+        subject: Self::Subject,
+    ) -> Result<PredicateResult<Self::Subject>, hitbox::PredicateError> {
+        Ok(PredicateResult::Cacheable(subject))
     }
 }
 

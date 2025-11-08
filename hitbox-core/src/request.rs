@@ -1,6 +1,10 @@
 use async_trait::async_trait;
 
-use crate::{CacheKey, CachePolicy, extractor::Extractor, predicate::Predicate};
+use crate::{
+    CacheKey, CachePolicy,
+    extractor::Extractor,
+    predicate::{Predicate, PredicateError},
+};
 
 pub struct CacheablePolicyData<T> {
     pub key: CacheKey,
@@ -20,7 +24,11 @@ pub trait CacheableRequest
 where
     Self: Sized,
 {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    async fn cache_policy<P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Result<RequestCachePolicy<Self>, PredicateError>
     where
         P: Predicate<Subject = Self> + Send + Sync,
         E: Extractor<Subject = Self> + Send + Sync;
