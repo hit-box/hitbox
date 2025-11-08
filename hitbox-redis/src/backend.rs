@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::{
-    Backend, BackendError, BackendResult, CacheKeyFormat, DeleteStatus,
+    Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor,
     serializer::{Format, Raw},
 };
 use redis::{Client, aio::ConnectionManager};
@@ -19,14 +19,15 @@ use tracing::trace;
 /// [MultiplexedConnection]: redis::aio::MultiplexedConnection
 /// [Backend]: hitbox_backend::Backend
 #[derive(Clone)]
-pub struct RedisBackend {
+pub struct RedisBackend<C: Compressor = PassthroughCompressor> {
     client: Client,
     connection: OnceCell<ConnectionManager>,
     format: Format,
     key_format: CacheKeyFormat,
+    compressor: C,
 }
 
-impl RedisBackend {
+impl RedisBackend<PassthroughCompressor> {
     /// Create new backend instance with default settings.
     ///
     /// # Examples
@@ -38,15 +39,17 @@ impl RedisBackend {
     ///     let backend = RedisBackend::new();
     /// }
     /// ```
-    pub fn new() -> Result<RedisBackend, BackendError> {
+    pub fn new() -> Result<Self, BackendError> {
         Ok(Self::builder().build()?)
     }
 
     /// Creates new RedisBackend builder with default settings.
-    pub fn builder() -> RedisBackendBuilder {
+    pub fn builder() -> RedisBackendBuilder<PassthroughCompressor> {
         RedisBackendBuilder::default()
     }
+}
 
+impl<C: Compressor> RedisBackend<C> {
     /// Create lazy connection to redis via [ConnectionManager](redis::aio::ConnectionManager)
     pub async fn connection(&self) -> Result<&ConnectionManager, BackendError> {
         trace!("Get connection manager");
@@ -63,23 +66,25 @@ impl RedisBackend {
 }
 
 /// Part of builder pattern implementation for RedisBackend actor.
-pub struct RedisBackendBuilder {
+pub struct RedisBackendBuilder<C: Compressor = PassthroughCompressor> {
     connection_info: String,
     format: Format,
     key_format: CacheKeyFormat,
+    compressor: C,
 }
 
-impl Default for RedisBackendBuilder {
+impl Default for RedisBackendBuilder<PassthroughCompressor> {
     fn default() -> Self {
         Self {
             connection_info: "redis://127.0.0.1/".to_owned(),
             format: Format::default(),
             key_format: CacheKeyFormat::default(),
+            compressor: PassthroughCompressor,
         }
     }
 }
 
-impl RedisBackendBuilder {
+impl<C: Compressor> RedisBackendBuilder<C> {
     /// Set connection info (host, port, database, etc.) for RedisBackend actor.
     pub fn server(mut self, connection_info: String) -> Self {
         self.connection_info = connection_info;
@@ -98,19 +103,30 @@ impl RedisBackendBuilder {
         self
     }
 
+    /// Set compressor for value compression
+    pub fn compressor<NewC: Compressor>(self, compressor: NewC) -> RedisBackendBuilder<NewC> {
+        RedisBackendBuilder {
+            connection_info: self.connection_info,
+            format: self.format,
+            key_format: self.key_format,
+            compressor,
+        }
+    }
+
     /// Create new instance of Redis backend with passed settings.
-    pub fn build(self) -> Result<RedisBackend, Error> {
+    pub fn build(self) -> Result<RedisBackend<C>, Error> {
         Ok(RedisBackend {
             client: Client::open(self.connection_info)?,
             connection: OnceCell::new(),
             format: self.format,
             key_format: self.key_format,
+            compressor: self.compressor,
         })
     }
 }
 
 #[async_trait]
-impl Backend for RedisBackend {
+impl<C: Compressor + Send + Sync> Backend for RedisBackend<C> {
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         let client = self.client.clone();
         let cache_key = self.key_format.serialize(key)?;
@@ -168,6 +184,10 @@ impl Backend for RedisBackend {
 
     fn key_format(&self) -> &CacheKeyFormat {
         &self.key_format
+    }
+
+    fn compressor(&self) -> &dyn Compressor {
+        &self.compressor
     }
 
     // async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {

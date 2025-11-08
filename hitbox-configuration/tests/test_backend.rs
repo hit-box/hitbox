@@ -12,7 +12,9 @@ key:
   format: Bitcode
 value:
   format: Json
-  compression: Zstd
+  compression:
+    type: Zstd
+    level: 3
 "#;
 
     let backend: Backend = serde_saphyr::from_str(yaml).expect("failed to deserialize");
@@ -22,7 +24,7 @@ value:
             assert_eq!(config.backend.max_capacity, 10000);
             assert_eq!(config.key.format, KeySerialization::Bitcode);
             assert_eq!(config.value.format, ValueSerialization::Json);
-            assert_eq!(config.value.compression, Compression::Zstd);
+            assert_eq!(config.value.compression, Compression::Zstd { level: 3 });
         }
         _ => panic!("expected Moka backend"),
     }
@@ -37,7 +39,9 @@ key:
   format: UrlEncoded
 value:
   format: Bincode
-  compression: Zstd
+  compression:
+    type: Zstd
+    level: 3
 "#;
 
     let backend: Backend = serde_saphyr::from_str(yaml).expect("failed to deserialize");
@@ -47,7 +51,7 @@ value:
             assert_eq!(config.backend.path, Some("/tmp/cache.db".to_string()));
             assert_eq!(config.key.format, KeySerialization::UrlEncoded);
             assert_eq!(config.value.format, ValueSerialization::Bincode);
-            assert_eq!(config.value.compression, Compression::Zstd);
+            assert_eq!(config.value.compression, Compression::Zstd { level: 3 });
         }
         _ => panic!("expected FeOxDb backend"),
     }
@@ -85,7 +89,7 @@ fn test_backend_serialize_roundtrip() {
         },
         value: ValueFormat {
             format: ValueSerialization::Json,
-            compression: Compression::Zstd,
+            compression: Compression::Zstd { level: 3 },
         },
         backend: Moka { max_capacity: 5000 },
     });

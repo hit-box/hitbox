@@ -3,7 +3,7 @@ use chrono::Utc;
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::Backend;
 use hitbox_backend::serializer::Format;
-use hitbox_backend::{BackendResult, CacheKeyFormat, DeleteStatus};
+use hitbox_backend::{BackendResult, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor};
 use moka::{Expiry, future::Cache};
 use std::time::{Duration, Instant};
 
@@ -27,20 +27,21 @@ impl Expiry<CacheKey, CacheValue<Raw>> for Expiration {
 }
 
 #[derive(Clone, Debug)]
-pub struct MokaBackend {
+pub struct MokaBackend<C: Compressor = PassthroughCompressor> {
     pub cache: Cache<CacheKey, CacheValue<Raw>>,
     pub key_format: CacheKeyFormat,
     pub value_format: Format,
+    pub compressor: C,
 }
 
-impl MokaBackend {
-    pub fn builder(max_capacity: u64) -> crate::builder::MokaBackendBuilder {
+impl MokaBackend<PassthroughCompressor> {
+    pub fn builder(max_capacity: u64) -> crate::builder::MokaBackendBuilder<PassthroughCompressor> {
         crate::builder::MokaBackendBuilder::new(max_capacity)
     }
 }
 
 #[async_trait]
-impl Backend for MokaBackend {
+impl<C: Compressor + Send + Sync> Backend for MokaBackend<C> {
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         self.cache.get(key).await.map(Ok).transpose()
     }
@@ -70,5 +71,9 @@ impl Backend for MokaBackend {
 
     fn key_format(&self) -> &CacheKeyFormat {
         &self.key_format
+    }
+
+    fn compressor(&self) -> &dyn Compressor {
+        &self.compressor
     }
 }

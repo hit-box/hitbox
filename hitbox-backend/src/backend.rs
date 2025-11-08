@@ -5,7 +5,7 @@ use hitbox_core::{CacheKey, CacheValue, CacheableResponse};
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    BackendError, CacheKeyFormat, DeleteStatus,
+    BackendError, CacheKeyFormat, DeleteStatus, Compressor, PassthroughCompressor,
     serializer::{Format, Raw},
 };
 
@@ -30,6 +30,10 @@ pub trait Backend: Sync + Send {
 
     fn key_format(&self) -> &CacheKeyFormat {
         &CacheKeyFormat::Bitcode
+    }
+
+    fn compressor(&self) -> &dyn Compressor {
+        &PassthroughCompressor
     }
 }
 
@@ -62,6 +66,10 @@ impl Backend for &dyn Backend {
     fn key_format(&self) -> &CacheKeyFormat {
         (*self).key_format()
     }
+
+    fn compressor(&self) -> &dyn Compressor {
+        (*self).compressor()
+    }
 }
 
 #[async_trait]
@@ -90,6 +98,10 @@ impl Backend for Box<dyn Backend> {
     fn key_format(&self) -> &CacheKeyFormat {
         (**self).key_format()
     }
+
+    fn compressor(&self) -> &dyn Compressor {
+        (**self).compressor()
+    }
 }
 
 #[async_trait]
@@ -117,6 +129,10 @@ impl Backend for Arc<dyn Backend + Send + 'static> {
 
     fn key_format(&self) -> &CacheKeyFormat {
         (**self).key_format()
+    }
+
+    fn compressor(&self) -> &dyn Compressor {
+        (**self).compressor()
     }
 }
 

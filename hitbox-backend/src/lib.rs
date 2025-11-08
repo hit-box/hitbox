@@ -3,10 +3,16 @@
 //!
 //! If you want implement your own backend, you in the right place.
 mod backend;
+pub mod compressor;
 mod key;
 pub mod serializer;
 
 pub use backend::{Backend, BackendResult, CacheBackend};
+pub use compressor::{Compressor, CompressionError, PassthroughCompressor};
+#[cfg(feature = "gzip")]
+pub use compressor::GzipCompressor;
+#[cfg(feature = "zstd")]
+pub use compressor::ZstdCompressor;
 pub use key::{CacheKeyFormat, KeySerializer, UrlEncodedKeySerializer};
 use serializer::SerializerError;
 use thiserror::Error;

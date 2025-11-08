@@ -21,10 +21,12 @@ impl Backend {
 
                 let key_format = config.key.format.to_cache_key_format();
                 let value_format = config.value.format.to_serializer_format();
+                let compressor = config.value.compression.to_compressor();
 
                 let backend = MokaBackend::builder(config.backend.max_capacity)
                     .key_format(key_format)
                     .value_format(value_format)
+                    .compressor(compressor)
                     .build();
 
                 Ok(Arc::new(backend))
@@ -37,10 +39,12 @@ impl Backend {
 
                 let key_format = config.key.format.to_cache_key_format();
                 let value_format = config.value.format.to_serializer_format();
+                let compressor = config.value.compression.to_compressor();
 
                 let mut builder = FeOxDbBackend::builder()
                     .key_format(key_format)
-                    .value_format(value_format);
+                    .value_format(value_format)
+                    .compressor(compressor);
 
                 if let Some(path) = config.backend.path {
                     builder = builder.path(path);
@@ -60,11 +64,13 @@ impl Backend {
 
                 let key_format = config.key.format.to_cache_key_format();
                 let value_format = config.value.format.to_serializer_format();
+                let compressor = config.value.compression.to_compressor();
 
                 let backend = RedisBackend::builder()
                     .server(config.backend.connection_string)
                     .key_format(key_format)
                     .value_format(value_format)
+                    .compressor(compressor)
                     .build()
                     .map_err(|e| ConfigError::BackendNotAvailable(format!("Redis: {}", e)))?;
 
@@ -129,11 +135,56 @@ impl ValueSerialization {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(tag = "type")]
 pub enum Compression {
     #[default]
     Disabled,
-    Gzip,
-    Zstd,
+    Gzip {
+        #[serde(default = "default_gzip_level")]
+        level: u32,
+    },
+    Zstd {
+        #[serde(default = "default_zstd_level")]
+        level: i32,
+    },
+}
+
+fn default_gzip_level() -> u32 {
+    6
+}
+
+fn default_zstd_level() -> i32 {
+    3
+}
+
+impl Compression {
+    /// Convert configuration compression format to backend compressor
+    pub fn to_compressor(&self) -> std::sync::Arc<dyn hitbox_backend::Compressor> {
+        use std::sync::Arc;
+        use hitbox_backend::PassthroughCompressor;
+
+        match self {
+            Compression::Disabled => Arc::new(PassthroughCompressor),
+            #[cfg(feature = "gzip")]
+            Compression::Gzip { level } => {
+                use hitbox_backend::GzipCompressor;
+                Arc::new(GzipCompressor::with_level(*level))
+            }
+            #[cfg(not(feature = "gzip"))]
+            Compression::Gzip { .. } => {
+                panic!("Gzip compression requested but 'gzip' feature is not enabled in hitbox-configuration")
+            }
+            #[cfg(feature = "zstd")]
+            Compression::Zstd { level } => {
+                use hitbox_backend::ZstdCompressor;
+                Arc::new(ZstdCompressor::with_level(*level))
+            }
+            #[cfg(not(feature = "zstd"))]
+            Compression::Zstd { .. } => {
+                panic!("Zstd compression requested but 'zstd' feature is not enabled in hitbox-configuration")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]

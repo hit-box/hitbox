@@ -25,7 +25,15 @@ bincode = { workspace = true }
 bitcode = { workspace = true }
 thiserror = { workspace = true }
 serde_urlencoded = { version = "0.7.1", default-features = false }
-flate2 = { version = "1" }
+
+# Compression support (optional)
+flate2 = { version = "1", optional = true }
+zstd = { version = "0.13", optional = true }
+
+[features]
+default = []
+gzip = ["dep:flate2"]
+zstd = ["dep:zstd"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }

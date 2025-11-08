@@ -27,6 +27,8 @@ default = []
 moka = ["hitbox-moka"]
 feoxdb = ["hitbox-feoxdb"]
 redis = ["hitbox-redis"]
+gzip = ["hitbox-backend/gzip"]
+zstd = ["hitbox-backend/zstd"]
 
 
 [dev-dependencies]
