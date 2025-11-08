@@ -67,7 +67,7 @@ impl CacheableResponse for Value {
         self,
         _predicates: P,
         _: &EntityPolicyConfig,
-    ) -> hitbox_core::ResponseCachePolicy<Self>
+    ) -> Result<hitbox_core::ResponseCachePolicy<Self>, hitbox_core::PredicateError>
     where
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
     {
