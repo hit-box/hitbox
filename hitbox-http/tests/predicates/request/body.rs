@@ -260,3 +260,149 @@ mod protobuf_tests {
         fs::remove_file("test.proto").unwrap();
     }
 }
+
+#[cfg(test)]
+mod error_handling_tests {
+    use super::*;
+    use bytes::Bytes;
+    use hitbox_http::FromBytes;
+    use hitbox_http::FromChunks;
+    use http_body_util::BodyExt;
+    use std::fmt;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+
+    // Mock error type simulating network/timeout errors
+    #[derive(Debug, Clone)]
+    struct NetworkError;
+
+    impl fmt::Display for NetworkError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "Network error occurred")
+        }
+    }
+
+    impl std::error::Error for NetworkError {}
+
+    // Mock body that yields some chunks successfully, then an error
+    struct ErrorProducingBody {
+        chunks: Vec<Result<Bytes, NetworkError>>,
+        index: usize,
+    }
+
+    impl ErrorProducingBody {
+        fn new() -> Self {
+            Self {
+                chunks: vec![
+                    Ok(Bytes::from(r#"{"field":"#)),
+                    Ok(Bytes::from(r#""test-value"}"#)),
+                    Err(NetworkError),
+                ],
+                index: 0,
+            }
+        }
+    }
+
+    impl hyper::body::Body for ErrorProducingBody {
+        type Data = Bytes;
+        type Error = NetworkError;
+
+        fn poll_frame(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Option<Result<hyper::body::Frame<Self::Data>, Self::Error>>> {
+            if self.index >= self.chunks.len() {
+                return Poll::Ready(None);
+            }
+
+            let result = self.chunks[self.index].clone();
+            self.index += 1;
+
+            Poll::Ready(Some(result.map(hyper::body::Frame::data)))
+        }
+    }
+
+    impl FromBytes for ErrorProducingBody {
+        fn from_bytes(bytes: Bytes) -> Self {
+            Self {
+                chunks: vec![Ok(bytes)],
+                index: 0,
+            }
+        }
+    }
+
+    impl FromChunks<NetworkError> for ErrorProducingBody {
+        fn from_chunks(chunks: Vec<Result<Bytes, NetworkError>>) -> Self {
+            Self { chunks, index: 0 }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_body_collection_error_returns_non_cacheable() {
+        let body = ErrorProducingBody::new();
+        let request = Request::builder().body(body).unwrap();
+        let request = CacheableHttpRequest::from_request(request);
+
+        let predicate = NeutralRequestPredicate::new().body(
+            ParsingType::Jq,
+            ".field".to_owned(),
+            Operation::Eq("test-value".into()),
+        );
+
+        // Should not panic and should return NonCacheable
+        let prediction = predicate.check(request).await;
+        assert!(
+            matches!(prediction, PredicateResult::NonCacheable(_)),
+            "Expected NonCacheable when body collection error occurs"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_body_error_preserves_error_in_reconstructed_body() {
+        let body = ErrorProducingBody::new();
+        let request = Request::builder().body(body).unwrap();
+        let request = CacheableHttpRequest::from_request(request);
+
+        let predicate = NeutralRequestPredicate::new().body(
+            ParsingType::Jq,
+            ".field".to_owned(),
+            Operation::Eq("test-value".into()),
+        );
+
+        let prediction = predicate.check(request).await;
+
+        // Extract the request from the result
+        let reconstructed_request = match prediction {
+            PredicateResult::NonCacheable(req) => req,
+            _ => panic!("Expected NonCacheable result"),
+        };
+
+        // Verify the reconstructed body contains the exact same error
+        let (_, mut body) = reconstructed_request.into_parts();
+        let mut chunks_collected = 0;
+        let mut found_error = false;
+
+        while let Some(frame) = body.frame().await {
+            match frame {
+                Ok(frame) => {
+                    if frame.is_data() {
+                        chunks_collected += 1;
+                    }
+                }
+                Err(err) => {
+                    // Verify it's our NetworkError
+                    assert_eq!(
+                        err.to_string(),
+                        "Network error occurred",
+                        "Error message should match the injected NetworkError"
+                    );
+                    found_error = true;
+                    break;
+                }
+            }
+        }
+
+        assert_eq!(chunks_collected, 2, "Should have collected 2 successful chunks before error");
+        assert!(found_error, "Reconstructed body should contain the original NetworkError");
+    }
+}
