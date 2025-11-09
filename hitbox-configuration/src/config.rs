@@ -33,7 +33,7 @@ impl ConfigEndpoint {
     pub fn extractors<ReqBody>(&self) -> RequestExtractor<ReqBody>
     where
         ReqBody: hyper::body::Body + hitbox_http::FromBytes + Send + Debug + 'static,
-        ReqBody::Error: Debug,
+        ReqBody::Error: Debug + Send,
         ReqBody::Data: Send,
     {
         match &self.extractors {
@@ -49,7 +49,7 @@ impl ConfigEndpoint {
     pub fn into_endpoint<ReqBody, ResBody>(self) -> Result<Endpoint<ReqBody, ResBody>, ConfigError>
     where
         ReqBody: hyper::body::Body + hitbox_http::FromBytes + hitbox_http::FromChunks<ReqBody::Error> + Send + Debug + 'static,
-        ReqBody::Error: Debug,
+        ReqBody::Error: Debug + Send,
         ReqBody::Data: Send,
         ResBody: hyper::body::Body + hitbox_http::FromBytes + Send + 'static,
         ResBody::Error: Debug,

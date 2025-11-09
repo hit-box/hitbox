@@ -42,7 +42,7 @@ impl<ReqBody, ResBody> Clone for Endpoint<ReqBody, ResBody> {
 impl<ReqBody, ResBody> Default for Endpoint<ReqBody, ResBody>
 where
     ReqBody: hyper::body::Body + hitbox_http::FromBytes + hitbox_http::FromChunks<ReqBody::Error> + Send + Debug + 'static,
-    ReqBody::Error: Debug,
+    ReqBody::Error: Debug + Send,
     ReqBody::Data: Send,
     ResBody: hyper::body::Body + hitbox_http::FromBytes + Send + 'static,
     ResBody::Error: Debug,

@@ -39,7 +39,7 @@ impl Request {
     pub fn into_predicates<Req>(self) -> Result<RequestPredicate<Req>, ConfigError>
     where
         Req: HttpBody + FromBytes + hitbox_http::FromChunks<Req::Error> + Send + 'static,
-        Req::Error: std::fmt::Debug,
+        Req::Error: std::fmt::Debug + Send,
         Req::Data: Send,
     {
         let neutral_predicate: RequestPredicate<Req> =
