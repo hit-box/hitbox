@@ -23,7 +23,7 @@ impl BodyPredicate {
         inner: RequestPredicate<ReqBody>,
     ) -> Result<RequestPredicate<ReqBody>, ConfigError>
     where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
+        ReqBody: HttpBody + FromBytes + hitbox_http::FromChunks<ReqBody::Error> + Send + 'static,
         ReqBody::Error: std::fmt::Debug,
         ReqBody::Data: Send,
     {

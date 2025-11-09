@@ -48,7 +48,7 @@ impl ConfigEndpoint {
 
     pub fn into_endpoint<ReqBody, ResBody>(self) -> Result<Endpoint<ReqBody, ResBody>, ConfigError>
     where
-        ReqBody: hyper::body::Body + hitbox_http::FromBytes + Send + Debug + 'static,
+        ReqBody: hyper::body::Body + hitbox_http::FromBytes + hitbox_http::FromChunks<ReqBody::Error> + Send + Debug + 'static,
         ReqBody::Error: Debug,
         ReqBody::Data: Send,
         ResBody: hyper::body::Body + hitbox_http::FromBytes + Send + 'static,

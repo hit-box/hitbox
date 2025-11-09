@@ -12,7 +12,7 @@ use jaq_json::{self, Val};
 use prost_reflect::{DynamicMessage, MessageDescriptor, SerializeOptions};
 use serde_json::Value;
 
-use crate::{CacheableHttpRequest, FromBytes};
+use crate::{CacheableHttpRequest, FromBytes, FromChunks};
 
 #[derive(Debug)]
 pub enum Operation {
@@ -100,7 +100,7 @@ where
     P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
     ReqBody::Error: Debug,
     ReqBody::Data: Send,
-    ReqBody: FromBytes,
+    ReqBody: FromBytes + FromChunks<ReqBody::Error>,
 {
     type Subject = P::Subject;
 
@@ -109,39 +109,58 @@ where
             PredicateResult::Cacheable(request) => {
                 let (parts, body) = request.into_parts();
                 use http_body_util::BodyExt;
-                let payload = body.collect().await.unwrap().to_bytes();
-                // let payload = to_bytes(body).await.unwrap();
-                let body_str = String::from_utf8_lossy(&payload);
-                let json_value = match &self.parsing_type {
-                    ParsingType::Jq => serde_json::from_str(&body_str).unwrap_or(Value::Null),
-                    ParsingType::ProtoBuf(message) => {
-                        let dynamic_message =
-                            DynamicMessage::decode(message.clone(), payload.as_ref()).unwrap();
-                        let mut serializer = serde_json::Serializer::new(vec![]);
-                        let options = SerializeOptions::new().skip_default_fields(false);
-                        dynamic_message
-                            .serialize_with_options(&mut serializer, &options)
-                            .unwrap();
-                        serde_json::from_slice(&serializer.into_inner()).unwrap()
-                    }
-                };
-                let found_value = apply(&self.expression, json_value);
 
-                let is_cacheable = match &self.operation {
-                    Operation::Eq(expected) => {
-                        found_value.map(|v| v.eq(expected)).unwrap_or_default()
-                    }
-                    Operation::Exist => found_value.is_some(),
-                    Operation::In(values) => {
-                        found_value.map(|v| values.contains(&v)).unwrap_or_default()
-                    }
-                };
+                // Attempt to collect the body
+                match body.collect().await {
+                    Ok(collected) => {
+                        // Successfully collected all chunks
+                        let payload = collected.to_bytes();
+                        let chunks = vec![Ok(payload.clone())];
 
-                let request = Request::from_parts(parts, ReqBody::from_bytes(payload));
-                if is_cacheable {
-                    PredicateResult::Cacheable(CacheableHttpRequest::from_request(request))
-                } else {
-                    PredicateResult::NonCacheable(CacheableHttpRequest::from_request(request))
+                        let body_str = String::from_utf8_lossy(&payload);
+                        let json_value = match &self.parsing_type {
+                            ParsingType::Jq => serde_json::from_str(&body_str).unwrap_or(Value::Null),
+                            ParsingType::ProtoBuf(message) => {
+                                let dynamic_message =
+                                    DynamicMessage::decode(message.clone(), payload.as_ref()).unwrap();
+                                let mut serializer = serde_json::Serializer::new(vec![]);
+                                let options = SerializeOptions::new().skip_default_fields(false);
+                                dynamic_message
+                                    .serialize_with_options(&mut serializer, &options)
+                                    .unwrap();
+                                serde_json::from_slice(&serializer.into_inner()).unwrap()
+                            }
+                        };
+                        let found_value = apply(&self.expression, json_value);
+
+                        let is_cacheable = match &self.operation {
+                            Operation::Eq(expected) => {
+                                found_value.map(|v| v.eq(expected)).unwrap_or_default()
+                            }
+                            Operation::Exist => found_value.is_some(),
+                            Operation::In(values) => {
+                                found_value.map(|v| values.contains(&v)).unwrap_or_default()
+                            }
+                        };
+
+                        // Reconstruct the request body from chunks
+                        let reconstructed_body = ReqBody::from_chunks(chunks);
+                        let request = Request::from_parts(parts, reconstructed_body);
+                        if is_cacheable {
+                            PredicateResult::Cacheable(CacheableHttpRequest::from_request(request))
+                        } else {
+                            PredicateResult::NonCacheable(CacheableHttpRequest::from_request(request))
+                        }
+                    }
+                    Err(err) => {
+                        // Network/timeout error occurred during collection
+                        // Reconstruct body with the error and return NonCacheable
+                        // This preserves the error for upstream to handle
+                        let chunks = vec![Err(err)];
+                        let reconstructed_body = ReqBody::from_chunks(chunks);
+                        let request = Request::from_parts(parts, reconstructed_body);
+                        PredicateResult::NonCacheable(CacheableHttpRequest::from_request(request))
+                    }
                 }
             }
             PredicateResult::NonCacheable(request) => PredicateResult::NonCacheable(request),
