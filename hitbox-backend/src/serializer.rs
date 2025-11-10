@@ -13,7 +13,7 @@ pub enum FormatError {
 pub type Raw = Vec<u8>;
 
 /// Object-safe format trait (uses erased-serde for type erasure)
-/// This trait can be used with Arc<dyn Format> for dynamic dispatch
+/// This trait can be used with `Arc<dyn Format>` for dynamic dispatch
 pub trait Format: std::fmt::Debug + Send + Sync {
     fn erased_serialize(&self, value: &dyn erased_serde::Serialize) -> Result<Raw, FormatError>;
 

@@ -59,7 +59,7 @@ where
     S: Format,
     C: Compressor,
 {
-    /// Create lazy connection to redis via [ConnectionManager](redis::aio::ConnectionManager)
+    /// Create lazy connection to redis via [`ConnectionManager`]
     pub async fn connection(&self) -> Result<&ConnectionManager, BackendError> {
         trace!("Get connection manager");
         let manager = self
