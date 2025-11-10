@@ -2,8 +2,10 @@ use async_trait::async_trait;
 use chrono::Utc;
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::Backend;
-use hitbox_backend::serializer::Format;
-use hitbox_backend::{BackendResult, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor};
+use hitbox_backend::serializer::{Format, JsonFormat};
+use hitbox_backend::{
+    BackendResult, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor,
+};
 use moka::{Expiry, future::Cache};
 use std::time::{Duration, Instant};
 
@@ -26,22 +28,47 @@ impl Expiry<CacheKey, CacheValue<Raw>> for Expiration {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct MokaBackend<C: Compressor = PassthroughCompressor> {
+#[derive(Clone)]
+pub struct MokaBackend<S = JsonFormat, C = PassthroughCompressor>
+where
+    S: Format,
+    C: Compressor,
+{
     pub cache: Cache<CacheKey, CacheValue<Raw>>,
     pub key_format: CacheKeyFormat,
-    pub value_format: Format,
+    pub serializer: S,
     pub compressor: C,
 }
 
-impl MokaBackend<PassthroughCompressor> {
-    pub fn builder(max_capacity: u64) -> crate::builder::MokaBackendBuilder<PassthroughCompressor> {
+impl<S, C> std::fmt::Debug for MokaBackend<S, C>
+where
+    S: Format,
+    C: Compressor,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MokaBackend")
+            .field("cache", &self.cache)
+            .field("key_format", &self.key_format)
+            .field("serializer", &std::any::type_name::<S>())
+            .field("compressor", &std::any::type_name::<C>())
+            .finish()
+    }
+}
+
+impl MokaBackend<JsonFormat, PassthroughCompressor> {
+    pub fn builder(
+        max_capacity: u64,
+    ) -> crate::builder::MokaBackendBuilder<JsonFormat, PassthroughCompressor> {
         crate::builder::MokaBackendBuilder::new(max_capacity)
     }
 }
 
 #[async_trait]
-impl<C: Compressor + Send + Sync> Backend for MokaBackend<C> {
+impl<S, C> Backend for MokaBackend<S, C>
+where
+    S: Format + Send + Sync,
+    C: Compressor + Send + Sync,
+{
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         self.cache.get(key).await.map(Ok).transpose()
     }
@@ -65,8 +92,8 @@ impl<C: Compressor + Send + Sync> Backend for MokaBackend<C> {
         }
     }
 
-    fn value_format(&self) -> &Format {
-        &self.value_format
+    fn value_format(&self) -> &dyn Format {
+        &self.serializer
     }
 
     fn key_format(&self) -> &CacheKeyFormat {

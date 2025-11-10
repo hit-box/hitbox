@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use hitbox_backend::serializer::Format;
 use hitbox_backend::{Backend, CacheBackend, CacheKeyFormat, DeleteStatus};
 use hitbox_core::{
     CacheKey, CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, ResponseCachePolicy,
@@ -260,16 +259,11 @@ async fn test_binary_data<B: CacheBackend>(backend: &B) {
 
 /// Test UrlEncoded key + JSON value format
 pub async fn test_url_encoded_key_json_value<B: Backend + CacheBackend>(backend: &B) {
-    // Verify backend format configuration
+    // Verify backend key format configuration
     assert_eq!(
         backend.key_format(),
         &CacheKeyFormat::UrlEncoded,
         "backend should use UrlEncoded key format"
-    );
-    assert_eq!(
-        backend.value_format(),
-        &Format::Json,
-        "backend should use Json value format"
     );
 
     let key = CacheKey::from_str("format-test", "url-json");
@@ -313,11 +307,6 @@ pub async fn test_url_encoded_key_bincode_value<B: Backend + CacheBackend>(backe
         &CacheKeyFormat::UrlEncoded,
         "backend should use UrlEncoded key format"
     );
-    assert_eq!(
-        backend.value_format(),
-        &Format::Bincode,
-        "backend should use Bincode value format"
-    );
 
     let key = CacheKey::from_str("format-test", "url-bincode");
     let response = TestResponse::new(101, "url-bincode-test", vec![4, 5, 6]);
@@ -358,11 +347,6 @@ pub async fn test_bitcode_key_json_value<B: Backend + CacheBackend>(backend: &B)
         &CacheKeyFormat::Bitcode,
         "backend should use Bitcode key format"
     );
-    assert_eq!(
-        backend.value_format(),
-        &Format::Json,
-        "backend should use Json value format"
-    );
 
     let key = CacheKey::from_str("format-test", "bitcode-json");
     let response = TestResponse::new(102, "bitcode-json-test", vec![7, 8, 9]);
@@ -402,11 +386,6 @@ pub async fn test_bitcode_key_bincode_value<B: Backend + CacheBackend>(backend: 
         backend.key_format(),
         &CacheKeyFormat::Bitcode,
         "backend should use Bitcode key format"
-    );
-    assert_eq!(
-        backend.value_format(),
-        &Format::Bincode,
-        "backend should use Bincode value format"
     );
 
     let key = CacheKey::from_str("format-test", "bitcode-bincode");

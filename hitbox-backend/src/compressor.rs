@@ -58,7 +58,9 @@ impl GzipCompressor {
 
     /// Create a new GzipCompressor with specified compression level (0-9)
     pub fn with_level(level: u32) -> Self {
-        Self { level: level.min(9) }
+        Self {
+            level: level.min(9),
+        }
     }
 }
 
@@ -72,14 +74,16 @@ impl Default for GzipCompressor {
 #[cfg(feature = "gzip")]
 impl Compressor for GzipCompressor {
     fn compress(&self, data: &[u8]) -> Result<Vec<u8>, CompressionError> {
-        use flate2::write::GzEncoder;
         use flate2::Compression;
+        use flate2::write::GzEncoder;
         use std::io::Write;
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::new(self.level));
-        encoder.write_all(data)
+        encoder
+            .write_all(data)
             .map_err(|e| CompressionError::CompressionFailed(e.to_string()))?;
-        encoder.finish()
+        encoder
+            .finish()
             .map_err(|e| CompressionError::CompressionFailed(e.to_string()))
     }
 
@@ -89,7 +93,8 @@ impl Compressor for GzipCompressor {
 
         let mut decoder = GzDecoder::new(data);
         let mut decompressed = Vec::new();
-        decoder.read_to_end(&mut decompressed)
+        decoder
+            .read_to_end(&mut decompressed)
             .map_err(|e| CompressionError::DecompressionFailed(e.to_string()))?;
         Ok(decompressed)
     }
@@ -113,7 +118,9 @@ impl ZstdCompressor {
     /// Lower values = faster but less compression
     /// Higher values = slower but better compression
     pub fn with_level(level: i32) -> Self {
-        Self { level: level.clamp(-7, 22) }
+        Self {
+            level: level.clamp(-7, 22),
+        }
     }
 }
 
@@ -132,8 +139,7 @@ impl Compressor for ZstdCompressor {
     }
 
     fn decompress(&self, data: &[u8]) -> Result<Vec<u8>, CompressionError> {
-        zstd::decode_all(data)
-            .map_err(|e| CompressionError::DecompressionFailed(e.to_string()))
+        zstd::decode_all(data).map_err(|e| CompressionError::DecompressionFailed(e.to_string()))
     }
 }
 
@@ -160,7 +166,10 @@ mod tests {
         let data = b"Hello, World! This is a test of gzip compression.".repeat(10);
 
         let compressed = compressor.compress(&data).unwrap();
-        assert!(compressed.len() < data.len(), "Compressed data should be smaller");
+        assert!(
+            compressed.len() < data.len(),
+            "Compressed data should be smaller"
+        );
 
         let decompressed = compressor.decompress(&compressed).unwrap();
         assert_eq!(decompressed, data);
@@ -196,7 +205,10 @@ mod tests {
         let data = b"Hello, World! This is a test of zstd compression.".repeat(10);
 
         let compressed = compressor.compress(&data).unwrap();
-        assert!(compressed.len() < data.len(), "Compressed data should be smaller");
+        assert!(
+            compressed.len() < data.len(),
+            "Compressed data should be smaller"
+        );
 
         let decompressed = compressor.decompress(&compressed).unwrap();
         assert_eq!(decompressed, data);

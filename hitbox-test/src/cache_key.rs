@@ -1,4 +1,4 @@
-use hitbox_backend::serializer::SerializerError;
+use hitbox_backend::serializer::FormatError;
 use hitbox_core::CacheKey;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -50,16 +50,16 @@ impl From<FlatCacheKey> for CacheKey {
 }
 
 /// Serialize cache key in debug YAML format
-pub fn serialize_debug(key: &CacheKey) -> Result<Vec<u8>, SerializerError> {
+pub fn serialize_debug(key: &CacheKey) -> Result<Vec<u8>, FormatError> {
     let flat: FlatCacheKey = key.into();
     let yaml_string =
-        serde_yaml::to_string(&flat).map_err(|e| SerializerError::Serialize(Box::new(e)))?;
+        serde_yaml::to_string(&flat).map_err(|e| FormatError::Serialize(Box::new(e)))?;
     Ok(yaml_string.into_bytes())
 }
 
 /// Deserialize cache key from debug YAML format
-pub fn deserialize_debug(data: &[u8]) -> Result<CacheKey, SerializerError> {
+pub fn deserialize_debug(data: &[u8]) -> Result<CacheKey, FormatError> {
     let flat: FlatCacheKey =
-        serde_yaml::from_slice(data).map_err(|e| SerializerError::Deserialize(Box::new(e)))?;
+        serde_yaml::from_slice(data).map_err(|e| FormatError::Deserialize(Box::new(e)))?;
     Ok(flat.into())
 }

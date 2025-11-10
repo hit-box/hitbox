@@ -1,5 +1,5 @@
 use crate::error::ConfigError;
-use hitbox_backend::serializer::Format as SerializerFormat;
+use hitbox_backend::serializer::{BincodeFormat, Format, JsonFormat};
 use hitbox_backend::{Backend as BackendTrait, CacheKeyFormat};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -20,12 +20,12 @@ impl Backend {
                 use hitbox_moka::MokaBackend;
 
                 let key_format = config.key.format.to_cache_key_format();
-                let value_format = config.value.format.to_serializer_format();
+                let serializer = config.value.format.to_serializer();
                 let compressor = config.value.compression.to_compressor()?;
 
                 let backend = MokaBackend::builder(config.backend.max_capacity)
                     .key_format(key_format)
-                    .value_format(value_format)
+                    .value_format(serializer)
                     .compressor(compressor)
                     .build();
 
@@ -38,12 +38,12 @@ impl Backend {
                 use hitbox_feoxdb::FeOxDbBackend;
 
                 let key_format = config.key.format.to_cache_key_format();
-                let value_format = config.value.format.to_serializer_format();
+                let serializer = config.value.format.to_serializer();
                 let compressor = config.value.compression.to_compressor()?;
 
                 let mut builder = FeOxDbBackend::builder()
                     .key_format(key_format)
-                    .value_format(value_format)
+                    .value_format(serializer)
                     .compressor(compressor);
 
                 if let Some(path) = config.backend.path {
@@ -63,13 +63,13 @@ impl Backend {
                 use hitbox_redis::RedisBackend;
 
                 let key_format = config.key.format.to_cache_key_format();
-                let value_format = config.value.format.to_serializer_format();
+                let serializer = config.value.format.to_serializer();
                 let compressor = config.value.compression.to_compressor()?;
 
                 let backend = RedisBackend::builder()
                     .server(config.backend.connection_string)
                     .key_format(key_format)
-                    .value_format(value_format)
+                    .value_format(serializer)
                     .compressor(compressor)
                     .build()
                     .map_err(|e| ConfigError::BackendNotAvailable(format!("Redis: {}", e)))?;
@@ -125,11 +125,10 @@ pub enum ValueSerialization {
 }
 
 impl ValueSerialization {
-    /// Convert configuration value serialization format to backend serializer format
-    pub fn to_serializer_format(&self) -> SerializerFormat {
+    pub fn to_serializer(&self) -> Arc<dyn Format> {
         match self {
-            ValueSerialization::Json => SerializerFormat::Json,
-            ValueSerialization::Bincode => SerializerFormat::Bincode,
+            ValueSerialization::Json => Arc::new(JsonFormat),
+            ValueSerialization::Bincode => Arc::new(BincodeFormat),
         }
     }
 }
@@ -159,9 +158,11 @@ fn default_zstd_level() -> i32 {
 
 impl Compression {
     /// Convert configuration compression format to backend compressor
-    pub fn to_compressor(&self) -> Result<std::sync::Arc<dyn hitbox_backend::Compressor>, ConfigError> {
-        use std::sync::Arc;
+    pub fn to_compressor(
+        &self,
+    ) -> Result<std::sync::Arc<dyn hitbox_backend::Compressor>, ConfigError> {
         use hitbox_backend::PassthroughCompressor;
+        use std::sync::Arc;
 
         match self {
             Compression::Disabled => Ok(Arc::new(PassthroughCompressor)),
@@ -171,22 +172,18 @@ impl Compression {
                 Ok(Arc::new(GzipCompressor::with_level(*level)))
             }
             #[cfg(not(feature = "gzip"))]
-            Compression::Gzip { .. } => {
-                Err(ConfigError::BackendNotAvailable(
-                    "Gzip compression requested but 'gzip' feature is not enabled".to_string()
-                ))
-            }
+            Compression::Gzip { .. } => Err(ConfigError::BackendNotAvailable(
+                "Gzip compression requested but 'gzip' feature is not enabled".to_string(),
+            )),
             #[cfg(feature = "zstd")]
             Compression::Zstd { level } => {
                 use hitbox_backend::ZstdCompressor;
                 Ok(Arc::new(ZstdCompressor::with_level(*level)))
             }
             #[cfg(not(feature = "zstd"))]
-            Compression::Zstd { .. } => {
-                Err(ConfigError::BackendNotAvailable(
-                    "Zstd compression requested but 'zstd' feature is not enabled".to_string()
-                ))
-            }
+            Compression::Zstd { .. } => Err(ConfigError::BackendNotAvailable(
+                "Zstd compression requested but 'zstd' feature is not enabled".to_string(),
+            )),
         }
     }
 }

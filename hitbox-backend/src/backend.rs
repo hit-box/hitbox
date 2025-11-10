@@ -5,8 +5,8 @@ use hitbox_core::{CacheKey, CacheValue, CacheableResponse};
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    BackendError, CacheKeyFormat, DeleteStatus, Compressor, PassthroughCompressor,
-    serializer::{Format, Raw},
+    BackendError, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor,
+    serializer::{Format, FormatExt, JsonFormat, Raw},
 };
 
 pub type BackendResult<T> = Result<T, BackendError>;
@@ -24,8 +24,8 @@ pub trait Backend: Sync + Send {
 
     async fn remove(&self, key: &CacheKey) -> BackendResult<DeleteStatus>;
 
-    fn value_format(&self) -> &Format {
-        &Format::Json
+    fn value_format(&self) -> &dyn Format {
+        &JsonFormat
     }
 
     fn key_format(&self) -> &CacheKeyFormat {
@@ -59,7 +59,7 @@ impl Backend for &dyn Backend {
         (*self).delete(key).await
     }
 
-    fn value_format(&self) -> &Format {
+    fn value_format(&self) -> &dyn Format {
         (*self).value_format()
     }
 
@@ -91,7 +91,7 @@ impl Backend for Box<dyn Backend> {
         (**self).remove(key).await
     }
 
-    fn value_format(&self) -> &Format {
+    fn value_format(&self) -> &dyn Format {
         (**self).value_format()
     }
 
@@ -123,7 +123,7 @@ impl Backend for Arc<dyn Backend + Send + 'static> {
         (**self).remove(key).await
     }
 
-    fn value_format(&self) -> &Format {
+    fn value_format(&self) -> &dyn Format {
         (**self).value_format()
     }
 

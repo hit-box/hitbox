@@ -2,7 +2,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum SerializerError {
+pub enum FormatError {
     #[error(transparent)]
     Serialize(Box<dyn std::error::Error + Send>),
 
@@ -12,68 +12,130 @@ pub enum SerializerError {
 
 pub type Raw = Vec<u8>;
 
-pub trait Serializer {
-    fn serialize<T>(&self, value: &T) -> Result<Raw, SerializerError>
-    where
-        T: Serialize;
+/// Object-safe format trait (uses erased-serde for type erasure)
+/// This trait can be used with Arc<dyn Format> for dynamic dispatch
+pub trait Format: std::fmt::Debug + Send + Sync {
+    fn erased_serialize(&self, value: &dyn erased_serde::Serialize) -> Result<Raw, FormatError>;
 
-    fn deserialize<T>(&self, value: &Raw) -> Result<T, SerializerError>
-    where
-        T: DeserializeOwned;
+    /// Provides access to a deserializer via a callback to avoid lifetime issues
+    fn with_deserializer(
+        &self,
+        data: &[u8],
+        f: &mut dyn FnMut(&mut dyn erased_serde::Deserializer) -> Result<(), erased_serde::Error>,
+    ) -> Result<(), FormatError>;
 }
 
-pub struct Json;
-
-impl Serializer for Json {
-    fn serialize<T>(&self, value: &T) -> Result<Raw, SerializerError>
+/// Extension trait providing generic serialize/deserialize methods
+/// This is automatically implemented for all Format types
+pub trait FormatExt: Format {
+    fn serialize<T>(&self, value: &T) -> Result<Raw, FormatError>
     where
         T: Serialize,
     {
-        serde_json::to_vec(value).map_err(|error| SerializerError::Serialize(Box::new(error)))
+        self.erased_serialize(value as _)
     }
 
-    fn deserialize<T>(&self, value: &Raw) -> Result<T, SerializerError>
+    fn deserialize<T>(&self, data: &Raw) -> Result<T, FormatError>
     where
         T: DeserializeOwned,
     {
-        serde_json::from_slice(value.as_slice())
-            .map_err(|error| SerializerError::Deserialize(Box::new(error)))
+        let mut result: Option<T> = None;
+        self.with_deserializer(data, &mut |deserializer| {
+            let value: T = erased_serde::deserialize(deserializer)?;
+            result = Some(value);
+            Ok(())
+        })
+        .map_err(|error| FormatError::Deserialize(Box::new(error)))?;
+
+        result.ok_or_else(|| {
+            FormatError::Deserialize(Box::new(std::io::Error::other(
+                "deserialization produced no result",
+            )))
+        })
     }
 }
 
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Format {
-    #[default]
-    Json,
-    Bincode,
-}
+// Blanket implementation: all Formats automatically get generic methods
+impl<T: Format + ?Sized> FormatExt for T {}
 
-impl Format {
-    pub fn serialize<T>(&self, value: &T) -> Result<Raw, SerializerError>
-    where
-        T: Serialize,
-    {
-        match self {
-            Format::Json => serde_json::to_vec(value)
-                .map_err(|error| SerializerError::Serialize(Box::new(error))),
-            Format::Bincode => bincode::serde::encode_to_vec(value, bincode::config::standard())
-                .map_err(|error| SerializerError::Serialize(Box::new(error))),
-        }
+// Blanket implementation for Arc<dyn Format>
+impl Format for std::sync::Arc<dyn Format> {
+    fn erased_serialize(&self, value: &dyn erased_serde::Serialize) -> Result<Raw, FormatError> {
+        (**self).erased_serialize(value)
     }
 
-    pub fn deserialize<T>(&self, value: &Raw) -> Result<T, SerializerError>
-    where
-        T: DeserializeOwned,
-    {
-        match self {
-            Format::Json => serde_json::from_slice(value.as_slice())
-                .map_err(|error| SerializerError::Deserialize(Box::new(error))),
-            Format::Bincode => {
-                bincode::serde::decode_from_slice(value.as_slice(), bincode::config::standard())
-                    .map(|(result, _)| result)
-                    .map_err(|error| SerializerError::Deserialize(Box::new(error)))
+    fn with_deserializer(
+        &self,
+        data: &[u8],
+        f: &mut dyn FnMut(&mut dyn erased_serde::Deserializer) -> Result<(), erased_serde::Error>,
+    ) -> Result<(), FormatError> {
+        (**self).with_deserializer(data, f)
+    }
+}
+
+/// JSON format (default)
+#[derive(Debug, Clone, Copy, Default)]
+pub struct JsonFormat;
+
+impl Format for JsonFormat {
+    fn erased_serialize(&self, value: &dyn erased_serde::Serialize) -> Result<Raw, FormatError> {
+        let mut buf = Vec::new();
+        let mut ser = serde_json::Serializer::new(&mut buf);
+        value
+            .erased_serialize(&mut <dyn erased_serde::Serializer>::erase(&mut ser))
+            .map_err(|error| FormatError::Serialize(Box::new(error)))?;
+        Ok(buf)
+    }
+
+    fn with_deserializer(
+        &self,
+        data: &[u8],
+        f: &mut dyn FnMut(&mut dyn erased_serde::Deserializer) -> Result<(), erased_serde::Error>,
+    ) -> Result<(), FormatError> {
+        let mut deser = serde_json::Deserializer::from_slice(data);
+        let mut erased = <dyn erased_serde::Deserializer>::erase(&mut deser);
+        f(&mut erased).map_err(|error| FormatError::Deserialize(Box::new(error)))
+    }
+}
+
+/// Bincode format
+#[derive(Debug, Clone, Copy)]
+pub struct BincodeFormat;
+
+impl Format for BincodeFormat {
+    fn erased_serialize(&self, value: &dyn erased_serde::Serialize) -> Result<Raw, FormatError> {
+        // Wrapper that implements serde::Serialize
+        struct SerdeWrapper<'a>(&'a dyn erased_serde::Serialize);
+
+        impl<'a> serde::Serialize for SerdeWrapper<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                use serde::ser::Error;
+                erased_serde::serialize(self.0, serializer).map_err(S::Error::custom)
             }
         }
+
+        bincode::serde::encode_to_vec(SerdeWrapper(value), bincode::config::standard())
+            .map_err(|error| FormatError::Serialize(Box::new(error)))
+    }
+
+    fn with_deserializer(
+        &self,
+        data: &[u8],
+        f: &mut dyn FnMut(&mut dyn erased_serde::Deserializer) -> Result<(), erased_serde::Error>,
+    ) -> Result<(), FormatError> {
+        use bincode::de::read::SliceReader;
+        use bincode::serde::OwnedSerdeDecoder;
+
+        let reader = SliceReader::new(data);
+        let mut decoder = OwnedSerdeDecoder::from_reader(reader, bincode::config::standard());
+        let deser = decoder.as_deserializer();
+
+        // Erase the bincode deserializer
+        let mut erased = <dyn erased_serde::Deserializer>::erase(deser);
+        f(&mut erased).map_err(|error| FormatError::Deserialize(Box::new(error)))
     }
 }
 
@@ -116,11 +178,11 @@ mod test {
 // pub trait Serializer {
 //     type Raw;
 //
-//     fn deserialize<T>(data: Self::Raw) -> Result<CachedValue<T>, SerializerError>
+//     fn deserialize<T>(data: Self::Raw) -> Result<CachedValue<T>, FormatError>
 //     where
 //         T: DeserializeOwned;
 //
-//     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, SerializerError>
+//     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, FormatError>
 //     where
 //         T: Serialize;
 // }
@@ -145,17 +207,17 @@ mod test {
 // impl Serializer for JsonSerializer<Vec<u8>> {
 //     type Raw = Vec<u8>;
 //
-//     fn deserialize<T>(data: Self::Raw) -> Result<CachedValue<T>, SerializerError>
+//     fn deserialize<T>(data: Self::Raw) -> Result<CachedValue<T>, FormatError>
 //     where
 //         T: DeserializeOwned,
 //     {
 //         let deserialized: SerializableCachedValue<T> = serde_json::from_slice(&data)
-//             .map_err(|err| SerializerError::Deserialize(Box::new(err)))?;
+//             .map_err(|err| FormatError::Deserialize(Box::new(err)))?;
 //         let cached_value = deserialized.into_cached_value();
 //         Ok(CachedValue::new(cached_value.data, cached_value.expired))
 //     }
 //
-//     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, SerializerError>
+//     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, FormatError>
 //     where
 //         T: Serialize,
 //     {
@@ -164,24 +226,24 @@ mod test {
 //             expired: value.expired,
 //         };
 //         serde_json::to_vec(&serializable_value)
-//             .map_err(|err| SerializerError::Serialize(Box::new(err)))
+//             .map_err(|err| FormatError::Serialize(Box::new(err)))
 //     }
 // }
 //
 // impl Serializer for JsonSerializer<String> {
 //     type Raw = String;
 //
-//     fn deserialize<T>(data: Self::Raw) -> Result<CachedValue<T>, SerializerError>
+//     fn deserialize<T>(data: Self::Raw) -> Result<CachedValue<T>, FormatError>
 //     where
 //         T: DeserializeOwned,
 //     {
 //         let deserialized: SerializableCachedValue<T> = serde_json::from_str(&data)
-//             .map_err(|err| SerializerError::Deserialize(Box::new(err)))?;
+//             .map_err(|err| FormatError::Deserialize(Box::new(err)))?;
 //         let cached_value = deserialized.into_cached_value();
 //         Ok(CachedValue::new(cached_value.data, cached_value.expired))
 //     }
 //
-//     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, SerializerError>
+//     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, FormatError>
 //     where
 //         T: Serialize,
 //     {
@@ -190,7 +252,7 @@ mod test {
 //             expired: value.expired,
 //         };
 //         serde_json::to_string(&serializable_value)
-//             .map_err(|err| SerializerError::Serialize(Box::new(err)))
+//             .map_err(|err| FormatError::Serialize(Box::new(err)))
 //     }
 // }
 //
@@ -202,17 +264,17 @@ mod test {
 // impl Serializer for BinSerializer<Vec<u8>> {
 //     type Raw = Vec<u8>;
 //
-//     fn deserialize<T>(data: Self::Raw) -> Result<CachedValue<T>, SerializerError>
+//     fn deserialize<T>(data: Self::Raw) -> Result<CachedValue<T>, FormatError>
 //     where
 //         T: DeserializeOwned,
 //     {
 //         let deserialized: SerializableCachedValue<T> = bincode::deserialize(&data)
-//             .map_err(|err| SerializerError::Deserialize(Box::new(err)))?;
+//             .map_err(|err| FormatError::Deserialize(Box::new(err)))?;
 //         let cached_value = deserialized.into_cached_value();
 //         Ok(CachedValue::new(cached_value.data, cached_value.expired))
 //     }
 //
-//     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, SerializerError>
+//     fn serialize<T>(value: &CachedValue<T>) -> Result<Self::Raw, FormatError>
 //     where
 //         T: Serialize,
 //     {
@@ -221,7 +283,7 @@ mod test {
 //             expired: value.expired,
 //         };
 //         bincode::serialize(&serializable_value)
-//             .map_err(|err| SerializerError::Serialize(Box::new(err)))
+//             .map_err(|err| FormatError::Serialize(Box::new(err)))
 //     }
 // }
 //
