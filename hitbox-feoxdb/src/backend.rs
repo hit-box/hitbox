@@ -7,8 +7,11 @@ use bincode::{
 };
 use chrono::{DateTime, Utc};
 use feoxdb::{FeoxError, FeoxStore};
-use hitbox_backend::serializer::Format;
-use hitbox_backend::{Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor};
+use hitbox_backend::serializer::{Format, JsonFormat};
+use hitbox_backend::{
+    Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus,
+    PassthroughCompressor,
+};
 use hitbox_core::{CacheKey, CacheValue};
 use serde::{Deserialize, Serialize};
 
@@ -41,14 +44,18 @@ impl From<SerializableCacheValue> for CacheValue<Raw> {
 }
 
 #[derive(Clone)]
-pub struct FeOxDbBackend<C: Compressor = PassthroughCompressor> {
+pub struct FeOxDbBackend<S = JsonFormat, C = PassthroughCompressor>
+where
+    S: Format,
+    C: Compressor,
+{
     store: Arc<FeoxStore>,
     key_format: CacheKeyFormat,
-    value_format: Format,
+    serializer: S,
     compressor: C,
 }
 
-impl FeOxDbBackend<PassthroughCompressor> {
+impl FeOxDbBackend<JsonFormat, PassthroughCompressor> {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, FeOxDbError> {
         let mut path_buf = path.as_ref().to_path_buf();
         if path_buf.is_dir() {
@@ -65,12 +72,12 @@ impl FeOxDbBackend<PassthroughCompressor> {
         Ok(Self {
             store: Arc::new(store),
             key_format: CacheKeyFormat::Bitcode,
-            value_format: Format::Json,
+            serializer: JsonFormat,
             compressor: PassthroughCompressor,
         })
     }
 
-    pub fn builder() -> FeOxDbBackendBuilder<PassthroughCompressor> {
+    pub fn builder() -> FeOxDbBackendBuilder<JsonFormat, PassthroughCompressor> {
         FeOxDbBackendBuilder::default()
     }
 
@@ -78,7 +85,7 @@ impl FeOxDbBackend<PassthroughCompressor> {
         Self {
             store: Arc::new(store),
             key_format: CacheKeyFormat::Bitcode,
-            value_format: Format::Json,
+            serializer: JsonFormat,
             compressor: PassthroughCompressor,
         }
     }
@@ -89,31 +96,39 @@ impl FeOxDbBackend<PassthroughCompressor> {
         Ok(Self {
             store: Arc::new(store),
             key_format: CacheKeyFormat::Bitcode,
-            value_format: Format::Json,
+            serializer: JsonFormat,
             compressor: PassthroughCompressor,
         })
     }
 }
 
-pub struct FeOxDbBackendBuilder<C: Compressor = PassthroughCompressor> {
+pub struct FeOxDbBackendBuilder<S = JsonFormat, C = PassthroughCompressor>
+where
+    S: Format,
+    C: Compressor,
+{
     path: Option<String>,
     key_format: CacheKeyFormat,
-    value_format: Format,
+    serializer: S,
     compressor: C,
 }
 
-impl Default for FeOxDbBackendBuilder<PassthroughCompressor> {
+impl Default for FeOxDbBackendBuilder<JsonFormat, PassthroughCompressor> {
     fn default() -> Self {
         Self {
             path: None,
             key_format: CacheKeyFormat::Bitcode,
-            value_format: Format::Json,
+            serializer: JsonFormat,
             compressor: PassthroughCompressor,
         }
     }
 }
 
-impl<C: Compressor> FeOxDbBackendBuilder<C> {
+impl<S, C> FeOxDbBackendBuilder<S, C>
+where
+    S: Format,
+    C: Compressor,
+{
     pub fn path(mut self, path: String) -> Self {
         self.path = Some(path);
         self
@@ -124,21 +139,31 @@ impl<C: Compressor> FeOxDbBackendBuilder<C> {
         self
     }
 
-    pub fn value_format(mut self, format: Format) -> Self {
-        self.value_format = format;
-        self
-    }
-
-    pub fn compressor<NewC: Compressor>(self, compressor: NewC) -> FeOxDbBackendBuilder<NewC> {
+    pub fn value_format<NewS>(self, serializer: NewS) -> FeOxDbBackendBuilder<NewS, C>
+    where
+        NewS: Format,
+    {
         FeOxDbBackendBuilder {
             path: self.path,
             key_format: self.key_format,
-            value_format: self.value_format,
+            serializer,
+            compressor: self.compressor,
+        }
+    }
+
+    pub fn compressor<NewC>(self, compressor: NewC) -> FeOxDbBackendBuilder<S, NewC>
+    where
+        NewC: Compressor,
+    {
+        FeOxDbBackendBuilder {
+            path: self.path,
+            key_format: self.key_format,
+            serializer: self.serializer,
             compressor,
         }
     }
 
-    pub fn build(self) -> Result<FeOxDbBackend<C>, FeOxDbError> {
+    pub fn build(self) -> Result<FeOxDbBackend<S, C>, FeOxDbError> {
         let store = if let Some(path) = self.path {
             let mut path_buf = std::path::PathBuf::from(path);
             if path_buf.is_dir() {
@@ -156,14 +181,18 @@ impl<C: Compressor> FeOxDbBackendBuilder<C> {
         Ok(FeOxDbBackend {
             store: Arc::new(store),
             key_format: self.key_format,
-            value_format: self.value_format,
+            serializer: self.serializer,
             compressor: self.compressor,
         })
     }
 }
 
 #[async_trait]
-impl<C: Compressor + Send + Sync> Backend for FeOxDbBackend<C> {
+impl<S, C> Backend for FeOxDbBackend<S, C>
+where
+    S: Format + Send + Sync,
+    C: Compressor + Send + Sync,
+{
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         let store = self.store.clone();
 
@@ -241,8 +270,8 @@ impl<C: Compressor + Send + Sync> Backend for FeOxDbBackend<C> {
         .map_err(|e| BackendError::InternalError(Box::new(e)))?
     }
 
-    fn value_format(&self) -> &Format {
-        &self.value_format
+    fn value_format(&self) -> &dyn Format {
+        &self.serializer
     }
 
     fn key_format(&self) -> &CacheKeyFormat {

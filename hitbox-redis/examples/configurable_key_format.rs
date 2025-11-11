@@ -13,7 +13,7 @@ fn main() {
 
     println!("1. Default Backend:");
     println!("   Key format: {:?}", backend_default.key_format());
-    println!("   Value format: {:?}\n", backend_default.value_format());
+    println!("   Format: JSON (default)\n");
 
     // Example 2: Compact binary keys for high-performance use cases
     let backend_bincode = RedisBackend::builder()

@@ -25,6 +25,7 @@ bincode = { workspace = true }
 bitcode = { workspace = true }
 thiserror = { workspace = true }
 serde_urlencoded = { version = "0.7.1", default-features = false }
+erased-serde = "0.4"
 
 # Compression support (optional)
 flate2 = { version = "1", optional = true }

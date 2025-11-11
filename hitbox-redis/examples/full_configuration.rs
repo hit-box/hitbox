@@ -1,4 +1,4 @@
-use hitbox_backend::serializer::Format;
+use hitbox_backend::serializer::{BincodeFormat, JsonFormat};
 /// Complete example showing how to configure both key and value serialization formats
 /// for optimal Redis backend performance.
 use hitbox_backend::{Backend, CacheKeyFormat};
@@ -14,12 +14,12 @@ fn main() {
     let dev_backend = RedisBackend::builder()
         .server("redis://127.0.0.1:6379/0".to_string())
         .key_format(CacheKeyFormat::UrlEncoded) // Human-readable keys
-        .value_format(Format::Json) // Human-readable values
+        .value_format(JsonFormat) // Human-readable values
         .build()
         .expect("Failed to create dev backend");
 
     println!("   Key format:   {:?}", dev_backend.key_format());
-    println!("   Value format: {:?}", dev_backend.value_format());
+    println!("   Format:   JSON");
     println!("   Benefit: Easy debugging with redis-cli");
     println!("   Trade-off: Slightly larger keys than Bitcode\n");
 
@@ -31,12 +31,12 @@ fn main() {
     let prod_backend = RedisBackend::builder()
         .server("redis://127.0.0.1:6379/1".to_string())
         .key_format(CacheKeyFormat::Bitcode) // Compact binary keys
-        .value_format(Format::Json) // Standard JSON values (or Bincode for max performance)
+        .value_format(JsonFormat) // Standard JSON values (or Bincode for max performance)
         .build()
         .expect("Failed to create prod backend");
 
     println!("   Key format:   {:?}", prod_backend.key_format());
-    println!("   Value format: {:?}", prod_backend.value_format());
+    println!("   Format:   JSON");
     println!("   Benefit: 20-30% less memory, faster serialization");
     println!("   Trade-off: Keys not human-readable\n");
 
@@ -47,12 +47,12 @@ fn main() {
     let cdn_backend = RedisBackend::builder()
         .server("redis://127.0.0.1:6379/2".to_string())
         .key_format(CacheKeyFormat::UrlEncoded) // HTTP-safe keys
-        .value_format(Format::Json) // Cross-platform values
+        .value_format(JsonFormat) // Cross-platform values
         .build()
         .expect("Failed to create CDN backend");
 
     println!("   Key format:   {:?}", cdn_backend.key_format());
-    println!("   Value format: {:?}", cdn_backend.value_format());
+    println!("   Format:   JSON");
     println!("   Benefit: Keys safe for Vary headers, CDN integration");
     println!("   Use case: Edge caching, HTTP cache control\n");
 
@@ -63,12 +63,12 @@ fn main() {
     let efficient_backend = RedisBackend::builder()
         .server("redis://127.0.0.1:6379/3".to_string())
         .key_format(CacheKeyFormat::Bitcode) // Most compact keys
-        .value_format(Format::Bincode) // Compact values
+        .value_format(BincodeFormat) // Compact values
         .build()
         .expect("Failed to create efficient backend");
 
     println!("   Key format:   {:?}", efficient_backend.key_format());
-    println!("   Value format: {:?}", efficient_backend.value_format());
+    println!("   Format:   Bincode");
     println!("   Benefit: Minimal memory footprint, fast serialization");
     println!("   Use case: High-scale production, limited memory\n");
 

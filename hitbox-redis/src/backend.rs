@@ -4,8 +4,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 use hitbox::{CacheKey, CacheValue};
 use hitbox_backend::{
-    Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor,
-    serializer::{Format, Raw},
+    Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus,
+    PassthroughCompressor,
+    serializer::{Format, JsonFormat, Raw},
 };
 use redis::{Client, aio::ConnectionManager};
 use tokio::sync::OnceCell;
@@ -19,15 +20,19 @@ use tracing::trace;
 /// [MultiplexedConnection]: redis::aio::MultiplexedConnection
 /// [Backend]: hitbox_backend::Backend
 #[derive(Clone)]
-pub struct RedisBackend<C: Compressor = PassthroughCompressor> {
+pub struct RedisBackend<S = JsonFormat, C = PassthroughCompressor>
+where
+    S: Format,
+    C: Compressor,
+{
     client: Client,
     connection: OnceCell<ConnectionManager>,
-    format: Format,
+    serializer: S,
     key_format: CacheKeyFormat,
     compressor: C,
 }
 
-impl RedisBackend<PassthroughCompressor> {
+impl RedisBackend<JsonFormat, PassthroughCompressor> {
     /// Create new backend instance with default settings.
     ///
     /// # Examples
@@ -44,13 +49,17 @@ impl RedisBackend<PassthroughCompressor> {
     }
 
     /// Creates new RedisBackend builder with default settings.
-    pub fn builder() -> RedisBackendBuilder<PassthroughCompressor> {
+    pub fn builder() -> RedisBackendBuilder<JsonFormat, PassthroughCompressor> {
         RedisBackendBuilder::default()
     }
 }
 
-impl<C: Compressor> RedisBackend<C> {
-    /// Create lazy connection to redis via [ConnectionManager](redis::aio::ConnectionManager)
+impl<S, C> RedisBackend<S, C>
+where
+    S: Format,
+    C: Compressor,
+{
+    /// Create lazy connection to redis via [`ConnectionManager`]
     pub async fn connection(&self) -> Result<&ConnectionManager, BackendError> {
         trace!("Get connection manager");
         let manager = self
@@ -66,25 +75,33 @@ impl<C: Compressor> RedisBackend<C> {
 }
 
 /// Part of builder pattern implementation for RedisBackend actor.
-pub struct RedisBackendBuilder<C: Compressor = PassthroughCompressor> {
+pub struct RedisBackendBuilder<S = JsonFormat, C = PassthroughCompressor>
+where
+    S: Format,
+    C: Compressor,
+{
     connection_info: String,
-    format: Format,
+    serializer: S,
     key_format: CacheKeyFormat,
     compressor: C,
 }
 
-impl Default for RedisBackendBuilder<PassthroughCompressor> {
+impl Default for RedisBackendBuilder<JsonFormat, PassthroughCompressor> {
     fn default() -> Self {
         Self {
             connection_info: "redis://127.0.0.1/".to_owned(),
-            format: Format::default(),
+            serializer: JsonFormat,
             key_format: CacheKeyFormat::default(),
             compressor: PassthroughCompressor,
         }
     }
 }
 
-impl<C: Compressor> RedisBackendBuilder<C> {
+impl<S, C> RedisBackendBuilder<S, C>
+where
+    S: Format,
+    C: Compressor,
+{
     /// Set connection info (host, port, database, etc.) for RedisBackend actor.
     pub fn server(mut self, connection_info: String) -> Self {
         self.connection_info = connection_info;
@@ -92,9 +109,16 @@ impl<C: Compressor> RedisBackendBuilder<C> {
     }
 
     /// Set value serialization format (JSON, Bincode, etc.)
-    pub fn value_format(mut self, format: Format) -> Self {
-        self.format = format;
-        self
+    pub fn value_format<NewS>(self, serializer: NewS) -> RedisBackendBuilder<NewS, C>
+    where
+        NewS: Format,
+    {
+        RedisBackendBuilder {
+            connection_info: self.connection_info,
+            serializer,
+            key_format: self.key_format,
+            compressor: self.compressor,
+        }
     }
 
     /// Set key serialization format (String, JSON, Bincode, UrlEncoded)
@@ -104,21 +128,24 @@ impl<C: Compressor> RedisBackendBuilder<C> {
     }
 
     /// Set compressor for value compression
-    pub fn compressor<NewC: Compressor>(self, compressor: NewC) -> RedisBackendBuilder<NewC> {
+    pub fn compressor<NewC>(self, compressor: NewC) -> RedisBackendBuilder<S, NewC>
+    where
+        NewC: Compressor,
+    {
         RedisBackendBuilder {
             connection_info: self.connection_info,
-            format: self.format,
+            serializer: self.serializer,
             key_format: self.key_format,
             compressor,
         }
     }
 
     /// Create new instance of Redis backend with passed settings.
-    pub fn build(self) -> Result<RedisBackend<C>, Error> {
+    pub fn build(self) -> Result<RedisBackend<S, C>, Error> {
         Ok(RedisBackend {
             client: Client::open(self.connection_info)?,
             connection: OnceCell::new(),
-            format: self.format,
+            serializer: self.serializer,
             key_format: self.key_format,
             compressor: self.compressor,
         })
@@ -126,7 +153,11 @@ impl<C: Compressor> RedisBackendBuilder<C> {
 }
 
 #[async_trait]
-impl<C: Compressor + Send + Sync> Backend for RedisBackend<C> {
+impl<S, C> Backend for RedisBackend<S, C>
+where
+    S: Format + Send + Sync,
+    C: Compressor + Send + Sync,
+{
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         let client = self.client.clone();
         let cache_key = self.key_format.serialize(key)?;
@@ -178,8 +209,8 @@ impl<C: Compressor + Send + Sync> Backend for RedisBackend<C> {
         }
     }
 
-    fn value_format(&self) -> &Format {
-        &self.format
+    fn value_format(&self) -> &dyn Format {
+        &self.serializer
     }
 
     fn key_format(&self) -> &CacheKeyFormat {
@@ -203,7 +234,7 @@ impl<C: Compressor + Send + Sync> Backend for RedisBackend<C> {
     //             .map_err(BackendError::from)?;
     //         result
     //             .map(|value| {
-    //                 JsonSerializer::<Vec<u8>>::deserialize(value).map_err(BackendError::from)
+    //                 JsonFormat::<Vec<u8>>::deserialize(value).map_err(BackendError::from)
     //             })
     //             .transpose()
     //     }
@@ -242,7 +273,7 @@ impl<C: Compressor + Send + Sync> Backend for RedisBackend<C> {
     //     let mut request = redis::cmd("SET");
     //     let cache_key = UrlEncodedKeySerializer::serialize(key)?;
     //     let serialized_value =
-    //         JsonSerializer::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
+    //         JsonFormat::<Vec<u8>>::serialize(value).map_err(BackendError::from)?;
     //     request.arg(cache_key).arg(serialized_value);
     //     if let Some(ttl) = ttl {
     //         request.arg("EX").arg(ttl);

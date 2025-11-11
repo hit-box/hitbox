@@ -5,8 +5,8 @@ use hitbox_core::{CacheKey, CacheValue, CacheableResponse};
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    BackendError, CacheKeyFormat, DeleteStatus, Compressor, PassthroughCompressor,
-    serializer::{Format, Raw},
+    BackendError, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor,
+    serializer::{Format, FormatExt, JsonFormat, Raw},
 };
 
 pub type BackendResult<T> = Result<T, BackendError>;
@@ -24,8 +24,8 @@ pub trait Backend: Sync + Send {
 
     async fn remove(&self, key: &CacheKey) -> BackendResult<DeleteStatus>;
 
-    fn value_format(&self) -> &Format {
-        &Format::Json
+    fn value_format(&self) -> &dyn Format {
+        &JsonFormat
     }
 
     fn key_format(&self) -> &CacheKeyFormat {
@@ -59,7 +59,7 @@ impl Backend for &dyn Backend {
         (*self).delete(key).await
     }
 
-    fn value_format(&self) -> &Format {
+    fn value_format(&self) -> &dyn Format {
         (*self).value_format()
     }
 
@@ -91,7 +91,7 @@ impl Backend for Box<dyn Backend> {
         (**self).remove(key).await
     }
 
-    fn value_format(&self) -> &Format {
+    fn value_format(&self) -> &dyn Format {
         (**self).value_format()
     }
 
@@ -123,7 +123,7 @@ impl Backend for Arc<dyn Backend + Send + 'static> {
         (**self).remove(key).await
     }
 
-    fn value_format(&self) -> &Format {
+    fn value_format(&self) -> &dyn Format {
         (**self).value_format()
     }
 
@@ -162,16 +162,15 @@ pub trait CacheBackend: Backend {
         T::Cached: DeserializeOwned,
     {
         async move {
-            Ok(self
-                .read(key)
-                .await?
-                .map(|value| {
+            match self.read(key).await? {
+                Some(value) => {
                     let (meta, value) = value.into_parts();
-                    self.value_format()
-                        .deserialize(&value)
-                        .map(|value| CacheValue::new(value, meta.expire, meta.stale))
-                })
-                .transpose()?)
+                    let decompressed = self.compressor().decompress(&value)?;
+                    let deserialized = self.value_format().deserialize(&decompressed)?;
+                    Ok(Some(CacheValue::new(deserialized, meta.expire, meta.stale)))
+                }
+                None => Ok(None),
+            }
         }
     }
 
@@ -187,9 +186,10 @@ pub trait CacheBackend: Backend {
     {
         async move {
             let serialized_value = self.value_format().serialize(&value.data)?;
+            let compressed_value = self.compressor().compress(&serialized_value)?;
             self.write(
                 key,
-                CacheValue::new(serialized_value, value.expire, value.stale),
+                CacheValue::new(compressed_value, value.expire, value.stale),
                 ttl,
             )
             .await

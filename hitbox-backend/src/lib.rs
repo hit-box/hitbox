@@ -8,13 +8,13 @@ mod key;
 pub mod serializer;
 
 pub use backend::{Backend, BackendResult, CacheBackend};
-pub use compressor::{Compressor, CompressionError, PassthroughCompressor};
 #[cfg(feature = "gzip")]
 pub use compressor::GzipCompressor;
 #[cfg(feature = "zstd")]
 pub use compressor::ZstdCompressor;
+pub use compressor::{CompressionError, Compressor, PassthroughCompressor};
 pub use key::{CacheKeyFormat, KeySerializer, UrlEncodedKeySerializer};
-use serializer::SerializerError;
+use serializer::FormatError;
 use thiserror::Error;
 
 /// Proxy Error describes general groups of errors in backend interaction process.
@@ -30,7 +30,10 @@ pub enum BackendError {
     ConnectionError(Box<dyn std::error::Error + Send>),
     /// Serializing\Deserializing data error.
     #[error(transparent)]
-    SerializerError(#[from] SerializerError),
+    FormatError(#[from] FormatError),
+    /// Compressing\Decompressing data error.
+    #[error(transparent)]
+    CompressionError(#[from] CompressionError),
 
     /// DEBUG @TODO: remove
     #[error("test")]
