@@ -8,11 +8,10 @@ use hitbox_moka::MokaBackend;
 use hitbox_redis::RedisBackend;
 use hitbox_test::backend::{
     run_backend_tests, test_bitcode_key_bincode_value, test_bitcode_key_json_value,
-    test_compression_is_used, test_url_encoded_key_bincode_value,
-    test_url_encoded_key_json_value,
+    test_compression_is_used, test_url_encoded_key_bincode_value, test_url_encoded_key_json_value,
 };
 use std::sync::LazyLock;
-use testcontainers::{runners::AsyncRunner, ContainerAsync};
+use testcontainers::{ContainerAsync, runners::AsyncRunner};
 use testcontainers_modules::redis::Redis as RedisContainer;
 
 /// All test configurations (key format, value format, compression)
@@ -105,9 +104,7 @@ async fn test_moka_all_combinations() {
                 format: value_format.clone(),
                 compression: compression.clone(),
             },
-            backend: Moka {
-                max_capacity: 1000,
-            },
+            backend: Moka { max_capacity: 1000 },
         };
 
         // Skip configurations with unavailable compression features
