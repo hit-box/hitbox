@@ -162,16 +162,15 @@ pub trait CacheBackend: Backend {
         T::Cached: DeserializeOwned,
     {
         async move {
-            Ok(self
-                .read(key)
-                .await?
-                .map(|value| {
+            match self.read(key).await? {
+                Some(value) => {
                     let (meta, value) = value.into_parts();
-                    self.value_format()
-                        .deserialize(&value)
-                        .map(|value| CacheValue::new(value, meta.expire, meta.stale))
-                })
-                .transpose()?)
+                    let decompressed = self.compressor().decompress(&value)?;
+                    let deserialized = self.value_format().deserialize(&decompressed)?;
+                    Ok(Some(CacheValue::new(deserialized, meta.expire, meta.stale)))
+                }
+                None => Ok(None),
+            }
         }
     }
 
@@ -187,9 +186,10 @@ pub trait CacheBackend: Backend {
     {
         async move {
             let serialized_value = self.value_format().serialize(&value.data)?;
+            let compressed_value = self.compressor().compress(&serialized_value)?;
             self.write(
                 key,
-                CacheValue::new(serialized_value, value.expire, value.stale),
+                CacheValue::new(compressed_value, value.expire, value.stale),
                 ttl,
             )
             .await

@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::Utc;
+use hitbox_backend::serializer::FormatExt;
 use hitbox_backend::{Backend, CacheBackend, CacheKeyFormat, DeleteStatus};
 use hitbox_core::{
     CacheKey, CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, ResponseCachePolicy,
@@ -61,15 +62,15 @@ impl CacheableResponse for TestResponse {
 /// - TTL expiration
 /// - Delete operations
 /// - Missing key handling
-pub async fn run_backend_tests<B: CacheBackend + Send + Sync>(backend: B) {
-    test_write_and_read(&backend).await;
-    test_write_and_read_with_metadata(&backend).await;
-    test_delete_existing(&backend).await;
-    test_delete_missing(&backend).await;
-    test_read_nonexistent(&backend).await;
-    test_overwrite(&backend).await;
-    test_multiple_keys(&backend).await;
-    test_binary_data(&backend).await;
+pub async fn run_backend_tests<B: CacheBackend + Send + Sync>(backend: &B) {
+    test_write_and_read(backend).await;
+    test_write_and_read_with_metadata(backend).await;
+    test_delete_existing(backend).await;
+    test_delete_missing(backend).await;
+    test_read_nonexistent(backend).await;
+    test_overwrite(backend).await;
+    test_multiple_keys(backend).await;
+    test_binary_data(backend).await;
 }
 
 async fn test_write_and_read<B: CacheBackend>(backend: &B) {
@@ -283,9 +284,15 @@ pub async fn test_url_encoded_key_json_value<B: Backend + CacheBackend>(backend:
         .expect("failed to read raw")
         .expect("value should exist");
 
+    // Decompress the data before validating format
+    let decompressed = backend
+        .compressor()
+        .decompress(&raw_value.data)
+        .expect("failed to decompress");
+
     // Verify it's valid JSON
     let as_string =
-        String::from_utf8(raw_value.data.clone()).expect("Value should be valid UTF-8 JSON");
+        String::from_utf8(decompressed.clone()).expect("Value should be valid UTF-8 JSON");
     assert!(
         as_string.contains("\"id\"") || as_string.contains("id"),
         "Value should contain JSON fields"
@@ -324,8 +331,14 @@ pub async fn test_url_encoded_key_bincode_value<B: Backend + CacheBackend>(backe
         .expect("failed to read raw")
         .expect("value should exist");
 
+    // Decompress the data before validating format
+    let decompressed = backend
+        .compressor()
+        .decompress(&raw_value.data)
+        .expect("failed to decompress");
+
     // Verify it's NOT readable JSON (binary format)
-    let as_string = String::from_utf8(raw_value.data.clone());
+    let as_string = String::from_utf8(decompressed.clone());
     assert!(
         as_string.is_err() || !as_string.unwrap().contains("\"id\""),
         "Value should be in Bincode format (binary), not JSON"
@@ -364,9 +377,15 @@ pub async fn test_bitcode_key_json_value<B: Backend + CacheBackend>(backend: &B)
         .expect("failed to read raw")
         .expect("value should exist");
 
+    // Decompress the data before validating format
+    let decompressed = backend
+        .compressor()
+        .decompress(&raw_value.data)
+        .expect("failed to decompress");
+
     // Verify value is JSON
     let as_string =
-        String::from_utf8(raw_value.data.clone()).expect("Value should be valid UTF-8 JSON");
+        String::from_utf8(decompressed.clone()).expect("Value should be valid UTF-8 JSON");
     assert!(
         as_string.contains("\"id\"") || as_string.contains("id"),
         "Value should be in JSON format"
@@ -404,8 +423,14 @@ pub async fn test_bitcode_key_bincode_value<B: Backend + CacheBackend>(backend: 
         .expect("failed to read raw")
         .expect("value should exist");
 
+    // Decompress the data before validating format
+    let decompressed = backend
+        .compressor()
+        .decompress(&raw_value.data)
+        .expect("failed to decompress");
+
     // Verify value is binary Bincode
-    let as_string = String::from_utf8(raw_value.data.clone());
+    let as_string = String::from_utf8(decompressed.clone());
     assert!(
         as_string.is_err() || !as_string.unwrap().contains("\"id\""),
         "Value should be in Bincode format (binary), not JSON"
@@ -417,4 +442,59 @@ pub async fn test_bitcode_key_bincode_value<B: Backend + CacheBackend>(backend: 
         .expect("failed to deserialize");
     assert!(result.is_some());
     assert_eq!(result.unwrap().data, response);
+}
+
+/// Test that compression is actually being used
+///
+/// This test verifies that compression is working by comparing the serialized data
+/// with the raw stored data. If they're different, compression was applied.
+///
+/// # Arguments
+/// * `backend` - Backend configured with a compressor
+pub async fn test_compression_is_used<B>(backend: &B)
+where
+    B: Backend + CacheBackend,
+{
+    // Create a large, highly compressible test response with lots of repeated data
+    let large_repeated_data = vec![42u8; 10000]; // 10KB of the same byte
+    let key = CacheKey::from_str("compression-test", "verify-compression");
+    let response = TestResponse::new(999, "compression-test-data", large_repeated_data);
+    let value = CacheValue::new(response.clone(), None, None);
+
+    // Serialize the value to get the raw uncompressed serialized bytes
+    let serialized = backend
+        .value_format()
+        .serialize(&response)
+        .expect("failed to serialize");
+
+    // Write to backend (should apply compression via compressor)
+    backend
+        .set::<TestResponse>(&key, &value, Some(Duration::from_secs(3600)))
+        .await
+        .expect("failed to write to backend");
+
+    // Read raw stored bytes
+    let raw_value = backend
+        .read(&key)
+        .await
+        .expect("failed to read from backend")
+        .expect("value should exist in backend");
+
+    // Verify compression was applied: raw stored bytes should differ from serialized bytes
+    assert_ne!(
+        raw_value.data, serialized,
+        "Stored data should be different from serialized data if compression is applied"
+    );
+
+    // Verify backend can correctly deserialize the data
+    let result: Option<CacheValue<TestResponse>> = backend
+        .get::<TestResponse>(&key)
+        .await
+        .expect("failed to deserialize from backend");
+    assert!(result.is_some(), "value should exist after compression");
+    assert_eq!(
+        result.unwrap().data,
+        response,
+        "data should be identical after compression roundtrip"
+    );
 }

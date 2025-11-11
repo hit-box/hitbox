@@ -1,2 +1,1 @@
-mod generic_tests;
-mod serialization_formats;
+mod comprehensive_tests;

@@ -31,6 +31,9 @@ pub enum BackendError {
     /// Serializing\Deserializing data error.
     #[error(transparent)]
     FormatError(#[from] FormatError),
+    /// Compressing\Decompressing data error.
+    #[error(transparent)]
+    CompressionError(#[from] CompressionError),
 
     /// DEBUG @TODO: remove
     #[error("test")]
