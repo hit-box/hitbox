@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn test_lock_manager_creation() {
         let manager = LockManager::new(100);
-        let key = CacheKey::from_slice(&[("test", "key")]);
+        let key = CacheKey::from_slice(&[("test", Some("key"))]);
 
         // Should be able to acquire
         assert!(manager.try_acquire(&key).is_some());
@@ -146,7 +146,7 @@ mod tests {
     #[tokio::test]
     async fn test_lock_prevents_concurrent_access() {
         let manager = LockManager::new(100);
-        let key = CacheKey::from_slice(&[("test", "key")]);
+        let key = CacheKey::from_slice(&[("test", Some("key"))]);
 
         // First acquire should succeed
         let permit1 = manager.try_acquire(&key);
@@ -167,7 +167,7 @@ mod tests {
     #[tokio::test]
     async fn test_acquire_waits_for_release() {
         let manager = LockManager::new(100);
-        let key = CacheKey::from_slice(&[("test", "key")]);
+        let key = CacheKey::from_slice(&[("test", Some("key"))]);
 
         // Acquire lock
         let permit1 = manager.try_acquire(&key).unwrap();
@@ -196,9 +196,9 @@ mod tests {
     fn test_lru_eviction() {
         let manager = LockManager::new(2); // Small capacity
 
-        let key1 = CacheKey::from_slice(&[("key", "1")]);
-        let key2 = CacheKey::from_slice(&[("key", "2")]);
-        let key3 = CacheKey::from_slice(&[("key", "3")]);
+        let key1 = CacheKey::from_slice(&[("key", Some("1"))]);
+        let key2 = CacheKey::from_slice(&[("key", Some("2"))]);
+        let key3 = CacheKey::from_slice(&[("key", Some("3"))]);
 
         // Acquire and release to add to cache
         drop(manager.try_acquire(&key1));
