@@ -1,11 +1,12 @@
 use hitbox_http::FromBytes;
 use hitbox_http::extractors;
 use hyper::body::Body as HttpBody;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::RequestExtractor;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, JsonSchema)]
 pub struct Body(String);
 
 impl Body {

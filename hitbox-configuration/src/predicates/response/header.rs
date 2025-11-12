@@ -7,6 +7,7 @@ use http::header::{HeaderName, HeaderValue as HttpHeaderValue};
 use hyper::body::Body as HttpBody;
 use indexmap::IndexMap;
 use regex::Regex;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ConfigError;
@@ -14,7 +15,7 @@ use crate::error::ConfigError;
 type CorePredicate<ReqBody> =
     Box<dyn Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync>;
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum HeaderValue {
     Eq(String),
@@ -22,7 +23,7 @@ pub enum HeaderValue {
     Operation(HeaderValueOperation),
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum HeaderValueOperation {
     Eq(String),

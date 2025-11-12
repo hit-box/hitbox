@@ -2,6 +2,7 @@ use hitbox_http::FromBytes;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::predicates::conditions::{Not, Or};
 use hyper::body::Body as HttpBody;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::Expression;
@@ -9,7 +10,7 @@ use crate::{RequestPredicate, error::ConfigError};
 
 // Use standard externally-tagged enum (serde default)
 // YAML syntax: And: [...], Or: [...], Not: {...}
-#[derive(Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Eq, PartialEq, Deserialize, Serialize, JsonSchema)]
 pub enum Operation {
     And(Vec<Expression>),
     Or(Vec<Expression>),

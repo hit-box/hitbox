@@ -112,8 +112,19 @@ response:
 ";
     let result = serde_saphyr::from_str::<ConfigEndpoint>(yaml_str);
     assert!(
-        result.is_err(),
-        "Invalid range (start > end) should be rejected during deserialization"
+        result.is_ok(),
+        "Deserialization should succeed; range validation happens during into_predicates()"
+    );
+
+    // Validation should fail when converting to predicates
+    let endpoint = result.unwrap();
+    let predicates_result = endpoint
+        .response
+        .unwrap_or_default()
+        .into_predicates::<Empty<Bytes>>();
+    assert!(
+        predicates_result.is_err(),
+        "Invalid range (start > end) should be rejected during into_predicates()"
     );
 }
 

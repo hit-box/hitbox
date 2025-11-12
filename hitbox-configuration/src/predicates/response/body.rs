@@ -4,13 +4,14 @@ use hitbox_http::predicates::response::BodyPredicate;
 use hitbox_http::predicates::response::body::{Operation as BodyOperation, ParsingType};
 use hitbox_http::{CacheableHttpResponse, FromBytes};
 use hyper::body::Body as HttpBody;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 type CorePredicate<ReqBody> =
     Box<dyn Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync>;
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum Operation {
     Jq(String),

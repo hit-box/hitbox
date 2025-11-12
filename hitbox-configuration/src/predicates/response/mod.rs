@@ -6,6 +6,7 @@ use hitbox_http::predicates::NeutralResponsePredicate;
 use hitbox_http::predicates::conditions::Or;
 use hitbox_http::{CacheableHttpResponse, FromBytes};
 use hyper::body::Body as HttpBody;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ConfigError;
@@ -13,7 +14,7 @@ use crate::error::ConfigError;
 type CorePredicate<ReqBody> =
     Box<dyn hitbox_core::Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync>;
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 pub enum Predicate {
     Status(status::Operation),
     Body(body::Operation),
@@ -38,7 +39,7 @@ impl Predicate {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 pub enum Operation {
     And(Vec<Expression>),
     Or(Vec<Expression>),
@@ -84,7 +85,7 @@ impl Operation {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum Expression {
     Predicate(Predicate),
@@ -108,7 +109,7 @@ impl Expression {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum Response {
     Flat(Vec<Predicate>),

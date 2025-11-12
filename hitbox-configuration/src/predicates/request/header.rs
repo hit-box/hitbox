@@ -2,11 +2,12 @@ use hitbox_http::predicates::request::{Header, header::Operation};
 use http::header::{HeaderName, HeaderValue as HttpHeaderValue};
 use indexmap::IndexMap;
 use regex::Regex;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{RequestPredicate, error::ConfigError};
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum HeaderValue {
     Eq(String),
@@ -14,7 +15,7 @@ pub enum HeaderValue {
     Operation(HeaderValueOperation),
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum HeaderValueOperation {
     Eq(String),

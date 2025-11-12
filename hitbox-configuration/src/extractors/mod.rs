@@ -1,5 +1,6 @@
 use hitbox_http::FromBytes;
 use hyper::body::Body as HttpBody;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::RequestExtractor;
@@ -11,7 +12,7 @@ pub mod method;
 pub mod path;
 pub mod query;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, JsonSchema)]
 pub enum Extractor {
     Path(Path),
     Method(Method),

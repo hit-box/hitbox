@@ -1,6 +1,7 @@
 use hitbox_http::FromBytes;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hyper::body::Body as HttpBody;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{RequestPredicate, error::ConfigError};
@@ -22,7 +23,7 @@ pub use predicate::Predicate;
 pub use query::QueryOperation;
 
 // Use untagged enum - serde tries Flat (array) first, then Tree
-#[derive(Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Eq, PartialEq, Deserialize, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum Request {
     Flat(Vec<Predicate>),

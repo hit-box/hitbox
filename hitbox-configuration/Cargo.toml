@@ -21,9 +21,14 @@ serde-saphyr = { workspace = true }
 indexmap = { version = "2.10", features = ["serde"] }
 thiserror = { workspace = true }
 regex = { workspace = true }
+schemars = { version = "0.8", features = ["indexmap2"] }
+jsonschema = { version = "0.26", optional = true }
+yaml-rust = { version = "0.4", optional = true }
+strsim = { version = "0.11", optional = true }
 
 [features]
-default = []
+default = ["validation"]
+validation = ["jsonschema", "yaml-rust", "strsim"]
 moka = ["hitbox-moka"]
 feoxdb = ["hitbox-feoxdb"]
 redis = ["hitbox-redis"]

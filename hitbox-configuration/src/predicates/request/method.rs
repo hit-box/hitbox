@@ -1,10 +1,11 @@
 use hitbox_http::predicates::request::Method;
 use http::Method as HttpMethod;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{RequestPredicate, error::ConfigError};
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum MethodOperation {
     Eq(String),

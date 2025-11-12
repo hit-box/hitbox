@@ -7,6 +7,20 @@ pub enum ConfigError {
     #[error("YAML parsing error: {0}")]
     Yaml(#[from] serde_saphyr::Error),
 
+    /// YAML scanner error (from yaml_rust)
+    #[cfg(feature = "validation")]
+    #[error("YAML parsing error: {0}")]
+    YamlScan(String),
+
+    /// JSON parsing error
+    #[error("JSON parsing error: {0}")]
+    Json(#[from] serde_json::Error),
+
+    /// Schema validation error
+    #[cfg(feature = "validation")]
+    #[error("Configuration validation error:\n{0}")]
+    Validation(String),
+
     /// Invalid HTTP header name
     #[error("Invalid HTTP header name: {0}")]
     InvalidHeaderName(String, #[source] http::header::InvalidHeaderName),
@@ -19,7 +33,7 @@ pub enum ConfigError {
     #[error("Invalid HTTP method: {0}")]
     InvalidMethod(String, #[source] http::method::InvalidMethod),
 
-    /// Invalid HTTP status code
+    /// Invalid HTTP status code: {0} (must be between 100 and 599)
     #[error("Invalid HTTP status code: {0}")]
     InvalidStatusCode(u16),
 
@@ -30,6 +44,10 @@ pub enum ConfigError {
         #[source]
         error: regex::Error,
     },
+
+    /// Invalid configuration value
+    #[error("Invalid configuration: {0}")]
+    InvalidConfiguration(String),
 
     /// Backend not available (feature not enabled)
     #[error("Backend '{0}' is not available. Enable the corresponding feature flag.")]
@@ -42,7 +60,27 @@ impl From<http::method::InvalidMethod> for ConfigError {
     }
 }
 
-/// Parse YAML configuration from a string
+/// Parse YAML configuration from a string (without validation)
+///
+/// For enhanced validation with better error messages, use `validate_config` instead.
+///
+/// # Arguments
+/// * `yaml` - YAML configuration string
+///
+/// # Examples
+/// ```
+/// use hitbox_configuration::ConfigEndpoint;
+/// use hitbox_configuration::parse_config;
+///
+/// let yaml = r#"
+/// policy:
+///   Enabled:
+///     ttl: 60
+/// "#;
+///
+/// let config = parse_config::<ConfigEndpoint>(yaml)?;
+/// # Ok::<(), hitbox_configuration::error::ConfigError>(())
+/// ```
 pub fn parse_config<T>(yaml: &str) -> Result<T, ConfigError>
 where
     T: serde::de::DeserializeOwned,
