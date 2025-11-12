@@ -1,18 +1,41 @@
 use std::num::NonZeroU16;
 
 use hitbox_core::Predicate;
-use hitbox_http::predicates::response::{StatusClass, StatusCode};
+use hitbox_http::predicates::response::{StatusClass as HttpStatusClass, StatusCode};
 use hitbox_http::{CacheableHttpResponse, FromBytes};
 use http::StatusCode as HttpStatusCode;
 use hyper::body::Body as HttpBody;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ConfigError;
 
+/// Configuration version of StatusClass with JsonSchema support
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq, JsonSchema)]
+pub enum StatusClass {
+    Informational,
+    Success,
+    Redirect,
+    ClientError,
+    ServerError,
+}
+
+impl From<StatusClass> for HttpStatusClass {
+    fn from(class: StatusClass) -> Self {
+        match class {
+            StatusClass::Informational => HttpStatusClass::Informational,
+            StatusClass::Success => HttpStatusClass::Success,
+            StatusClass::Redirect => HttpStatusClass::Redirect,
+            StatusClass::ClientError => HttpStatusClass::ClientError,
+            StatusClass::ServerError => HttpStatusClass::ServerError,
+        }
+    }
+}
+
 type CorePredicate<ReqBody> =
     Box<dyn Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync>;
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum Eq {
     Explicit { eq: NonZeroU16 },
@@ -28,7 +51,7 @@ impl Eq {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum In {
     Explicit { r#in: Vec<NonZeroU16> },
@@ -44,7 +67,7 @@ impl In {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum Class {
     Explicit { class: StatusClass },
@@ -52,17 +75,18 @@ pub enum Class {
 }
 
 impl Class {
-    fn class(&self) -> StatusClass {
+    fn class(&self) -> HttpStatusClass {
         match self {
-            Class::Explicit { class } => *class,
-            Class::Implicit(cls) => *cls,
+            Class::Explicit { class } => (*class).into(),
+            Class::Implicit(cls) => (*cls).into(),
         }
     }
 }
 
-#[derive(Serialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
+#[serde(transparent)]
 pub struct Range {
-    range: [NonZeroU16; 2],
+    pub range: [NonZeroU16; 2],
 }
 
 impl Range {
@@ -73,29 +97,20 @@ impl Range {
     fn end(&self) -> NonZeroU16 {
         self.range[1]
     }
-}
 
-impl<'de> Deserialize<'de> for Range {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::Error;
-        let range: [NonZeroU16; 2] = Deserialize::deserialize(deserializer)?;
-        let [start, end] = range;
-
+    fn validate(&self) -> Result<(), String> {
+        let [start, end] = self.range;
         if start.get() > end.get() {
-            return Err(D::Error::custom(format!(
+            return Err(format!(
                 "Invalid status code range: start ({}) must be less than or equal to end ({})",
                 start, end
-            )));
+            ));
         }
-
-        Ok(Range { range })
+        Ok(())
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum Operation {
     // Explicit-only forms (must be objects with named fields)
@@ -127,6 +142,7 @@ impl Operation {
                 Ok(Box::new(StatusCode::new_in(inner, status_codes)))
             }
             Operation::Range { range } => {
+                range.validate().map_err(|e| ConfigError::InvalidConfiguration(e))?;
                 let start = parse_status_code(range.start().get())?;
                 let end = parse_status_code(range.end().get())?;
                 Ok(Box::new(StatusCode::new_range(inner, start, end)))

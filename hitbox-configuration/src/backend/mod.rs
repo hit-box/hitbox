@@ -1,10 +1,11 @@
 use crate::error::ConfigError;
 use hitbox_backend::serializer::{BincodeFormat, Format, JsonFormat};
 use hitbox_backend::{Backend as BackendTrait, CacheKeyFormat};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema)]
 #[serde(tag = "type")]
 pub enum Backend {
     Moka(BackendConfig<Moka>),
@@ -82,7 +83,7 @@ impl Backend {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema)]
 pub struct BackendConfig<T> {
     pub key: KeyFormat,
     pub value: ValueFormat,
@@ -90,19 +91,19 @@ pub struct BackendConfig<T> {
     pub backend: T,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema)]
 pub struct KeyFormat {
     pub format: KeySerialization,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema)]
 pub struct ValueFormat {
     pub format: ValueSerialization,
     #[serde(default)]
     pub compression: Compression,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema)]
 pub enum KeySerialization {
     UrlEncoded,
     Bitcode,
@@ -118,7 +119,7 @@ impl KeySerialization {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema)]
 pub enum ValueSerialization {
     Json,
     Bincode,
@@ -133,7 +134,7 @@ impl ValueSerialization {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default, JsonSchema)]
 #[serde(tag = "type")]
 pub enum Compression {
     #[default]
@@ -188,17 +189,17 @@ impl Compression {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema)]
 pub struct Moka {
     pub max_capacity: u64,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema)]
 pub struct FeOxDb {
     pub path: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema)]
 pub struct Redis {
     pub connection_string: String,
 }

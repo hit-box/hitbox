@@ -1,6 +1,5 @@
 use std::{fmt::Debug, sync::Arc};
 
-use hitbox::policy::PolicyConfig;
 use hitbox_http::{
     extractors::{NeutralExtractor, method::MethodExtractor, path::PathExtractor},
     predicates::{
@@ -9,16 +8,18 @@ use hitbox_http::{
     },
 };
 use http::{Method, StatusCode};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     ConfigError, Request, RequestPredicate, Response, ResponsePredicate,
     endpoint::{Endpoint, RequestExtractor},
     extractors::Extractor,
+    policy::PolicyConfig,
     types::MaybeUndefined,
 };
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default, JsonSchema)]
 pub struct ConfigEndpoint {
     #[serde(default)]
     pub request: MaybeUndefined<Request>,
@@ -80,7 +81,7 @@ impl ConfigEndpoint {
             extractors,
             request_predicates,
             response_predicates,
-            policy: self.policy,
+            policy: self.policy.into_policy(),
         })
     }
 }

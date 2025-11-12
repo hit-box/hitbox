@@ -2,19 +2,21 @@ use std::fmt::Display;
 
 use hitbox_http::predicates::request::Query;
 use indexmap::IndexMap;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{RequestPredicate, error::ConfigError};
 
-#[derive(Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Eq, PartialEq, Deserialize, Serialize, JsonSchema)]
 pub struct QueryOperation {
     #[serde(flatten)]
+    #[schemars(flatten)]
     params: IndexMap<String, ParamOperation>,
 }
 
 // Untagged enum to accept any scalar type and convert to String
 // HTTP query parameters are always strings, but YAML allows different scalar types
-#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(untagged)]
 enum QueryParamValue {
     String(String),
@@ -33,7 +35,7 @@ impl Display for QueryParamValue {
 }
 
 // Untagged enum for query parameter operations
-#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(untagged)]
 enum ParamOperation {
     // Try explicit forms first (must be mappings)

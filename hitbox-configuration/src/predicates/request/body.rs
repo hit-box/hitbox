@@ -2,11 +2,12 @@ use crate::error::ConfigError;
 use hitbox_http::FromBytes;
 use hitbox_http::predicates::request::BodyPredicate as _;
 use hyper::body::Body as HttpBody;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::RequestPredicate;
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum BodyPredicate {
     Jq(String),

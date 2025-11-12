@@ -1,9 +1,10 @@
 use hitbox_http::extractors;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::RequestExtractor;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, JsonSchema)]
 pub struct Method {}
 
 impl Method {

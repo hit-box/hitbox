@@ -1,3 +1,6 @@
+use schemars::JsonSchema;
+use schemars::r#gen::SchemaGenerator;
+use schemars::schema::Schema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Eq, PartialEq, Default)]
@@ -6,6 +9,18 @@ pub enum MaybeUndefined<T> {
     #[default]
     Undefined,
     Value(T),
+}
+
+// Implement JsonSchema manually for MaybeUndefined to treat it as Option<T>
+impl<T: JsonSchema> JsonSchema for MaybeUndefined<T> {
+    fn schema_name() -> String {
+        format!("Nullable_{}", T::schema_name())
+    }
+
+    fn json_schema(schema_gen: &mut SchemaGenerator) -> Schema {
+        // MaybeUndefined behaves like Option<T> in JSON Schema
+        schema_gen.subschema_for::<Option<T>>()
+    }
 }
 
 impl<T> MaybeUndefined<T> {
