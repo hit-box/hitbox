@@ -43,6 +43,7 @@
 pub mod backend;
 pub mod error;
 pub mod fsm;
+pub mod lock_manager;
 #[cfg(feature = "metrics")]
 #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
 pub mod metrics;

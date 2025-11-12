@@ -4,8 +4,9 @@ use futures::future::BoxFuture;
 use hitbox_backend::BackendError;
 use hitbox_core::{RequestCachePolicy, ResponseCachePolicy};
 use pin_project::pin_project;
+use tokio::sync::OwnedSemaphorePermit;
 
-use crate::{CacheState, CacheValue, CacheableResponse};
+use crate::{CacheKey, CacheState, CacheValue, CacheableResponse, lock_manager::LockError};
 
 pub type CacheResult<T> = Result<Option<CacheValue<T>>, BackendError>;
 pub type PollCacheFuture<T> = BoxFuture<'static, CacheResult<T>>;
@@ -13,6 +14,7 @@ pub type UpdateCache<T> = BoxFuture<'static, (Result<(), BackendError>, T)>;
 pub type RequestCachePolicyFuture<T> = BoxFuture<'static, RequestCachePolicy<T>>;
 pub type CacheStateFuture<T> = BoxFuture<'static, CacheState<T>>;
 pub type UpstreamFuture<T> = BoxFuture<'static, T>;
+pub type LockFuture = BoxFuture<'static, Result<OwnedSemaphorePermit, LockError>>;
 
 #[allow(missing_docs)]
 #[pin_project(project = StateProj)]
@@ -35,6 +37,22 @@ where
     // },
     CheckCacheState {
         cache_state: CacheStateFuture<Res>,
+        request: Option<Req>,
+    },
+    TryAcquireLock {
+        key: CacheKey,
+        request: Option<Req>,
+    },
+    WaitForLock {
+        #[pin]
+        lock_future: LockFuture,
+        key: CacheKey,
+        request: Option<Req>,
+    },
+    CheckCacheAfterWait {
+        #[pin]
+        cache_check: PollCacheFuture<Res::Cached>,
+        permit: Option<OwnedSemaphorePermit>,
         request: Option<Req>,
     },
     PollUpstream {
@@ -67,6 +85,9 @@ where
             State::PollCache { .. } => f.write_str("State::PollCache"),
             // State::CachePolled { .. } => f.write_str("State::PollCache"),
             State::CheckCacheState { .. } => f.write_str("State::CheckCacheState"),
+            State::TryAcquireLock { .. } => f.write_str("State::TryAcquireLock"),
+            State::WaitForLock { .. } => f.write_str("State::WaitForLock"),
+            State::CheckCacheAfterWait { .. } => f.write_str("State::CheckCacheAfterWait"),
             State::CheckResponseCachePolicy { .. } => {
                 f.write_str("State::CheckResponseCachePolicy")
             }

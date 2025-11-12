@@ -12,12 +12,14 @@ use futures::ready;
 use hitbox_core::{CacheablePolicyData, EntityPolicyConfig};
 use pin_project::pin_project;
 use serde::{Serialize, de::DeserializeOwned};
+use tokio::sync::OwnedSemaphorePermit;
 use tracing::debug;
 
 use crate::{
     CacheKey, CacheableRequest, Extractor, Predicate,
     backend::CacheBackend,
     fsm::{PollCacheFuture, State, states::StateProj},
+    lock_manager::LockManager,
 };
 
 const POLL_AFTER_READY_ERROR: &str = "CacheFuture can't be polled after finishing";
@@ -180,6 +182,8 @@ where
     response_predicates: Arc<dyn Predicate<Subject = Res::Subject> + Send + Sync>,
     key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
     policy: Arc<crate::policy::PolicyConfig>,
+    lock_manager: Option<Arc<LockManager>>,
+    lock_permit: Option<OwnedSemaphorePermit>,
 }
 
 impl<B, Req, Res, T> CacheFuture<B, Req, Res, T>
@@ -198,8 +202,23 @@ where
         response_predicates: Arc<dyn Predicate<Subject = Res::Subject> + Send + Sync>,
         key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
         policy: Arc<crate::policy::PolicyConfig>,
+        lock_manager: Option<Arc<LockManager>>,
     ) -> Self {
         let cache_enabled = matches!(policy.as_ref(), crate::policy::PolicyConfig::Enabled(_));
+
+        // Determine if we should actually use locks based on policy configuration
+        let lock_manager = lock_manager.and_then(|manager| {
+            if let crate::policy::PolicyConfig::Enabled(config) = policy.as_ref() {
+                if config.locks().map(|l| l.enabled).unwrap_or(false) {
+                    Some(manager)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+
         CacheFuture {
             transformer,
             backend,
@@ -213,6 +232,8 @@ where
             response_predicates,
             key_extractors,
             policy,
+            lock_manager,
+            lock_permit: None,
         }
     }
 }
@@ -294,11 +315,20 @@ where
                             request: request.take(),
                         },
                         None => {
-                            let upstream_future =
-                                Box::pin(this.transformer.upstream_transform(
-                                    request.take().expect(POLL_AFTER_READY_ERROR),
-                                ));
-                            State::PollUpstream { upstream_future }
+                            // Cache MISS - check if we should use locks
+                            if let Some(_lock_manager) = this.lock_manager.as_ref() {
+                                State::TryAcquireLock {
+                                    key: this.cache_key.clone().expect("cache key must be set"),
+                                    request: request.take(),
+                                }
+                            } else {
+                                // No lock manager, go directly to upstream
+                                let upstream_future =
+                                    Box::pin(this.transformer.upstream_transform(
+                                        request.take().expect(POLL_AFTER_READY_ERROR),
+                                    ));
+                                State::PollUpstream { upstream_future }
+                            }
                         }
                     }
                 }
@@ -315,9 +345,110 @@ where
                         CacheState::Stale(response) => State::Response {
                             response: Some(response),
                         },
-                        // TODO: remove code duplication with PollCache (upstream_future creation)
                         CacheState::Expired(_response) => {
                             *this.cache_status = CacheStatus::Miss;
+                            // Cache EXPIRED - check if we should use locks
+                            if let Some(_lock_manager) = this.lock_manager.as_ref() {
+                                State::TryAcquireLock {
+                                    key: this.cache_key.clone().expect("cache key must be set"),
+                                    request: request.take(),
+                                }
+                            } else {
+                                // No lock manager, go directly to upstream
+                                let upstream_future =
+                                    Box::pin(this.transformer.upstream_transform(
+                                        request.take().expect(POLL_AFTER_READY_ERROR),
+                                    ));
+                                State::PollUpstream { upstream_future }
+                            }
+                        }
+                    }
+                }
+                StateProj::TryAcquireLock { key, request } => {
+                    let lock_manager = this.lock_manager.as_ref().expect("lock manager must be present");
+
+                    // Try to acquire lock immediately
+                    match lock_manager.try_acquire(key) {
+                        Some(permit) => {
+                            // Got the lock! Store permit and fetch upstream
+                            *this.lock_permit = Some(permit);
+                            let upstream_future =
+                                Box::pin(this.transformer.upstream_transform(
+                                    request.take().expect(POLL_AFTER_READY_ERROR),
+                                ));
+                            State::PollUpstream { upstream_future }
+                        }
+                        None => {
+                            // Lock held by another request, wait for it
+                            let lock_manager = lock_manager.clone();
+                            let key_for_future = key.clone();
+                            let lock_future = Box::pin(async move {
+                                lock_manager.acquire(&key_for_future).await
+                            });
+
+                            State::WaitForLock {
+                                lock_future,
+                                key: key.clone(),
+                                request: request.take(),
+                            }
+                        }
+                    }
+                }
+                StateProj::WaitForLock {
+                    mut lock_future,
+                    key,
+                    request,
+                } => {
+                    match ready!(lock_future.as_mut().poll(cx)) {
+                        Ok(permit) => {
+                            // Got the lock! Check if cache was populated while waiting
+                            let backend = this.backend.clone();
+                            let cache_key = key.clone();
+                            let cache_check = Box::pin(async move {
+                                backend.get::<Res>(&cache_key).await
+                            });
+
+                            State::CheckCacheAfterWait {
+                                cache_check,
+                                permit: Some(permit),
+                                request: request.take(),
+                            }
+                        }
+                        Err(_) => {
+                            // Semaphore closed (shouldn't happen), fallback to upstream without lock
+                            let upstream_future =
+                                Box::pin(this.transformer.upstream_transform(
+                                    request.take().expect(POLL_AFTER_READY_ERROR),
+                                ));
+                            State::PollUpstream { upstream_future }
+                        }
+                    }
+                }
+                StateProj::CheckCacheAfterWait {
+                    cache_check,
+                    permit,
+                    request,
+                } => {
+                    let cached = ready!(cache_check.poll(cx)).unwrap_or_else(|_err| None);
+
+                    match cached {
+                        Some(cached_value) => {
+                            // Cache was populated by another request!
+                            // Release the lock (permit drops) and return cached value
+                            drop(permit.take());
+
+                            // Check if it's still valid or stale
+                            let cache_state = cached_value.cache_state();
+                            State::CheckCacheState {
+                                cache_state: Box::pin(cache_state),
+                                request: request.take(),
+                            }
+                        }
+                        None => {
+                            // Cache still empty, we need to fetch upstream
+                            // Keep the permit - it will be released after cache update
+                            *this.lock_permit = permit.take();
+
                             let upstream_future =
                                 Box::pin(this.transformer.upstream_transform(
                                     request.take().expect(POLL_AFTER_READY_ERROR),
@@ -374,16 +505,32 @@ where
                                 update_cache_future,
                             }
                         }
-                        CachePolicy::NonCacheable(response) => State::Response {
-                            response: Some(response),
-                        },
+                        CachePolicy::NonCacheable(response) => {
+                            // Release lock (if held) for non-cacheable responses
+                            if let Some(permit) = this.lock_permit.take() {
+                                drop(permit);
+                            }
+                            State::Response {
+                                response: Some(response),
+                            }
+                        }
                     }
                 }
                 StateProj::UpdateCache {
                     update_cache_future,
                 } => {
-                    // TODO: check backend result
-                    let (_backend_result, upstream_result) = ready!(update_cache_future.poll(cx));
+                    let (backend_result, upstream_result) = ready!(update_cache_future.poll(cx));
+
+                    // Release lock (if held) after cache update
+                    if let Some(permit) = this.lock_permit.take() {
+                        drop(permit);
+                    }
+
+                    // Log errors but don't fail the request
+                    if let Err(e) = backend_result {
+                        tracing::warn!("Failed to update cache: {}", e);
+                    }
+
                     State::Response {
                         response: Some(upstream_result),
                     }
