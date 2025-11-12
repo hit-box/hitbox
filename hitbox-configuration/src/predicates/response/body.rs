@@ -1,8 +1,7 @@
 use crate::error::ConfigError;
 use hitbox_core::Predicate;
 use hitbox_http::predicates::response::BodyPredicate;
-use hitbox_http::predicates::response::body::{Operation as BodyOperation, ParsingType};
-use hitbox_http::{CacheableHttpResponse, FromBytes};
+use hitbox_http::{CacheableHttpResponse, FromBytes, Operation as BodyOperation, ParsingType};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;

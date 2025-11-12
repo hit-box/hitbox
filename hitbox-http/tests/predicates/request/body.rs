@@ -1,10 +1,9 @@
 use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
-use hitbox_http::CacheableHttpRequest;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::predicates::request::BodyPredicate;
 use hitbox_http::predicates::request::ParsingType;
-use hitbox_http::predicates::request::body::Operation;
+use hitbox_http::{CacheableHttpRequest, Operation};
 use http::Request;
 use serde_json::json;
 

@@ -5,6 +5,7 @@ use hitbox::predicate::{Predicate, PredicateResult};
 
 use crate::{CacheableHttpRequest, CacheableHttpResponse};
 
+pub mod body;
 pub mod conditions;
 pub mod request;
 pub mod response;
