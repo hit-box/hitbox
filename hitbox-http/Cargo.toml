@@ -30,6 +30,7 @@ bytes = { workspace = true }
 chrono = { workspace = true }
 hyper = { workspace = true }
 futures = { workspace = true }
+pin-project = { workspace = true }
 actix-router = "0.5"
 serde_qs = "0.15"
 serde = { workspace = true }

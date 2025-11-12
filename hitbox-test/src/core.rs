@@ -1,6 +1,7 @@
 use crate::app::app;
 use crate::time::{MockTime, MockTimeProvider, clear_mock_time_provider};
 use hitbox_configuration::Endpoint;
+use hitbox_http::BufferedBody;
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
 use std::fmt::Debug;
@@ -25,7 +26,7 @@ pub struct TimeState {
 
 #[derive(Debug, World)]
 pub struct HitboxWorld {
-    pub config: Endpoint<axum::body::Body, axum::body::Body>,
+    pub config: Endpoint<BufferedBody<axum::body::Body>, BufferedBody<axum::body::Body>>,
     pub state: State,
     pub backend: MokaBackend,
     pub time_state: TimeState,

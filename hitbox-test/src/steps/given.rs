@@ -64,7 +64,7 @@ async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Erro
             .as_str(),
     )?;
     let extractors = config.0.into_iter().rev().rfold(
-        Box::new(NeutralExtractor::<axum::body::Body>::new()) as RequestExtractor<_>,
+        Box::new(NeutralExtractor::<hitbox_http::BufferedBody<axum::body::Body>>::new()) as RequestExtractor<_>,
         |inner, item| item.into_extractors(inner),
     );
     world.config.extractors = Arc::new(extractors);
