@@ -7,7 +7,7 @@ use std::{
 
 use futures::{Future, future::BoxFuture};
 use hitbox::fsm::Transform;
-use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, FromBytes};
+use hitbox_http::{BufferedBody, CacheableHttpRequest, CacheableHttpResponse};
 use http::{Request, Response};
 use pin_project::pin_project;
 use tower::Service;
@@ -30,15 +30,19 @@ impl<S, ReqBody, ResBody>
     Transform<CacheableHttpRequest<ReqBody>, Result<CacheableHttpResponse<ResBody>, S::Error>>
     for Transformer<S, ReqBody>
 where
-    S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+    S: Service<Request<BufferedBody<ReqBody>>, Response = Response<ResBody>>
+        + Clone
+        + Send
+        + 'static,
     S::Future: Send,
-    ReqBody: Send + 'static,
-    ResBody: FromBytes,
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
+    ResBody: hyper::body::Body,
     // debug bounds
     S::Error: Debug,
 {
     type Future = UpstreamFuture<ResBody, S::Error>;
-    type Response = Result<Response<ResBody>, S::Error>;
+    type Response = Result<Response<BufferedBody<ResBody>>, S::Error>;
 
     fn upstream_transform(&self, req: CacheableHttpRequest<ReqBody>) -> Self::Future {
         UpstreamFuture::new(self.inner.clone(), req)
@@ -66,17 +70,26 @@ where
 }
 
 #[pin_project]
-pub struct UpstreamFuture<ResBody, E> {
+pub struct UpstreamFuture<ResBody, E>
+where
+    ResBody: hyper::body::Body,
+{
     inner_future: BoxFuture<'static, Result<CacheableHttpResponse<ResBody>, E>>,
 }
 
-impl<ResBody, E> UpstreamFuture<ResBody, E> {
+impl<ResBody, E> UpstreamFuture<ResBody, E>
+where
+    ResBody: hyper::body::Body,
+{
     pub fn new<S, ReqBody>(mut inner_service: S, req: CacheableHttpRequest<ReqBody>) -> Self
     where
-        S: Service<Request<ReqBody>, Response = Response<ResBody>, Error = E> + Send + 'static,
+        S: Service<Request<BufferedBody<ReqBody>>, Response = Response<ResBody>, Error = E>
+            + Send
+            + 'static,
         S::Future: Send,
-        ReqBody: Send + 'static,
-        ResBody: FromBytes,
+        ReqBody: hyper::body::Body + Send + 'static,
+        ReqBody::Error: Send,
+        ResBody: hyper::body::Body,
         // debug bounds
         S::Error: Debug,
     {
@@ -91,13 +104,22 @@ impl<ResBody, E> UpstreamFuture<ResBody, E> {
             //         dbg!(err);
             //     }
             // };
-            res.map(CacheableHttpResponse::from_response)
+            res.map(|response| {
+                // Wrap the response body in BufferedBody::Passthrough
+                let (parts, body) = response.into_parts();
+                let buffered_response =
+                    Response::from_parts(parts, BufferedBody::Passthrough(body));
+                CacheableHttpResponse::from_response(buffered_response)
+            })
         });
         UpstreamFuture { inner_future }
     }
 }
 
-impl<ResBody, E> Future for UpstreamFuture<ResBody, E> {
+impl<ResBody, E> Future for UpstreamFuture<ResBody, E>
+where
+    ResBody: hyper::body::Body,
+{
     type Output = Result<CacheableHttpResponse<ResBody>, E>;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();

@@ -1,8 +1,8 @@
 use crate::error::ConfigError;
 use hitbox_core::Predicate;
+use hitbox_http::CacheableHttpResponse;
 use hitbox_http::predicates::response::BodyPredicate;
 use hitbox_http::predicates::response::body::{Operation as BodyOperation, ParsingType};
-use hitbox_http::{CacheableHttpResponse, FromBytes};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -27,8 +27,8 @@ impl Operation {
         inner: CorePredicate<ReqBody>,
     ) -> Result<CorePredicate<ReqBody>, ConfigError>
     where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
+        ReqBody: HttpBody + Send + 'static,
+        ReqBody::Error: std::fmt::Debug + Send,
         ReqBody::Data: Send,
     {
         match self {

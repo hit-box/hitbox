@@ -5,8 +5,8 @@ use hitbox_configuration::{
     predicates::request::{Expression, MethodOperation, Operation, Predicate, Request},
     types::MaybeUndefined,
 };
-use hitbox_http::CacheableHttpRequest;
 use hitbox_http::predicates::NeutralRequestPredicate;
+use hitbox_http::{BufferedBody, CacheableHttpRequest};
 use http::Request as HttpRequest;
 use http_body_util::Empty;
 use pretty_assertions::assert_eq;
@@ -53,7 +53,7 @@ async fn test_expression_into_predicates() {
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
             .method("PUT")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
@@ -128,7 +128,7 @@ async fn test_or_with_matching_first_predicate() {
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
             .method("GET")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
@@ -150,7 +150,7 @@ async fn test_or_with_matching_middle_predicate() {
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
             .method("POST")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
@@ -172,7 +172,7 @@ async fn test_or_with_matching_last_predicate() {
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
             .method("HEAD")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
@@ -194,7 +194,7 @@ async fn test_or_with_no_matching_predicates() {
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
             .method("DELETE")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
@@ -212,7 +212,7 @@ async fn test_or_with_single_predicate_matching() {
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
             .method("GET")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
@@ -230,7 +230,7 @@ async fn test_or_with_single_predicate_not_matching() {
     let request = CacheableHttpRequest::from_request(
         HttpRequest::builder()
             .method("POST")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;
@@ -251,7 +251,7 @@ async fn test_or_with_mixed_predicate_types() {
         HttpRequest::builder()
             .method("GET")
             .uri("/books")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let cacheable = predicate_or.check(request).await;

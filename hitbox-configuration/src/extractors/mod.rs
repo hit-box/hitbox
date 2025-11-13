@@ -1,4 +1,3 @@
-use hitbox_http::FromBytes;
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
@@ -26,8 +25,8 @@ impl Extractor {
         inner: RequestExtractor<ReqBody>,
     ) -> RequestExtractor<ReqBody>
     where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
+        ReqBody: HttpBody + Send + 'static,
+        ReqBody::Error: std::fmt::Debug + Send,
         ReqBody::Data: Send,
     {
         match self {

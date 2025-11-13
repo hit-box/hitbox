@@ -1,6 +1,5 @@
 use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
-use hitbox_http::CacheableHttpRequest;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::predicates::conditions::{NotPredicate, OrPredicate};
 use hitbox_http::predicates::request::header;
@@ -8,6 +7,7 @@ use hitbox_http::predicates::request::query;
 use hitbox_http::predicates::request::{
     HeaderPredicate, MethodPredicate, PathPredicate, QueryPredicate,
 };
+use hitbox_http::{BufferedBody, CacheableHttpRequest};
 use http::Request;
 use http_body_util::Empty;
 
@@ -16,7 +16,7 @@ async fn test_conditions_or_cacheable() {
     let request = CacheableHttpRequest::from_request(
         Request::builder()
             .method("GET")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let neutral_predicate = NeutralRequestPredicate::new();
@@ -34,7 +34,7 @@ async fn test_conditions_or_noncacheable_base() {
     let request = CacheableHttpRequest::from_request(
         Request::builder()
             .method("GET")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let wrong_base_predicate = NeutralRequestPredicate::new().method(http::Method::PATCH);
@@ -52,7 +52,7 @@ async fn test_conditions_or_noncacheable() {
     let request = CacheableHttpRequest::from_request(
         Request::builder()
             .method("GET")
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let neutral_predicate = NeutralRequestPredicate::new();
@@ -73,14 +73,13 @@ async fn test_conditions_not() {
         Request::builder()
             .header("x-test", "test-value")
             .uri(path)
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let correct_query_predicate =
-        NeutralRequestPredicate::<CacheableHttpRequest<Empty<Bytes>>>::new()
-            .query(query::Operation::Eq("name".to_owned(), "value".to_owned()));
-    let wrong_path_predicate = NeutralRequestPredicate::<CacheableHttpRequest<Empty<Bytes>>>::new()
-        .path(expression.into());
+    let correct_query_predicate = NeutralRequestPredicate::<Empty<Bytes>>::new()
+        .query(query::Operation::Eq("name".to_owned(), "value".to_owned()));
+    let wrong_path_predicate =
+        NeutralRequestPredicate::<Empty<Bytes>>::new().path(expression.into());
     let wrong_header_predicate = NeutralRequestPredicate::new().header(header::Operation::Eq(
         "x-test".parse().unwrap(),
         "wrong-test-value".parse().unwrap(),

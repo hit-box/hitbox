@@ -17,15 +17,18 @@ type RequestExtractor<ResBody> =
 pub trait CacheConfig {
     fn request_predicates<ReqBody>(&self) -> RequestPredicate<ReqBody>
     where
-        ReqBody: Send + 'static;
+        ReqBody: hyper::body::Body + Send + 'static,
+        ReqBody::Error: Send;
 
     fn response_predicates<ResBody>(&self) -> ResponsePredicate<ResBody>
     where
-        ResBody: Send + 'static;
+        ResBody: hyper::body::Body + Send + 'static,
+        ResBody::Error: Send;
 
     fn extractors<ReqBody>(&self) -> RequestExtractor<ReqBody>
     where
-        ReqBody: Send + 'static + Debug;
+        ReqBody: hyper::body::Body + Send + 'static + Debug,
+        ReqBody::Error: Send;
 
     fn policy(&self) -> PolicyConfig;
 }

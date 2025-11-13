@@ -36,10 +36,15 @@ where
 
 pub type HeaderOperation = IndexMap<String, HeaderValue>;
 
-pub fn into_predicates<ReqBody: Send + 'static>(
+pub fn into_predicates<ReqBody>(
     headers: HeaderOperation,
     inner: RequestPredicate<ReqBody>,
-) -> Result<RequestPredicate<ReqBody>, ConfigError> {
+) -> Result<RequestPredicate<ReqBody>, ConfigError>
+where
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
+    ReqBody::Data: Send,
+{
     headers.into_iter().try_rfold(
         inner,
         |inner, (header_name, header_value)| -> Result<RequestPredicate<ReqBody>, ConfigError> {

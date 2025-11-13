@@ -1,4 +1,3 @@
-use hitbox_http::FromBytes;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
@@ -38,8 +37,8 @@ impl Default for Request {
 impl Request {
     pub fn into_predicates<Req>(self) -> Result<RequestPredicate<Req>, ConfigError>
     where
-        Req: HttpBody + FromBytes + Send + 'static,
-        Req::Error: std::fmt::Debug,
+        Req: HttpBody + Send + 'static,
+        Req::Error: std::fmt::Debug + Send,
         Req::Data: Send,
     {
         let neutral_predicate: RequestPredicate<Req> =

@@ -12,7 +12,7 @@ use jaq_json::{self, Val};
 use prost_reflect::{DynamicMessage, MessageDescriptor, SerializeOptions};
 use serde_json::Value;
 
-use crate::{CacheableHttpRequest, FromBytes};
+use crate::{BufferedBody, CacheableHttpRequest};
 
 #[derive(Debug)]
 pub enum Operation {
@@ -98,9 +98,8 @@ impl<P, ReqBody> Predicate for Body<P>
 where
     ReqBody: HttpBody + Send + 'static,
     P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
-    ReqBody::Error: Debug,
+    ReqBody::Error: Debug + Send,
     ReqBody::Data: Send,
-    ReqBody: FromBytes,
 {
     type Subject = P::Subject;
 
@@ -108,9 +107,18 @@ where
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
                 let (parts, body) = request.into_parts();
-                use http_body_util::BodyExt;
-                let payload = body.collect().await.unwrap().to_bytes();
-                // let payload = to_bytes(body).await.unwrap();
+
+                // Collect body, handling errors by returning NonCacheable with error body
+                let payload = match body.collect().await {
+                    Ok(bytes) => bytes,
+                    Err(error_body) => {
+                        let request = Request::from_parts(parts, error_body);
+                        return PredicateResult::NonCacheable(CacheableHttpRequest::from_request(
+                            request,
+                        ));
+                    }
+                };
+
                 let body_str = String::from_utf8_lossy(&payload);
                 let json_value = match &self.parsing_type {
                     ParsingType::Jq => serde_json::from_str(&body_str).unwrap_or(Value::Null),
@@ -137,7 +145,8 @@ where
                     }
                 };
 
-                let request = Request::from_parts(parts, ReqBody::from_bytes(payload));
+                let body = BufferedBody::Complete(Some(payload));
+                let request = Request::from_parts(parts, body);
                 if is_cacheable {
                     PredicateResult::Cacheable(CacheableHttpRequest::from_request(request))
                 } else {

@@ -40,7 +40,8 @@ where
 #[async_trait]
 impl<P, ReqBody> Predicate for Query<P>
 where
-    ReqBody: Send + 'static,
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
     P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
 {
     type Subject = P::Subject;

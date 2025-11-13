@@ -112,7 +112,8 @@ where
 impl<P, ReqBody> Predicate for StatusCode<P>
 where
     P: Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync,
-    ReqBody: Send + 'static,
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
 {
     type Subject = P::Subject;
 

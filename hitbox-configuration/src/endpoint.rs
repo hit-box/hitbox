@@ -21,14 +21,22 @@ pub type ArcRequestExtractor<ReqBody> =
     Arc<dyn Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>;
 
 #[derive(Debug)]
-pub struct Endpoint<ReqBody, ResBody> {
+pub struct Endpoint<ReqBody, ResBody>
+where
+    ReqBody: hyper::body::Body,
+    ResBody: hyper::body::Body,
+{
     pub request_predicates: ArcRequestPredicate<ReqBody>,
     pub response_predicates: ArcResponsePredicate<ResBody>,
     pub extractors: ArcRequestExtractor<ReqBody>,
     pub policy: PolicyConfig,
 }
 
-impl<ReqBody, ResBody> Clone for Endpoint<ReqBody, ResBody> {
+impl<ReqBody, ResBody> Clone for Endpoint<ReqBody, ResBody>
+where
+    ReqBody: hyper::body::Body,
+    ResBody: hyper::body::Body,
+{
     fn clone(&self) -> Self {
         Self {
             request_predicates: Arc::clone(&self.request_predicates),
@@ -41,11 +49,11 @@ impl<ReqBody, ResBody> Clone for Endpoint<ReqBody, ResBody> {
 
 impl<ReqBody, ResBody> Default for Endpoint<ReqBody, ResBody>
 where
-    ReqBody: hyper::body::Body + hitbox_http::FromBytes + Send + Debug + 'static,
-    ReqBody::Error: Debug,
+    ReqBody: hyper::body::Body + Send + Debug + 'static,
+    ReqBody::Error: Debug + Send,
     ReqBody::Data: Send,
-    ResBody: hyper::body::Body + hitbox_http::FromBytes + Send + 'static,
-    ResBody::Error: Debug,
+    ResBody: hyper::body::Body + Send + 'static,
+    ResBody::Error: Debug + Send,
     ResBody::Data: Send,
 {
     fn default() -> Self {
@@ -58,8 +66,12 @@ where
 impl<ReqBody, ResBody> CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>
     for Endpoint<ReqBody, ResBody>
 where
-    ReqBody: Send + 'static,
-    ResBody: Send + 'static,
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
+    ReqBody::Data: Send,
+    ResBody: hyper::body::Body + Send + 'static,
+    ResBody::Error: Send,
+    ResBody::Data: Send,
 {
     fn request_predicates(
         &self,

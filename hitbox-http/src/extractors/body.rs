@@ -10,7 +10,7 @@ use jaq_core::{
 use jaq_json::{self, Val};
 use serde_json::Value;
 
-use crate::{CacheableHttpRequest, FromBytes};
+use crate::CacheableHttpRequest;
 
 #[derive(Debug)]
 pub struct Body<E> {
@@ -73,8 +73,8 @@ fn apply(expression: &str, input: Value) -> Option<Value> {
 #[async_trait]
 impl<ReqBody, E> Extractor for Body<E>
 where
-    ReqBody: HttpBody + FromBytes + Send + 'static,
-    ReqBody::Error: Debug,
+    ReqBody: HttpBody + Send + 'static,
+    ReqBody::Error: Debug + Send,
     ReqBody::Data: Send,
     E: Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
 {
@@ -82,8 +82,21 @@ where
 
     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
         let (parts, body) = subject.into_parts();
-        use http_body_util::BodyExt;
-        let payload = body.collect().await.unwrap().to_bytes();
+
+        // Collect body, handling errors
+        let payload = match body.collect().await {
+            Ok(bytes) => bytes,
+            Err(error_body) => {
+                // If collection fails, return early with None for this key part
+                let request = CacheableHttpRequest::from_request(http::Request::from_parts(
+                    parts, error_body,
+                ));
+                let mut key_parts = self.inner.get(request).await;
+                key_parts.push(KeyPart::new(self.expression.clone(), None::<String>));
+                return key_parts;
+            }
+        };
+
         let body_str = String::from_utf8_lossy(&payload);
         let json_value = serde_json::from_str(&body_str).unwrap_or(Value::Null);
 
@@ -97,10 +110,8 @@ where
             other => Some(other.to_string()),
         });
 
-        let request = CacheableHttpRequest::from_request(http::Request::from_parts(
-            parts,
-            ReqBody::from_bytes(payload),
-        ));
+        let body = crate::BufferedBody::Complete(Some(payload));
+        let request = CacheableHttpRequest::from_request(http::Request::from_parts(parts, body));
 
         let mut key_parts = self.inner.get(request).await;
         key_parts.push(KeyPart::new(self.expression.clone(), value_string));

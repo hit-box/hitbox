@@ -1,4 +1,3 @@
-use hitbox_http::FromBytes;
 use hitbox_http::predicates::request::Path;
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
@@ -23,8 +22,8 @@ impl Predicate {
         inner: RequestPredicate<ReqBody>,
     ) -> Result<RequestPredicate<ReqBody>, ConfigError>
     where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
+        ReqBody: HttpBody + Send + 'static,
+        ReqBody::Error: std::fmt::Debug + Send,
         ReqBody::Data: Send,
     {
         match self {

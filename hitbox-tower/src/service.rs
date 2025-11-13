@@ -2,7 +2,7 @@ use hitbox::config::CacheConfig;
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};
-use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, FromBytes};
+use hitbox_http::{BufferedBody, CacheableHttpRequest, CacheableHttpResponse};
 use http::{Request, Response};
 use hyper::body::Body as HttpBody;
 use tower::Service;
@@ -42,19 +42,23 @@ where
 
 impl<S, B, C, ReqBody, ResBody> Service<Request<ReqBody>> for CacheService<S, B, C>
 where
-    S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+    S: Service<Request<BufferedBody<ReqBody>>, Response = Response<ResBody>>
+        + Clone
+        + Send
+        + 'static,
     B: CacheBackend + Clone + Send + Sync + 'static,
     S::Future: Send,
     C: CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>,
     // debug bounds
     ReqBody: Debug + HttpBody + Send + 'static,
+    ReqBody::Error: Send,
     // Body: From<ReqBody>,
-    ResBody: FromBytes + HttpBody + Send + 'static,
-    ResBody::Error: Debug,
+    ResBody: HttpBody + Send + 'static,
+    ResBody::Error: Debug + Send,
     ResBody::Data: Send,
     S::Error: Debug + Send,
 {
-    type Response = Response<ResBody>;
+    type Response = Response<BufferedBody<ResBody>>;
     type Error = S::Error;
     type Future = CacheFuture<
         B,
@@ -73,9 +77,14 @@ where
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
         let transformer = Transformer::new(self.upstream.clone());
         let configuration = &self.configuration;
+
+        // Wrap the incoming request body in BufferedBody::Passthrough
+        let (parts, body) = req.into_parts();
+        let buffered_request = Request::from_parts(parts, BufferedBody::Passthrough(body));
+
         CacheFuture::new(
             self.backend.clone(),
-            CacheableHttpRequest::from_request(req),
+            CacheableHttpRequest::from_request(buffered_request),
             transformer,
             Arc::new(configuration.request_predicates()),
             Arc::new(configuration.response_predicates()),

@@ -35,7 +35,8 @@ where
 impl<P, ReqBody> Predicate for Path<P>
 where
     P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
-    ReqBody: Send + 'static,
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
 {
     type Subject = P::Subject;
 

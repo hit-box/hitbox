@@ -28,7 +28,8 @@ impl<ResBody> NeutralExtractor<ResBody> {
 #[async_trait]
 impl<ResBody> Extractor for NeutralExtractor<ResBody>
 where
-    ResBody: Send + 'static + Debug,
+    ResBody: hyper::body::Body + Send + 'static + Debug,
+    ResBody::Error: Send,
 {
     type Subject = CacheableHttpRequest<ResBody>;
 

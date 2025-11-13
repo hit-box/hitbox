@@ -1,4 +1,3 @@
-use hitbox_http::FromBytes;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::predicates::conditions::{Not, Or};
 use hyper::body::Body as HttpBody;
@@ -22,8 +21,8 @@ impl Operation {
         inner: RequestPredicate<ReqBody>,
     ) -> Result<RequestPredicate<ReqBody>, ConfigError>
     where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
+        ReqBody: HttpBody + Send + 'static,
+        ReqBody::Error: std::fmt::Debug + Send,
         ReqBody::Data: Send,
     {
         match self {
@@ -33,7 +32,7 @@ impl Operation {
                     None => Ok(inner),
                     Some(first) => {
                         let first_predicate =
-                            first.into_predicates(Box::new(NeutralRequestPredicate::new()))?;
+                            first.into_predicates(Box::new(NeutralRequestPredicate::<_>::new()))?;
                         iter.try_fold(first_predicate, |acc, predicate| {
                             let predicate =
                                 predicate
@@ -43,7 +42,7 @@ impl Operation {
                             Ok(Box::new(Or::new(
                                 predicate,
                                 acc,
-                                Box::new(NeutralRequestPredicate::new()),
+                                Box::new(NeutralRequestPredicate::<_>::new()),
                             )) as RequestPredicate<ReqBody>)
                         })
                     }
@@ -54,7 +53,7 @@ impl Operation {
                 .try_rfold(inner, |inner, predicate| predicate.into_predicates(inner)),
             Operation::Not(expression) => {
                 let predicate =
-                    expression.into_predicates(Box::new(NeutralRequestPredicate::new()))?;
+                    expression.into_predicates(Box::new(NeutralRequestPredicate::<_>::new()))?;
                 Ok(Box::new(Not::new(predicate)))
             }
         }
