@@ -12,7 +12,7 @@ use jaq_json::{self, Val};
 use prost_reflect::{DynamicMessage, MessageDescriptor, SerializeOptions};
 use serde_json::Value;
 
-use crate::{CacheableHttpResponse, FromBytes};
+use crate::{BufferedBody, CacheableHttpResponse};
 
 #[derive(Debug)]
 pub enum Operation {
@@ -98,19 +98,27 @@ impl<P, ResBody> Predicate for Body<P>
 where
     ResBody: HttpBody + Send + 'static,
     P: Predicate<Subject = CacheableHttpResponse<ResBody>> + Send + Sync,
-    ResBody::Error: Debug,
+    ResBody::Error: Debug + Send,
     ResBody::Data: Send,
-    ResBody: FromBytes,
 {
     type Subject = P::Subject;
 
     async fn check(&self, response: Self::Subject) -> PredicateResult<Self::Subject> {
-        use http_body_util::BodyExt;
         match self.inner.check(response).await {
             PredicateResult::Cacheable(response) => {
                 let (parts, body) = response.into_response().into_parts();
-                // TODO: remove unwrap here
-                let payload = body.collect().await.unwrap().to_bytes();
+
+                // Collect body, handling errors by returning NonCacheable with error body
+                let payload = match body.collect().await {
+                    Ok(bytes) => bytes,
+                    Err(error_body) => {
+                        let response = Response::from_parts(parts, error_body);
+                        return PredicateResult::NonCacheable(
+                            CacheableHttpResponse::from_response(response),
+                        );
+                    }
+                };
+
                 let body_str = String::from_utf8_lossy(&payload);
                 let json_value = match &self.parsing_type {
                     ParsingType::Jq => serde_json::from_str(&body_str).unwrap_or(Value::Null),
@@ -137,7 +145,8 @@ where
                     }
                 };
 
-                let response = Response::from_parts(parts, ResBody::from_bytes(payload));
+                let body = BufferedBody::Complete(Some(payload));
+                let response = Response::from_parts(parts, body);
                 if is_cacheable {
                     PredicateResult::Cacheable(CacheableHttpResponse::from_response(response))
                 } else {

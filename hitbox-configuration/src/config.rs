@@ -32,13 +32,15 @@ pub struct ConfigEndpoint {
 impl ConfigEndpoint {
     pub fn extractors<ReqBody>(&self) -> RequestExtractor<ReqBody>
     where
-        ReqBody: hyper::body::Body + hitbox_http::FromBytes + Send + Debug + 'static,
-        ReqBody::Error: Debug,
+        ReqBody: hyper::body::Body + Send + Debug + 'static,
+        ReqBody::Error: Debug + Send,
         ReqBody::Data: Send,
     {
         match &self.extractors {
-            MaybeUndefined::Null => Box::new(NeutralExtractor::new()),
-            MaybeUndefined::Undefined => Box::new(NeutralExtractor::new().method().path("*")),
+            MaybeUndefined::Null => Box::new(NeutralExtractor::<ReqBody>::new()),
+            MaybeUndefined::Undefined => {
+                Box::new(NeutralExtractor::<ReqBody>::new().method().path("*"))
+            }
             MaybeUndefined::Value(extractors) => extractors.iter().cloned().rfold(
                 Box::new(NeutralExtractor::<ReqBody>::new()),
                 |inner, item| item.into_extractors(inner),
@@ -48,31 +50,31 @@ impl ConfigEndpoint {
 
     pub fn into_endpoint<ReqBody, ResBody>(self) -> Result<Endpoint<ReqBody, ResBody>, ConfigError>
     where
-        ReqBody: hyper::body::Body + hitbox_http::FromBytes + Send + Debug + 'static,
-        ReqBody::Error: Debug,
+        ReqBody: hyper::body::Body + Send + Debug + 'static,
+        ReqBody::Error: Debug + Send,
         ReqBody::Data: Send,
-        ResBody: hyper::body::Body + hitbox_http::FromBytes + Send + 'static,
-        ResBody::Error: Debug,
+        ResBody: hyper::body::Body + Send + 'static,
+        ResBody::Error: Debug + Send,
         ResBody::Data: Send,
     {
         let extractors = Arc::new(self.extractors());
         let response_predicates = Arc::new(match self.response {
             MaybeUndefined::Value(response) => response.into_predicates()?,
             MaybeUndefined::Null => {
-                Box::new(NeutralResponsePredicate::new()) as ResponsePredicate<ResBody>
+                Box::new(NeutralResponsePredicate::<ResBody>::new()) as ResponsePredicate<ResBody>
             }
             MaybeUndefined::Undefined => {
-                Box::new(NeutralResponsePredicate::new().status_code(StatusCode::OK))
+                Box::new(NeutralResponsePredicate::<ResBody>::new().status_code(StatusCode::OK))
                     as ResponsePredicate<ResBody>
             }
         });
         let request_predicates = Arc::new(match self.request {
             MaybeUndefined::Value(request) => request.into_predicates()?,
             MaybeUndefined::Null => {
-                Box::new(NeutralRequestPredicate::new()) as RequestPredicate<ReqBody>
+                Box::new(NeutralRequestPredicate::<ReqBody>::new()) as RequestPredicate<ReqBody>
             }
             MaybeUndefined::Undefined => {
-                Box::new(NeutralRequestPredicate::new().method(Method::GET))
+                Box::new(NeutralRequestPredicate::<ReqBody>::new().method(Method::GET))
                     as RequestPredicate<ReqBody>
             }
         });

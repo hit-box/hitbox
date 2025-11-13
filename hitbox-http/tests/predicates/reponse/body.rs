@@ -1,10 +1,10 @@
 use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
-use hitbox_http::CacheableHttpResponse;
 use hitbox_http::predicates::NeutralResponsePredicate;
 use hitbox_http::predicates::response::BodyPredicate;
 use hitbox_http::predicates::response::ParsingType;
 use hitbox_http::predicates::response::body::Operation;
+use hitbox_http::{BufferedBody, CacheableHttpResponse};
 use http::Response;
 use serde_json::json;
 
@@ -18,7 +18,9 @@ mod eq_tests {
     async fn test_positive() {
         let json_body = r#"{"field":"test-value"}"#;
         let body = Full::new(Bytes::from(json_body));
-        let request = Response::builder().body(body).unwrap();
+        let request = Response::builder()
+            .body(BufferedBody::Passthrough(body))
+            .unwrap();
         let request = CacheableHttpResponse::from_response(request);
 
         let predicate = NeutralResponsePredicate::new().body(
@@ -35,7 +37,9 @@ mod eq_tests {
     async fn test_negative() {
         let json_body = r#"{"field":"test-value"}"#;
         let body = Full::new(Bytes::from(json_body));
-        let response = Response::builder().body(body).unwrap();
+        let response = Response::builder()
+            .body(BufferedBody::Passthrough(body))
+            .unwrap();
         let response = CacheableHttpResponse::from_response(response);
 
         let predicate = NeutralResponsePredicate::new().body(
@@ -52,7 +56,9 @@ mod eq_tests {
     async fn test_field_not_found() {
         let json_body = r#"{"field":"test-value"}"#;
         let body = Full::new(Bytes::from(json_body));
-        let request = Response::builder().body(body).unwrap();
+        let request = Response::builder()
+            .body(BufferedBody::Passthrough(body))
+            .unwrap();
         let request = CacheableHttpResponse::from_response(request);
 
         let predicate = NeutralResponsePredicate::new().body(
@@ -75,7 +81,9 @@ mod exist_tests {
     async fn test_positive() {
         let json_body = r#"{"field":"test-value"}"#;
         let body = Full::new(Bytes::from(json_body));
-        let request = Response::builder().body(body).unwrap();
+        let request = Response::builder()
+            .body(BufferedBody::Passthrough(body))
+            .unwrap();
         let request = CacheableHttpResponse::from_response(request);
 
         let predicate = NeutralResponsePredicate::new().body(
@@ -92,7 +100,9 @@ mod exist_tests {
     async fn test_negative() {
         let json_body = r#"{"other_field":"test-value"}"#;
         let body = Full::new(Bytes::from(json_body));
-        let request = Response::builder().body(body).unwrap();
+        let request = Response::builder()
+            .body(BufferedBody::Passthrough(body))
+            .unwrap();
         let request = CacheableHttpResponse::from_response(request);
 
         let predicate = NeutralResponsePredicate::new().body(
@@ -115,7 +125,9 @@ mod in_tests {
     async fn test_positive() {
         let json_body = r#"{"field":"test-value"}"#;
         let body = Full::new(Bytes::from(json_body));
-        let request = Response::builder().body(body).unwrap();
+        let request = Response::builder()
+            .body(BufferedBody::Passthrough(body))
+            .unwrap();
         let request = CacheableHttpResponse::from_response(request);
 
         let values = vec!["value-1".to_owned(), "test-value".to_owned()];
@@ -133,7 +145,9 @@ mod in_tests {
     async fn test_negative() {
         let json_body = r#"{"field":"wrong-value"}"#;
         let body = Full::new(Bytes::from(json_body));
-        let request = Response::builder().body(body).unwrap();
+        let request = Response::builder()
+            .body(BufferedBody::Passthrough(body))
+            .unwrap();
         let request = CacheableHttpResponse::from_response(request);
 
         let values = vec!["value-1".to_owned(), "test-value".to_owned()];
@@ -152,7 +166,11 @@ mod in_tests {
 async fn test_request_body_predicates_positive_basic() {
     let json_body = r#"{"inner":{"field_one":"value_one","field_two":"value_two"}}"#;
     let body = http_body_util::Full::new(Bytes::from(json_body));
-    let request = CacheableHttpResponse::from_response(Response::builder().body(body).unwrap());
+    let request = CacheableHttpResponse::from_response(
+        Response::builder()
+            .body(BufferedBody::Passthrough(body))
+            .unwrap(),
+    );
 
     let predicate = NeutralResponsePredicate::new().body(
         ParsingType::Jq,
@@ -172,7 +190,11 @@ async fn test_request_body_predicates_positive_array() {
         {"key": "my-key-01", "value": "my-value-01"}
     ]"#;
     let body = http_body_util::Full::new(Bytes::from(json_body));
-    let request = CacheableHttpResponse::from_response(Response::builder().body(body).unwrap());
+    let request = CacheableHttpResponse::from_response(
+        Response::builder()
+            .body(BufferedBody::Passthrough(body))
+            .unwrap(),
+    );
 
     let predicate = NeutralResponsePredicate::new().body(
         ParsingType::Jq,
@@ -193,7 +215,11 @@ async fn test_request_body_predicates_positive_multiple_value() {
         {"key": "my-key-02", "value": "my-value-02"}
     ]"#;
     let body = http_body_util::Full::new(Bytes::from(json_body));
-    let request = CacheableHttpResponse::from_response(Response::builder().body(body).unwrap());
+    let request = CacheableHttpResponse::from_response(
+        Response::builder()
+            .body(BufferedBody::Passthrough(body))
+            .unwrap(),
+    );
 
     let predicate = NeutralResponsePredicate::new().body(
         ParsingType::Jq,

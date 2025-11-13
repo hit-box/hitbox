@@ -2,9 +2,9 @@ pub mod body;
 pub mod header;
 pub mod status;
 
+use hitbox_http::CacheableHttpResponse;
 use hitbox_http::predicates::NeutralResponsePredicate;
 use hitbox_http::predicates::conditions::Or;
-use hitbox_http::{CacheableHttpResponse, FromBytes};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
@@ -26,8 +26,8 @@ impl Predicate {
         inner: CorePredicate<ReqBody>,
     ) -> Result<CorePredicate<ReqBody>, ConfigError>
     where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
+        ReqBody: HttpBody + Send + 'static,
+        ReqBody::Error: std::fmt::Debug + Send,
         ReqBody::Data: Send,
     {
         match self {
@@ -50,8 +50,8 @@ impl Operation {
         inner: CorePredicate<ReqBody>,
     ) -> Result<CorePredicate<ReqBody>, ConfigError>
     where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
+        ReqBody: HttpBody + Send + 'static,
+        ReqBody::Error: std::fmt::Debug + Send,
         ReqBody::Data: Send,
     {
         match self {
@@ -97,8 +97,8 @@ impl Expression {
         inner: CorePredicate<ReqBody>,
     ) -> Result<CorePredicate<ReqBody>, ConfigError>
     where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
+        ReqBody: HttpBody + Send + 'static,
+        ReqBody::Error: std::fmt::Debug + Send,
         ReqBody::Data: Send,
     {
         match self {
@@ -124,8 +124,8 @@ impl Default for Response {
 impl Response {
     pub fn into_predicates<Req>(self) -> Result<CorePredicate<Req>, ConfigError>
     where
-        Req: HttpBody + FromBytes + Send + 'static,
-        Req::Error: std::fmt::Debug,
+        Req: HttpBody + Send + 'static,
+        Req::Error: std::fmt::Debug + Send,
         Req::Data: Send,
     {
         let neutral_predicate: CorePredicate<Req> =

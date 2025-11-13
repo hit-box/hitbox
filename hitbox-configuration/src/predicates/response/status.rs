@@ -1,8 +1,8 @@
 use std::num::NonZeroU16;
 
 use hitbox_core::Predicate;
+use hitbox_http::CacheableHttpResponse;
 use hitbox_http::predicates::response::{StatusClass, StatusCode};
-use hitbox_http::{CacheableHttpResponse, FromBytes};
 use http::StatusCode as HttpStatusCode;
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
@@ -113,8 +113,8 @@ impl Operation {
         inner: CorePredicate<ReqBody>,
     ) -> Result<CorePredicate<ReqBody>, ConfigError>
     where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
+        ReqBody: HttpBody + Send + 'static,
+        ReqBody::Error: std::fmt::Debug + Send,
         ReqBody::Data: Send,
     {
         match self {

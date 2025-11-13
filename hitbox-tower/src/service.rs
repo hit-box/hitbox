@@ -2,7 +2,7 @@ use hitbox::config::CacheConfig;
 use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{backend::CacheBackend, fsm::CacheFuture};
-use hitbox_http::{BufferedBody, CacheableHttpRequest, CacheableHttpResponse, FromBytes};
+use hitbox_http::{BufferedBody, CacheableHttpRequest, CacheableHttpResponse};
 use http::{Request, Response};
 use hyper::body::Body as HttpBody;
 use tower::Service;
@@ -42,15 +42,18 @@ where
 
 impl<S, B, C, ReqBody, ResBody> Service<Request<ReqBody>> for CacheService<S, B, C>
 where
-    S: Service<Request<BufferedBody<ReqBody>>, Response = Response<ResBody>> + Clone + Send + 'static,
+    S: Service<Request<BufferedBody<ReqBody>>, Response = Response<ResBody>>
+        + Clone
+        + Send
+        + 'static,
     B: CacheBackend + Clone + Send + Sync + 'static,
     S::Future: Send,
-    C: CacheConfig<CacheableHttpRequest<BufferedBody<ReqBody>>, CacheableHttpResponse<BufferedBody<ResBody>>>,
+    C: CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>,
     // debug bounds
     ReqBody: Debug + HttpBody + Send + 'static,
     ReqBody::Error: Send,
     // Body: From<ReqBody>,
-    ResBody: FromBytes + HttpBody + Send + 'static,
+    ResBody: HttpBody + Send + 'static,
     ResBody::Error: Debug + Send,
     ResBody::Data: Send,
     S::Error: Debug + Send,
@@ -59,8 +62,8 @@ where
     type Error = S::Error;
     type Future = CacheFuture<
         B,
-        CacheableHttpRequest<BufferedBody<ReqBody>>,
-        Result<CacheableHttpResponse<BufferedBody<ResBody>>, S::Error>,
+        CacheableHttpRequest<ReqBody>,
+        Result<CacheableHttpResponse<ResBody>, S::Error>,
         Transformer<S, ReqBody>,
     >;
 

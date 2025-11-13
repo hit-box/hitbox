@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Utc;
@@ -9,52 +7,30 @@ use hitbox::{
 use http::{HeaderMap, Response, response::Parts};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
-use crate::body::FromBytes;
+use crate::body::BufferedBody;
 
 #[derive(Debug)]
-pub enum ResponseBody<ResBody> {
-    Pending(ResBody),
-    Complete(Bytes),
-}
-
-impl<ResBody> ResponseBody<ResBody>
+pub struct CacheableHttpResponse<ResBody>
 where
-    ResBody: FromBytes,
+    ResBody: HttpBody,
 {
-    pub fn into_inner_body(self) -> ResBody {
-        match self {
-            ResponseBody::Pending(body) => body,
-            ResponseBody::Complete(body) => ResBody::from_bytes(body),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct CacheableHttpResponse<ResBody> {
     pub parts: Parts,
-    pub body: ResponseBody<ResBody>,
+    pub body: BufferedBody<ResBody>,
 }
 
 impl<ResBody> CacheableHttpResponse<ResBody>
 where
-    ResBody: FromBytes,
+    ResBody: HttpBody,
 {
-    pub fn from_response(response: Response<ResBody>) -> Self {
+    pub fn from_response(response: Response<BufferedBody<ResBody>>) -> Self {
         let (parts, body) = response.into_parts();
-        CacheableHttpResponse {
-            parts,
-            body: ResponseBody::Pending(body),
-        }
+        CacheableHttpResponse { parts, body }
     }
 
-    pub fn into_response(self) -> Response<ResBody> {
-        match self.body {
-            ResponseBody::Pending(body) => Response::from_parts(self.parts, body),
-            ResponseBody::Complete(body) => {
-                Response::from_parts(self.parts, ResBody::from_bytes(body))
-            }
-        }
+    pub fn into_response(self) -> Response<BufferedBody<ResBody>> {
+        Response::from_parts(self.parts, self.body)
     }
 }
 
@@ -71,9 +47,9 @@ pub struct SerializableHttpResponse {
 #[async_trait]
 impl<ResBody> CacheableResponse for CacheableHttpResponse<ResBody>
 where
-    ResBody: HttpBody + FromBytes + Send + 'static,
+    ResBody: HttpBody + Send + 'static,
     // debug bounds
-    ResBody::Error: Debug,
+    ResBody::Error: Debug + Send,
     ResBody::Data: Send,
 {
     type Cached = SerializableHttpResponse;
@@ -101,28 +77,29 @@ where
     }
 
     async fn into_cached(self) -> CachePolicy<Self::Cached, Self> {
-        use http_body_util::BodyExt;
-        let body = self
-            .body
-            .into_inner_body()
-            .collect()
-            .await
-            .unwrap()
-            .to_bytes()
-            .to_vec();
+        let body_bytes = match self.body.collect().await {
+            Ok(bytes) => bytes,
+            Err(error_body) => {
+                // If collection fails, return NonCacheable with error body
+                return CachePolicy::NonCacheable(CacheableHttpResponse {
+                    parts: self.parts,
+                    body: error_body,
+                });
+            }
+        };
 
         // We can store the HeaderMap directly, including pseudo-headers
         // HeaderMap is designed to handle pseudo-headers and http-serde will serialize them correctly
         CachePolicy::Cacheable(SerializableHttpResponse {
             status: self.parts.status.as_u16(),
             version: format!("{:?}", self.parts.version),
-            body,
+            body: body_bytes.to_vec(),
             headers: self.parts.headers,
         })
     }
 
     async fn from_cached(cached: Self::Cached) -> Self {
-        let body = ResBody::from_bytes(Bytes::from(cached.body));
+        let body = BufferedBody::Complete(Some(Bytes::from(cached.body)));
         let mut response = Response::builder()
             .status(cached.status)
             .body(body)

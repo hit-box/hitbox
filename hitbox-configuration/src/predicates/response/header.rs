@@ -1,6 +1,6 @@
 use hitbox_core::Predicate;
 use hitbox_http::{
-    CacheableHttpResponse, FromBytes,
+    CacheableHttpResponse,
     predicates::response::{Header, header::Operation},
 };
 use http::header::{HeaderName, HeaderValue as HttpHeaderValue};
@@ -49,8 +49,8 @@ pub fn into_predicates<ReqBody>(
     inner: CorePredicate<ReqBody>,
 ) -> Result<CorePredicate<ReqBody>, ConfigError>
 where
-    ReqBody: HttpBody + FromBytes + Send + 'static,
-    ReqBody::Error: std::fmt::Debug,
+    ReqBody: HttpBody + Send + 'static,
+    ReqBody::Error: std::fmt::Debug + Send,
     ReqBody::Data: Send,
 {
     headers.into_iter().try_rfold(

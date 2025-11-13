@@ -12,10 +12,15 @@ pub enum MethodOperation {
 }
 
 impl MethodOperation {
-    pub(crate) fn into_predicates<ReqBody: Send + 'static>(
+    pub fn into_predicates<ReqBody>(
         self,
         inner: RequestPredicate<ReqBody>,
-    ) -> Result<RequestPredicate<ReqBody>, ConfigError> {
+    ) -> Result<RequestPredicate<ReqBody>, ConfigError>
+    where
+        ReqBody: hyper::body::Body + Send + 'static,
+        ReqBody::Error: std::fmt::Debug + Send,
+        ReqBody::Data: Send,
+    {
         match self {
             MethodOperation::Eq(method) => {
                 let http_method = parse_method(&method)?;

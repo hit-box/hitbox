@@ -17,7 +17,8 @@ impl<T> Not<T> {
 #[async_trait]
 impl<T, ReqBody> Predicate for Not<T>
 where
-    ReqBody: Send + 'static,
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
     T: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
 {
     type Subject = CacheableHttpRequest<ReqBody>;

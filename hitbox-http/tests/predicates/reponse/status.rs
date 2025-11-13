@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
 use hitbox_http::{
-    CacheableHttpResponse,
+    BufferedBody, CacheableHttpResponse,
     predicates::{NeutralResponsePredicate, response::StatusCodePredicate},
 };
 use http::{Response, StatusCode};
@@ -13,7 +13,7 @@ async fn test_response_predicates_match() {
     let request = CacheableHttpResponse::from_response(
         Response::builder()
             .status(status)
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let predicate =
@@ -29,7 +29,7 @@ async fn test_response_predicates_not_match() {
     let request = CacheableHttpResponse::from_response(
         Response::builder()
             .status(response_status)
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let predicate = NeutralResponsePredicate::new()

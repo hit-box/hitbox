@@ -46,7 +46,7 @@ where
 impl<P, ReqBody> Predicate for Header<P>
 where
     ReqBody: HttpBody + Send + 'static,
-    ReqBody::Error: std::fmt::Debug,
+    ReqBody::Error: std::fmt::Debug + Send,
     ReqBody::Data: Send,
     P: Predicate<Subject = CacheableHttpResponse<ReqBody>> + Send + Sync,
 {

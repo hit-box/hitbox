@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
-use hitbox_http::CacheableHttpRequest;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::predicates::request::QueryPredicate;
 use hitbox_http::predicates::request::query;
+use hitbox_http::{BufferedBody, CacheableHttpRequest};
 use http::Request;
 use http_body_util::Empty;
 
@@ -13,7 +13,7 @@ async fn test_request_query_predicates_positive() {
     let request = CacheableHttpRequest::from_request(
         Request::builder()
             .uri(path)
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let predicate = NeutralRequestPredicate::new()
@@ -28,7 +28,7 @@ async fn test_request_query_predicates_multiple() {
     let request = CacheableHttpRequest::from_request(
         Request::builder()
             .uri(path)
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let predicate = NeutralRequestPredicate::new().query(query::Operation::In(
@@ -45,7 +45,7 @@ async fn test_request_query_predicates_negative() {
     let request = CacheableHttpRequest::from_request(
         Request::builder()
             .uri(path)
-            .body(Empty::<Bytes>::new())
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
     let predicate = NeutralRequestPredicate::new().query(query::Operation::Eq(

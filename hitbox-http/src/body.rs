@@ -1,65 +1,13 @@
-use axum::body::Body;
-use bytes::{Buf, Bytes};
+use bytes::{Buf, Bytes, BytesMut};
 use http_body::{Body as HttpBody, Frame};
-use http_body_util::{BodyExt, Empty, Full, combinators::UnsyncBoxBody};
 use pin_project::pin_project;
 use std::fmt;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pub trait FromBytes {
-    fn from_bytes(bytes: Bytes) -> Self;
-}
-
-impl FromBytes for Body {
-    fn from_bytes(bytes: Bytes) -> Self {
-        Body::from(bytes)
-    }
-}
-
-// impl<D> FromBytes for Collected<D> {
-//     fn from_bytes(bytes: Bytes) -> Self {
-//         Collected::from(bytes)
-//     }
-// }
-
-impl<D, E> FromBytes for UnsyncBoxBody<D, E>
-where
-    D: From<Bytes> + Buf + Send + 'static,
-    E: 'static,
-{
-    fn from_bytes(bytes: Bytes) -> Self {
-        UnsyncBoxBody::new(Full::new(D::from(bytes)).map_err(|_| unreachable!()))
-    }
-}
-
-impl<D> FromBytes for Full<D>
-where
-    D: From<Bytes> + Buf + Send + 'static,
-{
-    fn from_bytes(bytes: Bytes) -> Self {
-        Full::new(D::from(bytes))
-    }
-}
-
-impl<D> FromBytes for Empty<D>
-where
-    D: From<Bytes> + Buf + Send + 'static,
-{
-    fn from_bytes(_bytes: Bytes) -> Self {
-        Empty::new()
-    }
-}
-
-impl FromBytes for String {
-    fn from_bytes(bytes: Bytes) -> Self {
-        String::from_utf8_lossy(&bytes).to_string()
-    }
-}
-
-/// Internal enum to represent the remaining body state after partial consumption.
+/// Enum to represent the remaining body state after partial consumption.
 #[pin_project(project = RemainingProj)]
-enum Remaining<B>
+pub enum Remaining<B>
 where
     B: HttpBody,
 {
@@ -143,7 +91,8 @@ where
                         // Continue polling the remaining body stream and convert Data type
                         match body.poll_frame(cx) {
                             Poll::Ready(Some(Ok(frame))) => {
-                                let frame = frame.map_data(|mut data| data.copy_to_bytes(data.remaining()));
+                                let frame =
+                                    frame.map_data(|mut data| data.copy_to_bytes(data.remaining()));
                                 Poll::Ready(Some(Ok(frame)))
                             }
                             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
@@ -230,12 +179,72 @@ where
     }
 }
 
-impl<B> FromBytes for BufferedBody<B>
+impl<B> BufferedBody<B>
 where
     B: HttpBody,
 {
-    fn from_bytes(bytes: Bytes) -> Self {
-        BufferedBody::Complete(Some(bytes))
+    /// Collects the entire body into bytes, handling errors properly.
+    ///
+    /// This method consumes the body and returns:
+    /// - `Ok(bytes)` if collection succeeds
+    /// - `Err(Self)` with `BufferedBody::Partial` containing the error if collection fails
+    pub async fn collect(self) -> Result<Bytes, Self>
+    where
+        B::Data: Send,
+    {
+        use http_body_util::BodyExt;
+
+        match self {
+            // Already complete, extract bytes
+            BufferedBody::Complete(Some(bytes)) => Ok(bytes),
+            BufferedBody::Complete(None) => Ok(Bytes::new()),
+
+            // Passthrough - need to collect
+            BufferedBody::Passthrough(body) => match body.collect().await {
+                Ok(collected) => Ok(collected.to_bytes()),
+                Err(err) => Err(BufferedBody::Partial {
+                    prefix: None,
+                    remaining: Remaining::Error(Some(err)),
+                }),
+            },
+
+            // Partial without prefix - need to collect remaining
+            BufferedBody::Partial {
+                prefix: None,
+                remaining: Remaining::Body(body),
+            } => match body.collect().await {
+                Ok(collected) => Ok(collected.to_bytes()),
+                Err(err) => Err(BufferedBody::Partial {
+                    prefix: None,
+                    remaining: Remaining::Error(Some(err)),
+                }),
+            },
+
+            // Partial with prefix - need to collect remaining and combine
+            BufferedBody::Partial {
+                prefix: Some(prefix),
+                remaining: Remaining::Body(body),
+            } => match body.collect().await {
+                Ok(collected) => {
+                    let mut combined = BytesMut::from(prefix.as_ref());
+                    combined.extend_from_slice(&collected.to_bytes());
+                    Ok(combined.freeze())
+                }
+                Err(err) => Err(BufferedBody::Partial {
+                    prefix: Some(prefix),
+                    remaining: Remaining::Error(Some(err)),
+                }),
+            },
+
+            // Already has an error, return as error
+            BufferedBody::Partial {
+                prefix,
+                remaining: Remaining::Error(err),
+            } => Err(BufferedBody::Partial {
+                prefix,
+                remaining: Remaining::Error(err),
+            }),
+        }
     }
 }
 
@@ -245,12 +254,11 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BufferedBody::Complete(Some(bytes)) => {
-                f.debug_tuple("Complete").field(&format!("{} bytes", bytes.len())).finish()
-            }
-            BufferedBody::Complete(None) => {
-                f.debug_tuple("Complete").field(&"consumed").finish()
-            }
+            BufferedBody::Complete(Some(bytes)) => f
+                .debug_tuple("Complete")
+                .field(&format!("{} bytes", bytes.len()))
+                .finish(),
+            BufferedBody::Complete(None) => f.debug_tuple("Complete").field(&"consumed").finish(),
             BufferedBody::Partial { prefix, .. } => {
                 let prefix_len = prefix.as_ref().map(|b| b.len()).unwrap_or(0);
                 f.debug_struct("Partial")
@@ -258,9 +266,7 @@ where
                     .field("remaining", &"...")
                     .finish()
             }
-            BufferedBody::Passthrough(_) => {
-                f.debug_tuple("Passthrough").field(&"...").finish()
-            }
+            BufferedBody::Passthrough(_) => f.debug_tuple("Passthrough").field(&"...").finish(),
         }
     }
 }

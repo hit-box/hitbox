@@ -30,7 +30,8 @@ where
 #[async_trait]
 impl<ReqBody, E> Extractor for Method<E>
 where
-    ReqBody: Send + 'static,
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
     E: Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
 {
     type Subject = E::Subject;

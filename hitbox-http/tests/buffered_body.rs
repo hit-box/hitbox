@@ -1,8 +1,8 @@
 use bytes::Bytes;
+use futures::stream;
+use hitbox_http::BufferedBody;
 use http_body::Body;
 use http_body_util::{BodyExt, Full, StreamBody};
-use hitbox_http::BufferedBody;
-use futures::stream;
 
 #[tokio::test]
 async fn test_complete_yields_bytes_once() {
@@ -71,7 +71,10 @@ async fn test_passthrough_with_error_in_stream() {
     let stream = stream::iter(vec![
         Ok(http_body::Frame::data(Bytes::from("chunk1"))),
         Ok(http_body::Frame::data(Bytes::from("chunk2"))),
-        Err(io::Error::new(io::ErrorKind::ConnectionReset, "connection reset")),
+        Err(io::Error::new(
+            io::ErrorKind::ConnectionReset,
+            "connection reset",
+        )),
     ]);
 
     let inner_body = StreamBody::new(stream);
@@ -98,7 +101,7 @@ async fn test_passthrough_with_error_in_stream() {
 
 #[tokio::test]
 async fn test_partial_yields_prefix_then_remaining() {
-    let prefix = Bytes::from("prefix-");
+    let _prefix = Bytes::from("prefix-");
 
     // Create a stream for the remaining body
     use std::convert::Infallible;

@@ -5,6 +5,6 @@ pub mod query;
 mod request;
 mod response;
 
-pub use body::{BufferedBody, FromBytes};
+pub use body::BufferedBody;
 pub use request::CacheableHttpRequest;
 pub use response::{CacheableHttpResponse, SerializableHttpResponse};

@@ -49,7 +49,8 @@ impl CacheConfig for EndpointConfig {
         &self,
     ) -> Box<dyn Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
     where
-        ReqBody: Send + 'static,
+        ReqBody: hyper::body::Body + Send + 'static,
+        ReqBody::Error: Send,
     {
         let acc_predicate = Box::new(NeutralRequestPredicate::new());
         //dbg!(&self.request_predicates);
@@ -74,7 +75,8 @@ impl CacheConfig for EndpointConfig {
         &self,
     ) -> Box<dyn Predicate<Subject = CacheableHttpResponse<ResBody>> + Send + Sync>
     where
-        ResBody: Send + 'static,
+        ResBody: hyper::body::Body + Send + 'static,
+        ResBody::Error: Send,
     {
         let acc_predicate = Box::new(NeutralResponsePredicate::new());
         self.response_predicates
@@ -88,7 +90,8 @@ impl CacheConfig for EndpointConfig {
         &self,
     ) -> Box<dyn Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
     where
-        ReqBody: Send + 'static + Debug,
+        ReqBody: hyper::body::Body + Send + 'static + Debug,
+        ReqBody::Error: Send,
     {
         let acc_extractors = Box::new(NeutralExtractor::new());
         self.extractors
@@ -114,7 +117,8 @@ where
         &self,
     ) -> Box<dyn Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
     where
-        ReqBody: Send + 'static,
+        ReqBody: hyper::body::Body + Send + 'static,
+        ReqBody::Error: Send,
     {
         self.as_ref().request_predicates()
     }
@@ -123,7 +127,8 @@ where
         &self,
     ) -> Box<dyn Predicate<Subject = CacheableHttpResponse<ResBody>> + Send + Sync>
     where
-        ResBody: Send + 'static,
+        ResBody: hyper::body::Body + Send + 'static,
+        ResBody::Error: Send,
     {
         self.as_ref().response_predicates()
     }
@@ -132,7 +137,8 @@ where
         &self,
     ) -> Box<dyn Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>
     where
-        ReqBody: Send + 'static + Debug,
+        ReqBody: hyper::body::Body + Send + 'static + Debug,
+        ReqBody::Error: Send,
     {
         self.as_ref().extractors()
     }
