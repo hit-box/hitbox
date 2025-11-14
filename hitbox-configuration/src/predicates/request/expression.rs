@@ -19,8 +19,8 @@ impl Expression {
         inner: RequestPredicate<ReqBody>,
     ) -> Result<RequestPredicate<ReqBody>, ConfigError>
     where
-        ReqBody: HttpBody + FromBytes + Send + 'static,
-        ReqBody::Error: std::fmt::Debug,
+        ReqBody: HttpBody + FromBytes + hitbox_http::FromChunks<ReqBody::Error> + Send + 'static,
+        ReqBody::Error: std::fmt::Debug + Send,
         ReqBody::Data: Send,
     {
         match self {

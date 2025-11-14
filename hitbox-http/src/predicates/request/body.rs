@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use async_trait::async_trait;
+use bytes::{Buf, Bytes};
 use hitbox::predicate::{Predicate, PredicateResult};
 use http::Request;
 use hyper::body::Body as HttpBody;
@@ -12,7 +13,7 @@ use jaq_json::{self, Val};
 use prost_reflect::{DynamicMessage, MessageDescriptor, SerializeOptions};
 use serde_json::Value;
 
-use crate::{CacheableHttpRequest, FromBytes};
+use crate::{CacheableHttpRequest, FromBytes, FromChunks};
 
 #[derive(Debug)]
 pub enum Operation {
@@ -63,6 +64,38 @@ where
     }
 }
 
+/// Collects all chunks from a body stream, including any errors.
+/// Returns a vector of chunks where each chunk is either Ok(Bytes) or Err(E).
+async fn collect_chunks<B>(mut body: B) -> Vec<Result<Bytes, B::Error>>
+where
+    B: HttpBody + Unpin,
+    B::Data: bytes::Buf,
+    B::Error: Send,
+{
+    use http_body_util::BodyExt;
+
+    let mut chunks = Vec::new();
+
+    while let Some(frame) = body.frame().await {
+        match frame {
+            Ok(frame) => {
+                if let Ok(data) = frame.into_data() {
+                    // Convert data to Bytes
+                    let bytes = Bytes::copy_from_slice(data.chunk());
+                    chunks.push(Ok(bytes));
+                }
+            }
+            Err(err) => {
+                // Error occurred - store it and stop collection
+                chunks.push(Err(err));
+                break;
+            }
+        }
+    }
+
+    chunks
+}
+
 fn apply(expression: &str, input: Value) -> Option<Value> {
     // TODO: Handle the errors.
     let program = File {
@@ -98,9 +131,9 @@ impl<P, ReqBody> Predicate for Body<P>
 where
     ReqBody: HttpBody + Send + 'static,
     P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
-    ReqBody::Error: Debug,
+    ReqBody::Error: Debug + Send,
     ReqBody::Data: Send,
-    ReqBody: FromBytes,
+    ReqBody: FromBytes + FromChunks<ReqBody::Error>,
 {
     type Subject = P::Subject;
 
@@ -108,9 +141,28 @@ where
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
                 let (parts, body) = request.into_parts();
-                use http_body_util::BodyExt;
-                let payload = body.collect().await.unwrap().to_bytes();
-                // let payload = to_bytes(body).await.unwrap();
+
+                // Collect all chunks, including any errors
+                let chunks = collect_chunks(Box::pin(body)).await;
+
+                // Check if any chunk resulted in an error
+                if chunks.iter().any(|chunk| chunk.is_err()) {
+                    // Network/timeout error occurred - reconstruct and return NonCacheable
+                    let reconstructed_body = ReqBody::from_chunks(chunks);
+                    let request = Request::from_parts(parts, reconstructed_body);
+                    return PredicateResult::NonCacheable(CacheableHttpRequest::from_request(request));
+                }
+
+                // All chunks collected successfully - concatenate for predicate evaluation
+                let payload: Bytes = chunks
+                    .iter()
+                    .filter_map(|chunk| chunk.as_ref().ok())
+                    .fold(bytes::BytesMut::new(), |mut acc, bytes| {
+                        acc.extend_from_slice(bytes);
+                        acc
+                    })
+                    .freeze();
+
                 let body_str = String::from_utf8_lossy(&payload);
                 let json_value = match &self.parsing_type {
                     ParsingType::Jq => serde_json::from_str(&body_str).unwrap_or(Value::Null),
@@ -137,7 +189,9 @@ where
                     }
                 };
 
-                let request = Request::from_parts(parts, ReqBody::from_bytes(payload));
+                // Reconstruct the request body from chunks
+                let reconstructed_body = ReqBody::from_chunks(chunks);
+                let request = Request::from_parts(parts, reconstructed_body);
                 if is_cacheable {
                     PredicateResult::Cacheable(CacheableHttpRequest::from_request(request))
                 } else {
