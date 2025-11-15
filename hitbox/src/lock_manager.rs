@@ -1,13 +1,15 @@
 //! Lock manager for preventing dogpile effect in cache misses.
 //!
 //! This module provides per-key locking using tokio semaphores with LRU eviction
-//! to prevent unbounded memory growth.
+//! to prevent unbounded memory growth. Also provides broadcast channels for sharing
+//! responses among waiting requests to avoid cache backend reads.
 
+use std::any::Any;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use lru::LruCache;
 use parking_lot::Mutex;
-use tokio::sync::{Semaphore, OwnedSemaphorePermit};
+use tokio::sync::{broadcast, Semaphore, OwnedSemaphorePermit};
 use crate::CacheKey;
 
 /// Error types for lock operations.
@@ -18,10 +20,11 @@ pub enum LockError {
     Closed,
 }
 
-/// Manages per-key semaphores with LRU eviction to prevent memory leaks.
+/// Manages per-key semaphores and broadcast channels with LRU eviction to prevent memory leaks.
 ///
-/// Each cache key gets its own semaphore with 1 permit, ensuring only one
-/// request can fetch from upstream for that key at a time.
+/// Each cache key gets its own semaphore to control concurrent upstream fetches,
+/// and a broadcast channel to share responses among waiting requests without
+/// hitting the cache backend.
 ///
 /// # Example
 /// ```ignore
@@ -32,27 +35,29 @@ pub enum LockError {
 /// let key = CacheKey::from_parts(&[("method", "GET")]);
 ///
 /// // Try to acquire lock
-/// if let Some(permit) = manager.try_acquire(&key) {
+/// if let Some(permit) = manager.try_acquire(&key, 1) {
 ///     // Got the lock! Fetch from upstream
 ///     // ...
-///     // Permit automatically released on drop
+///     // Broadcast response to waiting requests
+///     manager.broadcast_response(&key, Arc::new(response), 1);
 /// } else {
-///     // Lock held by another request, wait for it
-///     let permit = manager.acquire(&key).await?;
-///     // Check if cache was populated while waiting
+///     // Lock held by another request, subscribe to broadcast
+///     let receiver = manager.subscribe(&key, 1);
+///     let response = receiver.recv().await?;
 /// }
 /// ```
 #[derive(Clone)]
 pub struct LockManager {
     semaphores: Arc<Mutex<LruCache<CacheKey, Arc<Semaphore>>>>,
+    broadcasts: Arc<Mutex<LruCache<CacheKey, Arc<dyn Any + Send + Sync>>>>,
 }
 
 impl LockManager {
     /// Create a new lock manager with the specified LRU capacity.
     ///
     /// # Arguments
-    /// * `capacity` - Maximum number of semaphores to keep in memory.
-    ///   When exceeded, least recently used semaphores are evicted.
+    /// * `capacity` - Maximum number of semaphores and broadcast channels to keep in memory.
+    ///   When exceeded, least recently used entries are evicted.
     ///
     /// # Panics
     /// Panics if capacity is 0.
@@ -62,6 +67,7 @@ impl LockManager {
 
         Self {
             semaphores: Arc::new(Mutex::new(LruCache::new(capacity))),
+            broadcasts: Arc::new(Mutex::new(LruCache::new(capacity))),
         }
     }
 
@@ -129,6 +135,95 @@ impl LockManager {
             .acquire_owned()
             .await
             .map_err(|_| LockError::Closed)
+    }
+
+    /// Get or create a broadcast channel for the given cache key.
+    ///
+    /// This method uses type erasure (`Any`) to store broadcast channels for different
+    /// response types in the same LRU cache. The type is recovered via downcast when
+    /// accessing the channel.
+    ///
+    /// # Type Safety
+    /// The same cache key must always use the same `Cached` type. This is enforced by
+    /// the endpoint definition - each endpoint has a specific response type. Using
+    /// different types for the same key will cause a panic.
+    fn get_or_create_broadcast<Cached>(&self, key: &CacheKey, concurrency: usize) -> broadcast::Sender<Arc<Cached>>
+    where
+        Cached: Clone + Send + Sync + 'static,
+    {
+        let mut cache = self.broadcasts.lock();
+
+        let any_sender = cache.get_or_insert(key.clone(), || {
+            let (tx, _) = broadcast::channel::<Arc<Cached>>(concurrency.max(1));
+            Arc::new(tx) as Arc<dyn Any + Send + Sync>
+        }).clone();
+
+        // Downcast back to concrete type
+        // This is safe because the same cache key always has the same Cached type
+        any_sender
+            .downcast_ref::<broadcast::Sender<Arc<Cached>>>()
+            .expect("Type mismatch in broadcast channel - same cache key used with different response types")
+            .clone()
+    }
+
+    /// Subscribe to broadcast channel for the given cache key.
+    ///
+    /// Returns a receiver that will receive the response when a fetcher broadcasts it.
+    /// This allows waiting requests to get responses without reading from the cache backend.
+    ///
+    /// # Arguments
+    /// * `key` - The cache key to subscribe to
+    /// * `concurrency` - Buffer size for the broadcast channel (matches max concurrent fetchers)
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Waiting request subscribes to broadcast
+    /// let mut receiver = manager.subscribe::<SerializableHttpResponse>(&key, 1);
+    ///
+    /// // Wait for response from fetcher
+    /// match receiver.recv().await {
+    ///     Ok(cached_response) => {
+    ///         // Got response without cache read!
+    ///         let response = Response::from_cached(Arc::unwrap_or_clone(cached_response)).await;
+    ///     }
+    ///     Err(_) => {
+    ///         // Channel closed, fallback to cache
+    ///     }
+    /// }
+    /// ```
+    pub fn subscribe<Cached>(&self, key: &CacheKey, concurrency: usize) -> broadcast::Receiver<Arc<Cached>>
+    where
+        Cached: Clone + Send + Sync + 'static,
+    {
+        let tx = self.get_or_create_broadcast::<Cached>(key, concurrency);
+        tx.subscribe()
+    }
+
+    /// Broadcast a cached response to all waiting requests.
+    ///
+    /// This sends the response to all subscribers (waiting requests) for this cache key,
+    /// allowing them to receive the response without reading from the cache backend.
+    ///
+    /// # Arguments
+    /// * `key` - The cache key
+    /// * `cached` - The cached response wrapped in Arc for cheap cloning
+    /// * `concurrency` - Buffer size for the broadcast channel
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Fetcher broadcasts response after caching
+    /// let cached = SerializableHttpResponse { /* ... */ };
+    /// manager.broadcast_response(&key, Arc::new(cached), 1);
+    ///
+    /// // All waiting requests receive it immediately
+    /// ```
+    pub fn broadcast_response<Cached>(&self, key: &CacheKey, cached: Arc<Cached>, concurrency: usize)
+    where
+        Cached: Clone + Send + Sync + 'static,
+    {
+        let tx = self.get_or_create_broadcast::<Cached>(key, concurrency);
+        // Ignore send errors (no receivers is fine - means no one is waiting)
+        let _ = tx.send(cached);
     }
 }
 

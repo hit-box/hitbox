@@ -15,7 +15,7 @@ use futures::ready;
 use hitbox_core::{CacheablePolicyData, EntityPolicyConfig};
 use pin_project::pin_project;
 use serde::{Serialize, de::DeserializeOwned};
-use tokio::sync::OwnedSemaphorePermit;
+use tokio::sync::{broadcast, OwnedSemaphorePermit};
 use tracing::debug;
 
 use crate::{
@@ -383,17 +383,17 @@ where
                             State::PollUpstream { upstream_future }
                         }
                         None => {
-                            // Lock held by another request, wait for it
+                            // Lock held by another request, subscribe to broadcast
+                            let mut receiver = lock_manager.subscribe::<Res::Cached>(key, *concurrency);
                             let key_for_future = key.clone();
-                            let concurrency_value = *concurrency;
-                            let lock_future = Box::pin(async move {
-                                lock_manager.acquire(&key_for_future, concurrency_value).await
+
+                            let broadcast_future = Box::pin(async move {
+                                receiver.recv().await
                             });
 
-                            State::WaitForLock {
-                                lock_future,
-                                key: key.clone(),
-                                request: request.take(),
+                            State::WaitForBroadcast {
+                                broadcast_future,
+                                key: key_for_future,
                             }
                         }
                     }
@@ -461,6 +461,74 @@ where
                         }
                     }
                 }
+                StateProj::WaitForBroadcast {
+                    mut broadcast_future,
+                    key,
+                } => {
+                    match ready!(broadcast_future.as_mut().poll(cx)) {
+                        Ok(cached_arc) => {
+                            // Got broadcast response! Convert to Res and return
+                            // No cache backend read needed!
+                            *this.cache_status = CacheStatus::Hit;
+
+                            let cached = Arc::unwrap_or_clone(cached_arc);
+                            let response_future = Res::from_cached(cached);
+                            let response = Box::pin(response_future);
+
+                            State::ConvertCachedToResponse {
+                                response_future: response,
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(_)) => {
+                            // Missed messages due to slow receiver, fallback to cache
+                            debug!("Broadcast lagged, falling back to cache read");
+                            let backend = this.backend.clone();
+                            let cache_key = key.clone();
+                            let cache_check = Box::pin(async move {
+                                backend.get::<Res>(&cache_key).await
+                            });
+
+                            State::CheckCacheAfterBroadcastFailure { cache_check }
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            // Channel closed (no senders), fallback to cache
+                            debug!("Broadcast channel closed, falling back to cache read");
+                            let backend = this.backend.clone();
+                            let cache_key = key.clone();
+                            let cache_check = Box::pin(async move {
+                                backend.get::<Res>(&cache_key).await
+                            });
+
+                            State::CheckCacheAfterBroadcastFailure { cache_check }
+                        }
+                    }
+                }
+                StateProj::CheckCacheAfterBroadcastFailure { cache_check } => {
+                    let cached = ready!(cache_check.poll(cx)).unwrap_or_else(|_err| None);
+
+                    match cached {
+                        Some(cached_value) => {
+                            // Got from cache as fallback
+                            *this.cache_status = CacheStatus::Hit;
+                            let cache_state = cached_value.cache_state();
+                            State::CheckCacheState {
+                                cache_state: Box::pin(cache_state),
+                                request: None, // No request to pass through
+                            }
+                        }
+                        None => {
+                            // Both broadcast and cache failed - this shouldn't happen
+                            // but we need to handle it gracefully
+                            panic!("Broadcast failed and cache empty - cache should have been populated by fetcher");
+                        }
+                    }
+                }
+                StateProj::ConvertCachedToResponse { mut response_future } => {
+                    let response = ready!(response_future.as_mut().poll(cx));
+                    State::Response {
+                        response: Some(response),
+                    }
+                }
                 StateProj::PollUpstream { upstream_future } => {
                     let res = ready!(upstream_future.as_mut().poll(cx));
                     State::UpstreamPolled {
@@ -498,6 +566,23 @@ where
                     let cache_key = this.cache_key.take().expect("CacheKey not found");
                     match policy {
                         CachePolicy::Cacheable(cache_value) => {
+                            // If we held a lock, broadcast the cached response to waiting requests
+                            if this.lock_permit.is_some() {
+                                let cached = cache_value.data.clone();
+                                let cached_arc = Arc::new(cached);
+
+                                // Get concurrency from policy
+                                let concurrency = match this.policy.as_ref() {
+                                    PolicyConfig::Enabled(EnabledCacheConfig {
+                                        locks: LockConfig::Enabled { concurrency },
+                                        ..
+                                    }) => *concurrency,
+                                    _ => 1,
+                                };
+
+                                this.lock_manager.broadcast_response::<Res::Cached>(&cache_key, cached_arc, concurrency);
+                            }
+
                             let update_cache_future = Box::pin(async move {
                                 let update_cache_result =
                                     backend.set::<Res>(&cache_key, &cache_value, None).await;

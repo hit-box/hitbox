@@ -1,10 +1,11 @@
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use futures::future::BoxFuture;
 use hitbox_backend::BackendError;
 use hitbox_core::{RequestCachePolicy, ResponseCachePolicy};
 use pin_project::pin_project;
-use tokio::sync::OwnedSemaphorePermit;
+use tokio::sync::{broadcast, OwnedSemaphorePermit};
 
 use crate::{CacheKey, CacheState, CacheValue, CacheableResponse, lock_manager::LockError};
 
@@ -15,6 +16,7 @@ pub type RequestCachePolicyFuture<T> = BoxFuture<'static, RequestCachePolicy<T>>
 pub type CacheStateFuture<T> = BoxFuture<'static, CacheState<T>>;
 pub type UpstreamFuture<T> = BoxFuture<'static, T>;
 pub type LockFuture = BoxFuture<'static, Result<OwnedSemaphorePermit, LockError>>;
+pub type BroadcastFuture<T> = BoxFuture<'static, Result<Arc<T>, broadcast::error::RecvError>>;
 
 #[allow(missing_docs)]
 #[pin_project(project = StateProj)]
@@ -56,6 +58,19 @@ where
         permit: Option<OwnedSemaphorePermit>,
         request: Option<Req>,
     },
+    WaitForBroadcast {
+        #[pin]
+        broadcast_future: BroadcastFuture<Res::Cached>,
+        key: CacheKey,
+    },
+    CheckCacheAfterBroadcastFailure {
+        #[pin]
+        cache_check: PollCacheFuture<Res::Cached>,
+    },
+    ConvertCachedToResponse {
+        #[pin]
+        response_future: BoxFuture<'static, Res>,
+    },
     PollUpstream {
         upstream_future: UpstreamFuture<Res>,
     },
@@ -89,6 +104,9 @@ where
             State::TryAcquireLock { .. } => f.write_str("State::TryAcquireLock"),
             State::WaitForLock { .. } => f.write_str("State::WaitForLock"),
             State::CheckCacheAfterWait { .. } => f.write_str("State::CheckCacheAfterWait"),
+            State::WaitForBroadcast { .. } => f.write_str("State::WaitForBroadcast"),
+            State::CheckCacheAfterBroadcastFailure { .. } => f.write_str("State::CheckCacheAfterBroadcastFailure"),
+            State::ConvertCachedToResponse { .. } => f.write_str("State::ConvertCachedToResponse"),
             State::CheckResponseCachePolicy { .. } => {
                 f.write_str("State::CheckResponseCachePolicy")
             }
