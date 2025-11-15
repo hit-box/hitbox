@@ -128,7 +128,7 @@
 - [x] Three predicates all match - request cached (Method AND Header AND Path)
 - [x] Method AND Header AND Query all match
 - [x] Method AND Path AND Body all match
-- [ ] Four or more predicates chained together
+- [x] Four or more predicates chained together
 
 ##### Edge Cases
 - [ ] Empty And list behavior (should be neutral/cacheable)
