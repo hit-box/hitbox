@@ -27,6 +27,7 @@ where
 
 impl<S, B, C> Layer<S> for Cache<B, C>
 where
+    B: CacheBackend,
     C: Clone,
 {
     type Service = CacheService<S, B, C>;

@@ -26,6 +26,12 @@ tracing = { workspace = true }
 async-trait = { workspace = true }
 pin-project = { workspace = true }
 futures = { workspace = true, features = ["alloc"] }
+tokio = { workspace = true, features = ["sync"] }
+lru = "0.12"
+parking_lot = "0.12"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["sync", "rt", "time", "macros"] }
 
 [features]
 default = []

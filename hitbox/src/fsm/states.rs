@@ -1,11 +1,13 @@
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use futures::future::BoxFuture;
 use hitbox_backend::BackendError;
 use hitbox_core::{RequestCachePolicy, ResponseCachePolicy};
 use pin_project::pin_project;
+use tokio::sync::{broadcast, OwnedSemaphorePermit};
 
-use crate::{CacheState, CacheValue, CacheableResponse};
+use crate::{CacheKey, CacheState, CacheValue, CacheableResponse};
 
 pub type CacheResult<T> = Result<Option<CacheValue<T>>, BackendError>;
 pub type PollCacheFuture<T> = BoxFuture<'static, CacheResult<T>>;
@@ -13,6 +15,7 @@ pub type UpdateCache<T> = BoxFuture<'static, (Result<(), BackendError>, T)>;
 pub type RequestCachePolicyFuture<T> = BoxFuture<'static, RequestCachePolicy<T>>;
 pub type CacheStateFuture<T> = BoxFuture<'static, CacheState<T>>;
 pub type UpstreamFuture<T> = BoxFuture<'static, T>;
+pub type BroadcastFuture<T> = BoxFuture<'static, Result<Arc<T>, broadcast::error::RecvError>>;
 
 #[allow(missing_docs)]
 #[pin_project(project = StateProj)]
@@ -36,6 +39,30 @@ where
     CheckCacheState {
         cache_state: CacheStateFuture<Res>,
         request: Option<Req>,
+    },
+    TryAcquireLock {
+        key: CacheKey,
+        request: Option<Req>,
+        concurrency: usize,
+    },
+    CheckCacheAfterWait {
+        #[pin]
+        cache_check: PollCacheFuture<Res::Cached>,
+        permit: Option<OwnedSemaphorePermit>,
+        request: Option<Req>,
+    },
+    WaitForBroadcast {
+        #[pin]
+        broadcast_future: BroadcastFuture<Res::Cached>,
+        key: CacheKey,
+    },
+    CheckCacheAfterBroadcastFailure {
+        #[pin]
+        cache_check: PollCacheFuture<Res::Cached>,
+    },
+    ConvertCachedToResponse {
+        #[pin]
+        response_future: BoxFuture<'static, Res>,
     },
     PollUpstream {
         upstream_future: UpstreamFuture<Res>,
@@ -67,6 +94,11 @@ where
             State::PollCache { .. } => f.write_str("State::PollCache"),
             // State::CachePolled { .. } => f.write_str("State::PollCache"),
             State::CheckCacheState { .. } => f.write_str("State::CheckCacheState"),
+            State::TryAcquireLock { .. } => f.write_str("State::TryAcquireLock"),
+            State::CheckCacheAfterWait { .. } => f.write_str("State::CheckCacheAfterWait"),
+            State::WaitForBroadcast { .. } => f.write_str("State::WaitForBroadcast"),
+            State::CheckCacheAfterBroadcastFailure { .. } => f.write_str("State::CheckCacheAfterBroadcastFailure"),
+            State::ConvertCachedToResponse { .. } => f.write_str("State::ConvertCachedToResponse"),
             State::CheckResponseCachePolicy { .. } => {
                 f.write_str("State::CheckResponseCachePolicy")
             }

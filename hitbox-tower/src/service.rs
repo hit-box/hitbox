@@ -1,7 +1,7 @@
 use hitbox::config::CacheConfig;
 use std::{fmt::Debug, sync::Arc};
 
-use hitbox::{backend::CacheBackend, fsm::CacheFuture};
+use hitbox::{backend::CacheBackend, fsm::CacheFuture, lock_manager::LockManager};
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse, FromBytes};
 use http::{Request, Response};
 use hyper::body::Body as HttpBody;
@@ -13,14 +13,23 @@ pub struct CacheService<S, B, C> {
     upstream: S,
     backend: Arc<B>,
     configuration: C,
+    lock_manager: Arc<LockManager>,
 }
 
-impl<S, B, C> CacheService<S, B, C> {
+impl<S, B, C> CacheService<S, B, C>
+where
+    B: CacheBackend,
+{
     pub fn new(upstream: S, backend: Arc<B>, configuration: C) -> Self {
+        // Always create lock manager - CacheFuture will decide whether to use it
+        // based on the policy configuration
+        let lock_manager = Arc::new(LockManager::new(10_000));
+
         CacheService {
             upstream,
             backend,
             configuration,
+            lock_manager,
         }
     }
 }
@@ -36,6 +45,7 @@ where
             upstream: self.upstream.clone(),
             backend: self.backend.clone(),
             configuration: self.configuration.clone(),
+            lock_manager: self.lock_manager.clone(),
         }
     }
 }
@@ -81,6 +91,7 @@ where
             Arc::new(configuration.response_predicates()),
             Arc::new(configuration.extractors()),
             Arc::new(configuration.policy().clone()),
+            self.lock_manager.clone(),
         )
     }
 }
