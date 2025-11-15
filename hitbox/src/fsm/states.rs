@@ -7,7 +7,7 @@ use hitbox_core::{RequestCachePolicy, ResponseCachePolicy};
 use pin_project::pin_project;
 use tokio::sync::{broadcast, OwnedSemaphorePermit};
 
-use crate::{CacheKey, CacheState, CacheValue, CacheableResponse, lock_manager::LockError};
+use crate::{CacheKey, CacheState, CacheValue, CacheableResponse};
 
 pub type CacheResult<T> = Result<Option<CacheValue<T>>, BackendError>;
 pub type PollCacheFuture<T> = BoxFuture<'static, CacheResult<T>>;
@@ -15,7 +15,6 @@ pub type UpdateCache<T> = BoxFuture<'static, (Result<(), BackendError>, T)>;
 pub type RequestCachePolicyFuture<T> = BoxFuture<'static, RequestCachePolicy<T>>;
 pub type CacheStateFuture<T> = BoxFuture<'static, CacheState<T>>;
 pub type UpstreamFuture<T> = BoxFuture<'static, T>;
-pub type LockFuture = BoxFuture<'static, Result<OwnedSemaphorePermit, LockError>>;
 pub type BroadcastFuture<T> = BoxFuture<'static, Result<Arc<T>, broadcast::error::RecvError>>;
 
 #[allow(missing_docs)]
@@ -45,12 +44,6 @@ where
         key: CacheKey,
         request: Option<Req>,
         concurrency: usize,
-    },
-    WaitForLock {
-        #[pin]
-        lock_future: LockFuture,
-        key: CacheKey,
-        request: Option<Req>,
     },
     CheckCacheAfterWait {
         #[pin]
@@ -102,7 +95,6 @@ where
             // State::CachePolled { .. } => f.write_str("State::PollCache"),
             State::CheckCacheState { .. } => f.write_str("State::CheckCacheState"),
             State::TryAcquireLock { .. } => f.write_str("State::TryAcquireLock"),
-            State::WaitForLock { .. } => f.write_str("State::WaitForLock"),
             State::CheckCacheAfterWait { .. } => f.write_str("State::CheckCacheAfterWait"),
             State::WaitForBroadcast { .. } => f.write_str("State::WaitForBroadcast"),
             State::CheckCacheAfterBroadcastFailure { .. } => f.write_str("State::CheckCacheAfterBroadcastFailure"),

@@ -398,36 +398,6 @@ where
                         }
                     }
                 }
-                StateProj::WaitForLock {
-                    mut lock_future,
-                    key,
-                    request,
-                } => {
-                    match ready!(lock_future.as_mut().poll(cx)) {
-                        Ok(permit) => {
-                            // Got the lock! Check if cache was populated while waiting
-                            let backend = this.backend.clone();
-                            let cache_key = key.clone();
-                            let cache_check = Box::pin(async move {
-                                backend.get::<Res>(&cache_key).await
-                            });
-
-                            State::CheckCacheAfterWait {
-                                cache_check,
-                                permit: Some(permit),
-                                request: request.take(),
-                            }
-                        }
-                        Err(_) => {
-                            // Semaphore closed (shouldn't happen), fallback to upstream without lock
-                            let upstream_future =
-                                Box::pin(this.transformer.upstream_transform(
-                                    request.take().expect(POLL_AFTER_READY_ERROR),
-                                ));
-                            State::PollUpstream { upstream_future }
-                        }
-                    }
-                }
                 StateProj::CheckCacheAfterWait {
                     cache_check,
                     permit,
