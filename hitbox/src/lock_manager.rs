@@ -69,27 +69,31 @@ impl LockManager {
     ///
     /// This method updates the LRU tracking, moving the semaphore to the
     /// most recently used position.
-    fn get_semaphore(&self, key: &CacheKey) -> Arc<Semaphore> {
+    fn get_semaphore(&self, key: &CacheKey, concurrency: usize) -> Arc<Semaphore> {
         let mut cache = self.semaphores.lock();
         cache
-            .get_or_insert(key.clone(), || Arc::new(Semaphore::new(1)))
+            .get_or_insert(key.clone(), || Arc::new(Semaphore::new(concurrency)))
             .clone()
     }
 
     /// Try to acquire a lock immediately without waiting.
     ///
-    /// Returns `Some(permit)` if the lock was acquired, `None` if it's already held.
+    /// # Arguments
+    /// * `key` - The cache key to lock
+    /// * `concurrency` - Maximum concurrent fetches allowed for this key
+    ///
+    /// Returns `Some(permit)` if the lock was acquired, `None` if all permits are taken.
     ///
     /// # Example
     /// ```ignore
-    /// if let Some(permit) = manager.try_acquire(&key) {
+    /// if let Some(permit) = manager.try_acquire(&key, 1) {
     ///     // Got it! Fetch upstream
     /// } else {
     ///     // Already locked by another request
     /// }
     /// ```
-    pub fn try_acquire(&self, key: &CacheKey) -> Option<OwnedSemaphorePermit> {
-        let semaphore = self.get_semaphore(key);
+    pub fn try_acquire(&self, key: &CacheKey, concurrency: usize) -> Option<OwnedSemaphorePermit> {
+        let semaphore = self.get_semaphore(key, concurrency);
         semaphore.try_acquire_owned().ok()
     }
 
@@ -98,13 +102,17 @@ impl LockManager {
     /// This method will wait indefinitely until the lock is released.
     /// The lock is automatically released when the returned permit is dropped.
     ///
+    /// # Arguments
+    /// * `key` - The cache key to lock
+    /// * `concurrency` - Maximum concurrent fetches allowed for this key
+    ///
     /// # Errors
     /// Returns `LockError::Closed` if the semaphore was closed (rare).
     ///
     /// # Example
     /// ```ignore
     /// // Wait for lock
-    /// let permit = manager.acquire(&key).await?;
+    /// let permit = manager.acquire(&key, 1).await?;
     ///
     /// // Check if cache was populated while waiting
     /// if let Some(cached) = backend.get(&key).await? {
@@ -115,8 +123,8 @@ impl LockManager {
     /// let response = fetch_upstream().await?;
     /// // Permit dropped here, releasing lock
     /// ```
-    pub async fn acquire(&self, key: &CacheKey) -> Result<OwnedSemaphorePermit, LockError> {
-        let semaphore = self.get_semaphore(key);
+    pub async fn acquire(&self, key: &CacheKey, concurrency: usize) -> Result<OwnedSemaphorePermit, LockError> {
+        let semaphore = self.get_semaphore(key, concurrency);
         semaphore
             .acquire_owned()
             .await
@@ -133,8 +141,8 @@ mod tests {
         let manager = LockManager::new(100);
         let key = CacheKey::from_slice(&[("test", Some("key"))]);
 
-        // Should be able to acquire
-        assert!(manager.try_acquire(&key).is_some());
+        // Should be able to acquire with concurrency 1
+        assert!(manager.try_acquire(&key, 1).is_some());
     }
 
     #[test]
@@ -148,19 +156,19 @@ mod tests {
         let manager = LockManager::new(100);
         let key = CacheKey::from_slice(&[("test", Some("key"))]);
 
-        // First acquire should succeed
-        let permit1 = manager.try_acquire(&key);
+        // First acquire should succeed (concurrency 1)
+        let permit1 = manager.try_acquire(&key, 1);
         assert!(permit1.is_some());
 
-        // Second acquire should fail (lock held)
-        let permit2 = manager.try_acquire(&key);
+        // Second acquire should fail (only 1 permit)
+        let permit2 = manager.try_acquire(&key, 1);
         assert!(permit2.is_none());
 
         // Drop first permit
         drop(permit1);
 
         // Now should succeed
-        let permit3 = manager.try_acquire(&key);
+        let permit3 = manager.try_acquire(&key, 1);
         assert!(permit3.is_some());
     }
 
@@ -170,14 +178,14 @@ mod tests {
         let key = CacheKey::from_slice(&[("test", Some("key"))]);
 
         // Acquire lock
-        let permit1 = manager.try_acquire(&key).unwrap();
+        let permit1 = manager.try_acquire(&key, 1).unwrap();
 
         let manager_clone = manager.clone();
         let key_clone = key.clone();
 
         // Spawn task that will wait for lock
         let task = tokio::spawn(async move {
-            manager_clone.acquire(&key_clone).await
+            manager_clone.acquire(&key_clone, 1).await
         });
 
         // Give spawned task time to start waiting
@@ -201,16 +209,40 @@ mod tests {
         let key3 = CacheKey::from_slice(&[("key", Some("3"))]);
 
         // Acquire and release to add to cache
-        drop(manager.try_acquire(&key1));
-        drop(manager.try_acquire(&key2));
+        drop(manager.try_acquire(&key1, 1));
+        drop(manager.try_acquire(&key2, 1));
 
         // key1 and key2 should be in cache
         // Acquiring key3 should evict key1 (LRU)
-        drop(manager.try_acquire(&key3));
+        drop(manager.try_acquire(&key3, 1));
 
         // All should still be acquirable (new semaphores created if evicted)
-        assert!(manager.try_acquire(&key1).is_some());
-        assert!(manager.try_acquire(&key2).is_some());
-        assert!(manager.try_acquire(&key3).is_some());
+        assert!(manager.try_acquire(&key1, 1).is_some());
+        assert!(manager.try_acquire(&key2, 1).is_some());
+        assert!(manager.try_acquire(&key3, 1).is_some());
+    }
+
+    #[tokio::test]
+    async fn test_concurrency_allows_multiple_acquires() {
+        let manager = LockManager::new(100);
+        let key = CacheKey::from_slice(&[("test", Some("key"))]);
+
+        // With concurrency 2, should allow 2 concurrent acquires
+        let permit1 = manager.try_acquire(&key, 2);
+        assert!(permit1.is_some(), "First acquire should succeed");
+
+        let permit2 = manager.try_acquire(&key, 2);
+        assert!(permit2.is_some(), "Second acquire should succeed (concurrency=2)");
+
+        // Third should fail
+        let permit3 = manager.try_acquire(&key, 2);
+        assert!(permit3.is_none(), "Third acquire should fail (only 2 permits)");
+
+        // Drop one permit
+        drop(permit1);
+
+        // Now third should succeed
+        let permit4 = manager.try_acquire(&key, 2);
+        assert!(permit4.is_some(), "Fourth acquire should succeed after release");
     }
 }

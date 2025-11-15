@@ -30,6 +30,9 @@ tokio = { workspace = true, features = ["sync"] }
 lru = "0.12"
 parking_lot = "0.12"
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["sync", "rt", "time", "macros"] }
+
 [features]
 default = []
 

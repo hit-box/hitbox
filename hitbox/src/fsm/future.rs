@@ -7,7 +7,10 @@ use std::{
     time::Duration,
 };
 
-use crate::{CachePolicy, CacheState, CacheStatus, CacheableResponse, policy::PolicyConfig};
+use crate::{
+    CachePolicy, CacheState, CacheStatus, CacheableResponse,
+    policy::{EnabledCacheConfig, LockConfig, PolicyConfig},
+};
 use futures::ready;
 use hitbox_core::{CacheablePolicyData, EntityPolicyConfig};
 use pin_project::pin_project;
@@ -182,7 +185,7 @@ where
     response_predicates: Arc<dyn Predicate<Subject = Res::Subject> + Send + Sync>,
     key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
     policy: Arc<crate::policy::PolicyConfig>,
-    lock_manager: Option<Arc<LockManager>>,
+    lock_manager: Arc<LockManager>,
     lock_permit: Option<OwnedSemaphorePermit>,
 }
 
@@ -202,22 +205,9 @@ where
         response_predicates: Arc<dyn Predicate<Subject = Res::Subject> + Send + Sync>,
         key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
         policy: Arc<crate::policy::PolicyConfig>,
-        lock_manager: Option<Arc<LockManager>>,
+        lock_manager: Arc<LockManager>,
     ) -> Self {
         let cache_enabled = matches!(policy.as_ref(), crate::policy::PolicyConfig::Enabled(_));
-
-        // Determine if we should actually use locks based on policy configuration
-        let lock_manager = lock_manager.and_then(|manager| {
-            if let crate::policy::PolicyConfig::Enabled(config) = policy.as_ref() {
-                if config.locks().map(|l| l.enabled).unwrap_or(false) {
-                    Some(manager)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        });
 
         CacheFuture {
             transformer,
@@ -315,19 +305,26 @@ where
                             request: request.take(),
                         },
                         None => {
-                            // Cache MISS - check if we should use locks
-                            if let Some(_lock_manager) = this.lock_manager.as_ref() {
-                                State::TryAcquireLock {
-                                    key: this.cache_key.clone().expect("cache key must be set"),
-                                    request: request.take(),
+                            // Cache MISS - check policy
+                            match this.policy.as_ref() {
+                                PolicyConfig::Enabled(EnabledCacheConfig {
+                                    locks: LockConfig::Enabled { concurrency },
+                                    ..
+                                }) => {
+                                    // Both cache enabled AND locks enabled
+                                    State::TryAcquireLock {
+                                        key: this.cache_key.clone().expect("cache key must be set"),
+                                        request: request.take(),
+                                        concurrency: *concurrency,
+                                    }
                                 }
-                            } else {
-                                // No lock manager, go directly to upstream
-                                let upstream_future =
-                                    Box::pin(this.transformer.upstream_transform(
+                                _ => {
+                                    // Cache disabled OR locks disabled
+                                    let upstream_future = Box::pin(this.transformer.upstream_transform(
                                         request.take().expect(POLL_AFTER_READY_ERROR),
                                     ));
-                                State::PollUpstream { upstream_future }
+                                    State::PollUpstream { upstream_future }
+                                }
                             }
                         }
                     }
@@ -347,28 +344,35 @@ where
                         },
                         CacheState::Expired(_response) => {
                             *this.cache_status = CacheStatus::Miss;
-                            // Cache EXPIRED - check if we should use locks
-                            if let Some(_lock_manager) = this.lock_manager.as_ref() {
-                                State::TryAcquireLock {
-                                    key: this.cache_key.clone().expect("cache key must be set"),
-                                    request: request.take(),
+                            // Cache EXPIRED - check policy
+                            match this.policy.as_ref() {
+                                PolicyConfig::Enabled(EnabledCacheConfig {
+                                    locks: LockConfig::Enabled { concurrency },
+                                    ..
+                                }) => {
+                                    // Both cache enabled AND locks enabled
+                                    State::TryAcquireLock {
+                                        key: this.cache_key.clone().expect("cache key must be set"),
+                                        request: request.take(),
+                                        concurrency: *concurrency,
+                                    }
                                 }
-                            } else {
-                                // No lock manager, go directly to upstream
-                                let upstream_future =
-                                    Box::pin(this.transformer.upstream_transform(
+                                _ => {
+                                    // Cache disabled OR locks disabled
+                                    let upstream_future = Box::pin(this.transformer.upstream_transform(
                                         request.take().expect(POLL_AFTER_READY_ERROR),
                                     ));
-                                State::PollUpstream { upstream_future }
+                                    State::PollUpstream { upstream_future }
+                                }
                             }
                         }
                     }
                 }
-                StateProj::TryAcquireLock { key, request } => {
-                    let lock_manager = this.lock_manager.as_ref().expect("lock manager must be present");
+                StateProj::TryAcquireLock { key, request, concurrency } => {
+                    let lock_manager = this.lock_manager.clone();
 
                     // Try to acquire lock immediately
-                    match lock_manager.try_acquire(key) {
+                    match lock_manager.try_acquire(key, *concurrency) {
                         Some(permit) => {
                             // Got the lock! Store permit and fetch upstream
                             *this.lock_permit = Some(permit);
@@ -380,10 +384,10 @@ where
                         }
                         None => {
                             // Lock held by another request, wait for it
-                            let lock_manager = lock_manager.clone();
                             let key_for_future = key.clone();
+                            let concurrency_value = *concurrency;
                             let lock_future = Box::pin(async move {
-                                lock_manager.acquire(&key_for_future).await
+                                lock_manager.acquire(&key_for_future, concurrency_value).await
                             });
 
                             State::WaitForLock {

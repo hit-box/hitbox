@@ -1,15 +1,18 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct EnabledCacheConfig {
     pub ttl: Option<u32>,
     pub stale: Option<u32>,
-    pub locks: Option<LockConfig>,
+    #[serde(default)]
+    pub locks: LockConfig,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct LockConfig {
-    pub enabled: bool,
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Eq, PartialEq)]
+pub enum LockConfig {
+    Enabled { concurrency: usize },
+    #[default]
+    Disabled,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -23,14 +26,8 @@ impl Default for PolicyConfig {
         Self::Enabled(EnabledCacheConfig {
             ttl: Some(5),
             stale: None,
-            locks: None,
+            locks: LockConfig::Disabled,
         })
     }
 }
 
-impl EnabledCacheConfig {
-    /// Returns the lock configuration if present.
-    pub fn locks(&self) -> Option<&LockConfig> {
-        self.locks.as_ref()
-    }
-}

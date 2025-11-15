@@ -42,6 +42,7 @@ where
     TryAcquireLock {
         key: CacheKey,
         request: Option<Req>,
+        concurrency: usize,
     },
     WaitForLock {
         #[pin]

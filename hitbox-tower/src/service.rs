@@ -13,7 +13,7 @@ pub struct CacheService<S, B, C> {
     upstream: S,
     backend: Arc<B>,
     configuration: C,
-    lock_manager: Option<Arc<LockManager>>,
+    lock_manager: Arc<LockManager>,
 }
 
 impl<S, B, C> CacheService<S, B, C>
@@ -23,7 +23,7 @@ where
     pub fn new(upstream: S, backend: Arc<B>, configuration: C) -> Self {
         // Always create lock manager - CacheFuture will decide whether to use it
         // based on the policy configuration
-        let lock_manager = Some(Arc::new(LockManager::new(10_000)));
+        let lock_manager = Arc::new(LockManager::new(10_000));
 
         CacheService {
             upstream,
