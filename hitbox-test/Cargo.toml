@@ -59,7 +59,7 @@ jaq-json = { version = "1.1.0", features = ["serde_json"] }
 serial_test = "3.2"
 tempfile = "3"
 testcontainers = "0.23"
-testcontainers-modules = { version = "0.11", features = ["redis"] }
+testcontainers-modules = { version = "0.13", features = ["redis"] }
 
 [features]
 default = []
