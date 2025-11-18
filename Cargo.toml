@@ -27,7 +27,7 @@ tokio = { version = "1", default-features = false }
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde-saphyr = "0.0.7"
+serde-saphyr = "0.0.8"
 bitcode = { version = "0.6", features = ["serde"] }
 bincode = { version = "2", features = ["serde"] }
 
