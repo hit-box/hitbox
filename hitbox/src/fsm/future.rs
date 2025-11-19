@@ -17,141 +17,20 @@ use tracing::debug;
 use crate::{
     CacheKey, CacheableRequest, Extractor, Predicate,
     backend::CacheBackend,
+    concurrency::{ConcurrencyDecision, ConcurrencyManager},
     fsm::{PollCacheFuture, State, states::StateProj},
 };
 
 const POLL_AFTER_READY_ERROR: &str = "CacheFuture can't be polled after finishing";
 
-// #[cfg(test)]
-// mod tests {
-//     use std::{convert::Infallible, time::Duration};
-//
-//     use super::*;
-//
-//     use async_trait::async_trait;
-//     use futures::FutureExt;
-//     use hitbox_backend::CachePolicy;
-//
-//     use crate::{
-//         cache::{CacheKey, CacheableRequest},
-//         predicates::Predicate,
-//     };
-//
-//     #[tokio::test]
-//     pub async fn test_cache_future() {
-//         pub struct Req {}
-//         pub struct CacheableReq {}
-//
-//         impl CacheableReq {
-//             pub fn from_req(req: Req) -> Self {
-//                 Self {}
-//             }
-//
-//             pub fn into_req(self) -> Req {
-//                 Req {}
-//             }
-//         }
-//
-//         #[async_trait]
-//         impl CacheableRequest for CacheableReq {
-//             async fn cache_policy(
-//                 self,
-//                 predicates: &[Box<dyn Predicate<Self> + Send>],
-//             ) -> crate::cache::CachePolicy<Self> {
-//                 crate::cache::CachePolicy::Cacheable(self)
-//             }
-//         }
-//
-//         pub struct Res {}
-//         #[derive(Clone)]
-//         pub struct CacheableRes {}
-//
-//         impl CacheableRes {
-//             pub fn from_res(res: Res) -> Self {
-//                 Self {}
-//             }
-//             pub fn into_res(self) -> Res {
-//                 Res {}
-//             }
-//         }
-//
-//         #[async_trait]
-//         impl CacheableResponse for CacheableRes {
-//             type Cached = CacheableRes;
-//
-//             async fn into_cached(self) -> Self::Cached {
-//                 self
-//             }
-//
-//             async fn from_cached(cached: Self::Cached) -> Self {
-//                 cached
-//             }
-//         }
-//
-//         #[derive(Clone)]
-//         pub struct Service {
-//             counter: u32,
-//         }
-//
-//         impl Service {
-//             pub fn new() -> Self {
-//                 Self { counter: 0 }
-//             }
-//
-//             async fn call(&mut self, req: Req) -> Res {
-//                 self.counter += 1;
-//                 tokio::time::sleep(Duration::from_secs(3)).await;
-//                 Res {}
-//             }
-//         }
-//
-//         #[pin_project]
-//         pub struct UpstreamFuture {
-//             inner_future: BoxFuture<'static, CacheableRes>,
-//         }
-//
-//         impl UpstreamFuture {
-//             pub fn new(inner: &Service, req: CacheableReq) -> Self {
-//                 let mut inner_service = inner.clone();
-//                 let f = Box::pin(async move {
-//                     inner_service
-//                         .call(req.into_req())
-//                         .map(CacheableRes::from_res)
-//                         .await
-//                 });
-//                 UpstreamFuture { inner_future: f }
-//             }
-//         }
-//
-//         impl Future for UpstreamFuture {
-//             type Output = CacheableRes;
-//             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-//                 let this = self.project();
-//                 this.inner_future.as_mut().poll(cx)
-//             }
-//         }
-//
-//         let req = CacheableReq {};
-//         let service = Service::new();
-//         // let upstream = move |req| {
-//         //     let mut s = service.clone();
-//         //     Box::pin(s.call(req).map(|res| Res {})) as Pin<Box<dyn Future<Output = Res> + Send>>
-//         // };
-//         // let fsm = CacheFuture::new(req, upstream);
-//
-//         let upstream = |req| UpstreamFuture::new(&service, req);
-//         let fsm = CacheFuture3::new(req, upstream);
-//         fsm.await;
-//     }
-// }
-
 #[pin_project]
-pub struct CacheFuture<B, Req, Res, U>
+pub struct CacheFuture<B, Req, Res, U, C>
 where
     U: Upstream<Req, Response = Res>,
     B: CacheBackend,
     Res: CacheableResponse,
     Req: CacheableRequest,
+    C: ConcurrencyManager<Res>,
 {
     upstream: U,
     backend: Arc<B>,
@@ -167,15 +46,18 @@ where
     response_predicates: Arc<dyn Predicate<Subject = Res::Subject> + Send + Sync>,
     key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
     policy: Arc<crate::policy::PolicyConfig>,
+    concurrency_manager: Arc<C>,
 }
 
-impl<B, Req, Res, U> CacheFuture<B, Req, Res, U>
+impl<B, Req, Res, U, C> CacheFuture<B, Req, Res, U, C>
 where
     U: Upstream<Req, Response = Res>,
     B: CacheBackend,
     Res: CacheableResponse,
     Req: CacheableRequest,
+    C: ConcurrencyManager<Res>,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         backend: Arc<B>,
         request: Req,
@@ -184,6 +66,7 @@ where
         response_predicates: Arc<dyn Predicate<Subject = Res::Subject> + Send + Sync>,
         key_extractors: Arc<dyn Extractor<Subject = Req> + Send + Sync>,
         policy: Arc<crate::policy::PolicyConfig>,
+        concurrency_manager: Arc<C>,
     ) -> Self {
         let cache_enabled = matches!(policy.as_ref(), crate::policy::PolicyConfig::Enabled(_));
         CacheFuture {
@@ -199,11 +82,12 @@ where
             response_predicates,
             key_extractors,
             policy,
+            concurrency_manager,
         }
     }
 }
 
-impl<B, Req, Res, U> Future for CacheFuture<B, Req, Res, U>
+impl<B, Req, Res, U, C> Future for CacheFuture<B, Req, Res, U, C>
 where
     U: Upstream<Req, Response = Res>,
     U::Future: Send + 'static,
@@ -211,6 +95,7 @@ where
     Res: CacheableResponse,
     Res::Cached: Serialize + DeserializeOwned + Send + Sync,
     Req: CacheableRequest + Send + 'static,
+    C: ConcurrencyManager<Res>,
     // Debug bounds
     Req: Debug,
     Res::Cached: Debug,
@@ -277,13 +162,47 @@ where
                             cache_state: Box::pin(cached_value.cache_state()),
                             request: request.take(),
                         },
-                        None => {
-                            let upstream_future = Box::pin(
-                                this.upstream
-                                    .call(request.take().expect(POLL_AFTER_READY_ERROR)),
-                            );
+                        None => State::CheckConcurrency {
+                            request: request.take(),
+                        },
+                    }
+                }
+                StateProj::CheckConcurrency { request } => {
+                    let request = request.take().expect(POLL_AFTER_READY_ERROR);
+                    match this.policy.as_ref() {
+                        PolicyConfig::Enabled(config) if config.concurrency.is_some() => {
+                            State::ConcurrentPollUpstream {
+                                request: Some(request),
+                            }
+                        }
+                        _ => {
+                            let upstream_future = Box::pin(this.upstream.call(request));
                             State::PollUpstream { upstream_future }
                         }
+                    }
+                }
+                StateProj::ConcurrentPollUpstream { request } => {
+                    let request = request.take().expect(POLL_AFTER_READY_ERROR);
+                    let cache_key = this
+                        .cache_key
+                        .as_ref()
+                        .expect("CacheKey not found for concurrency check");
+                    match this.concurrency_manager.check(cache_key) {
+                        ConcurrencyDecision::Proceed => {
+                            let upstream_future = Box::pin(this.upstream.call(request));
+                            State::PollUpstream { upstream_future }
+                        }
+                        ConcurrencyDecision::Await(await_future) => State::AwaitResponse {
+                            await_response_future: await_future,
+                        },
+                    }
+                }
+                StateProj::AwaitResponse {
+                    await_response_future,
+                } => {
+                    let response = ready!(await_response_future.poll(cx));
+                    State::Response {
+                        response: Some(response),
                     }
                 }
                 StateProj::CheckCacheState {
@@ -299,14 +218,11 @@ where
                         CacheState::Stale(response) => State::Response {
                             response: Some(response),
                         },
-                        // TODO: remove code duplication with PollCache (upstream_future creation)
                         CacheState::Expired(_response) => {
                             *this.cache_status = CacheStatus::Miss;
-                            let upstream_future = Box::pin(
-                                this.upstream
-                                    .call(request.take().expect(POLL_AFTER_READY_ERROR)),
-                            );
-                            State::PollUpstream { upstream_future }
+                            State::CheckConcurrency {
+                                request: request.take(),
+                            }
                         }
                     }
                 }
@@ -320,7 +236,12 @@ where
                     let upstream_result = upstream_result.take().expect(POLL_AFTER_READY_ERROR);
                     let predicates = this.response_predicates.clone();
                     match this.cache_key {
-                        Some(_cache_key) => {
+                        Some(cache_key) => {
+                            // Notify waiting requests that response is ready
+                            let upstream_result = this
+                                .concurrency_manager
+                                .complete(cache_key, upstream_result);
+
                             let entity_config = match this.policy.as_ref() {
                                 PolicyConfig::Enabled(config) => EntityPolicyConfig {
                                     ttl: config.ttl.map(|s| Duration::from_secs(s as u64)),

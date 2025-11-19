@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct EnabledCacheConfig {
     pub ttl: Option<u32>,
     pub stale: Option<u32>,
+    pub concurrency: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -17,6 +18,7 @@ impl Default for PolicyConfig {
         Self::Enabled(EnabledCacheConfig {
             ttl: Some(5),
             stale: None,
+            concurrency: None,
         })
     }
 }

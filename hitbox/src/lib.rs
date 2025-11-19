@@ -41,6 +41,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod backend;
+pub mod concurrency;
 pub mod error;
 pub mod fsm;
 #[cfg(feature = "metrics")]

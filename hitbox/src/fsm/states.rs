@@ -13,6 +13,7 @@ pub type UpdateCache<T> = BoxFuture<'static, (Result<(), BackendError>, T)>;
 pub type RequestCachePolicyFuture<T> = BoxFuture<'static, RequestCachePolicy<T>>;
 pub type CacheStateFuture<T> = BoxFuture<'static, CacheState<T>>;
 pub type UpstreamFuture<T> = BoxFuture<'static, T>;
+pub type AwaitResponseFuture<T> = BoxFuture<'static, T>;
 
 #[allow(missing_docs)]
 #[pin_project(project = StateProj)]
@@ -36,6 +37,16 @@ where
     CheckCacheState {
         cache_state: CacheStateFuture<Res>,
         request: Option<Req>,
+    },
+    CheckConcurrency {
+        request: Option<Req>,
+    },
+    ConcurrentPollUpstream {
+        request: Option<Req>,
+    },
+    AwaitResponse {
+        #[pin]
+        await_response_future: AwaitResponseFuture<Res>,
     },
     PollUpstream {
         upstream_future: UpstreamFuture<Res>,
@@ -67,6 +78,9 @@ where
             State::PollCache { .. } => f.write_str("State::PollCache"),
             // State::CachePolled { .. } => f.write_str("State::PollCache"),
             State::CheckCacheState { .. } => f.write_str("State::CheckCacheState"),
+            State::CheckConcurrency { .. } => f.write_str("State::CheckConcurrency"),
+            State::ConcurrentPollUpstream { .. } => f.write_str("State::ConcurrentPollUpstream"),
+            State::AwaitResponse { .. } => f.write_str("State::AwaitResponse"),
             State::CheckResponseCachePolicy { .. } => {
                 f.write_str("State::CheckResponseCachePolicy")
             }
