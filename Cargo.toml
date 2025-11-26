@@ -30,7 +30,7 @@ serde_json = "1"
 serde-saphyr = "0.0.10"
 bitcode = { version = "0.6", features = ["serde"] }
 bincode = { version = "2", features = ["serde", "alloc"] }
-rkyv = { version = "0.7", features = ["validation"] }
+rkyv = { version = "0.8", features = ["validation"] }
 rkyv_dyn = "0.7"
 rkyv_typename = "0.7"
 
