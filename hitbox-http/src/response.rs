@@ -17,12 +17,59 @@ use crate::body::BufferedBody;
 use crate::predicates::header::HasHeaders;
 use crate::predicates::version::HasVersion;
 
+/// Wraps an HTTP response for cache storage and retrieval.
+///
+/// This type holds the response metadata ([`Parts`]) and a [`BufferedBody`].
+/// When caching, the body is collected into bytes and stored as a
+/// [`SerializableHttpResponse`]. When retrieving from cache, the response
+/// is reconstructed with a [`BufferedBody::Complete`] containing the cached bytes.
+///
+/// # Type Parameters
+///
+/// * `ResBody` - The HTTP response body type. Must implement [`hyper::body::Body`]
+///   with `Send` bounds. Common concrete types:
+///   - [`Empty<Bytes>`](http_body_util::Empty) - No body (204 responses)
+///   - [`Full<Bytes>`](http_body_util::Full) - Complete body in memory
+///   - `BoxBody<Bytes, E>` - Type-erased body for dynamic dispatch
+///
+/// # Examples
+///
+/// ```
+/// use bytes::Bytes;
+/// use http::Response;
+/// use http_body_util::Empty;
+/// use hitbox_http::{BufferedBody, CacheableHttpResponse};
+///
+/// let response = Response::builder()
+///     .status(200)
+///     .header("Content-Type", "application/json")
+///     .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
+///     .unwrap();
+///
+/// let cacheable = CacheableHttpResponse::from_response(response);
+/// ```
+///
+/// # Cache Storage
+///
+/// When a response is cacheable, the body is fully collected and stored as
+/// [`SerializableHttpResponse`]. This means:
+///
+/// - The entire response body must fit in memory
+/// - Streaming responses are buffered before storage
+/// - Body collection errors result in a `NonCacheable` policy
+///
+/// # Performance
+///
+/// Retrieving a cached response is allocation-efficient: the body bytes are
+/// wrapped directly in [`BufferedBody::Complete`] without copying.
 #[derive(Debug)]
 pub struct CacheableHttpResponse<ResBody>
 where
     ResBody: HttpBody,
 {
+    /// Response metadata (status, version, headers, extensions).
     pub parts: Parts,
+    /// The response body in one of three buffering states.
     pub body: BufferedBody<ResBody>,
 }
 
@@ -30,11 +77,18 @@ impl<ResBody> CacheableHttpResponse<ResBody>
 where
     ResBody: HttpBody,
 {
+    /// Creates a cacheable response from an HTTP response with a buffered body.
+    ///
+    /// The response body must already be wrapped in a [`BufferedBody`]. Use
+    /// [`BufferedBody::Passthrough`] for responses that haven't been inspected yet.
     pub fn from_response(response: Response<BufferedBody<ResBody>>) -> Self {
         let (parts, body) = response.into_parts();
         CacheableHttpResponse { parts, body }
     }
 
+    /// Converts back into a standard HTTP response.
+    ///
+    /// Use this after cache policy evaluation to send the response to the client.
     pub fn into_response(self) -> Response<BufferedBody<ResBody>> {
         Response::from_parts(self.parts, self.body)
     }
@@ -247,6 +301,27 @@ mod rkyv_header_map {
     }
 }
 
+/// Serialized form of an HTTP response for cache storage.
+///
+/// This type captures all information needed to reconstruct an HTTP response:
+/// status code, HTTP version, headers, and body bytes. It supports multiple
+/// serialization formats through serde and optionally rkyv for zero-copy
+/// deserialization.
+///
+/// # Serialization Formats
+///
+/// - **JSON/Bincode**: Standard serde serialization via [`http_serde`]
+/// - **rkyv** (feature `rkyv_format`): Zero-copy deserialization for maximum
+///   performance when reading from cache
+///
+/// # Performance
+///
+/// With the `rkyv_format` feature enabled:
+/// - HTTP version is stored as a single byte (9, 10, 11, 20, 30)
+/// - Status code is stored as a u16
+/// - Headers are stored as `Vec<(String, Vec<u8>)>` for zero-copy access
+///
+/// This allows cache hits to avoid most allocations during deserialization.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[cfg_attr(
     feature = "rkyv_format",

@@ -1,22 +1,69 @@
+//! Query parameter matching predicate.
+//!
+//! Provides [`Query`] predicate and [`Operation`] for matching URL query parameters.
+
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
 use hitbox::Neutral;
 use hitbox::predicate::{Predicate, PredicateResult};
 
+/// Operations for matching query parameters.
+///
+/// # Variants
+///
+/// - [`Eq`](Self::Eq) — Parameter must equal a specific value
+/// - [`Exist`](Self::Exist) — Parameter must be present
+/// - [`In`](Self::In) — Parameter value must be one of the specified values
 #[derive(Debug)]
 pub enum Operation {
+    /// Match if the parameter equals the value. Format: `(name, expected_value)`.
     Eq(String, String),
+    /// Match if the parameter exists (regardless of value).
     Exist(String),
+    /// Match if the parameter value is one of these values. Format: `(name, allowed_values)`.
     In(String, Vec<String>),
 }
 
+/// A predicate that matches requests by query parameters.
+///
+/// Returns [`Cacheable`](PredicateResult::Cacheable) when the query parameter
+/// satisfies the operation, [`NonCacheable`](PredicateResult::NonCacheable) otherwise.
+///
+/// # Type Parameters
+///
+/// * `P` - The inner predicate to chain with. Use [`Query::new`] to start
+///   a new predicate chain (uses [`Neutral`] internally), or use the
+///   [`QueryPredicate`] extension trait to chain onto an existing predicate.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::predicates::request::query::{Query, Operation};
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// # use hitbox::Neutral;
+/// # use hitbox_http::CacheableHttpRequest;
+/// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
+/// // Cache only when "format" query parameter is "json"
+/// let predicate = Query::new(Operation::Eq("format".into(), "json".into()));
+/// # let _: &Query<Neutral<Subject>> = &predicate;
+/// ```
 #[derive(Debug)]
 pub struct Query<P> {
+    /// The operation to perform on the query parameter.
     pub operation: Operation,
     inner: P,
 }
 
 impl<S> Query<Neutral<S>> {
+    /// Creates a predicate that matches query parameters against the operation.
+    ///
+    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
+    /// the query parameter satisfies the operation, [`NonCacheable`](hitbox::predicate::PredicateResult::NonCacheable) otherwise.
+    ///
+    /// Chain onto existing predicates using [`QueryPredicate::query`] instead
+    /// if you already have a predicate chain.
     pub fn new(operation: Operation) -> Self {
         Self {
             operation,
@@ -25,7 +72,20 @@ impl<S> Query<Neutral<S>> {
     }
 }
 
+/// Extension trait for adding query parameter matching to a predicate chain.
+///
+/// # For Callers
+///
+/// Chain this to match requests by their URL query parameters. Use the
+/// [`Operation`] enum to specify exact matches, existence checks, or
+/// set membership.
+///
+/// # For Implementors
+///
+/// This trait is automatically implemented for all [`Predicate`]
+/// types. You don't need to implement it manually.
 pub trait QueryPredicate: Sized {
+    /// Adds a query parameter match to this predicate chain.
     fn query(self, operation: Operation) -> Query<Self>;
 }
 

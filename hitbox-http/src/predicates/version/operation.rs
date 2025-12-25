@@ -1,11 +1,34 @@
+//! HTTP version matching operations.
+
 use http::Version;
 
-/// Operations for matching HTTP versions
+/// Operations for matching HTTP versions.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::predicates::version::Operation;
+/// use http::Version;
+///
+/// // Match HTTP/2 only
+/// let op = Operation::Eq(Version::HTTP_2);
+/// assert!(op.check(Version::HTTP_2));
+/// assert!(!op.check(Version::HTTP_11));
+///
+/// // Match HTTP/1.1 or HTTP/2
+/// let op = Operation::In(vec![Version::HTTP_11, Version::HTTP_2]);
+/// assert!(op.check(Version::HTTP_11));
+/// assert!(op.check(Version::HTTP_2));
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operation {
-    /// Match exact HTTP version
+    /// Use when caching should apply to a specific HTTP version only.
+    ///
+    /// Best for HTTP/2-only features or HTTP/1.1 fallback scenarios.
     Eq(Version),
-    /// Match if version is in the list
+    /// Use when caching should apply to multiple HTTP versions.
+    ///
+    /// Best for supporting both HTTP/1.1 and HTTP/2 while excluding HTTP/1.0.
     In(Vec<Version>),
 }
 

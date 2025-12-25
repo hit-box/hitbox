@@ -51,24 +51,110 @@ use std::fmt;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Enum to represent the remaining body state after partial consumption.
+/// What remains of a body stream after partial consumption.
+///
+/// When predicates or extractors read bytes from a body, the stream may have
+/// more data available or may have encountered an error. This enum captures
+/// both possibilities, preserving the stream state for forwarding to upstream.
+///
+/// # When You'll Encounter This
+///
+/// You typically don't create this directly. It appears when:
+/// - Using [`BufferedBody::collect_exact`] which returns remaining stream data
+/// - Decomposing a [`PartialBufferedBody`] via [`into_parts`](PartialBufferedBody::into_parts)
+///
+/// # Invariants
+///
+/// - `Body(stream)`: The stream has not ended and may yield more frames
+/// - `Error(Some(e))`: An error occurred; will be yielded once then become `None`
+/// - `Error(None)`: Error was already yielded; stream is terminated
+///
+/// # Examples
+///
+/// ```no_run
+/// use hitbox_http::{BufferedBody, CollectExactResult, Remaining};
+///
+/// async fn example<B: hyper::body::Body + Unpin>(body: BufferedBody<B>) {
+///     // After collecting 100 bytes from a larger body
+///     let result = body.collect_exact(100).await;
+///     match result {
+///         CollectExactResult::AtLeast { buffered, remaining } => {
+///             match remaining {
+///                 Some(Remaining::Body(stream)) => {
+///                     // More data available in stream
+///                 }
+///                 Some(Remaining::Error(err)) => {
+///                     // Error occurred after collecting bytes
+///                 }
+///                 None => {
+///                     // Stream ended exactly at limit
+///                 }
+///             }
+///         }
+///         CollectExactResult::Incomplete { .. } => {}
+///     }
+/// }
+/// ```
 #[pin_project(project = RemainingProj)]
 #[derive(Debug)]
 pub enum Remaining<B>
 where
     B: HttpBody,
 {
-    /// The body stream continues
+    /// The body stream continues with unconsumed data.
     Body(#[pin] B),
-    /// An error was encountered during consumption - yield once then end stream.
-    /// The Option allows us to yield the error once, then return None on subsequent polls.
+    /// An error occurred during consumption.
+    ///
+    /// The `Option` allows the error to be yielded once, then `None` on
+    /// subsequent polls.
     Error(Option<B::Error>),
 }
 
-/// Represents a partially consumed body with a buffered prefix and remaining stream.
+/// A partially consumed body: buffered prefix plus remaining stream.
 ///
-/// This type acts as both a data structure and a streamable body, implementing `HttpBody`
-/// to yield the prefix first, then stream from the remaining body.
+/// Created when a predicate or extractor reads some bytes from a body stream
+/// without consuming it entirely. Implements [`HttpBody`] to transparently
+/// replay the buffered prefix followed by the remaining stream data.
+///
+/// # When You'll Encounter This
+///
+/// You typically don't create this directly. It appears inside
+/// [`BufferedBody::Partial`] after operations like [`collect_exact`](BufferedBody::collect_exact).
+///
+/// # Invariants
+///
+/// - The prefix contains bytes already read from the original stream
+/// - The remaining stream has not been polled since the prefix was extracted
+/// - When polled as `HttpBody`, prefix bytes are yielded before remaining data
+///
+/// # Streaming Behavior
+///
+/// When polled as an [`HttpBody`]:
+/// 1. Yields the buffered prefix (if any) as a single frame
+/// 2. Delegates to the remaining stream, or yields the stored error
+///
+/// # Examples
+///
+/// ```no_run
+/// use bytes::Bytes;
+/// use hitbox_http::{BufferedBody, PartialBufferedBody, Remaining};
+///
+/// fn example<B: hyper::body::Body>(body: BufferedBody<B>) {
+///     // Decompose a partial body
+///     if let BufferedBody::Partial(partial) = body {
+///         let prefix: Option<&Bytes> = partial.prefix();
+///         println!("Buffered {} bytes", prefix.map(|b| b.len()).unwrap_or(0));
+///
+///         let (prefix, remaining) = partial.into_parts();
+///         // Can now handle prefix and remaining separately
+///     }
+/// }
+/// ```
+///
+/// # Performance
+///
+/// The prefix is yielded as a single frame, avoiding per-byte overhead.
+/// The remaining stream is passed through without additional buffering.
 #[pin_project]
 pub struct PartialBufferedBody<B>
 where
@@ -83,14 +169,27 @@ impl<B> PartialBufferedBody<B>
 where
     B: HttpBody,
 {
+    /// Constructs a partial body for transparent stream replay.
+    ///
+    /// When this body is polled as [`HttpBody`], the prefix bytes are yielded
+    /// first as a single frame, followed by the remaining stream data (or error).
+    /// This enables predicates to inspect body content without losing data.
     pub fn new(prefix: Option<Bytes>, remaining: Remaining<B>) -> Self {
         Self { prefix, remaining }
     }
 
+    /// Returns the bytes already consumed from the original stream.
+    ///
+    /// These bytes will be replayed before any remaining stream data when
+    /// this body is polled. Returns `None` if no bytes were buffered.
     pub fn prefix(&self) -> Option<&Bytes> {
         self.prefix.as_ref()
     }
 
+    /// Separates the buffered prefix from the remaining stream for independent handling.
+    ///
+    /// Use this when you need to process the prefix and remaining data differently,
+    /// such as forwarding them to separate destinations.
     pub fn into_parts(self) -> (Option<Bytes>, Remaining<B>) {
         (self.prefix, self.remaining)
     }
@@ -178,12 +277,43 @@ impl<B: HttpBody> HttpBody for PartialBufferedBody<B> {
 /// without losing data. The complete body (including any buffered prefix) is
 /// forwarded to upstream services.
 ///
-/// # Variants
+/// # States
 ///
-/// - [`Complete`](BufferedBody::Complete): Body was fully read and buffered (within size limits)
-/// - [`Partial`](BufferedBody::Partial): Body was partially read - has buffered prefix plus
-///   remaining stream or error
-/// - [`Passthrough`](BufferedBody::Passthrough): Body was not read at all (untouched)
+/// - [`Complete`](Self::Complete): Body fully buffered in memory
+/// - [`Partial`](Self::Partial): Prefix buffered, remaining stream preserved
+/// - [`Passthrough`](Self::Passthrough): Untouched, zero overhead
+///
+/// # Examples
+///
+/// Creating a passthrough body for a new request:
+///
+/// ```
+/// use bytes::Bytes;
+/// use http_body_util::Empty;
+/// use hitbox_http::BufferedBody;
+///
+/// let body: BufferedBody<Empty<Bytes>> = BufferedBody::Passthrough(Empty::new());
+/// ```
+///
+/// Creating a complete body from cached data:
+///
+/// ```
+/// use bytes::Bytes;
+/// use http_body_util::Empty;
+/// use hitbox_http::BufferedBody;
+///
+/// let cached_data = Bytes::from_static(b"{\"id\": 42}");
+/// let body: BufferedBody<Empty<Bytes>> = BufferedBody::Complete(Some(cached_data));
+/// ```
+///
+/// # State Transitions
+///
+/// ```text
+/// Passthrough ──collect_exact()──► Partial (if stream continues)
+///      │                               │
+///      │                               ▼
+///      └──────collect()──────────► Complete
+/// ```
 #[pin_project(project = BufferedBodyProj)]
 pub enum BufferedBody<B>
 where
@@ -273,14 +403,45 @@ where
 
 /// Result of attempting to collect at least N bytes from a body.
 ///
-/// Used by [`BufferedBody::collect_exact`] to read a fixed number of bytes
-/// from the body stream, regardless of size hints or total body size.
+/// Returned by [`BufferedBody::collect_exact`] to indicate whether the
+/// requested number of bytes was successfully read from the stream.
 ///
-/// This is useful for operations that need to inspect a prefix of the body
-/// (e.g., checking if body starts with specific bytes).
+/// # When to Use
 ///
-/// Note: When reading from frames, the buffered data may contain more than
-/// the requested number of bytes if an entire frame was consumed.
+/// Use this when you need to inspect a fixed-size prefix of a body without
+/// consuming the entire stream:
+/// - Checking magic bytes for file type detection
+/// - Reading protocol headers
+/// - Validating body format before full processing
+///
+/// # Invariants
+///
+/// - `AtLeast`: `buffered.len() >= requested_bytes`
+/// - `Incomplete`: `buffered.len() < requested_bytes` (stream ended or error)
+/// - The buffered data may exceed the requested size if a frame boundary
+///   didn't align exactly
+///
+/// # Examples
+///
+/// ```no_run
+/// use hitbox_http::{BufferedBody, CollectExactResult};
+///
+/// async fn example<B: hyper::body::Body + Unpin>(body: BufferedBody<B>) {
+///     // Check if body starts with JSON array
+///     let result = body.collect_exact(1).await;
+///     match result {
+///         CollectExactResult::AtLeast { ref buffered, .. } => {
+///             if buffered.starts_with(b"[") {
+///                 // It's a JSON array, reconstruct body for further processing
+///                 let body = result.into_buffered_body();
+///             }
+///         }
+///         CollectExactResult::Incomplete { buffered, error } => {
+///             // Body was empty or error occurred
+///         }
+///     }
+/// }
+/// ```
 #[derive(Debug)]
 pub enum CollectExactResult<B: HttpBody> {
     /// Successfully collected at least the requested number of bytes.
@@ -291,7 +452,9 @@ pub enum CollectExactResult<B: HttpBody> {
     /// - `Some(Remaining::Error(err))` - error occurred after collecting enough bytes
     /// - `None` - stream ended cleanly
     AtLeast {
+        /// The bytes successfully read from the stream (at least `limit_bytes`).
         buffered: Bytes,
+        /// The remaining stream data, if any.
         remaining: Option<Remaining<B>>,
     },
 
@@ -303,7 +466,9 @@ pub enum CollectExactResult<B: HttpBody> {
     ///
     /// The buffered field contains any bytes successfully read before the failure.
     Incomplete {
+        /// Bytes read before the stream ended or error occurred.
         buffered: Option<Bytes>,
+        /// The error that occurred, if any.
         error: Option<B::Error>,
     },
 }
@@ -355,11 +520,45 @@ impl<B> BufferedBody<B>
 where
     B: HttpBody,
 {
-    /// Collects the entire body into bytes, handling errors properly.
+    /// Collects the entire body into memory.
     ///
-    /// This method consumes the body and returns:
-    /// - `Ok(bytes)` if collection succeeds
-    /// - `Err(Self)` with `BufferedBody::Partial` containing the error if collection fails
+    /// Consumes all remaining bytes from the stream and returns them as a
+    /// contiguous `Bytes` buffer.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use hitbox_http::BufferedBody;
+    ///
+    /// async fn example<B: hyper::body::Body>(body: BufferedBody<B>)
+    /// where
+    ///     B::Data: Send,
+    /// {
+    ///     match body.collect().await {
+    ///         Ok(bytes) => println!("Collected {} bytes", bytes.len()),
+    ///         Err(error_body) => {
+    ///             // Error occurred, but we still have the body for forwarding
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(BufferedBody::Partial(...))` if the underlying stream
+    /// yields an error. The error is preserved in the returned body so it
+    /// can be forwarded to upstream services.
+    ///
+    /// # Performance
+    ///
+    /// Allocates a buffer to hold the entire body. For large bodies, consider:
+    /// - Using [`collect_exact`](Self::collect_exact) to read only a prefix
+    /// - Streaming the body directly without buffering
+    ///
+    /// # Caveats
+    ///
+    /// This method blocks until the entire body is received. For very large
+    /// bodies or slow streams, this may take significant time and memory.
     pub async fn collect(self) -> Result<Bytes, Self>
     where
         B::Data: Send,
@@ -408,23 +607,51 @@ where
         }
     }
 
-    /// Collects exactly `limit_bytes` from the body, ignoring size hints.
+    /// Collects at least `limit_bytes` from the body, preserving the rest.
     ///
-    /// This method always attempts to read the requested number of bytes from the stream,
-    /// unlike `collect_partial` which may return early based on size hints.
+    /// Reads bytes from the stream until at least `limit_bytes` are buffered,
+    /// then returns both the buffered prefix and the remaining stream. This
+    /// enables inspecting a body prefix without consuming the entire stream.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use hitbox_http::{BufferedBody, CollectExactResult};
+    ///
+    /// async fn check_json_array<B: hyper::body::Body + Unpin>(
+    ///     body: BufferedBody<B>,
+    /// ) -> bool {
+    ///     match body.collect_exact(1).await {
+    ///         CollectExactResult::AtLeast { buffered, .. } => {
+    ///             buffered.starts_with(b"[")
+    ///         }
+    ///         CollectExactResult::Incomplete { .. } => false,
+    ///     }
+    /// }
+    /// ```
     ///
     /// # Returns
     ///
-    /// * [`CollectExactResult::AtLeast`] - Collected at least `limit_bytes`
-    /// * [`CollectExactResult::Incomplete`] - Body ended or error occurred before reaching `limit_bytes`
+    /// - [`AtLeast`](CollectExactResult::AtLeast): Collected `>= limit_bytes`; remaining stream preserved
+    /// - [`Incomplete`](CollectExactResult::Incomplete): Stream ended or error before reaching limit
+    ///
+    /// # Errors
+    ///
+    /// Stream errors are captured in [`CollectExactResult::Incomplete`] with the
+    /// error in the `error` field. Any bytes read before the error are preserved
+    /// in `buffered`.
+    ///
+    /// # Performance
+    ///
+    /// Only allocates for the prefix buffer (up to `limit_bytes` plus one frame).
+    /// The remaining stream is preserved without additional buffering.
     ///
     /// # Use Cases
     ///
-    /// This is useful for operations that need to inspect a fixed-size prefix of the body,
-    /// such as:
-    /// - Checking if body starts with specific bytes
-    /// - Reading file format magic numbers
-    /// - Protocol header parsing
+    /// - Checking magic bytes for file type detection
+    /// - Reading fixed-size protocol headers
+    /// - Validating body format before full processing
+    /// - JQ/regex predicates that need body content
     pub async fn collect_exact(self, limit_bytes: usize) -> CollectExactResult<B>
     where
         B: Unpin,

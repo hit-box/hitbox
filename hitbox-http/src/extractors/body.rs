@@ -1,4 +1,18 @@
-//! Body extractor with support for hash, jq (JSON), and regex extraction.
+//! Body content extraction for cache keys.
+//!
+//! Provides [`Body`] extractor with support for hashing, jq (JSON) queries,
+//! and regular expression matching.
+//!
+//! # Extraction Modes
+//!
+//! - **Hash**: SHA256 hash of the entire body (truncated to 16 hex chars)
+//! - **Jq**: Extract values from JSON bodies using jq expressions
+//! - **Regex**: Extract values using regular expression capture groups
+//!
+//! # Performance
+//!
+//! All modes buffer the body into memory. For large bodies, consider
+//! using hash mode to minimize cache key size.
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -18,18 +32,38 @@ pub use super::transform::Transform;
 use super::transform::{apply_hash, apply_transform_chain};
 use crate::CacheableHttpRequest;
 
-/// Body extraction mode.
+/// Body extraction mode for generating cache key parts.
+///
+/// # Variants
+///
+/// - [`Hash`](Self::Hash): SHA256 hash of entire body
+/// - [`Jq`](Self::Jq): Extract from JSON using jq expressions
+/// - [`Regex`](Self::Regex): Extract using regular expression captures
 #[derive(Debug, Clone)]
 pub enum BodyExtraction {
-    /// Hash the entire body
+    /// Hash the entire body using SHA256 (truncated to 16 hex chars).
     Hash,
-    /// Extract using jq expression
+    /// Extract values from JSON body using a jq expression.
     Jq(JqExtraction),
-    /// Extract using regex
+    /// Extract values using regular expression captures.
     Regex(RegexExtraction),
 }
 
-/// Compiled jq extraction.
+/// A compiled jq expression for extracting values from JSON bodies.
+///
+/// Includes a custom `hash` function for hashing extracted values.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::body::JqExtraction;
+///
+/// // Extract user ID from JSON body
+/// let extraction = JqExtraction::compile(".user.id").unwrap();
+///
+/// // Extract and hash a sensitive field
+/// let extraction = JqExtraction::compile(".password | hash").unwrap();
+/// ```
 #[derive(Clone)]
 pub struct JqExtraction {
     filter: Filter<Native<Val>>,
@@ -95,6 +129,17 @@ fn custom_jq_funs() -> impl Iterator<Item = (&'static str, Box<[Bind]>, Native<V
 }
 
 impl JqExtraction {
+    /// Compiles a jq expression for extracting values from JSON bodies.
+    ///
+    /// The compiled filter can be reused across multiple requests.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(String)` if the expression is invalid:
+    /// - Parse errors (syntax errors in the jq expression)
+    /// - Compile errors (undefined functions, type mismatches)
+    ///
+    /// The error message includes details about the parsing or compilation failure.
     pub fn compile(expression: &str) -> Result<Self, String> {
         let program = File {
             code: expression,
@@ -123,29 +168,62 @@ impl JqExtraction {
     }
 }
 
-/// Regex extraction configuration.
+/// Configuration for regex-based body extraction.
+///
+/// Extracts values using regular expression captures. Supports both named
+/// and unnamed capture groups, with optional transformations.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::body::{RegexExtraction, Transforms};
+/// use regex::Regex;
+///
+/// // Extract order ID from body
+/// let extraction = RegexExtraction {
+///     regex: Regex::new(r#""order_id":\s*"(\w+)""#).unwrap(),
+///     key: Some("order_id".to_string()),
+///     global: false,
+///     transforms: Transforms::None,
+/// };
+/// ```
 #[derive(Debug, Clone)]
 pub struct RegexExtraction {
+    /// The regular expression pattern.
     pub regex: Regex,
+    /// Key name for unnamed captures. Defaults to `"body"` if `None`.
     pub key: Option<String>,
+    /// If `true`, extract all matches; if `false`, extract first match only.
     pub global: bool,
-    /// Transformations: per-key or full body
+    /// Transformations to apply to captured values.
     pub transforms: Transforms,
 }
 
-/// Transformations configuration.
+/// Transformations to apply to extracted values.
+///
+/// Apply hash, lowercase, or other transforms to captured values
+/// before using them in cache keys.
 #[derive(Debug, Clone, Default)]
 pub enum Transforms {
-    /// No transforms
+    /// No transformations applied.
     #[default]
     None,
-    /// Full body transform chain: applied to all captured values
+    /// Apply transforms to all captured values.
     FullBody(Vec<Transform>),
-    /// Per-key transforms: key name -> transform chain
+    /// Apply different transforms per capture group name.
     PerKey(HashMap<String, Vec<Transform>>),
 }
 
-/// Body extractor.
+/// Extracts cache key parts from request bodies.
+///
+/// Supports hash, jq (JSON), and regex extraction modes.
+/// Chain with other extractors using the builder pattern.
+///
+/// # Caveats
+///
+/// The entire body is buffered into memory during extraction.
+/// The body is returned as [`BufferedBody::Complete`](crate::BufferedBody::Complete)
+/// after extraction.
 #[derive(Debug)]
 pub struct Body<E> {
     inner: E,
@@ -153,6 +231,7 @@ pub struct Body<E> {
 }
 
 impl<S> Body<super::NeutralExtractor<S>> {
+    /// Creates a body extractor with the given extraction mode.
     pub fn new(extraction: BodyExtraction) -> Self {
         Self {
             inner: super::NeutralExtractor::new(),
@@ -161,7 +240,25 @@ impl<S> Body<super::NeutralExtractor<S>> {
     }
 }
 
+/// Extension trait for adding body extraction to an extractor chain.
+///
+/// # For Callers
+///
+/// Chain this to extract cache key parts from request bodies. Choose an
+/// extraction mode based on your needs:
+/// - [`BodyExtraction::Hash`] for opaque body identification
+/// - [`BodyExtraction::Jq`] for JSON content extraction
+/// - [`BodyExtraction::Regex`] for pattern-based extraction
+///
+/// **Important**: Body extraction buffers the entire body into memory.
+/// The body is returned as [`BufferedBody::Complete`](crate::BufferedBody::Complete) after extraction.
+///
+/// # For Implementors
+///
+/// This trait is automatically implemented for all [`Extractor`]
+/// types. You don't need to implement it manually.
 pub trait BodyExtractor: Sized {
+    /// Adds body extraction with the specified mode.
     fn body(self, extraction: BodyExtraction) -> Body<Self>;
 }
 

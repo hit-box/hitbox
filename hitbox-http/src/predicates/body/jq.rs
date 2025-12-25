@@ -1,3 +1,8 @@
+//! JQ expression support for body predicates.
+//!
+//! Provides [`JqExpression`] for compiling and applying jq filters to JSON bodies,
+//! and [`JqOperation`] for matching against jq query results.
+
 use std::fmt::Debug;
 
 use hitbox::predicate::PredicateResult;
@@ -11,13 +16,41 @@ use serde_json::Value;
 
 use crate::BufferedBody;
 
-/// Wrapper around a compiled jq expression.
-/// This allows us to compile the expression once and reuse it.
+/// A compiled jq expression for querying JSON bodies.
+///
+/// Wraps a jaq filter that can be compiled once and reused for multiple requests.
+/// This avoids the overhead of parsing and compiling the jq expression on each request.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::predicates::body::JqExpression;
+///
+/// // Compile a jq expression
+/// let expr = JqExpression::compile(".user.id").unwrap();
+///
+/// // Apply to JSON data
+/// let json = serde_json::json!({"user": {"id": 42}});
+/// let result = expr.apply(json);
+/// assert_eq!(result, Some(serde_json::json!(42)));
+/// ```
+///
+/// # Errors
+///
+/// [`compile`](Self::compile) returns `Err` if the jq expression is invalid.
 #[derive(Clone)]
 pub struct JqExpression(Filter<Native<Val>>);
 
 impl JqExpression {
-    /// Compile a jq expression into a reusable filter.
+    /// Compiles a jq expression into a reusable filter.
+    ///
+    /// # Arguments
+    ///
+    /// * `expression` — A jq filter expression (e.g., `.user.id`, `.items[] | .name`)
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the expression cannot be parsed or compiled.
     pub fn compile(expression: &str) -> Result<Self, String> {
         let program = File {
             code: expression,
@@ -35,7 +68,10 @@ impl JqExpression {
         Ok(Self(filter))
     }
 
-    /// Apply the filter to a JSON value and return the result.
+    /// Applies the filter to a JSON value and returns the result.
+    ///
+    /// Returns `None` if the filter produces `null` or no output.
+    /// If the filter produces multiple values, they are returned as a JSON array.
     pub fn apply(&self, input: Value) -> Option<Value> {
         let inputs = RcIter::new(core::iter::empty());
         let out = self.0.run((Ctx::new([], &inputs), Val::from(input)));
@@ -61,17 +97,38 @@ impl Debug for JqExpression {
     }
 }
 
+/// Operations for matching jq query results.
+///
+/// Used with [`JqExpression`] to check if a JSON body matches certain criteria.
+///
+/// # Variants
+///
+/// - [`Eq`](Self::Eq) — The jq result must equal the specified value
+/// - [`Exist`](Self::Exist) — The jq result must be non-null
+/// - [`In`](Self::In) — The jq result must be one of the specified values
 #[derive(Debug, Clone)]
 pub enum JqOperation {
+    /// Match if the jq result equals this value.
     Eq(Value),
+    /// Match if the jq result is non-null (path exists).
     Exist,
+    /// Match if the jq result is one of these values.
     In(Vec<Value>),
 }
 
 impl JqOperation {
-    /// Check if the jq operation matches the body.
-    /// Returns `PredicateResult::Cacheable` if the operation is satisfied,
-    /// `PredicateResult::NonCacheable` otherwise.
+    /// Checks if the jq operation matches the body.
+    ///
+    /// Collects the entire body, parses it as JSON, applies the jq filter,
+    /// and checks if the result satisfies this operation.
+    ///
+    /// Returns [`Cacheable`](PredicateResult::Cacheable) if the operation is satisfied,
+    /// [`NonCacheable`](PredicateResult::NonCacheable) otherwise.
+    ///
+    /// # Caveats
+    ///
+    /// - The entire body is buffered into memory for JSON parsing
+    /// - Returns `NonCacheable` if the body is not valid JSON
     pub async fn check<B>(
         &self,
         filter: &JqExpression,

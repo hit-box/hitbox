@@ -58,6 +58,7 @@ rkyv_format = ["dep:rkyv", "hitbox/rkyv_format", "hitbox-backend/rkyv_format"]
 
 [dev-dependencies]
 hitbox-core = { path = "../hitbox-core", version = "0.1" }
+hitbox-configuration = { path = "../hitbox-configuration", version = "0.1" }
 bincode = { version = "2", features = ["serde"] }
 tokio = { workspace = true, features = [
     "test-util",

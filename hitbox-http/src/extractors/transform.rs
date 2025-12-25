@@ -1,15 +1,37 @@
 //! Shared value transformations for extractors.
+//!
+//! Transforms modify extracted values before they become part of the cache key.
+//! They can be chained to apply multiple transformations in sequence.
+//!
+//! # Examples
+//!
+//! ```
+//! use hitbox_http::extractors::transform::Transform;
+//!
+//! // Hash sensitive values to avoid storing them in cache keys
+//! let transforms = vec![Transform::Hash];
+//!
+//! // Normalize case for case-insensitive matching
+//! let transforms = vec![Transform::Lowercase];
+//! ```
 
 use sha2::{Digest, Sha256};
 
-/// Value transformation.
+/// Transforms extracted values before they become cache key parts.
+///
+/// Multiple transforms can be chained and are applied in order.
 #[derive(Debug, Clone, Copy)]
 pub enum Transform {
-    /// SHA256 hash (truncated to 16 hex chars)
+    /// SHA256 hash, truncated to 16 hex characters.
+    ///
+    /// Useful for hashing sensitive values (API keys, tokens) to avoid
+    /// storing them directly in cache keys while still differentiating requests.
     Hash,
-    /// Convert to lowercase
+    /// Convert to lowercase.
+    ///
+    /// Useful for case-insensitive cache key matching.
     Lowercase,
-    /// Convert to uppercase
+    /// Convert to uppercase.
     Uppercase,
 }
 

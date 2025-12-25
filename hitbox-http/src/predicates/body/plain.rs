@@ -1,3 +1,8 @@
+//! Plain-text body matching operations.
+//!
+//! Provides [`PlainOperation`] for matching raw body bytes using equality,
+//! prefix/suffix checks, substring search, and regular expressions.
+
 use std::fmt::Debug;
 
 use bytes::{Buf, Bytes, BytesMut};
@@ -8,12 +13,9 @@ use hyper::body::Body as HttpBody;
 use crate::{BufferedBody, PartialBufferedBody, Remaining};
 
 /// Searches for a pattern in a body stream without collecting the entire body.
-/// Returns (found: bool, buffered_body)
 ///
-/// This function optimizes the search by:
-/// - Stopping early if pattern is found
-/// - Handling pattern spanning chunk boundaries with overlap buffer
-/// - Preserving errors in Partial bodies for transparency
+/// Optimizes the search by stopping early when the pattern is found and handling
+/// patterns that span chunk boundaries.
 async fn streaming_search<B>(body: BufferedBody<B>, pattern: &[u8]) -> (bool, BufferedBody<B>)
 where
     B: HttpBody + Unpin,
@@ -138,19 +140,58 @@ where
     }
 }
 
+/// Operations for matching raw body bytes.
+///
+/// Each operation checks the body content against a pattern and returns
+/// [`Cacheable`](PredicateResult::Cacheable) on match or
+/// [`NonCacheable`](PredicateResult::NonCacheable) otherwise.
+///
+/// # Performance
+///
+/// - [`Starts`](Self::Starts): Reads only the prefix bytes needed for comparison
+/// - [`Contains`](Self::Contains): Uses streaming search, stops early on match
+/// - [`Eq`](Self::Eq), [`Ends`](Self::Ends), [`RegExp`](Self::RegExp): Collect the entire body
+///
+/// # Caveats
+///
+/// All operations consume the body stream. The body is returned as
+/// [`BufferedBody::Complete`] or [`BufferedBody::Partial`] after checking.
 #[derive(Debug)]
 pub enum PlainOperation {
+    /// Use when the entire body must match exactly.
+    ///
+    /// Best for known static responses or signatures.
     Eq(Bytes),
+    /// Use when a marker or pattern appears anywhere in the body.
+    ///
+    /// Best for success markers, error messages, or content indicators.
+    /// Uses streaming search for efficiency.
     Contains(Bytes),
+    /// Use when the body should begin with a specific prefix.
+    ///
+    /// Best for magic numbers, file signatures, or protocol headers.
+    /// Only reads the prefix bytes needed.
     Starts(Bytes),
+    /// Use when the body should end with a specific suffix.
+    ///
+    /// Best for file extensions embedded in content or trailing markers.
+    /// Requires reading the entire body.
     Ends(Bytes),
+    /// Use when matching complex patterns in body content.
+    ///
+    /// Best for structured text, log formats, or flexible content matching.
+    /// Requires reading the entire body.
     RegExp(regex::bytes::Regex),
 }
 
 impl PlainOperation {
-    /// Check if the operation matches the body.
-    /// Returns `PredicateResult::Cacheable` if the operation is satisfied,
-    /// `PredicateResult::NonCacheable` otherwise.
+    /// Checks if this operation matches the body.
+    ///
+    /// Returns [`Cacheable`](PredicateResult::Cacheable) when the body matches,
+    /// [`NonCacheable`](PredicateResult::NonCacheable) otherwise.
+    ///
+    /// The returned body is always in a buffered state suitable for further
+    /// processing or caching.
     pub async fn check<B>(&self, body: BufferedBody<B>) -> PredicateResult<BufferedBody<B>>
     where
         B: HttpBody + Unpin,
