@@ -1,4 +1,21 @@
 //! Upstream wrapper for reqwest-middleware's Next type.
+//!
+//! This module provides [`ReqwestUpstream`] which bridges the gap between
+//! hitbox's [`Upstream`] trait and reqwest-middleware's [`Next`] type.
+//!
+//! # Overview
+//!
+//! When the cache middleware needs to fetch data from the actual HTTP endpoint
+//! (on cache miss or stale), it uses [`ReqwestUpstream`] to:
+//!
+//! 1. Convert [`CacheableHttpRequest`] back to [`reqwest::Request`]
+//! 2. Call the next middleware in the chain via [`Next::run`]
+//! 3. Convert [`reqwest::Response`] to [`CacheableHttpResponse`]
+//!
+//! [`Upstream`]: hitbox_core::Upstream
+//! [`Next`]: reqwest_middleware::Next
+//! [`CacheableHttpRequest`]: hitbox_http::CacheableHttpRequest
+//! [`CacheableHttpResponse`]: hitbox_http::CacheableHttpResponse
 
 use std::future::Future;
 use std::pin::Pin;
@@ -9,22 +26,38 @@ use hitbox_http::{BufferedBody, CacheableHttpRequest, CacheableHttpResponse};
 use http::Extensions;
 use reqwest_middleware::{Next, Result};
 
-/// Upstream wrapper that bridges reqwest-middleware's `Next<'a>` to hitbox's `Upstream` trait.
+/// Upstream wrapper that bridges reqwest-middleware's [`Next`] to hitbox's [`Upstream`] trait.
 ///
-/// This wrapper holds the middleware chain and converts between hitbox-http types
-/// and reqwest types.
+/// This adapter allows the hitbox cache FSM to call the remaining middleware
+/// chain when it needs to fetch fresh data from upstream.
+///
+/// # Type Parameter
+///
+/// The lifetime `'a` comes from [`Next<'a>`], representing the middleware
+/// chain's lifetime. This is why [`DisabledOffload`] is used in the middleware -
+/// we cannot spawn background tasks with non-`'static` lifetimes.
+///
+/// [`Next`]: reqwest_middleware::Next
+/// [`DisabledOffload`]: hitbox_core::DisabledOffload
 pub struct ReqwestUpstream<'a> {
     next: Next<'a>,
     extensions: Extensions,
 }
 
 impl<'a> ReqwestUpstream<'a> {
-    /// Create a new upstream wrapper.
+    /// Creates a new upstream wrapper. Typically called internally by
+    /// [`CacheMiddleware`](crate::CacheMiddleware).
     pub fn new(next: Next<'a>, extensions: Extensions) -> Self {
         Self { next, extensions }
     }
 }
 
+/// Implementation of [`Upstream`] for reqwest-middleware integration.
+///
+/// This allows the hitbox cache FSM to treat the remaining middleware chain
+/// as an upstream service that can be called on cache misses.
+///
+/// [`Upstream`]: hitbox_core::Upstream
 impl<'a> Upstream<CacheableHttpRequest<reqwest::Body>> for ReqwestUpstream<'a> {
     type Response = Result<CacheableHttpResponse<reqwest::Body>>;
     type Future = Pin<Box<dyn Future<Output = Self::Response> + Send + 'a>>;
@@ -61,13 +94,19 @@ impl<'a> Upstream<CacheableHttpRequest<reqwest::Body>> for ReqwestUpstream<'a> {
     }
 }
 
-/// Convert BufferedBody to reqwest::Body.
+/// Converts a [`BufferedBody`] to [`reqwest::Body`].
+///
+/// # Performance
 ///
 /// This conversion is cheap for most cases:
-/// - Passthrough: just unwraps the inner body (zero cost)
-/// - Complete: creates body from bytes
-/// - Partial: wraps the PartialBufferedBody which implements HttpBody
-///   (handles prefix + remaining stream + error cases)
+///
+/// - **Passthrough**: Unwraps the inner body with zero overhead
+/// - **Complete**: Creates a body from the buffered bytes
+/// - **Partial**: Wraps a [`PartialBufferedBody`] which implements [`http_body::Body`],
+///   yielding the buffered prefix first, then the remaining stream
+///
+/// [`BufferedBody`]: hitbox_http::BufferedBody
+/// [`PartialBufferedBody`]: hitbox_http::PartialBufferedBody
 pub fn buffered_body_to_reqwest(buffered: BufferedBody<reqwest::Body>) -> reqwest::Body {
     match buffered {
         BufferedBody::Passthrough(body) => body,

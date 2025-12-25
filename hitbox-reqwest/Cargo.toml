@@ -15,11 +15,25 @@ categories = [
 ]
 keywords = ["cache", "reqwest", "async", "http", "hitbox", "middleware"]
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+default = ["docs"]
+# Enable this feature to build documentation with links to backend crates
+docs = ["dep:hitbox-moka", "dep:hitbox-redis", "dep:hitbox-feoxdb"]
+
 [dependencies]
 hitbox = { path = "../hitbox", version = "0.1" }
 hitbox-core = { path = "../hitbox-core", version = "0.1" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.1" }
 hitbox-http = { path = "../hitbox-http", version = "0.1" }
+
+# Optional dependencies for documentation links
+hitbox-moka = { path = "../hitbox-moka", version = "0.1", optional = true }
+hitbox-redis = { path = "../hitbox-redis", version = "0.1", optional = true }
+hitbox-feoxdb = { path = "../hitbox-feoxdb", version = "0.1", optional = true }
 
 reqwest = { version = "0.12", default-features = false }
 reqwest-middleware = "0.4"
