@@ -37,7 +37,7 @@ http = { workspace = true }
 bytes = { workspace = true }
 axum = { workspace = true, features = ["macros"] }
 axum-test = "18.2"
-reqwest = "0.12"
+reqwest = "0.13"
 cucumber = { version = "0.22", features = ["output-junit", "libtest"] }
 serde-saphyr = { workspace = true }
 serde_yaml = "0.9"
