@@ -30,7 +30,7 @@ hitbox-reqwest = { path = "../hitbox-reqwest" }
 hitbox-feoxdb = { path = "../hitbox-feoxdb" }
 
 reqwest = { version = "0.12", features = ["json"] }
-reqwest-middleware = "0.4"
+reqwest-middleware = "0.5"
 
 actix = "0.13"
 axum = { workspace = true }
