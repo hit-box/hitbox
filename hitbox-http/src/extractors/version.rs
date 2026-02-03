@@ -16,13 +16,15 @@ use crate::CacheableHttpRequest;
 /// # Examples
 ///
 /// ```
-/// use hitbox_http::extractors::{Method, version::VersionExtractor};
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, VersionConfig, VersionExtractor};
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox_http::extractors::{NeutralExtractor, Version};
+/// # use hitbox_http::extractors::{NeutralExtractor, Method, Version};
 /// // Include version in cache key
-/// let extractor = Method::new().version();
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .version(VersionConfig::new());
 /// # let _: &Version<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
 /// ```
 #[derive(Debug)]
@@ -51,6 +53,32 @@ impl<S> Default for Version<NeutralExtractor<S>> {
     }
 }
 
+/// Configuration for the version extractor.
+///
+/// This is a marker type with no configuration options — the HTTP version
+/// is always extracted as-is.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, VersionConfig, VersionExtractor};
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .version(VersionConfig::new());
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct VersionConfig;
+
+impl VersionConfig {
+    /// Creates a new version extractor configuration.
+    pub fn new() -> Self {
+        VersionConfig
+    }
+}
+
 /// Extension trait for adding version extraction to an extractor chain.
 ///
 /// # For Callers
@@ -65,14 +93,14 @@ impl<S> Default for Version<NeutralExtractor<S>> {
 /// types. You don't need to implement it manually.
 pub trait VersionExtractor: Sized {
     /// Adds HTTP version extraction to this extractor chain.
-    fn version(self) -> Version<Self>;
+    fn version(self, config: VersionConfig) -> Version<Self>;
 }
 
 impl<E> VersionExtractor for E
 where
     E: Extractor,
 {
-    fn version(self) -> Version<Self> {
+    fn version(self, _config: VersionConfig) -> Version<Self> {
         Version { inner: self }
     }
 }

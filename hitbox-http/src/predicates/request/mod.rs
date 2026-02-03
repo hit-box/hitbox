@@ -8,7 +8,7 @@
 //! Cache only GET and HEAD requests:
 //!
 //! ```
-//! use hitbox_http::predicates::request::Method;
+//! use hitbox_http::predicates::request::{Method, method};
 //!
 //! # use bytes::Bytes;
 //! # use http_body_util::Empty;
@@ -16,14 +16,14 @@
 //! # use hitbox_http::CacheableHttpRequest;
 //! # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 //! // Single method
-//! let predicate = Method::new(http::Method::GET).unwrap();
+//! let predicate = Method::new(method::Operation::eq(http::Method::GET));
 //! # let _: &Method<Neutral<Subject>> = &predicate;
 //!
 //! // Multiple methods
-//! let predicate = Method::new_in(
-//!     Neutral::new(),
-//!     vec![http::Method::GET, http::Method::HEAD],
-//! );
+//! let predicate = Method::new(method::Operation::any(vec![
+//!     http::Method::GET,
+//!     http::Method::HEAD,
+//! ]));
 //! # let _: &Method<Neutral<Subject>> = &predicate;
 //! ```
 //!
@@ -58,3 +58,20 @@ pub use header::{Header, HeaderPredicate};
 pub use method::{Method, MethodPredicate};
 pub use path::{Path, PathPredicate};
 pub use query::{Query, QueryPredicate};
+
+use super::NeutralRequestPredicate;
+
+/// Creates a neutral request predicate as the starting point for a predicate chain.
+///
+/// # Examples
+///
+/// ```ignore
+/// use hitbox_http::predicates::request::{self, method, path, MethodPredicate, PathPredicate};
+///
+/// let pred = request::predicate()
+///     .method(method::Operation::eq(http::Method::GET))
+///     .path(path::Operation::pattern("/api/users/{id}"));
+/// ```
+pub fn predicate<ReqBody: http_body::Body>() -> NeutralRequestPredicate<ReqBody> {
+    NeutralRequestPredicate::new()
+}

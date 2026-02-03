@@ -8,18 +8,18 @@
 //! Cache only successful responses:
 //!
 //! ```
-//! use hitbox_http::predicates::response::{StatusCode, StatusClass};
+//! use hitbox_http::predicates::response::{StatusCode, StatusClass, status};
 //!
 //! # use bytes::Bytes;
 //! # use http_body_util::Empty;
 //! # use hitbox::Neutral;
 //! # use hitbox_http::CacheableHttpResponse;
 //! # type Subject = CacheableHttpResponse<Empty<Bytes>>;
-//! // Match 2xx status codes
-//! let predicate = StatusCode::new(http::StatusCode::OK);
+//! // Match 200 OK
+//! let predicate = StatusCode::new(status::Operation::eq(http::StatusCode::OK));
 //! # let _: &StatusCode<Neutral<Subject>> = &predicate;
 //! // Or match the entire success class
-//! let predicate = StatusCode::new_class(Neutral::new(), StatusClass::Success);
+//! let predicate = StatusCode::new(status::Operation::class(StatusClass::Success));
 //! # let _: &StatusCode<Neutral<Subject>> = &predicate;
 //! ```
 //!
@@ -51,3 +51,19 @@ pub use status::{StatusClass, StatusCode, StatusCodePredicate};
 
 // Re-export shared body types for convenience
 pub use crate::predicates::body::{JqExpression, JqOperation, Operation, PlainOperation};
+
+use super::NeutralResponsePredicate;
+
+/// Creates a neutral response predicate as the starting point for a predicate chain.
+///
+/// # Examples
+///
+/// ```ignore
+/// use hitbox_http::predicates::response::{self, status, StatusClass, StatusCodePredicate};
+///
+/// let pred = response::predicate()
+///     .status(status::Operation::class(StatusClass::Success));
+/// ```
+pub fn predicate<ResBody: http_body::Body>() -> NeutralResponsePredicate<ResBody> {
+    NeutralResponsePredicate::new()
+}

@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
+use hitbox_http::predicates::response::status::Operation as StatusOp;
 use hitbox_http::{
     BufferedBody, CacheableHttpResponse,
     predicates::{NeutralResponsePredicate, response::StatusCodePredicate},
@@ -17,7 +18,7 @@ async fn test_response_predicates_match() {
             .unwrap(),
     );
     let predicate =
-        NeutralResponsePredicate::new().status_code(StatusCode::from_u16(status).unwrap());
+        NeutralResponsePredicate::new().status(StatusOp::eq(StatusCode::from_u16(status).unwrap()));
     let prediction = predicate.check(request).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
@@ -32,8 +33,9 @@ async fn test_response_predicates_not_match() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let predicate = NeutralResponsePredicate::new()
-        .status_code(StatusCode::from_u16(predicate_status).unwrap());
+    let predicate = NeutralResponsePredicate::new().status(StatusOp::eq(
+        StatusCode::from_u16(predicate_status).unwrap(),
+    ));
     let prediction = predicate.check(request).await;
     assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }

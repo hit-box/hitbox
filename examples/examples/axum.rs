@@ -40,14 +40,12 @@ use hitbox::Config;
 use hitbox::policy::PolicyConfig;
 use hitbox::predicate::PredicateExt;
 use hitbox_http::{
-    extractors::{
-        Method as MethodExtractor, path::PathExtractor,
-        query::QueryExtractor as QueryExtractorTrait,
-    },
+    extractors::{self, MethodConfig, MethodExtractor, PathExtractor, query::QueryExtractor},
     predicates::{
         body::{BodyPredicate, JqExpression, JqOperation, Operation as BodyOperation},
-        header::{Header as RequestHeader, Operation as HeaderOperation},
-        response::StatusCode as ResponseStatusCode,
+        header::Operation as HeaderOperation,
+        request::{self, HeaderPredicate},
+        response::{self, StatusCodePredicate},
     },
 };
 use hitbox_moka::MokaBackend;
@@ -211,14 +209,16 @@ async fn main() {
     let list_config = Config::builder()
         .request_predicate(
             // Skip cache if Cache-Control: no-cache (RFC 9111)
-            RequestHeader::new(HeaderOperation::Contains(
-                http::header::CACHE_CONTROL,
-                "no-cache".to_string(),
-            ))
-            .not(),
+            request::predicate()
+                .header(HeaderOperation::contains(
+                    http::header::CACHE_CONTROL,
+                    "no-cache",
+                ))
+                .not(),
         )
         .response_predicate(
-            ResponseStatusCode::new(http::StatusCode::OK)
+            response::predicate()
+                .status(http::StatusCode::OK)
                 // Skip cache if tasks list is empty
                 .body(BodyOperation::Jq {
                     filter: JqExpression::compile(".tasks | length > 0").unwrap(),
@@ -226,10 +226,11 @@ async fn main() {
                 }),
         )
         .extractor(
-            MethodExtractor::new()
-                .query("page".to_string())
-                .query("limit".to_string())
-                .query("status".to_string()),
+            extractors::extractor()
+                .method(MethodConfig::new())
+                .query("page")
+                .query("limit")
+                .query("status"),
         )
         .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
         .build();
@@ -239,14 +240,19 @@ async fn main() {
     let details_config = Config::builder()
         .request_predicate(
             // Skip cache if Cache-Control: no-cache (RFC 9111)
-            RequestHeader::new(HeaderOperation::Contains(
-                http::header::CACHE_CONTROL,
-                "no-cache".to_string(),
-            ))
-            .not(),
+            request::predicate()
+                .header(HeaderOperation::contains(
+                    http::header::CACHE_CONTROL,
+                    "no-cache",
+                ))
+                .not(),
         )
-        .response_predicate(ResponseStatusCode::new(http::StatusCode::OK))
-        .extractor(MethodExtractor::new().path("/tasks/{task_id}"))
+        .response_predicate(response::predicate().status(http::StatusCode::OK))
+        .extractor(
+            extractors::extractor()
+                .method(MethodConfig::new())
+                .path("/tasks/{task_id}"),
+        )
         .policy(
             PolicyConfig::builder()
                 .ttl(Duration::from_secs(300))

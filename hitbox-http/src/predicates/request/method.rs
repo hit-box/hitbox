@@ -12,6 +12,24 @@ pub enum Operation {
     In(Vec<http::Method>),
 }
 
+impl Operation {
+    /// Match a specific HTTP method.
+    pub fn eq(method: http::Method) -> Self {
+        Operation::Eq(method)
+    }
+
+    /// Match any of the specified HTTP methods.
+    pub fn any(methods: Vec<http::Method>) -> Self {
+        Operation::In(methods)
+    }
+}
+
+impl From<http::Method> for Operation {
+    fn from(method: http::Method) -> Self {
+        Operation::Eq(method)
+    }
+}
+
 /// A predicate that matches requests by HTTP method.
 ///
 /// # Type Parameters
@@ -25,6 +43,7 @@ pub enum Operation {
 /// Match only GET requests:
 ///
 /// ```
+/// use hitbox_http::predicates::request::method::Operation;
 /// use hitbox_http::predicates::request::Method;
 ///
 /// # use bytes::Bytes;
@@ -32,66 +51,38 @@ pub enum Operation {
 /// # use hitbox::Neutral;
 /// # use hitbox_http::CacheableHttpRequest;
 /// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
-/// let predicate = Method::new(http::Method::GET).unwrap();
+/// let predicate = Method::new(Operation::eq(http::Method::GET));
 /// # let _: &Method<Neutral<Subject>> = &predicate;
 /// ```
 ///
-/// Match GET or HEAD requests (using the builder pattern):
+/// Match GET or HEAD requests:
 ///
 /// ```
-/// use hitbox::Neutral;
+/// use hitbox_http::predicates::request::method::Operation;
 /// use hitbox_http::predicates::request::Method;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
+/// # use hitbox::Neutral;
 /// # use hitbox_http::CacheableHttpRequest;
 /// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
-/// let predicate = Method::new_in(
-///     Neutral::new(),
-///     vec![http::Method::GET, http::Method::HEAD],
-/// );
+/// let predicate = Method::new(Operation::any(vec![http::Method::GET, http::Method::HEAD]));
 /// # let _: &Method<Neutral<Subject>> = &predicate;
 /// ```
 #[derive(Debug)]
 pub struct Method<P> {
-    operation: Operation,
-    inner: P,
+    pub(crate) operation: Operation,
+    pub(crate) inner: P,
 }
 
 impl<S> Method<Neutral<S>> {
-    /// Creates a predicate matching requests with the specified HTTP method.
+    /// Creates a standalone method predicate from an [`Operation`].
     ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the request method matches, [`NonCacheable`](hitbox::predicate::PredicateResult::NonCacheable) otherwise.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `method` cannot be converted to [`http::Method`].
-    /// When passing `http::Method` directly, this is infallible.
-    /// When passing a string, returns [`http::method::InvalidMethod`] if the
-    /// string is not a valid HTTP method.
-    pub fn new<E, T>(method: T) -> Result<Self, E>
-    where
-        T: TryInto<http::Method, Error = E>,
-    {
-        Ok(Method {
-            operation: Operation::Eq(method.try_into()?),
-            inner: Neutral::new(),
-        })
-    }
-}
-
-impl<P> Method<P> {
-    /// Creates a predicate matching requests with any of the specified HTTP methods.
-    ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the request method is in the provided list, [`NonCacheable`](hitbox::predicate::PredicateResult::NonCacheable) otherwise.
-    ///
-    /// Use this for caching strategies that apply to multiple methods (e.g., GET and HEAD).
-    pub fn new_in(inner: P, methods: Vec<http::Method>) -> Self {
+    /// For chaining, use the [`MethodPredicate`] extension trait directly.
+    pub fn new(operation: Operation) -> Self {
         Method {
-            operation: Operation::In(methods),
-            inner,
+            operation,
+            inner: Neutral::new(),
         }
     }
 }
@@ -109,16 +100,18 @@ impl<P> Method<P> {
 /// types. You don't need to implement it manually.
 pub trait MethodPredicate: Sized {
     /// Adds an HTTP method match to this predicate chain.
-    fn method(self, method: http::Method) -> Method<Self>;
+    ///
+    /// Accepts an [`Operation`] or an [`http::Method`] directly.
+    fn method(self, operation: impl Into<Operation>) -> Method<Self>;
 }
 
 impl<P> MethodPredicate for P
 where
     P: Predicate,
 {
-    fn method(self, method: http::Method) -> Method<Self> {
+    fn method(self, operation: impl Into<Operation>) -> Method<Self> {
         Method {
-            operation: Operation::Eq(method),
+            operation: operation.into(),
             inner: self,
         }
     }

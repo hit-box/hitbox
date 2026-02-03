@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
 use hitbox_http::predicates::NeutralRequestPredicate;
-use hitbox_http::predicates::request::PathPredicate;
+use hitbox_http::predicates::request::{PathPredicate, path};
 use hitbox_http::{BufferedBody, CacheableHttpRequest};
 use http::Request;
 use http_body_util::Empty;
@@ -16,7 +16,7 @@ async fn test_request_path_predicates_full_match() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let predicate = NeutralRequestPredicate::new().path(expression.into());
+    let predicate = NeutralRequestPredicate::new().path(path::Operation::pattern(expression));
     let prediction = predicate.check(request).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
@@ -31,7 +31,7 @@ async fn test_request_path_predicates_use_expression() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let predicate = NeutralRequestPredicate::new().path(expression.into());
+    let predicate = NeutralRequestPredicate::new().path(path::Operation::pattern(expression));
     let prediction = predicate.check(request).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
@@ -46,7 +46,7 @@ async fn test_request_path_predicates_non_match() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let predicate = NeutralRequestPredicate::new().path(expression.into());
+    let predicate = NeutralRequestPredicate::new().path(path::Operation::pattern(expression));
     let prediction = predicate.check(request).await;
     assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }

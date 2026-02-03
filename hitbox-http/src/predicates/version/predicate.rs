@@ -40,10 +40,9 @@ pub struct HttpVersion<P> {
 }
 
 impl<S> HttpVersion<Neutral<S>> {
-    /// Creates a version predicate that matches the HTTP protocol version.
+    /// Creates a standalone version predicate from an [`Operation`].
     ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the version satisfies the operation, [`NonCacheable`](hitbox::predicate::PredicateResult::NonCacheable) otherwise.
+    /// For chaining, use the [`VersionPredicate`] extension trait directly.
     pub fn new(operation: Operation) -> Self {
         Self {
             operation,
@@ -65,16 +64,18 @@ impl<S> HttpVersion<Neutral<S>> {
 /// types. You don't need to implement it manually.
 pub trait VersionPredicate: Sized {
     /// Adds a version match to this predicate chain.
-    fn version(self, operation: Operation) -> HttpVersion<Self>;
+    ///
+    /// Accepts an [`Operation`] or an [`http::Version`] (exact match) directly.
+    fn version(self, operation: impl Into<Operation>) -> HttpVersion<Self>;
 }
 
 impl<P> VersionPredicate for P
 where
     P: Predicate,
 {
-    fn version(self, operation: Operation) -> HttpVersion<Self> {
+    fn version(self, operation: impl Into<Operation>) -> HttpVersion<Self> {
         HttpVersion {
-            operation,
+            operation: operation.into(),
             inner: self,
         }
     }

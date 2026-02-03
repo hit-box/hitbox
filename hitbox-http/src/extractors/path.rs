@@ -12,9 +12,8 @@ use crate::CacheableHttpRequest;
 ///
 /// # Type Parameters
 ///
-/// * `E` - The inner extractor to chain with. Use [`Path::new`] to start
-///   a new extractor chain (uses [`NeutralExtractor`] internally), or use the
-///   [`PathExtractor`] extension trait to chain onto an existing extractor.
+/// * `E` - The inner extractor to chain with. Use [`extractors::extractor()`](super::extractor)
+///   to start a new chain, then call `.path(...)`.
 ///
 /// # Pattern Syntax
 ///
@@ -25,26 +24,14 @@ use crate::CacheableHttpRequest;
 /// # Examples
 ///
 /// ```
-/// use hitbox_http::extractors::Path;
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathExtractor};
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox_http::extractors::NeutralExtractor;
-/// // Extract user_id and post_id from "/users/42/posts/123"
-/// let extractor = Path::new("/users/{user_id}/posts/{post_id}");
-/// # let _: &Path<NeutralExtractor<Empty<Bytes>>> = &extractor;
-/// ```
-///
-/// Using the builder pattern:
-///
-/// ```
-/// use hitbox_http::extractors::{Method, path::PathExtractor};
-///
-/// # use bytes::Bytes;
-/// # use http_body_util::Empty;
-/// # use hitbox_http::extractors::{NeutralExtractor, Path};
-/// let extractor = Method::new()
-///     .path("/api/v1/users/{user_id}");
+/// # use hitbox_http::extractors::{NeutralExtractor, Method, Path};
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .path("/users/{user_id}/posts/{post_id}");
 /// # let _: &Path<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
 /// ```
 ///
@@ -84,6 +71,54 @@ impl<S> Path<NeutralExtractor<S>> {
     }
 }
 
+/// Configuration for the path extractor.
+///
+/// Wraps a path pattern string using [actix-router](https://docs.rs/actix-router) syntax.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::{self, PathConfig, PathExtractor};
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .path(PathConfig::pattern("/users/{user_id}/posts/{post_id}"));
+/// ```
+#[derive(Debug, Clone)]
+pub struct PathConfig {
+    pub(crate) pattern: String,
+}
+
+impl PathConfig {
+    /// Creates a path extractor configuration with the given pattern.
+    ///
+    /// See [`Path`] for pattern syntax documentation.
+    pub fn pattern(pattern: impl Into<String>) -> Self {
+        PathConfig {
+            pattern: pattern.into(),
+        }
+    }
+}
+
+impl From<&str> for PathConfig {
+    fn from(pattern: &str) -> Self {
+        PathConfig::pattern(pattern)
+    }
+}
+
+impl From<String> for PathConfig {
+    fn from(pattern: String) -> Self {
+        PathConfig::pattern(pattern)
+    }
+}
+
+impl From<&String> for PathConfig {
+    fn from(pattern: &String) -> Self {
+        PathConfig::pattern(pattern.as_str())
+    }
+}
+
 /// Extension trait for adding path extraction to an extractor chain.
 ///
 /// # For Callers
@@ -97,20 +132,23 @@ impl<S> Path<NeutralExtractor<S>> {
 /// This trait is automatically implemented for all [`Extractor`]
 /// types. You don't need to implement it manually.
 pub trait PathExtractor: Sized {
-    /// Adds path parameter extraction with the given pattern.
+    /// Adds path parameter extraction with the given configuration.
+    ///
+    /// Accepts a [`PathConfig`] or a string pattern directly.
     ///
     /// See [`Path`] for pattern syntax documentation.
-    fn path(self, resource: &str) -> Path<Self>;
+    fn path(self, config: impl Into<PathConfig>) -> Path<Self>;
 }
 
 impl<E> PathExtractor for E
 where
     E: Extractor,
 {
-    fn path(self, resource: &str) -> Path<Self> {
+    fn path(self, config: impl Into<PathConfig>) -> Path<Self> {
+        let config = config.into();
         Path {
             inner: self,
-            resource: ResourceDef::from(resource),
+            resource: ResourceDef::from(config.pattern.as_str()),
         }
     }
 }

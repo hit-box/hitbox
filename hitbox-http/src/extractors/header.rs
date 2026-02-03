@@ -8,13 +8,15 @@
 //! Extract a single header:
 //!
 //! ```
-//! use hitbox_http::extractors::{Method, header::HeaderExtractor};
+//! use hitbox_http::extractors::{self, MethodConfig, MethodExtractor};
+//! use hitbox_http::extractors::header::HeaderExtractor;
 //!
 //! # use bytes::Bytes;
 //! # use http_body_util::Empty;
-//! # use hitbox_http::extractors::{NeutralExtractor, header::Header};
-//! let extractor = Method::new()
-//!     .header("x-api-key".to_string());
+//! # use hitbox_http::extractors::{NeutralExtractor, Method, header::Header};
+//! let extractor = extractors::extractor::<Empty<Bytes>>()
+//!     .method(MethodConfig::new())
+//!     .header("x-api-key");
 //! # let _: &Header<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
 //! ```
 
@@ -39,6 +41,18 @@ pub enum NameSelector {
     Starts(String),
 }
 
+impl NameSelector {
+    /// Select by exact name.
+    pub fn exact(name: impl Into<String>) -> Self {
+        NameSelector::Exact(name.into())
+    }
+
+    /// Select by name prefix.
+    pub fn starts(prefix: impl Into<String>) -> Self {
+        NameSelector::Starts(prefix.into())
+    }
+}
+
 /// Extracts values from header content.
 #[derive(Debug, Clone)]
 pub enum ValueExtractor {
@@ -46,6 +60,65 @@ pub enum ValueExtractor {
     Full,
     /// Extract using regex (returns first capture group, or full match if no groups).
     Regex(Regex),
+}
+
+/// Configuration for the header extractor.
+///
+/// Builder with name selection, value extraction, and transform options.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, header::{HeaderConfig, HeaderExtractor, NameSelector}};
+/// use hitbox_http::extractors::transform::Transform;
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .header(HeaderConfig::name(NameSelector::exact("x-api-key")))
+///     .header(HeaderConfig::name(NameSelector::exact("accept")).transform(Transform::Lowercase));
+/// ```
+#[derive(Debug, Clone)]
+pub struct HeaderConfig {
+    pub(crate) name_selector: NameSelector,
+    pub(crate) value_extractor: ValueExtractor,
+    pub(crate) transforms: Vec<Transform>,
+}
+
+impl HeaderConfig {
+    /// Create a header extractor configuration with the given name selector.
+    pub fn name(selector: NameSelector) -> Self {
+        HeaderConfig {
+            name_selector: selector,
+            value_extractor: ValueExtractor::Full,
+            transforms: Vec::new(),
+        }
+    }
+
+    /// Set value extraction strategy.
+    pub fn value(mut self, extractor: ValueExtractor) -> Self {
+        self.value_extractor = extractor;
+        self
+    }
+
+    /// Add a transform to the chain.
+    pub fn transform(mut self, t: Transform) -> Self {
+        self.transforms.push(t);
+        self
+    }
+}
+
+impl From<&str> for HeaderConfig {
+    fn from(name: &str) -> Self {
+        HeaderConfig::name(NameSelector::exact(name))
+    }
+}
+
+impl From<String> for HeaderConfig {
+    fn from(name: String) -> Self {
+        HeaderConfig::name(NameSelector::exact(name))
+    }
 }
 
 /// Extracts header values as cache key parts.
@@ -121,20 +194,23 @@ impl<E> Header<E> {
 /// This trait is automatically implemented for all [`Extractor`]
 /// types. You don't need to implement it manually.
 pub trait HeaderExtractor: Sized {
-    /// Adds extraction for a single header by exact name.
-    fn header(self, name: String) -> Header<Self>;
+    /// Adds header extraction with the given configuration.
+    ///
+    /// Accepts a [`HeaderConfig`] or a string (exact header name) directly.
+    fn header(self, config: impl Into<HeaderConfig>) -> Header<Self>;
 }
 
 impl<E> HeaderExtractor for E
 where
     E: Extractor,
 {
-    fn header(self, name: String) -> Header<Self> {
+    fn header(self, config: impl Into<HeaderConfig>) -> Header<Self> {
+        let config = config.into();
         Header {
             inner: self,
-            name_selector: NameSelector::Exact(name),
-            value_extractor: ValueExtractor::Full,
-            transforms: Vec::new(),
+            name_selector: config.name_selector,
+            value_extractor: config.value_extractor,
+            transforms: config.transforms,
         }
     }
 }

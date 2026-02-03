@@ -214,6 +214,186 @@ pub enum Transforms {
     PerKey(HashMap<String, Vec<Transform>>),
 }
 
+/// Trait for converting a body extraction config into a [`BodyExtraction`].
+pub trait IntoBodyExtraction {
+    /// Convert into a [`BodyExtraction`].
+    fn into_extraction(self) -> BodyExtraction;
+}
+
+impl IntoBodyExtraction for BodyExtraction {
+    fn into_extraction(self) -> BodyExtraction {
+        self
+    }
+}
+
+/// Initial state for [`BodyConfig`] before a mode is chosen.
+#[derive(Debug, Clone)]
+pub struct NoMode;
+
+/// Hash mode for [`BodyConfig`].
+#[derive(Debug, Clone)]
+pub struct HashMode;
+
+/// JQ mode for [`BodyConfig`].
+#[derive(Debug, Clone)]
+pub struct JqMode {
+    extraction: JqExtraction,
+}
+
+/// Regex mode for [`BodyConfig`].
+#[derive(Debug, Clone)]
+pub struct RegexMode {
+    regex: Regex,
+    global: bool,
+}
+
+/// Configuration for the body extractor, parameterized by extraction mode.
+///
+/// Start with [`BodyConfig::new()`] to set shared options (key, transforms),
+/// then choose a mode. Or use the mode constructors directly as shortcuts.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, body::{BodyConfig, BodyExtractor}};
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// // Hash mode
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .body(BodyConfig::new().hash());
+///
+/// // Shared config then mode
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .body(BodyConfig::new().key("token").regex(r"(\w+)").unwrap().global());
+///
+/// // Mode-first shortcut with key
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .body(BodyConfig::new().regex(r"token=(\w+)").unwrap().key("api-token").global());
+/// ```
+#[derive(Debug, Clone)]
+pub struct BodyConfig<M> {
+    key: Option<String>,
+    transforms: Transforms,
+    mode: M,
+}
+
+// Shared builder methods available on all states.
+impl<M> BodyConfig<M> {
+    /// Set the key name for generated key parts. Defaults to `"body"`.
+    ///
+    /// Behavior varies by mode:
+    /// - **Hash**: used as the key part name (replaces default `"body"`).
+    /// - **Regex**: used as the key part name for unnamed capture groups.
+    ///   Named captures use their own names regardless of this setting.
+    /// - **Jq**: used as the key part name for scalar and array-of-scalar
+    ///   outputs. Object outputs use their field names, and array-of-object
+    ///   outputs use each object's field names — this setting is ignored
+    ///   in those cases.
+    pub fn key(mut self, key: impl Into<String>) -> Self {
+        self.key = Some(key.into());
+        self
+    }
+
+    /// Set transforms for extracted values.
+    pub fn transforms(mut self, transforms: Transforms) -> Self {
+        self.transforms = transforms;
+        self
+    }
+}
+
+impl BodyConfig<NoMode> {
+    /// Create a new body config without a mode. Set shared options,
+    /// then choose a mode with `.hash()`, `.jq()`, or `.regex()`.
+    pub fn new() -> Self {
+        BodyConfig {
+            key: None,
+            transforms: Transforms::None,
+            mode: NoMode,
+        }
+    }
+
+    /// Switch to hash mode.
+    pub fn hash(self) -> BodyConfig<HashMode> {
+        BodyConfig {
+            key: self.key,
+            transforms: self.transforms,
+            mode: HashMode,
+        }
+    }
+
+    /// Switch to jq mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the jq expression is invalid.
+    pub fn jq(self, expression: &str) -> Result<BodyConfig<JqMode>, String> {
+        Ok(BodyConfig {
+            key: self.key,
+            transforms: self.transforms,
+            mode: JqMode {
+                extraction: JqExtraction::compile(expression)?,
+            },
+        })
+    }
+
+    /// Switch to regex mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the regex pattern is invalid.
+    pub fn regex(self, pattern: &str) -> Result<BodyConfig<RegexMode>, regex::Error> {
+        Ok(BodyConfig {
+            key: self.key,
+            transforms: self.transforms,
+            mode: RegexMode {
+                regex: Regex::new(pattern)?,
+                global: false,
+            },
+        })
+    }
+}
+
+impl Default for BodyConfig<NoMode> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BodyConfig<RegexMode> {
+    /// Enable global matching (extract all matches instead of first).
+    pub fn global(mut self) -> Self {
+        self.mode.global = true;
+        self
+    }
+}
+
+impl IntoBodyExtraction for BodyConfig<HashMode> {
+    fn into_extraction(self) -> BodyExtraction {
+        BodyExtraction::Hash
+    }
+}
+
+impl IntoBodyExtraction for BodyConfig<JqMode> {
+    fn into_extraction(self) -> BodyExtraction {
+        BodyExtraction::Jq(self.mode.extraction)
+    }
+}
+
+impl IntoBodyExtraction for BodyConfig<RegexMode> {
+    fn into_extraction(self) -> BodyExtraction {
+        BodyExtraction::Regex(RegexExtraction {
+            regex: self.mode.regex,
+            key: self.key,
+            global: self.mode.global,
+            transforms: self.transforms,
+        })
+    }
+}
+
 /// Extracts cache key parts from request bodies.
 ///
 /// Supports hash, jq (JSON), and regex extraction modes.
@@ -245,10 +425,10 @@ impl<S> Body<super::NeutralExtractor<S>> {
 /// # For Callers
 ///
 /// Chain this to extract cache key parts from request bodies. Choose an
-/// extraction mode based on your needs:
-/// - [`BodyExtraction::Hash`] for opaque body identification
-/// - [`BodyExtraction::Jq`] for JSON content extraction
-/// - [`BodyExtraction::Regex`] for pattern-based extraction
+/// extraction mode via [`BodyConfig`]:
+/// - [`BodyConfig::hash()`] for opaque body identification
+/// - [`BodyConfig::jq()`] for JSON content extraction
+/// - [`BodyConfig::regex()`] for pattern-based extraction
 ///
 /// **Important**: Body extraction buffers the entire body into memory.
 /// The body is returned as [`BufferedBody::Complete`](crate::BufferedBody::Complete) after extraction.
@@ -258,18 +438,18 @@ impl<S> Body<super::NeutralExtractor<S>> {
 /// This trait is automatically implemented for all [`Extractor`]
 /// types. You don't need to implement it manually.
 pub trait BodyExtractor: Sized {
-    /// Adds body extraction with the specified mode.
-    fn body(self, extraction: BodyExtraction) -> Body<Self>;
+    /// Adds body extraction with the specified configuration.
+    fn body(self, config: impl IntoBodyExtraction) -> Body<Self>;
 }
 
 impl<E> BodyExtractor for E
 where
     E: hitbox::Extractor,
 {
-    fn body(self, extraction: BodyExtraction) -> Body<Self> {
+    fn body(self, config: impl IntoBodyExtraction) -> Body<Self> {
         Body {
             inner: self,
-            extraction,
+            extraction: config.into_extraction(),
         }
     }
 }

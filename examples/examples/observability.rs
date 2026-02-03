@@ -44,10 +44,10 @@ use hitbox::Config;
 use hitbox::concurrency::NoopConcurrencyManager;
 use hitbox::policy::PolicyConfig;
 use hitbox_http::{
-    extractors::{Method as MethodExtractor, path::PathExtractor},
+    extractors::{self, MethodConfig, MethodExtractor, PathExtractor},
     predicates::{
         NeutralResponsePredicate,
-        request::{Method as RequestMethod, PathPredicate},
+        request::{self, MethodPredicate, PathPredicate},
     },
 };
 use hitbox_moka::MokaBackend;
@@ -186,13 +186,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Extractor: method + path "/"
     // Policy: TTL 60s, stale 30s
     let root_config = Config::builder()
-        .request_predicate(
-            RequestMethod::new(http::Method::GET)
-                .unwrap()
-                .path("/".to_string()),
-        )
+        .request_predicate(request::predicate().method(http::Method::GET).path("/"))
         .response_predicate(NeutralResponsePredicate::new())
-        .extractor(MethodExtractor::new().path("/"))
+        .extractor(
+            extractors::extractor()
+                .method(MethodConfig::new())
+                .path("/"),
+        )
         .policy(
             PolicyConfig::builder()
                 .ttl(Duration::from_secs(60))
@@ -207,12 +207,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Policy: TTL 10s, stale 5s
     let greet_config = Config::builder()
         .request_predicate(
-            RequestMethod::new(http::Method::GET)
-                .unwrap()
-                .path("/greet/{name}".to_string()),
+            request::predicate()
+                .method(http::Method::GET)
+                .path("/greet/{name}"),
         )
         .response_predicate(NeutralResponsePredicate::new())
-        .extractor(MethodExtractor::new().path("/greet/{name}"))
+        .extractor(
+            extractors::extractor()
+                .method(MethodConfig::new())
+                .path("/greet/{name}"),
+        )
         .policy(
             PolicyConfig::builder()
                 .ttl(Duration::from_secs(10))
@@ -226,12 +230,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Policy: Disabled
     let health_config = Config::builder()
         .request_predicate(
-            RequestMethod::new(http::Method::GET)
-                .unwrap()
-                .path("/health".to_string()),
+            request::predicate()
+                .method(http::Method::GET)
+                .path("/health"),
         )
         .response_predicate(NeutralResponsePredicate::new())
-        .extractor(MethodExtractor::new().path("/health"))
+        .extractor(
+            extractors::extractor()
+                .method(MethodConfig::new())
+                .path("/health"),
+        )
         .policy(PolicyConfig::disabled())
         .build();
 

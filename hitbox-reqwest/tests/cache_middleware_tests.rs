@@ -7,6 +7,7 @@ use hitbox::{Config, Neutral};
 use hitbox_http::extractors::Method as MethodExtractor;
 use hitbox_http::extractors::path::PathExtractor;
 use hitbox_http::predicates::request::Method as MethodPredicate;
+use hitbox_http::predicates::request::method::Operation as MethodOp;
 use hitbox_moka::MokaBackend;
 use hitbox_reqwest::{CacheMiddleware, NoopConcurrencyManager};
 use reqwest::Client;
@@ -31,7 +32,7 @@ async fn test_cache_miss_then_hit() {
     let backend = MokaBackend::builder().max_entries(100).build();
 
     let config = Config::builder()
-        .request_predicate(MethodPredicate::new(http::Method::GET).unwrap())
+        .request_predicate(MethodPredicate::new(MethodOp::eq(http::Method::GET)))
         .response_predicate(Neutral::new())
         .extractor(MethodExtractor::new().path("/{path}*"))
         .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
@@ -82,7 +83,7 @@ async fn test_response_integrity() {
     let backend = MokaBackend::builder().max_entries(100).build();
 
     let config = Config::builder()
-        .request_predicate(MethodPredicate::new(http::Method::GET).unwrap())
+        .request_predicate(MethodPredicate::new(MethodOp::eq(http::Method::GET)))
         .response_predicate(Neutral::new())
         .extractor(MethodExtractor::new().path("/{path}*"))
         .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
@@ -152,7 +153,7 @@ async fn test_body_limit_exceeded_returns_full_body() {
 
     // Configure body limit of 100 bytes using response predicate
     let config = Config::builder()
-        .request_predicate(MethodPredicate::new(http::Method::GET).unwrap())
+        .request_predicate(MethodPredicate::new(MethodOp::eq(http::Method::GET)))
         .response_predicate(BodyPredicate::new(BodyOperation::Limit { bytes: 100 }))
         .extractor(MethodExtractor::new().path("/{path}*"))
         .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())

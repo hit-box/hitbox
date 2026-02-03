@@ -45,7 +45,7 @@ use hitbox::Config;
 use hitbox::policy::PolicyConfig;
 use hitbox_tower::Cache;
 use hitbox_moka::MokaBackend;
-use hitbox_http::extractors::Method;
+use hitbox_http::extractors::{self, MethodConfig, MethodExtractor};
 use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
 use tower::{ServiceBuilder, service_fn};
 # use http_body_util::Full;
@@ -58,13 +58,13 @@ let backend = MokaBackend::builder().max_entries(1000).build();
 let config = Config::builder()
     .request_predicate(NeutralRequestPredicate::new())
     .response_predicate(NeutralResponsePredicate::new())
-    .extractor(Method::new())
+    .extractor(extractors::extractor().method(MethodConfig::new()))
     .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
     .build();
 # let _: Config<
 #     NeutralRequestPredicate<Body>,
 #     NeutralResponsePredicate<Body>,
-#     Method<hitbox_http::extractors::NeutralExtractor<Body>>,
+#     hitbox_http::extractors::Method<hitbox_http::extractors::NeutralExtractor<Body>>,
 # > = config;
 
 // 3. Build the cache layer
@@ -114,9 +114,9 @@ This crate re-exports commonly used types for convenience:
 For predicates and extractors, import from [`hitbox_http`]:
 
 ```rust
-use hitbox_http::predicates::request::Method;
-use hitbox_http::predicates::response::StatusCode;
-use hitbox_http::extractors::{Method as MethodExtractor, path::PathExtractor};
+use hitbox_http::predicates::request::{self, MethodPredicate};
+use hitbox_http::predicates::response::{self, StatusCodePredicate};
+use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathExtractor};
 ```
 
 ## Examples

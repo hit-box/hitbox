@@ -24,6 +24,37 @@ pub enum Operation {
     In(String, Vec<String>),
 }
 
+impl Operation {
+    /// Creates an operation matching a query parameter with an exact value.
+    pub fn eq(name: impl Into<String>, value: impl Into<String>) -> Self {
+        Operation::Eq(name.into(), value.into())
+    }
+
+    /// Creates an operation matching the existence of a query parameter.
+    pub fn exist(name: impl Into<String>) -> Self {
+        Operation::Exist(name.into())
+    }
+
+    /// Creates an operation matching a query parameter against multiple values.
+    pub fn any(name: impl Into<String>, values: Vec<String>) -> Self {
+        Operation::In(name.into(), values)
+    }
+}
+
+impl From<&str> for Operation {
+    /// Shorthand for `Operation::exist(name)`.
+    fn from(name: &str) -> Self {
+        Operation::exist(name)
+    }
+}
+
+impl From<(&str, &str)> for Operation {
+    /// Shorthand for `Operation::eq(name, value)`.
+    fn from((name, value): (&str, &str)) -> Self {
+        Operation::eq(name, value)
+    }
+}
+
 /// A predicate that matches requests by query parameters.
 ///
 /// Returns [`Cacheable`](PredicateResult::Cacheable) when the query parameter
@@ -46,24 +77,19 @@ pub enum Operation {
 /// # use hitbox_http::CacheableHttpRequest;
 /// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 /// // Cache only when "format" query parameter is "json"
-/// let predicate = Query::new(Operation::Eq("format".into(), "json".into()));
+/// let predicate = Query::new(Operation::eq("format", "json"));
 /// # let _: &Query<Neutral<Subject>> = &predicate;
 /// ```
 #[derive(Debug)]
 pub struct Query<P> {
-    /// The operation to perform on the query parameter.
-    pub operation: Operation,
-    inner: P,
+    pub(crate) operation: Operation,
+    pub(crate) inner: P,
 }
 
 impl<S> Query<Neutral<S>> {
-    /// Creates a predicate that matches query parameters against the operation.
+    /// Creates a standalone query predicate from an [`Operation`].
     ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the query parameter satisfies the operation, [`NonCacheable`](hitbox::predicate::PredicateResult::NonCacheable) otherwise.
-    ///
-    /// Chain onto existing predicates using [`QueryPredicate::query`] instead
-    /// if you already have a predicate chain.
+    /// For chaining, use the [`QueryPredicate`] extension trait directly.
     pub fn new(operation: Operation) -> Self {
         Self {
             operation,
@@ -86,16 +112,19 @@ impl<S> Query<Neutral<S>> {
 /// types. You don't need to implement it manually.
 pub trait QueryPredicate: Sized {
     /// Adds a query parameter match to this predicate chain.
-    fn query(self, operation: Operation) -> Query<Self>;
+    ///
+    /// Accepts an [`Operation`], a `&str` (existence check), or
+    /// `(&str, &str)` (exact match) directly.
+    fn query(self, operation: impl Into<Operation>) -> Query<Self>;
 }
 
 impl<P> QueryPredicate for P
 where
     P: Predicate,
 {
-    fn query(self, operation: Operation) -> Query<Self> {
+    fn query(self, operation: impl Into<Operation>) -> Query<Self> {
         Query {
-            operation,
+            operation: operation.into(),
             inner: self,
         }
     }

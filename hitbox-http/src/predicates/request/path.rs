@@ -1,6 +1,6 @@
 //! Path pattern matching predicate.
 //!
-//! Provides [`Path`] predicate for matching request paths against
+//! Provides [`Path`] predicate and [`Operation`] for matching request paths against
 //! [actix-router](https://docs.rs/actix-router) patterns.
 
 use crate::CacheableHttpRequest;
@@ -9,11 +9,50 @@ use async_trait::async_trait;
 use hitbox::Neutral;
 use hitbox::predicate::{Predicate, PredicateResult};
 
-/// A predicate that matches request paths against a pattern.
+/// Matching operations for request paths.
 ///
-/// Uses [actix-router](https://docs.rs/actix-router) for pattern matching.
-/// The predicate returns [`Cacheable`](PredicateResult::Cacheable) when the
-/// request path matches the pattern.
+/// # Pattern Syntax
+///
+/// - `{name}` — matches a path segment
+/// - `{name:regex}` — matches with regex constraint
+/// - `{tail}*` — matches remaining path segments
+#[derive(Debug)]
+pub enum Operation {
+    /// Match a path against a pattern.
+    Pattern(ResourceDef),
+}
+
+impl Operation {
+    /// Match a path against a pattern.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use hitbox_http::predicates::request::path::Operation;
+    ///
+    /// let op = Operation::pattern("/api/users/{id}");
+    /// ```
+    pub fn pattern(value: impl Into<String>) -> Self {
+        Operation::Pattern(ResourceDef::new(value.into()))
+    }
+}
+
+impl From<&str> for Operation {
+    fn from(pattern: &str) -> Self {
+        Operation::pattern(pattern)
+    }
+}
+
+impl From<String> for Operation {
+    fn from(pattern: String) -> Self {
+        Operation::pattern(pattern)
+    }
+}
+
+/// A predicate that matches requests by path pattern.
+///
+/// Returns [`Cacheable`](PredicateResult::Cacheable) when the request path
+/// matches the pattern, [`NonCacheable`](PredicateResult::NonCacheable) otherwise.
 ///
 /// # Type Parameters
 ///
@@ -21,17 +60,11 @@ use hitbox::predicate::{Predicate, PredicateResult};
 ///   a new predicate chain (uses [`Neutral`] internally), or use the
 ///   [`PathPredicate`] extension trait to chain onto an existing predicate.
 ///
-/// # Pattern Syntax
-///
-/// - `{name}` — matches a path segment
-/// - `{name:regex}` — matches with regex constraint
-/// - `{tail}*` — matches remaining path segments
-///
 /// # Examples
 ///
 /// ```
-/// use hitbox_http::predicates::request::{Path, PathPredicate};
-/// use actix_router::ResourceDef;
+/// use hitbox_http::predicates::request::path::Operation;
+/// use hitbox_http::predicates::request::Path;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
@@ -39,26 +72,22 @@ use hitbox::predicate::{Predicate, PredicateResult};
 /// # use hitbox_http::CacheableHttpRequest;
 /// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 /// // Match requests to /api/users/{id}
-/// let predicate = Path::new(ResourceDef::new("/api/users/{id}"));
+/// let predicate = Path::new(Operation::pattern("/api/users/{id}"));
 /// # let _: &Path<Neutral<Subject>> = &predicate;
 /// ```
 #[derive(Debug)]
 pub struct Path<P> {
-    resource: ResourceDef,
-    inner: P,
+    pub(crate) operation: Operation,
+    pub(crate) inner: P,
 }
 
 impl<S> Path<Neutral<S>> {
-    /// Creates a predicate that matches request paths against a pattern.
+    /// Creates a standalone path predicate from an [`Operation`].
     ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the request path matches the pattern, [`NonCacheable`](hitbox::predicate::PredicateResult::NonCacheable) otherwise.
-    ///
-    /// Chain onto existing predicates using [`PathPredicate::path`] instead
-    /// if you already have a predicate chain.
-    pub fn new(resource: ResourceDef) -> Self {
-        Self {
-            resource,
+    /// For chaining, use the [`PathPredicate`] extension trait directly.
+    pub fn new(operation: Operation) -> Self {
+        Path {
+            operation,
             inner: Neutral::new(),
         }
     }
@@ -79,17 +108,17 @@ impl<S> Path<Neutral<S>> {
 pub trait PathPredicate: Sized {
     /// Adds a path pattern match to this predicate chain.
     ///
-    /// The pattern is compiled into a [`ResourceDef`].
-    fn path(self, resource: String) -> Path<Self>;
+    /// Accepts an [`Operation`] or a string pattern directly.
+    fn path(self, operation: impl Into<Operation>) -> Path<Self>;
 }
 
 impl<P> PathPredicate for P
 where
     P: Predicate,
 {
-    fn path(self, resource: String) -> Path<Self> {
+    fn path(self, operation: impl Into<Operation>) -> Path<Self> {
         Path {
-            resource: ResourceDef::from(resource),
+            operation: operation.into(),
             inner: self,
         }
     }
@@ -107,7 +136,10 @@ where
     async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
         match self.inner.check(request).await {
             PredicateResult::Cacheable(request) => {
-                if self.resource.is_match(request.parts().uri.path()) {
+                let is_match = match &self.operation {
+                    Operation::Pattern(resource) => resource.is_match(request.parts().uri.path()),
+                };
+                if is_match {
                     PredicateResult::Cacheable(request)
                 } else {
                     PredicateResult::NonCacheable(request)

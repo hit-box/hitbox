@@ -48,13 +48,9 @@ pub struct Body<P> {
 }
 
 impl<S> Body<Neutral<S>> {
-    /// Creates a predicate that matches body content against the operation.
+    /// Creates a standalone body predicate from an [`Operation`].
     ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the body satisfies the operation, [`NonCacheable`](hitbox::predicate::PredicateResult::NonCacheable) otherwise.
-    ///
-    /// Chain onto existing predicates using [`BodyPredicate::body`] instead
-    /// if you already have a predicate chain.
+    /// For chaining, use the [`BodyPredicate`] extension trait directly.
     pub fn new(operation: Operation) -> Self {
         Self {
             operation,

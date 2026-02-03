@@ -43,10 +43,9 @@ pub struct Header<P> {
 }
 
 impl<S> Header<Neutral<S>> {
-    /// Creates a header predicate that matches headers against the operation.
+    /// Creates a standalone header predicate from an [`Operation`].
     ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the headers satisfy the operation, [`NonCacheable`](hitbox::predicate::PredicateResult::NonCacheable) otherwise.
+    /// For chaining, use the [`HeaderPredicate`] extension trait directly.
     pub fn new(operation: Operation) -> Self {
         Self {
             operation,
@@ -68,16 +67,19 @@ impl<S> Header<Neutral<S>> {
 /// types. You don't need to implement it manually.
 pub trait HeaderPredicate: Sized {
     /// Adds a header matching operation to this predicate chain.
-    fn header(self, operation: Operation) -> Header<Self>;
+    ///
+    /// Accepts an [`Operation`], a [`HeaderName`](http::HeaderName) (existence check),
+    /// or `(HeaderName, HeaderValue)` (exact match) directly.
+    fn header(self, operation: impl Into<Operation>) -> Header<Self>;
 }
 
 impl<P> HeaderPredicate for P
 where
     P: Predicate,
 {
-    fn header(self, operation: Operation) -> Header<Self> {
+    fn header(self, operation: impl Into<Operation>) -> Header<Self> {
         Header {
-            operation,
+            operation: operation.into(),
             inner: self,
         }
     }

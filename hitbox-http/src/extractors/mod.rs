@@ -16,18 +16,20 @@
 //!
 //! # Builder Pattern
 //!
-//! Start with [`Method::new()`] and chain other extractors:
+//! Start with [`extractor()`] and chain extractors using Config types:
 //!
 //! ```
-//! use hitbox_http::extractors::{Method, path::PathExtractor, query::QueryExtractor};
+//! use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathExtractor};
+//! use hitbox_http::extractors::query::QueryExtractor;
 //!
 //! # use bytes::Bytes;
 //! # use http_body_util::Empty;
-//! # use hitbox_http::extractors::{NeutralExtractor, Path, query::Query};
-//! let extractor = Method::new()
+//! # use hitbox_http::extractors::{NeutralExtractor, Method, Path, query::Query};
+//! let extractor = extractors::extractor::<Empty<Bytes>>()
+//!     .method(MethodConfig::new())
 //!     .path("/users/{user_id}/posts/{post_id}")
-//!     .query("page".to_string())
-//!     .query("limit".to_string());
+//!     .query("page")
+//!     .query("limit");
 //! # let _: &Query<Query<Path<Method<NeutralExtractor<Empty<Bytes>>>>>> = &extractor;
 //! ```
 //!
@@ -56,9 +58,9 @@ use hitbox::{Extractor, KeyParts};
 
 use crate::CacheableHttpRequest;
 
-pub use method::Method;
-pub use path::Path;
-pub use version::Version;
+pub use method::{Method, MethodConfig, MethodExtractor};
+pub use path::{Path, PathConfig, PathExtractor};
+pub use version::{Version, VersionConfig, VersionExtractor};
 
 pub mod body;
 pub mod header;
@@ -73,7 +75,7 @@ pub mod version;
 /// Base extractor that produces an empty cache key.
 ///
 /// This is an internal building block used by other extractors. Users should
-/// start extractor chains with [`Method::new()`] instead.
+/// start extractor chains with [`extractor()`] instead.
 ///
 /// # Type Parameters
 ///
@@ -87,13 +89,15 @@ pub mod version;
 /// in extractor chains:
 ///
 /// ```
-/// use hitbox_http::extractors::{Method, path::PathExtractor};
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathExtractor};
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox_http::extractors::{NeutralExtractor, Path};
+/// # use hitbox_http::extractors::{NeutralExtractor, Method, Path};
 /// // The full type is Path<Method<NeutralExtractor<Empty<Bytes>>>>
-/// let extractor = Method::new().path("/users/{id}");
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .path("/users/{id}");
 /// # let _: &Path<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
 /// ```
 #[derive(Debug)]
@@ -125,4 +129,25 @@ impl<ResBody> Default for NeutralExtractor<ResBody> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Creates a neutral extractor as the starting point for an extractor chain.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathConfig, PathExtractor};
+/// use hitbox_http::extractors::query::{QueryConfig, QueryExtractor};
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// # use hitbox_http::extractors::{NeutralExtractor, Method, Path, query::Query};
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .path(PathConfig::pattern("/users/{user_id}"))
+///     .query("page");
+/// # let _: &Query<Path<Method<NeutralExtractor<Empty<Bytes>>>>> = &extractor;
+/// ```
+pub fn extractor<ReqBody: hyper::body::Body>() -> NeutralExtractor<ReqBody> {
+    NeutralExtractor::new()
 }

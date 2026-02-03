@@ -50,13 +50,15 @@ use crate::predicates::version::HasVersion;
 /// ```no_run
 /// use hitbox::Extractor;
 /// use hitbox_http::CacheableHttpRequest;
-/// use hitbox_http::extractors::{Method, path::PathExtractor};
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathExtractor};
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox_http::extractors::{NeutralExtractor, Path};
+/// # use hitbox_http::extractors::{NeutralExtractor, Method, Path};
 /// async fn example(cacheable: CacheableHttpRequest<Empty<Bytes>>) {
-///     let extractor = Method::new().path("/users/{user_id}");
+///     let extractor = extractors::extractor::<Empty<Bytes>>()
+///         .method(MethodConfig::new())
+///         .path("/users/{user_id}");
 ///     # let _: &Path<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
 ///     let key_parts = extractor.get(cacheable).await;
 /// }

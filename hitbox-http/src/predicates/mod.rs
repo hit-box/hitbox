@@ -34,7 +34,7 @@
 //!
 //! ```
 //! use hitbox::predicate::PredicateExt;
-//! use hitbox_http::predicates::request::Method;
+//! use hitbox_http::predicates::request::{Method, method};
 //! use hitbox_http::predicates::header::{Header, Operation};
 //!
 //! # use bytes::Bytes;
@@ -44,13 +44,10 @@
 //! # use hitbox_http::CacheableHttpRequest;
 //! # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 //! // Cache GET requests without Cache-Control: no-cache
-//! let predicate = Method::new(http::Method::GET).unwrap();
+//! let predicate = Method::new(method::Operation::eq(http::Method::GET));
 //! # let _: &Method<Neutral<Subject>> = &predicate;
 //! let predicate = predicate.and(
-//!     Header::new(Operation::Contains(
-//!         http::header::CACHE_CONTROL,
-//!         "no-cache".to_string(),
-//!     )).not()
+//!     Header::new(Operation::contains(http::header::CACHE_CONTROL, "no-cache")).not()
 //! );
 //! ```
 //!

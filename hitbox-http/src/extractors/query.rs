@@ -8,14 +8,16 @@
 //! Extract pagination parameters:
 //!
 //! ```
-//! use hitbox_http::extractors::{Method, query::QueryExtractor};
+//! use hitbox_http::extractors::{self, MethodConfig, MethodExtractor};
+//! use hitbox_http::extractors::query::QueryExtractor;
 //!
 //! # use bytes::Bytes;
 //! # use http_body_util::Empty;
-//! # use hitbox_http::extractors::{NeutralExtractor, query::Query};
-//! let extractor = Method::new()
-//!     .query("page".to_string())
-//!     .query("limit".to_string());
+//! # use hitbox_http::extractors::{NeutralExtractor, Method, query::Query};
+//! let extractor = extractors::extractor::<Empty<Bytes>>()
+//!     .method(MethodConfig::new())
+//!     .query("page")
+//!     .query("limit");
 //! # let _: &Query<Query<Method<NeutralExtractor<Empty<Bytes>>>>> = &extractor;
 //! ```
 
@@ -39,6 +41,18 @@ pub enum NameSelector {
     Starts(String),
 }
 
+impl NameSelector {
+    /// Select by exact name.
+    pub fn exact(name: impl Into<String>) -> Self {
+        NameSelector::Exact(name.into())
+    }
+
+    /// Select by name prefix.
+    pub fn starts(prefix: impl Into<String>) -> Self {
+        NameSelector::Starts(prefix.into())
+    }
+}
+
 /// Extracts values from query parameter content.
 #[derive(Debug, Clone)]
 pub enum ValueExtractor {
@@ -46,6 +60,65 @@ pub enum ValueExtractor {
     Full,
     /// Extract using regex (returns first capture group, or full match if no groups).
     Regex(Regex),
+}
+
+/// Configuration for the query extractor.
+///
+/// Builder with name selection, value extraction, and transform options.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, query::{QueryConfig, QueryExtractor, NameSelector}};
+/// use hitbox_http::extractors::transform::Transform;
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .query(QueryConfig::name(NameSelector::exact("page")))
+///     .query(QueryConfig::name(NameSelector::exact("search")).transform(Transform::Hash));
+/// ```
+#[derive(Debug, Clone)]
+pub struct QueryConfig {
+    pub(crate) name_selector: NameSelector,
+    pub(crate) value_extractor: ValueExtractor,
+    pub(crate) transforms: Vec<Transform>,
+}
+
+impl QueryConfig {
+    /// Create a query extractor configuration with the given name selector.
+    pub fn name(selector: NameSelector) -> Self {
+        QueryConfig {
+            name_selector: selector,
+            value_extractor: ValueExtractor::Full,
+            transforms: Vec::new(),
+        }
+    }
+
+    /// Set value extraction strategy.
+    pub fn value(mut self, extractor: ValueExtractor) -> Self {
+        self.value_extractor = extractor;
+        self
+    }
+
+    /// Add a transform to the chain.
+    pub fn transform(mut self, t: Transform) -> Self {
+        self.transforms.push(t);
+        self
+    }
+}
+
+impl From<&str> for QueryConfig {
+    fn from(name: &str) -> Self {
+        QueryConfig::name(NameSelector::exact(name))
+    }
+}
+
+impl From<String> for QueryConfig {
+    fn from(name: String) -> Self {
+        QueryConfig::name(NameSelector::exact(name))
+    }
 }
 
 /// Extracts query parameters as cache key parts.
@@ -143,20 +216,23 @@ impl<E> Query<E> {
 /// This trait is automatically implemented for all [`Extractor`]
 /// types. You don't need to implement it manually.
 pub trait QueryExtractor: Sized {
-    /// Adds extraction for a single query parameter by name.
-    fn query(self, name: String) -> Query<Self>;
+    /// Adds query parameter extraction with the given configuration.
+    ///
+    /// Accepts a [`QueryConfig`] or a string (exact parameter name) directly.
+    fn query(self, config: impl Into<QueryConfig>) -> Query<Self>;
 }
 
 impl<E> QueryExtractor for E
 where
     E: Extractor,
 {
-    fn query(self, name: String) -> Query<Self> {
+    fn query(self, config: impl Into<QueryConfig>) -> Query<Self> {
+        let config = config.into();
         Query {
             inner: self,
-            name_selector: NameSelector::Exact(name),
-            value_extractor: ValueExtractor::Full,
-            transforms: Vec::new(),
+            name_selector: config.name_selector,
+            value_extractor: config.value_extractor,
+            transforms: config.transforms,
         }
     }
 }

@@ -62,6 +62,42 @@ pub enum Operation {
 }
 
 impl Operation {
+    /// Match a specific status code.
+    pub fn eq(status_code: http::StatusCode) -> Self {
+        Operation::Eq(status_code)
+    }
+
+    /// Match any of the specified status codes.
+    pub fn any(codes: Vec<http::StatusCode>) -> Self {
+        Operation::In(codes)
+    }
+
+    /// Match status codes within a range (inclusive).
+    pub fn range(start: http::StatusCode, end: http::StatusCode) -> Self {
+        Operation::Range(start, end)
+    }
+
+    /// Match all status codes in a class (e.g., all 2xx).
+    pub fn class(class: StatusClass) -> Self {
+        Operation::Class(class)
+    }
+}
+
+impl From<http::StatusCode> for Operation {
+    /// Shorthand for `Operation::eq(code)`.
+    fn from(code: http::StatusCode) -> Self {
+        Operation::Eq(code)
+    }
+}
+
+impl From<StatusClass> for Operation {
+    /// Shorthand for `Operation::class(class)`.
+    fn from(class: StatusClass) -> Self {
+        Operation::Class(class)
+    }
+}
+
+impl Operation {
     fn matches(&self, status: http::StatusCode) -> bool {
         match self {
             Operation::Eq(expected) => status == *expected,
@@ -87,21 +123,21 @@ impl Operation {
 /// Match only 200 OK responses:
 ///
 /// ```
-/// use hitbox_http::predicates::response::StatusCode;
+/// use hitbox_http::predicates::response::status::{StatusCode, Operation};
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
 /// # use hitbox::Neutral;
 /// # use hitbox_http::CacheableHttpResponse;
 /// # type Subject = CacheableHttpResponse<Empty<Bytes>>;
-/// let predicate = StatusCode::new(http::StatusCode::OK);
+/// let predicate = StatusCode::new(Operation::eq(http::StatusCode::OK));
 /// # let _: &StatusCode<Neutral<Subject>> = &predicate;
 /// ```
 ///
 /// Chain with body predicate:
 ///
 /// ```
-/// use hitbox_http::predicates::response::StatusCode;
+/// use hitbox_http::predicates::response::status::{StatusCode, Operation};
 /// use hitbox_http::predicates::body::{BodyPredicate, Operation as BodyOperation, PlainOperation};
 ///
 /// # use bytes::Bytes;
@@ -110,115 +146,24 @@ impl Operation {
 /// # use hitbox_http::CacheableHttpResponse;
 /// # use hitbox_http::predicates::body::Body;
 /// # type Subject = CacheableHttpResponse<Empty<Bytes>>;
-/// let predicate = StatusCode::new(http::StatusCode::OK)
+/// let predicate = StatusCode::new(Operation::eq(http::StatusCode::OK))
 ///     .body(BodyOperation::Plain(PlainOperation::Contains("success".into())));
 /// # let _: &Body<StatusCode<Neutral<Subject>>> = &predicate;
 /// ```
 #[derive(Debug)]
 pub struct StatusCode<P> {
-    operation: Operation,
-    inner: P,
+    pub(crate) operation: Operation,
+    pub(crate) inner: P,
 }
 
 impl<S> StatusCode<Neutral<S>> {
-    /// Creates a predicate matching a specific status code.
-    pub fn new(status_code: http::StatusCode) -> Self {
+    /// Creates a standalone status code predicate from an [`Operation`].
+    ///
+    /// For chaining, use the [`StatusCodePredicate`] extension trait directly.
+    pub fn new(operation: Operation) -> Self {
         Self {
-            operation: Operation::Eq(status_code),
+            operation,
             inner: Neutral::new(),
-        }
-    }
-}
-
-impl<P> StatusCode<P> {
-    /// Creates a predicate matching any of the specified status codes.
-    ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the response status code is in the provided list.
-    ///
-    /// Use this for caching multiple specific status codes (e.g., 200 and 304).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use hitbox::Neutral;
-    /// use hitbox_http::predicates::response::StatusCode;
-    ///
-    /// # use bytes::Bytes;
-    /// # use http_body_util::Empty;
-    /// # use hitbox_http::CacheableHttpResponse;
-    /// # type Subject = CacheableHttpResponse<Empty<Bytes>>;
-    /// // Cache 200 OK and 304 Not Modified responses
-    /// let predicate = StatusCode::new_in(
-    ///     Neutral::new(),
-    ///     vec![http::StatusCode::OK, http::StatusCode::NOT_MODIFIED],
-    /// );
-    /// # let _: &StatusCode<Neutral<Subject>> = &predicate;
-    /// ```
-    pub fn new_in(inner: P, codes: Vec<http::StatusCode>) -> Self {
-        Self {
-            operation: Operation::In(codes),
-            inner,
-        }
-    }
-
-    /// Creates a predicate matching status codes within a range (inclusive).
-    ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the response status code is between `start` and `end` (inclusive).
-    ///
-    /// Use this for custom status code ranges not covered by [`StatusClass`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use hitbox::Neutral;
-    /// use hitbox_http::predicates::response::StatusCode;
-    ///
-    /// # use bytes::Bytes;
-    /// # use http_body_util::Empty;
-    /// # use hitbox_http::CacheableHttpResponse;
-    /// # type Subject = CacheableHttpResponse<Empty<Bytes>>;
-    /// // Cache responses with status codes 200-299 and 304
-    /// let predicate = StatusCode::new_range(
-    ///     Neutral::new(),
-    ///     http::StatusCode::OK,
-    ///     http::StatusCode::from_u16(299).unwrap(),
-    /// );
-    /// # let _: &StatusCode<Neutral<Subject>> = &predicate;
-    /// ```
-    pub fn new_range(inner: P, start: http::StatusCode, end: http::StatusCode) -> Self {
-        Self {
-            operation: Operation::Range(start, end),
-            inner,
-        }
-    }
-
-    /// Creates a predicate matching all status codes in a class.
-    ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the response status code belongs to the specified class (e.g., all 2xx).
-    ///
-    /// Use this for broad caching rules like "cache all successful responses".
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use hitbox::Neutral;
-    /// use hitbox_http::predicates::response::{StatusCode, StatusClass};
-    ///
-    /// # use bytes::Bytes;
-    /// # use http_body_util::Empty;
-    /// # use hitbox_http::CacheableHttpResponse;
-    /// # type Subject = CacheableHttpResponse<Empty<Bytes>>;
-    /// // Cache all successful (2xx) responses
-    /// let predicate = StatusCode::new_class(Neutral::new(), StatusClass::Success);
-    /// # let _: &StatusCode<Neutral<Subject>> = &predicate;
-    /// ```
-    pub fn new_class(inner: P, class: StatusClass) -> Self {
-        Self {
-            operation: Operation::Class(class),
-            inner,
         }
     }
 }
@@ -237,37 +182,22 @@ impl<P> StatusCode<P> {
 /// This trait is automatically implemented for all [`Predicate`]
 /// types. You don't need to implement it manually.
 pub trait StatusCodePredicate: Sized {
-    /// Matches an exact status code.
-    fn status_code(self, status_code: http::StatusCode) -> StatusCode<Self>;
-    /// Matches any of the specified status codes.
-    fn status_code_in(self, codes: Vec<http::StatusCode>) -> StatusCode<Self>;
-    /// Matches status codes within a range (inclusive).
-    fn status_code_range(self, start: http::StatusCode, end: http::StatusCode) -> StatusCode<Self>;
-    /// Matches all status codes in a class (e.g., all 2xx).
-    fn status_code_class(self, class: StatusClass) -> StatusCode<Self>;
+    /// Adds a status code match to this predicate chain.
+    ///
+    /// Accepts an [`Operation`], an [`http::StatusCode`] (exact match),
+    /// or a [`StatusClass`] (class match) directly.
+    fn status(self, operation: impl Into<Operation>) -> StatusCode<Self>;
 }
 
 impl<P> StatusCodePredicate for P
 where
     P: Predicate,
 {
-    fn status_code(self, status_code: http::StatusCode) -> StatusCode<Self> {
+    fn status(self, operation: impl Into<Operation>) -> StatusCode<Self> {
         StatusCode {
-            operation: Operation::Eq(status_code),
+            operation: operation.into(),
             inner: self,
         }
-    }
-
-    fn status_code_in(self, codes: Vec<http::StatusCode>) -> StatusCode<Self> {
-        StatusCode::new_in(self, codes)
-    }
-
-    fn status_code_range(self, start: http::StatusCode, end: http::StatusCode) -> StatusCode<Self> {
-        StatusCode::new_range(self, start, end)
-    }
-
-    fn status_code_class(self, class: StatusClass) -> StatusCode<Self> {
-        StatusCode::new_class(self, class)
     }
 }
 

@@ -32,8 +32,8 @@ use bytes::Bytes;
 use hitbox::Config;
 use hitbox::policy::PolicyConfig;
 use hitbox_http::{
-    extractors::{Method as MethodExtractor, path::PathExtractor},
-    predicates::{NeutralResponsePredicate, request::Method as RequestMethod},
+    extractors::{self, MethodConfig, MethodExtractor, PathExtractor},
+    predicates::{request, request::MethodPredicate, response},
 };
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
@@ -119,9 +119,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // - Cache key includes: method + path
     // - TTL: 30 seconds
     let cache_config = Config::builder()
-        .request_predicate(RequestMethod::new(http::Method::GET).unwrap())
-        .response_predicate(NeutralResponsePredicate::new())
-        .extractor(MethodExtractor::new().path("/{path}*"))
+        .request_predicate(request::predicate().method(http::Method::GET))
+        .response_predicate(response::predicate())
+        .extractor(
+            extractors::extractor()
+                .method(MethodConfig::new())
+                .path("/{path}*"),
+        )
         .policy(PolicyConfig::builder().ttl(Duration::from_secs(30)).build())
         .build();
 
