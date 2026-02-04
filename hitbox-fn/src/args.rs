@@ -7,10 +7,10 @@ use hitbox::{
 
 use crate::KeyExtract;
 
-/// Wrapper for individual function arguments with metadata for cache key extraction.
+/// Wrapper for function arguments included in cache key extraction.
 ///
-/// This type wraps each function argument and carries metadata about how it should
-/// be handled during cache key generation (e.g., whether to skip it).
+/// This type wraps arguments that should contribute to the cache key.
+/// The inner type must implement `KeyExtract`.
 ///
 /// # Example
 ///
@@ -19,45 +19,72 @@ use crate::KeyExtract;
 ///
 /// // Argument included in cache key
 /// let arg = Arg::new(42);
-///
-/// // Argument excluded from cache key
-/// let skipped = Arg::skipped("request-id".to_string());
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Arg<T> {
-    value: T,
-    skip: bool,
-}
+pub struct Arg<T>(T);
 
 impl<T> Arg<T> {
     /// Create a new argument that will be included in the cache key.
     pub fn new(value: T) -> Self {
-        Self { value, skip: false }
-    }
-
-    /// Create a new argument that will be skipped from the cache key.
-    pub fn skipped(value: T) -> Self {
-        Self { value, skip: true }
+        Self(value)
     }
 
     /// Get a reference to the inner value.
     pub fn value(&self) -> &T {
-        &self.value
+        &self.0
     }
 
     /// Unwrap and return the inner value.
     pub fn into_value(self) -> T {
-        self.value
+        self.0
     }
 }
 
 impl<T: KeyExtract> KeyExtract for Arg<T> {
     fn extract(&self) -> Vec<KeyPart> {
-        if self.skip {
-            vec![]
-        } else {
-            self.value.extract()
-        }
+        self.0.extract()
+    }
+}
+
+/// Wrapper for function arguments excluded from cache key extraction.
+///
+/// This type wraps arguments that should NOT contribute to the cache key.
+/// The inner type does NOT need to implement `KeyExtract`.
+///
+/// Useful for skipping types like database connections, request contexts,
+/// or other non-cacheable dependencies.
+///
+/// # Example
+///
+/// ```ignore
+/// use hitbox_fn::Skipped;
+///
+/// // Argument excluded from cache key (no KeyExtract bound needed)
+/// let skipped = Skipped::new(db_connection);
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Skipped<T>(T);
+
+impl<T> Skipped<T> {
+    /// Create a new skipped argument that will be excluded from the cache key.
+    pub fn new(value: T) -> Self {
+        Self(value)
+    }
+
+    /// Get a reference to the inner value.
+    pub fn value(&self) -> &T {
+        &self.0
+    }
+
+    /// Unwrap and return the inner value.
+    pub fn into_value(self) -> T {
+        self.0
+    }
+}
+
+impl<T> KeyExtract for Skipped<T> {
+    fn extract(&self) -> Vec<KeyPart> {
+        vec![]
     }
 }
 

@@ -9,14 +9,14 @@ pub struct CachedAttrs {
     /// Custom prefix for the cache key.
     /// If not specified, the function name is used.
     pub prefix: Option<String>,
+    /// Parameter names to skip from cache key generation.
+    pub skip: Vec<String>,
 }
 
 #[derive(Debug)]
 pub struct Argument {
     pub name: Ident,
     pub ty: Type,
-    /// Skip this parameter from cache key generation.
-    pub skip: bool,
 }
 
 #[derive(Debug)]
@@ -32,6 +32,8 @@ pub struct CachedFn {
     pub body: syn::Block,
     /// Custom prefix for cache key. If None, function name is used.
     pub prefix: Option<String>,
+    /// Parameter names to skip from cache key generation.
+    pub skip: Vec<String>,
 }
 
 impl CachedFn {
@@ -77,6 +79,7 @@ impl CachedFn {
             return_type,
             body: (*item.block).clone(),
             prefix: attrs.prefix,
+            skip: attrs.skip,
         })
     }
 
@@ -85,7 +88,7 @@ impl CachedFn {
             return Ok(CachedAttrs::default());
         }
 
-        // Parse as a list of meta items (e.g., `prefix = "value"`)
+        // Parse as a list of meta items (e.g., `prefix = "value"`, `skip(a, b)`)
         let parser = syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated;
         let metas = parser.parse2(attr)?;
 
@@ -102,6 +105,12 @@ impl CachedFn {
                     } else {
                         return Err(Error::new_spanned(&nv.value, "expected string literal"));
                     }
+                }
+                syn::Meta::List(list) if list.path.is_ident("skip") => {
+                    let parser =
+                        syn::punctuated::Punctuated::<syn::Ident, syn::Token![,]>::parse_terminated;
+                    let idents = parser.parse2(list.tokens.clone())?;
+                    attrs.skip = idents.into_iter().map(|i| i.to_string()).collect();
                 }
                 _ => {
                     return Err(Error::new_spanned(
@@ -126,7 +135,7 @@ impl CachedFn {
                         "#[cached] cannot be applied to methods with self",
                     ));
                 }
-                syn::FnArg::Typed(PatType { pat, ty, attrs, .. }) => {
+                syn::FnArg::Typed(PatType { pat, ty, .. }) => {
                     let name = match pat.as_ref() {
                         Pat::Ident(PatIdent { ident, .. }) => ident.clone(),
                         _ => {
@@ -136,11 +145,9 @@ impl CachedFn {
                             ));
                         }
                     };
-                    let skip = Self::parse_key_extract_skip(attrs)?;
                     args.push(Argument {
                         name,
                         ty: (**ty).clone(),
-                        skip,
                     });
                 }
             }
@@ -149,39 +156,20 @@ impl CachedFn {
         Ok(args)
     }
 
-    fn parse_key_extract_skip(attrs: &[syn::Attribute]) -> Result<bool, Error> {
-        for attr in attrs {
-            if !attr.path().is_ident("key_extract") {
-                continue;
-            }
-
-            let mut skip = false;
-            attr.parse_nested_meta(|meta| {
-                if meta.path.is_ident("skip") {
-                    skip = true;
-                    Ok(())
-                } else {
-                    Err(meta.error("expected `skip`"))
-                }
-            })?;
-
-            if skip {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
-    }
-
-    /// Returns the tuple type with each argument wrapped in `Arg<T>`.
-    /// Example: `(Arg<String>, Arg<i64>)`
+    /// Returns the tuple type with each argument wrapped in `Arg<T>` or `Skipped<T>`.
+    /// Example: `(Skipped<String>, Arg<i64>)`
     pub fn args_tuple_type(&self) -> TokenStream {
         let types: Vec<_> = self
             .args
             .iter()
             .map(|a| {
                 let ty = &a.ty;
-                quote::quote! { hitbox_fn::Arg<#ty> }
+                let is_skipped = self.skip.contains(&a.name.to_string());
+                if is_skipped {
+                    quote::quote! { hitbox_fn::Skipped<#ty> }
+                } else {
+                    quote::quote! { hitbox_fn::Arg<#ty> }
+                }
             })
             .collect();
         if types.len() == 1 {
@@ -192,16 +180,17 @@ impl CachedFn {
         }
     }
 
-    /// Returns the tuple expression with each argument wrapped in `Arg::new()` or `Arg::skipped()`.
-    /// Example: `(Arg::skipped(request_id), Arg::new(value))`
+    /// Returns the tuple expression with each argument wrapped in `Arg::new()` or `Skipped::new()`.
+    /// Example: `(Skipped::new(request_id), Arg::new(value))`
     pub fn args_tuple_expr(&self) -> TokenStream {
         let exprs: Vec<_> = self
             .args
             .iter()
             .map(|a| {
                 let name = &a.name;
-                if a.skip {
-                    quote::quote! { hitbox_fn::Arg::skipped(#name) }
+                let is_skipped = self.skip.contains(&a.name.to_string());
+                if is_skipped {
+                    quote::quote! { hitbox_fn::Skipped::new(#name) }
                 } else {
                     quote::quote! { hitbox_fn::Arg::new(#name) }
                 }

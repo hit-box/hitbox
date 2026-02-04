@@ -1,4 +1,4 @@
-//! Integration tests for #[cached] macro with #[key_extract(skip)] on parameters.
+//! Integration tests for #[cached] macro with skip(...) attribute.
 
 use std::time::Duration;
 
@@ -8,45 +8,61 @@ use hitbox_fn::prelude::*;
 use hitbox_moka::MokaBackend;
 
 // =============================================================================
-// Cached functions with #[key_extract(skip)] on parameters
+// Types without KeyExtract (for testing skip)
+// =============================================================================
+
+/// A type that intentionally does NOT implement KeyExtract.
+/// This simulates a database connection or request context.
+#[derive(Debug)]
+pub struct DbConnection {
+    _id: u64,
+}
+
+impl DbConnection {
+    pub fn new(id: u64) -> Self {
+        Self { _id: id }
+    }
+}
+
+// =============================================================================
+// Cached functions with skip(...) on macro
 // =============================================================================
 
 /// Function with one skipped parameter and one included.
-#[cached(prefix = "compute")]
-pub async fn compute_with_skip(#[key_extract(skip)] _request_id: String, value: i64) -> i64 {
+#[cached(prefix = "compute", skip(_request_id))]
+pub async fn compute_with_skip(_request_id: String, value: i64) -> i64 {
     value * 2
 }
 
 /// Function with multiple parameters, some skipped.
-#[cached(prefix = "multi")]
-pub async fn multi_params(
-    a: i64,
-    #[key_extract(skip)] _trace_id: String,
-    b: i64,
-    #[key_extract(skip)] _span_id: String,
-) -> i64 {
+#[cached(prefix = "multi", skip(_trace_id, _span_id))]
+pub async fn multi_params(a: i64, _trace_id: String, b: i64, _span_id: String) -> i64 {
     a + b
 }
 
 /// Function with all parameters skipped.
-#[cached(prefix = "all_skip")]
-pub async fn all_params_skipped(
-    #[key_extract(skip)] _id1: String,
-    #[key_extract(skip)] _id2: String,
-) -> i64 {
+#[cached(prefix = "all_skip", skip(_id1, _id2))]
+pub async fn all_params_skipped(_id1: String, _id2: String) -> i64 {
     42
 }
 
 /// Function with first parameter skipped.
-#[cached(prefix = "first_skip")]
-pub async fn first_param_skipped(#[key_extract(skip)] _skip: i64, keep: i64) -> i64 {
+#[cached(prefix = "first_skip", skip(_skip))]
+pub async fn first_param_skipped(_skip: i64, keep: i64) -> i64 {
     keep
 }
 
 /// Function with last parameter skipped.
-#[cached(prefix = "last_skip")]
-pub async fn last_param_skipped(keep: i64, #[key_extract(skip)] _skip: i64) -> i64 {
+#[cached(prefix = "last_skip", skip(_skip))]
+pub async fn last_param_skipped(keep: i64, _skip: i64) -> i64 {
     keep
+}
+
+/// Function with a skipped parameter that does NOT implement KeyExtract.
+/// This proves that skipped parameters don't need KeyExtract bound.
+#[cached(prefix = "with_db", skip(_db))]
+pub async fn with_db_connection(_db: DbConnection, user_id: i64) -> String {
+    format!("user_{}", user_id)
 }
 
 // =============================================================================
@@ -190,6 +206,29 @@ async fn test_last_param_skipped() {
         .await;
 
     // Different last param (skipped) - should hit
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+#[tokio::test]
+async fn test_skipped_type_without_key_extract() {
+    let cache = create_cache();
+
+    // DbConnection does NOT implement KeyExtract, but can be skipped
+    let db1 = DbConnection::new(1);
+    let db2 = DbConnection::new(2);
+
+    let (r1, c1) = with_db_connection(db1, 42)
+        .cache(&cache)
+        .with_context()
+        .await;
+    let (r2, c2) = with_db_connection(db2, 42)
+        .cache(&cache)
+        .with_context()
+        .await;
+
+    // Same user_id = cache hit, despite different DbConnection
+    assert_eq!(r1, r2);
     assert_eq!(c1.status, CacheStatus::Miss);
     assert_eq!(c2.status, CacheStatus::Hit);
 }
