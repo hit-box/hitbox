@@ -20,3 +20,8 @@ hitbox-core = { path = "../hitbox-core" }
 hitbox-derive = { path = "../hitbox-derive", optional = true }
 
 async-trait = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+serde = { workspace = true }
+hitbox-moka = { path = "../hitbox-moka" }

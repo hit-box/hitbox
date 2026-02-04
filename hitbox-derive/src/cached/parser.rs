@@ -15,6 +15,8 @@ pub struct CachedAttrs {
 pub struct Argument {
     pub name: Ident,
     pub ty: Type,
+    /// Skip this parameter from cache key generation.
+    pub skip: bool,
 }
 
 #[derive(Debug)]
@@ -124,7 +126,7 @@ impl CachedFn {
                         "#[cached] cannot be applied to methods with self",
                     ));
                 }
-                syn::FnArg::Typed(PatType { pat, ty, .. }) => {
+                syn::FnArg::Typed(PatType { pat, ty, attrs, .. }) => {
                     let name = match pat.as_ref() {
                         Pat::Ident(PatIdent { ident, .. }) => ident.clone(),
                         _ => {
@@ -134,9 +136,11 @@ impl CachedFn {
                             ));
                         }
                     };
+                    let skip = Self::parse_key_extract_skip(attrs)?;
                     args.push(Argument {
                         name,
                         ty: (**ty).clone(),
+                        skip,
                     });
                 }
             }
@@ -145,8 +149,41 @@ impl CachedFn {
         Ok(args)
     }
 
+    fn parse_key_extract_skip(attrs: &[syn::Attribute]) -> Result<bool, Error> {
+        for attr in attrs {
+            if !attr.path().is_ident("key_extract") {
+                continue;
+            }
+
+            let mut skip = false;
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("skip") {
+                    skip = true;
+                    Ok(())
+                } else {
+                    Err(meta.error("expected `skip`"))
+                }
+            })?;
+
+            if skip {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Returns the tuple type with each argument wrapped in `Arg<T>`.
+    /// Example: `(Arg<String>, Arg<i64>)`
     pub fn args_tuple_type(&self) -> TokenStream {
-        let types: Vec<_> = self.args.iter().map(|a| &a.ty).collect();
+        let types: Vec<_> = self
+            .args
+            .iter()
+            .map(|a| {
+                let ty = &a.ty;
+                quote::quote! { hitbox_fn::Arg<#ty> }
+            })
+            .collect();
         if types.len() == 1 {
             let ty = &types[0];
             quote::quote! { (#ty,) }
@@ -155,24 +192,63 @@ impl CachedFn {
         }
     }
 
+    /// Returns the tuple expression with each argument wrapped in `Arg::new()` or `Arg::skipped()`.
+    /// Example: `(Arg::skipped(request_id), Arg::new(value))`
     pub fn args_tuple_expr(&self) -> TokenStream {
-        let names: Vec<_> = self.args.iter().map(|a| &a.name).collect();
-        if names.len() == 1 {
-            let name = &names[0];
-            quote::quote! { (#name,) }
+        let exprs: Vec<_> = self
+            .args
+            .iter()
+            .map(|a| {
+                let name = &a.name;
+                if a.skip {
+                    quote::quote! { hitbox_fn::Arg::skipped(#name) }
+                } else {
+                    quote::quote! { hitbox_fn::Arg::new(#name) }
+                }
+            })
+            .collect();
+        if exprs.len() == 1 {
+            let expr = &exprs[0];
+            quote::quote! { (#expr,) }
         } else {
-            quote::quote! { (#(#names),*) }
+            quote::quote! { (#(#exprs),*) }
         }
     }
 
-    pub fn args_destructure(&self) -> TokenStream {
-        let names: Vec<_> = self.args.iter().map(|a| &a.name).collect();
-        if names.len() == 1 {
-            let name = &names[0];
-            quote::quote! { (#name,) }
+    /// Returns the destructuring pattern for Args tuple.
+    /// Example: `(__arg0, __arg1)`
+    pub fn args_destructure_pattern(&self) -> TokenStream {
+        let patterns: Vec<_> = self
+            .args
+            .iter()
+            .enumerate()
+            .map(|(i, _)| {
+                let name = Ident::new(&format!("__arg{}", i), proc_macro2::Span::call_site());
+                quote::quote! { #name }
+            })
+            .collect();
+        if patterns.len() == 1 {
+            let pat = &patterns[0];
+            quote::quote! { (#pat,) }
         } else {
-            quote::quote! { (#(#names),*) }
+            quote::quote! { (#(#patterns),*) }
         }
+    }
+
+    /// Returns let bindings to extract values from Arg wrappers.
+    /// Example: `let request_id = __arg0.into_value(); let value = __arg1.into_value();`
+    pub fn args_extract_values(&self) -> TokenStream {
+        let bindings: Vec<_> = self
+            .args
+            .iter()
+            .enumerate()
+            .map(|(i, a)| {
+                let arg_name = Ident::new(&format!("__arg{}", i), proc_macro2::Span::call_site());
+                let var_name = &a.name;
+                quote::quote! { let #var_name = #arg_name.into_value(); }
+            })
+            .collect();
+        quote::quote! { #(#bindings)* }
     }
 
     /// Returns the cache key prefix.

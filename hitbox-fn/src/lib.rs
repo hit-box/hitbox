@@ -52,7 +52,7 @@ mod cache;
 mod extractor;
 mod upstream;
 
-pub use args::Args;
+pub use args::{Arg, Args};
 pub use cache::{
     Cache, CacheBuilder, NoBackend, NoContext, NoPolicy, WithBackend, WithContext, WithPolicy,
 };
@@ -60,19 +60,17 @@ pub use extractor::{FnExtractor, KeyExtract};
 pub use upstream::FnUpstream;
 
 // Re-export derive macros when feature is enabled
+// Note: KeyExtract derive macro shares name with KeyExtract trait (different namespaces)
 #[cfg(feature = "derive")]
-pub use hitbox_derive::{
-    CacheableRequest, CacheableResponse, KeyExtract as KeyExtractDerive, cached,
-};
+pub use hitbox_derive::{CacheableRequest, CacheableResponse, KeyExtract, cached};
 
 /// Prelude for convenient imports.
 pub mod prelude {
-    pub use crate::{Args, Cache, FnExtractor, FnUpstream, KeyExtract};
+    pub use crate::{Arg, Args, Cache, FnExtractor, FnUpstream, KeyExtract};
 
+    // Re-export derive macros (KeyExtract derive is re-exported at crate root)
     #[cfg(feature = "derive")]
-    pub use hitbox_derive::{
-        CacheableRequest, CacheableResponse, KeyExtract as KeyExtractDerive, cached,
-    };
+    pub use hitbox_derive::{CacheableRequest, CacheableResponse, cached};
 
     // Re-export commonly used hitbox types
     pub use hitbox::policy::PolicyConfig;

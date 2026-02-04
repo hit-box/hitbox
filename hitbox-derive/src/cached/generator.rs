@@ -51,13 +51,15 @@ impl<'a> Generator<'a> {
     fn generate_impl_fn(&self) -> TokenStream {
         let impl_name = &self.cached_fn.impl_name;
         let args_tuple = self.cached_fn.args_tuple_type();
-        let args_destructure = self.cached_fn.args_destructure();
+        let args_pattern = self.cached_fn.args_destructure_pattern();
+        let args_extract = self.cached_fn.args_extract_values();
         let return_type = &self.cached_fn.return_type;
         let body = &self.cached_fn.body;
 
         quote! {
             async fn #impl_name(args: hitbox_fn::Args<#args_tuple>) -> #return_type {
-                let hitbox_fn::Args(#args_destructure) = args;
+                let hitbox_fn::Args(#args_pattern) = args;
+                #args_extract
                 #body
             }
         }

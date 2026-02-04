@@ -20,13 +20,13 @@ use serde::{Deserialize, Serialize};
 // Domain Types with KeyExtract
 // =============================================================================
 
-#[derive(Debug, Clone, Copy, KeyExtractDerive)]
+#[derive(Debug, Clone, Copy, KeyExtract)]
 pub struct UserId(#[key_extract(name = "user_id")] pub u64);
 
-#[derive(Debug, Clone, Copy, KeyExtractDerive)]
+#[derive(Debug, Clone, Copy, KeyExtract)]
 pub struct OrgId(#[key_extract(name = "org_id")] pub u64);
 
-#[derive(Debug, Clone, KeyExtractDerive)]
+#[derive(Debug, Clone, KeyExtract)]
 pub struct SearchQuery {
     #[key_extract(name = "q")]
     pub query: String,

@@ -1,9 +1,65 @@
 //! Argument wrapper for function caching.
 
 use hitbox::{
-    CachePolicy, CacheableRequest, Extractor, Predicate, RequestCachePolicy,
+    CachePolicy, CacheableRequest, Extractor, KeyPart, Predicate, RequestCachePolicy,
     predicate::PredicateResult,
 };
+
+use crate::KeyExtract;
+
+/// Wrapper for individual function arguments with metadata for cache key extraction.
+///
+/// This type wraps each function argument and carries metadata about how it should
+/// be handled during cache key generation (e.g., whether to skip it).
+///
+/// # Example
+///
+/// ```ignore
+/// use hitbox_fn::Arg;
+///
+/// // Argument included in cache key
+/// let arg = Arg::new(42);
+///
+/// // Argument excluded from cache key
+/// let skipped = Arg::skipped("request-id".to_string());
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Arg<T> {
+    value: T,
+    skip: bool,
+}
+
+impl<T> Arg<T> {
+    /// Create a new argument that will be included in the cache key.
+    pub fn new(value: T) -> Self {
+        Self { value, skip: false }
+    }
+
+    /// Create a new argument that will be skipped from the cache key.
+    pub fn skipped(value: T) -> Self {
+        Self { value, skip: true }
+    }
+
+    /// Get a reference to the inner value.
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+
+    /// Unwrap and return the inner value.
+    pub fn into_value(self) -> T {
+        self.value
+    }
+}
+
+impl<T: KeyExtract> KeyExtract for Arg<T> {
+    fn extract(&self) -> Vec<KeyPart> {
+        if self.skip {
+            vec![]
+        } else {
+            self.value.extract()
+        }
+    }
+}
 
 /// Wrapper around tuple to satisfy orphan rule.
 ///

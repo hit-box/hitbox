@@ -145,6 +145,12 @@ impl<T: KeyExtract> KeyExtract for Option<T> {
     }
 }
 
+impl<T: KeyExtract + ?Sized> KeyExtract for &T {
+    fn extract(&self) -> Vec<KeyPart> {
+        (*self).extract()
+    }
+}
+
 // KeyExtract implementations for Args<tuples>
 
 impl KeyExtract for Args<()> {
