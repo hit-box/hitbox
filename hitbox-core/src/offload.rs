@@ -16,6 +16,8 @@ use std::future::Future;
 
 use smol_str::SmolStr;
 
+use crate::CacheKey;
+
 /// Trait for spawning background tasks.
 ///
 /// This trait allows components like `CacheFuture` and `CompositionBackend`
@@ -69,6 +71,22 @@ pub trait Offload<'a>: Send + Sync + Clone {
     fn spawn<F>(&self, kind: impl Into<SmolStr>, future: F)
     where
         F: Future<Output = ()> + Send + 'a;
+
+    /// Spawn a future with a specific cache key for deduplication.
+    ///
+    /// Unlike [`spawn`], this method uses the provided cache key to enable
+    /// task deduplication. If a task with the same cache key is already in flight,
+    /// the new task may be skipped (depending on the implementation's configuration).
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The cache key used for deduplication.
+    /// * `kind` - A label categorizing the task type (e.g., "revalidate", "cache_write").
+    ///   Used for metrics and tracing.
+    /// * `future` - The future to execute in the background. Must be `Send + 'a`.
+    fn spawn_with_key<F>(&self, key: CacheKey, kind: impl Into<SmolStr>, future: F)
+    where
+        F: Future<Output = ()> + Send + 'a;
 }
 
 /// A disabled offload implementation that discards all spawned tasks.
@@ -100,6 +118,15 @@ pub struct DisabledOffload;
 impl<'a> Offload<'a> for DisabledOffload {
     #[inline]
     fn spawn<F>(&self, _kind: impl Into<SmolStr>, _future: F)
+    where
+        F: Future<Output = ()> + Send + 'a,
+    {
+        // Intentionally does nothing.
+        // The future is dropped without execution.
+    }
+
+    #[inline]
+    fn spawn_with_key<F>(&self, _key: CacheKey, _kind: impl Into<SmolStr>, _future: F)
     where
         F: Future<Output = ()> + Send + 'a,
     {

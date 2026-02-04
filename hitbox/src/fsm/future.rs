@@ -286,13 +286,13 @@ where
                     let result = handle_stale_state.transition(response, ctx, this.policy.as_ref());
 
                     // Handle offload revalidation if requested
-                    // Note: DisabledOffload::spawn is a no-op, so this does nothing when offload is disabled
+                    // Note: DisabledOffload::spawn_with_key is a no-op, so this does nothing when offload is disabled
                     if let Some(offload_data) = result.offload_data
                         && let Some(response_predicates) = this.response_predicates.take()
                     {
                         let backend = this.backend.clone();
                         let policy = this.policy.clone();
-                        let cache_key = offload_data.cache_key;
+                        let cache_key = offload_data.cache_key.clone();
                         let request = offload_data.request;
                         let upstream = offload_data.upstream;
 
@@ -301,16 +301,19 @@ where
                         let revalidate_future: CacheFuture<'_, _, _, _, _, ReqP, _, E, _, _> =
                             CacheFuture::revalidate(
                                 backend,
-                                cache_key,
+                                cache_key.clone(),
                                 request,
                                 upstream,
                                 response_predicates,
                                 policy,
                             );
 
-                        this.offload.spawn("revalidate", async move {
-                            let _ = revalidate_future.await;
-                        });
+                        // Use spawn_with_key with the cache key for proper deduplication
+                        // This ensures only one revalidation task runs per cache key
+                        this.offload
+                            .spawn_with_key(cache_key, "revalidate", async move {
+                                let _ = revalidate_future.await;
+                            });
                     }
 
                     result.transition.into_state(&*this.span)

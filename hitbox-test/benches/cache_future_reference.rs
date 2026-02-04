@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
-use hitbox_core::{DisabledOffload, Offload, SmolStr};
+use hitbox_core::{CacheKey, DisabledOffload, Offload, SmolStr};
 
 /// Offload that spawns tasks with tokio::spawn
 #[derive(Clone, Debug)]
@@ -27,6 +27,13 @@ impl Offload<'static> for BenchOffload {
         F: Future<Output = ()> + Send + 'static,
     {
         tokio::spawn(future);
+    }
+
+    fn spawn_with_key<F>(&self, _key: CacheKey, kind: impl Into<SmolStr>, future: F)
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        self.spawn(kind, future);
     }
 }
 use criterion::{Criterion, criterion_group, criterion_main};

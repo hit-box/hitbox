@@ -31,6 +31,13 @@ impl Offload<'static> for TestOffload {
     {
         tokio::spawn(future);
     }
+
+    fn spawn_with_key<F>(&self, _key: CacheKey, kind: impl Into<SmolStr>, future: F)
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        self.spawn(kind, future);
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

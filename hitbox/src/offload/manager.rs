@@ -343,4 +343,11 @@ impl hitbox_core::Offload<'static> for OffloadManager {
     {
         OffloadManager::spawn(self, kind, future);
     }
+
+    fn spawn_with_key<F>(&self, key: hitbox_core::CacheKey, _kind: impl Into<SmolStr>, future: F)
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        OffloadManager::spawn_with_key(self, key, future);
+    }
 }
