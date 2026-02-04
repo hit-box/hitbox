@@ -12,8 +12,11 @@ members = [
     "hitbox-moka",
     # "hitbox-tarantool",
     "hitbox-test",
-    "examples",
+    "hitbox-fn",
+    "hitbox-derive",
+    "hitbox-http",
     "hitbox-configuration",
+    "examples",
 ]
 
 [workspace.package]
