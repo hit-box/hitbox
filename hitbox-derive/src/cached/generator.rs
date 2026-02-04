@@ -1,54 +1,38 @@
+//! Generator for #[cached] macro output.
+//!
+//! Each code generation part is encapsulated in its own struct implementing `ToTokens`.
+
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{ToTokens, quote};
 
 use super::parser::CachedFn;
 
-pub struct Generator<'a> {
+// =============================================================================
+// Internal implementation function
+// =============================================================================
+
+/// Generates the internal async implementation function.
+///
+/// ```ignore
+/// async fn __function_impl<'a, T: Clone>(args: Args<(Arg<&'a T0>, Arg<T>)>) -> ReturnType {
+///     let Args((__arg0, __arg1)) = args;
+///     let param0 = __arg0.into_value();
+///     let param1 = __arg1.into_value();
+///     // original body
+/// }
+/// ```
+pub struct ImplFn<'a> {
     cached_fn: &'a CachedFn,
 }
 
-impl<'a> Generator<'a> {
+impl<'a> ImplFn<'a> {
     pub fn new(cached_fn: &'a CachedFn) -> Self {
         Self { cached_fn }
     }
+}
 
-    pub fn generate(&self) -> TokenStream {
-        let impl_fn = self.generate_impl_fn();
-        let call_struct = self.generate_call_struct();
-        let call_impl_new = self.generate_call_impl_new();
-        let call_impl_backend = self.generate_call_impl_backend();
-        let call_impl_policy = self.generate_call_impl_policy();
-        let call_impl_with_context = self.generate_call_impl_with_context();
-        let cached_call_struct = self.generate_cached_call_struct();
-        let call_impl_cache = self.generate_call_impl_cache();
-        let cached_call_impl_with_context = self.generate_cached_call_impl_with_context();
-        let into_future_call_no_context = self.generate_into_future_call_no_context();
-        let into_future_call_with_context = self.generate_into_future_call_with_context();
-        let into_future_cached_no_context = self.generate_into_future_cached_no_context();
-        let into_future_cached_with_context = self.generate_into_future_cached_with_context();
-        let execute_fn = self.generate_execute_fn();
-        let public_fn = self.generate_public_fn();
-
-        quote! {
-            #impl_fn
-            #call_struct
-            #call_impl_new
-            #call_impl_backend
-            #call_impl_policy
-            #call_impl_with_context
-            #cached_call_struct
-            #call_impl_cache
-            #cached_call_impl_with_context
-            #into_future_call_no_context
-            #into_future_call_with_context
-            #into_future_cached_no_context
-            #into_future_cached_with_context
-            #execute_fn
-            #public_fn
-        }
-    }
-
-    fn generate_impl_fn(&self) -> TokenStream {
+impl ToTokens for ImplFn<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let impl_name = &self.cached_fn.impl_name;
         let args_tuple = self.cached_fn.args_tuple_type();
         let args_pattern = self.cached_fn.args_destructure_pattern();
@@ -56,35 +40,106 @@ impl<'a> Generator<'a> {
         let return_type = &self.cached_fn.return_type;
         let body = &self.cached_fn.body;
 
-        quote! {
-            async fn #impl_name(args: hitbox_fn::Args<#args_tuple>) -> #return_type {
+        let generics = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            quote! { <#generic_params> }
+        } else {
+            quote! {}
+        };
+
+        tokens.extend(quote! {
+            async fn #impl_name #generics (args: hitbox_fn::Args<#args_tuple>) -> #return_type {
                 let hitbox_fn::Args(#args_pattern) = args;
                 #args_extract
                 #body
             }
-        }
+        });
     }
+}
 
-    fn generate_call_struct(&self) -> TokenStream {
+// =============================================================================
+// Call struct definition
+// =============================================================================
+
+/// Generates the Call struct with type-state pattern.
+///
+/// ```ignore
+/// pub struct FunctionCall<'a, T: Clone, B = NoBackend, P = NoPolicy, C = NoContext> {
+///     args: Args<(Arg<&'a T0>, Arg<T>)>,
+///     backend: B,
+///     policy: P,
+///     _context: PhantomData<C>,
+/// }
+/// ```
+pub struct CallStruct<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> CallStruct<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for CallStruct<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let call_name = &self.cached_fn.call_name;
         let args_tuple = self.cached_fn.args_tuple_type();
 
-        quote! {
-            pub struct #call_name<B = hitbox_fn::NoBackend, P = hitbox_fn::NoPolicy, C = hitbox_fn::NoContext> {
+        let generics = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            quote! { <#generic_params, B = hitbox_fn::NoBackend, P = hitbox_fn::NoPolicy, C = hitbox_fn::NoContext> }
+        } else {
+            quote! { <B = hitbox_fn::NoBackend, P = hitbox_fn::NoPolicy, C = hitbox_fn::NoContext> }
+        };
+
+        tokens.extend(quote! {
+            pub struct #call_name #generics {
                 args: hitbox_fn::Args<#args_tuple>,
                 backend: B,
                 policy: P,
                 _context: std::marker::PhantomData<C>,
             }
-        }
+        });
     }
+}
 
-    fn generate_call_impl_new(&self) -> TokenStream {
+// =============================================================================
+// Call::new() implementation
+// =============================================================================
+
+/// Generates the `new()` constructor for Call struct.
+pub struct CallImplNew<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> CallImplNew<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for CallImplNew<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let call_name = &self.cached_fn.call_name;
         let args_tuple = self.cached_fn.args_tuple_type();
 
-        quote! {
-            impl #call_name<hitbox_fn::NoBackend, hitbox_fn::NoPolicy, hitbox_fn::NoContext> {
+        let (impl_generics, type_generics) = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            let generic_args = self.cached_fn.generic_args();
+            (
+                quote! { <#generic_params> },
+                quote! { <#generic_args, hitbox_fn::NoBackend, hitbox_fn::NoPolicy, hitbox_fn::NoContext> },
+            )
+        } else {
+            (
+                quote! {},
+                quote! { <hitbox_fn::NoBackend, hitbox_fn::NoPolicy, hitbox_fn::NoContext> },
+            )
+        };
+
+        tokens.extend(quote! {
+            impl #impl_generics #call_name #type_generics {
                 fn new(args: hitbox_fn::Args<#args_tuple>) -> Self {
                     Self {
                         args,
@@ -94,15 +149,49 @@ impl<'a> Generator<'a> {
                     }
                 }
             }
-        }
+        });
     }
+}
 
-    fn generate_call_impl_backend(&self) -> TokenStream {
+// =============================================================================
+// Call::backend() implementation
+// =============================================================================
+
+/// Generates the `backend()` builder method.
+pub struct CallImplBackend<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> CallImplBackend<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for CallImplBackend<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let call_name = &self.cached_fn.call_name;
 
-        quote! {
-            impl<P, C> #call_name<hitbox_fn::NoBackend, P, C> {
-                pub fn backend<B: hitbox::backend::CacheBackend>(self, backend: B) -> #call_name<hitbox_fn::WithBackend<B>, P, C> {
+        let (impl_generics, type_generics_no_backend, type_generics_with_backend) =
+            if self.cached_fn.has_generics() {
+                let generic_params = self.cached_fn.generic_params();
+                let generic_args = self.cached_fn.generic_args();
+                (
+                    quote! { <#generic_params, P, C> },
+                    quote! { <#generic_args, hitbox_fn::NoBackend, P, C> },
+                    quote! { <#generic_args, hitbox_fn::WithBackend<B>, P, C> },
+                )
+            } else {
+                (
+                    quote! { <P, C> },
+                    quote! { <hitbox_fn::NoBackend, P, C> },
+                    quote! { <hitbox_fn::WithBackend<B>, P, C> },
+                )
+            };
+
+        tokens.extend(quote! {
+            impl #impl_generics #call_name #type_generics_no_backend {
+                pub fn backend<B: hitbox::backend::CacheBackend>(self, backend: B) -> #call_name #type_generics_with_backend {
                     #call_name {
                         args: self.args,
                         backend: hitbox_fn::WithBackend(std::sync::Arc::new(backend)),
@@ -111,15 +200,49 @@ impl<'a> Generator<'a> {
                     }
                 }
             }
-        }
+        });
     }
+}
 
-    fn generate_call_impl_policy(&self) -> TokenStream {
+// =============================================================================
+// Call::policy() implementation
+// =============================================================================
+
+/// Generates the `policy()` builder method.
+pub struct CallImplPolicy<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> CallImplPolicy<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for CallImplPolicy<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let call_name = &self.cached_fn.call_name;
 
-        quote! {
-            impl<B, C> #call_name<B, hitbox_fn::NoPolicy, C> {
-                pub fn policy(self, policy: hitbox::policy::PolicyConfig) -> #call_name<B, hitbox_fn::WithPolicy, C> {
+        let (impl_generics, type_generics_no_policy, type_generics_with_policy) =
+            if self.cached_fn.has_generics() {
+                let generic_params = self.cached_fn.generic_params();
+                let generic_args = self.cached_fn.generic_args();
+                (
+                    quote! { <#generic_params, B, C> },
+                    quote! { <#generic_args, B, hitbox_fn::NoPolicy, C> },
+                    quote! { <#generic_args, B, hitbox_fn::WithPolicy, C> },
+                )
+            } else {
+                (
+                    quote! { <B, C> },
+                    quote! { <B, hitbox_fn::NoPolicy, C> },
+                    quote! { <B, hitbox_fn::WithPolicy, C> },
+                )
+            };
+
+        tokens.extend(quote! {
+            impl #impl_generics #call_name #type_generics_no_policy {
+                pub fn policy(self, policy: hitbox::policy::PolicyConfig) -> #call_name #type_generics_with_policy {
                     #call_name {
                         args: self.args,
                         backend: self.backend,
@@ -128,15 +251,49 @@ impl<'a> Generator<'a> {
                     }
                 }
             }
-        }
+        });
     }
+}
 
-    fn generate_call_impl_with_context(&self) -> TokenStream {
+// =============================================================================
+// Call::with_context() implementation
+// =============================================================================
+
+/// Generates the `with_context()` method for Call.
+pub struct CallImplWithContext<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> CallImplWithContext<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for CallImplWithContext<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let call_name = &self.cached_fn.call_name;
 
-        quote! {
-            impl<B, P> #call_name<B, P, hitbox_fn::NoContext> {
-                pub fn with_context(self) -> #call_name<B, P, hitbox_fn::WithContext> {
+        let (impl_generics, type_generics_no_context, type_generics_with_context) =
+            if self.cached_fn.has_generics() {
+                let generic_params = self.cached_fn.generic_params();
+                let generic_args = self.cached_fn.generic_args();
+                (
+                    quote! { <#generic_params, B, P> },
+                    quote! { <#generic_args, B, P, hitbox_fn::NoContext> },
+                    quote! { <#generic_args, B, P, hitbox_fn::WithContext> },
+                )
+            } else {
+                (
+                    quote! { <B, P> },
+                    quote! { <B, P, hitbox_fn::NoContext> },
+                    quote! { <B, P, hitbox_fn::WithContext> },
+                )
+            };
+
+        tokens.extend(quote! {
+            impl #impl_generics #call_name #type_generics_no_context {
+                pub fn with_context(self) -> #call_name #type_generics_with_context {
                     #call_name {
                         args: self.args,
                         backend: self.backend,
@@ -145,29 +302,80 @@ impl<'a> Generator<'a> {
                     }
                 }
             }
-        }
+        });
     }
+}
 
-    fn generate_cached_call_struct(&self) -> TokenStream {
+// =============================================================================
+// CachedCall struct definition
+// =============================================================================
+
+/// Generates the CachedCall struct for use with pre-configured Cache.
+///
+/// ```ignore
+/// pub struct FunctionCallCached<'a, T: Clone, 'c, B, CM, O, C = NoContext> {
+///     args: Args<(Arg<&'a T0>, Arg<T>)>,
+///     cache: &'c Cache<B, CM, O>,
+///     _context: PhantomData<C>,
+/// }
+/// ```
+pub struct CachedCallStruct<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> CachedCallStruct<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for CachedCallStruct<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let cached_call_name = &self.cached_fn.cached_call_name;
         let args_tuple = self.cached_fn.args_tuple_type();
 
-        quote! {
-            pub struct #cached_call_name<'c, B, CM, O, C = hitbox_fn::NoContext> {
+        // Order: fn lifetimes, 'c, fn type params, B, CM, O, C
+        let lifetimes = &self.cached_fn.lifetimes;
+        let type_params = &self.cached_fn.type_params;
+
+        tokens.extend(quote! {
+            pub struct #cached_call_name <#( #lifetimes, )* 'c, #( #type_params, )* B, CM, O, C = hitbox_fn::NoContext> {
                 args: hitbox_fn::Args<#args_tuple>,
                 cache: &'c hitbox_fn::Cache<B, CM, O>,
                 _context: std::marker::PhantomData<C>,
             }
-        }
+        });
     }
+}
 
-    fn generate_call_impl_cache(&self) -> TokenStream {
+// =============================================================================
+// Call::cache() implementation
+// =============================================================================
+
+/// Generates the `cache()` method that transitions to CachedCall.
+pub struct CallImplCache<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> CallImplCache<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for CallImplCache<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let call_name = &self.cached_fn.call_name;
         let cached_call_name = &self.cached_fn.cached_call_name;
 
-        quote! {
-            impl<B, P, C> #call_name<B, P, C> {
-                pub fn cache<CB, CM, O>(self, cache: &hitbox_fn::Cache<CB, CM, O>) -> #cached_call_name<'_, CB, CM, O, C> {
+        let lifetimes = &self.cached_fn.lifetimes;
+        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
+        let type_params = &self.cached_fn.type_params;
+        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
+
+        tokens.extend(quote! {
+            impl <#( #lifetimes, )* #( #type_params, )* B, P, C> #call_name <#( #lifetime_idents, )* #( #type_idents, )* B, P, C> {
+                pub fn cache<CB, CM, O>(self, cache: &hitbox_fn::Cache<CB, CM, O>) -> #cached_call_name <#( #lifetime_idents, )* '_, #( #type_idents, )* CB, CM, O, C> {
                     #cached_call_name {
                         args: self.args,
                         cache,
@@ -175,15 +383,37 @@ impl<'a> Generator<'a> {
                     }
                 }
             }
-        }
+        });
     }
+}
 
-    fn generate_cached_call_impl_with_context(&self) -> TokenStream {
+// =============================================================================
+// CachedCall::with_context() implementation
+// =============================================================================
+
+/// Generates the `with_context()` method for CachedCall.
+pub struct CachedCallImplWithContext<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> CachedCallImplWithContext<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for CachedCallImplWithContext<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let cached_call_name = &self.cached_fn.cached_call_name;
 
-        quote! {
-            impl<'c, B, CM, O> #cached_call_name<'c, B, CM, O, hitbox_fn::NoContext> {
-                pub fn with_context(self) -> #cached_call_name<'c, B, CM, O, hitbox_fn::WithContext> {
+        let lifetimes = &self.cached_fn.lifetimes;
+        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
+        let type_params = &self.cached_fn.type_params;
+        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
+
+        tokens.extend(quote! {
+            impl <#( #lifetimes, )* 'c, #( #type_params, )* B, CM, O> #cached_call_name <#( #lifetime_idents, )* 'c, #( #type_idents, )* B, CM, O, hitbox_fn::NoContext> {
+                pub fn with_context(self) -> #cached_call_name <#( #lifetime_idents, )* 'c, #( #type_idents, )* B, CM, O, hitbox_fn::WithContext> {
                     #cached_call_name {
                         args: self.args,
                         cache: self.cache,
@@ -191,21 +421,61 @@ impl<'a> Generator<'a> {
                     }
                 }
             }
-        }
+        });
     }
+}
 
-    fn generate_into_future_call_no_context(&self) -> TokenStream {
+// =============================================================================
+// IntoFuture for Call (no context)
+// =============================================================================
+
+/// Generates `IntoFuture` impl for Call with backend and policy, without context.
+pub struct IntoFutureCallNoContext<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> IntoFutureCallNoContext<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for IntoFutureCallNoContext<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let call_name = &self.cached_fn.call_name;
         let execute_name = &self.cached_fn.execute_name;
         let return_type = &self.cached_fn.return_type;
 
-        quote! {
-            impl<B> std::future::IntoFuture for #call_name<hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::NoContext>
+        let (impl_generics, type_generics, future_lifetime) = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            let generic_args = self.cached_fn.generic_args();
+            // Use the first lifetime for the future bound if available, otherwise 'static
+            let future_lt = if self.cached_fn.has_lifetimes() {
+                let first_lifetime = &self.cached_fn.lifetimes[0].lifetime;
+                quote! { #first_lifetime }
+            } else {
+                quote! { 'static }
+            };
+            (
+                quote! { <#generic_params, B> },
+                quote! { <#generic_args, hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::NoContext> },
+                future_lt,
+            )
+        } else {
+            (
+                quote! { <B> },
+                quote! { <hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::NoContext> },
+                quote! { 'static },
+            )
+        };
+
+        tokens.extend(quote! {
+            impl #impl_generics std::future::IntoFuture for #call_name #type_generics
             where
                 B: hitbox::backend::CacheBackend + Send + Sync + 'static,
             {
                 type Output = #return_type;
-                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send>>;
+                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + #future_lifetime>>;
 
                 fn into_future(self) -> Self::IntoFuture {
                     let backend = self.backend.0;
@@ -224,21 +494,60 @@ impl<'a> Generator<'a> {
                     })
                 }
             }
-        }
+        });
     }
+}
 
-    fn generate_into_future_call_with_context(&self) -> TokenStream {
+// =============================================================================
+// IntoFuture for Call (with context)
+// =============================================================================
+
+/// Generates `IntoFuture` impl for Call with backend, policy, and context.
+pub struct IntoFutureCallWithContext<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> IntoFutureCallWithContext<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for IntoFutureCallWithContext<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let call_name = &self.cached_fn.call_name;
         let execute_name = &self.cached_fn.execute_name;
         let return_type = &self.cached_fn.return_type;
 
-        quote! {
-            impl<B> std::future::IntoFuture for #call_name<hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::WithContext>
+        let (impl_generics, type_generics, future_lifetime) = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            let generic_args = self.cached_fn.generic_args();
+            let future_lt = if self.cached_fn.has_lifetimes() {
+                let first_lifetime = &self.cached_fn.lifetimes[0].lifetime;
+                quote! { #first_lifetime }
+            } else {
+                quote! { 'static }
+            };
+            (
+                quote! { <#generic_params, B> },
+                quote! { <#generic_args, hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::WithContext> },
+                future_lt,
+            )
+        } else {
+            (
+                quote! { <B> },
+                quote! { <hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::WithContext> },
+                quote! { 'static },
+            )
+        };
+
+        tokens.extend(quote! {
+            impl #impl_generics std::future::IntoFuture for #call_name #type_generics
             where
                 B: hitbox::backend::CacheBackend + Send + Sync + 'static,
             {
                 type Output = (#return_type, hitbox::context::CacheContext);
-                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send>>;
+                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + #future_lifetime>>;
 
                 fn into_future(self) -> Self::IntoFuture {
                     let backend = self.backend.0;
@@ -256,23 +565,52 @@ impl<'a> Generator<'a> {
                     })
                 }
             }
-        }
+        });
     }
+}
 
-    fn generate_into_future_cached_no_context(&self) -> TokenStream {
+// =============================================================================
+// IntoFuture for CachedCall (no context)
+// =============================================================================
+
+/// Generates `IntoFuture` impl for CachedCall without context.
+pub struct IntoFutureCachedNoContext<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> IntoFutureCachedNoContext<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for IntoFutureCachedNoContext<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let cached_call_name = &self.cached_fn.cached_call_name;
         let execute_name = &self.cached_fn.execute_name;
         let return_type = &self.cached_fn.return_type;
 
-        quote! {
-            impl<'c, B, CM, O> std::future::IntoFuture for #cached_call_name<'c, B, CM, O, hitbox_fn::NoContext>
+        let lifetimes = &self.cached_fn.lifetimes;
+        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
+        let type_params = &self.cached_fn.type_params;
+        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
+
+        let future_lifetime = if self.cached_fn.has_lifetimes() {
+            let first_lifetime = &self.cached_fn.lifetimes[0].lifetime;
+            quote! { #first_lifetime }
+        } else {
+            quote! { 'c }
+        };
+
+        tokens.extend(quote! {
+            impl <#( #lifetimes, )* 'c, #( #type_params, )* B, CM, O> std::future::IntoFuture for #cached_call_name <#( #lifetime_idents, )* 'c, #( #type_idents, )* B, CM, O, hitbox_fn::NoContext>
             where
                 B: hitbox::backend::CacheBackend + Send + Sync + 'static,
                 CM: hitbox::concurrency::ConcurrencyManager<#return_type> + Clone + 'static,
                 O: hitbox_core::Offload<'static> + Clone + 'static,
             {
                 type Output = #return_type;
-                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + 'c>>;
+                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + #future_lifetime>>;
 
                 fn into_future(self) -> Self::IntoFuture {
                     let backend = std::sync::Arc::clone(self.cache.backend());
@@ -287,23 +625,52 @@ impl<'a> Generator<'a> {
                     })
                 }
             }
-        }
+        });
     }
+}
 
-    fn generate_into_future_cached_with_context(&self) -> TokenStream {
+// =============================================================================
+// IntoFuture for CachedCall (with context)
+// =============================================================================
+
+/// Generates `IntoFuture` impl for CachedCall with context.
+pub struct IntoFutureCachedWithContext<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> IntoFutureCachedWithContext<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for IntoFutureCachedWithContext<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let cached_call_name = &self.cached_fn.cached_call_name;
         let execute_name = &self.cached_fn.execute_name;
         let return_type = &self.cached_fn.return_type;
 
-        quote! {
-            impl<'c, B, CM, O> std::future::IntoFuture for #cached_call_name<'c, B, CM, O, hitbox_fn::WithContext>
+        let lifetimes = &self.cached_fn.lifetimes;
+        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
+        let type_params = &self.cached_fn.type_params;
+        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
+
+        let future_lifetime = if self.cached_fn.has_lifetimes() {
+            let first_lifetime = &self.cached_fn.lifetimes[0].lifetime;
+            quote! { #first_lifetime }
+        } else {
+            quote! { 'c }
+        };
+
+        tokens.extend(quote! {
+            impl <#( #lifetimes, )* 'c, #( #type_params, )* B, CM, O> std::future::IntoFuture for #cached_call_name <#( #lifetime_idents, )* 'c, #( #type_idents, )* B, CM, O, hitbox_fn::WithContext>
             where
                 B: hitbox::backend::CacheBackend + Send + Sync + 'static,
                 CM: hitbox::concurrency::ConcurrencyManager<#return_type> + Clone + 'static,
                 O: hitbox_core::Offload<'static> + Clone + 'static,
             {
                 type Output = (#return_type, hitbox::context::CacheContext);
-                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + 'c>>;
+                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + #future_lifetime>>;
 
                 fn into_future(self) -> Self::IntoFuture {
                     let backend = std::sync::Arc::clone(self.cache.backend());
@@ -317,18 +684,42 @@ impl<'a> Generator<'a> {
                     })
                 }
             }
-        }
+        });
     }
+}
 
-    fn generate_execute_fn(&self) -> TokenStream {
+// =============================================================================
+// Execute function
+// =============================================================================
+
+/// Generates the internal execute function that runs the cache FSM.
+pub struct ExecuteFn<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> ExecuteFn<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for ExecuteFn<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let impl_name = &self.cached_fn.impl_name;
         let execute_name = &self.cached_fn.execute_name;
         let args_tuple = self.cached_fn.args_tuple_type();
         let return_type = &self.cached_fn.return_type;
         let fn_path = self.cached_fn.fn_path();
 
-        quote! {
-            async fn #execute_name<B, CM, O>(
+        let generics = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            quote! { <#generic_params, B, CM, O> }
+        } else {
+            quote! { <B, CM, O> }
+        };
+
+        tokens.extend(quote! {
+            async fn #execute_name #generics (
                 backend: std::sync::Arc<B>,
                 policy: std::sync::Arc<hitbox::policy::PolicyConfig>,
                 concurrency_manager: CM,
@@ -357,10 +748,27 @@ impl<'a> Generator<'a> {
 
                 cache_future.await
             }
-        }
+        });
     }
+}
 
-    fn generate_public_fn(&self) -> TokenStream {
+// =============================================================================
+// Public wrapper function
+// =============================================================================
+
+/// Generates the public wrapper function that returns the Call struct.
+pub struct PublicFn<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> PublicFn<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for PublicFn<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let vis = &self.cached_fn.vis;
         let name = &self.cached_fn.name;
         let call_name = &self.cached_fn.call_name;
@@ -377,10 +785,75 @@ impl<'a> Generator<'a> {
             })
             .collect();
 
-        quote! {
-            #vis fn #name(#(#params),*) -> #call_name {
+        let (fn_generics, call_type_generics) = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            let generic_args = self.cached_fn.generic_args();
+            (quote! { <#generic_params> }, quote! { <#generic_args> })
+        } else {
+            (quote! {}, quote! {})
+        };
+
+        tokens.extend(quote! {
+            #vis fn #name #fn_generics (#(#params),*) -> #call_name #call_type_generics {
                 #call_name::new(hitbox_fn::Args(#args_tuple))
             }
+        });
+    }
+}
+
+// =============================================================================
+// Main Generator
+// =============================================================================
+
+/// Main generator that composes all code generation parts.
+pub struct Generator<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> Generator<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+
+    pub fn generate(&self) -> TokenStream {
+        let impl_fn = ImplFn::new(self.cached_fn);
+        let call_struct = CallStruct::new(self.cached_fn);
+        let call_impl_new = CallImplNew::new(self.cached_fn);
+        let call_impl_backend = CallImplBackend::new(self.cached_fn);
+        let call_impl_policy = CallImplPolicy::new(self.cached_fn);
+        let call_impl_with_context = CallImplWithContext::new(self.cached_fn);
+        let cached_call_struct = CachedCallStruct::new(self.cached_fn);
+        let call_impl_cache = CallImplCache::new(self.cached_fn);
+        let cached_call_impl_with_context = CachedCallImplWithContext::new(self.cached_fn);
+        let into_future_call_no_context = IntoFutureCallNoContext::new(self.cached_fn);
+        let into_future_call_with_context = IntoFutureCallWithContext::new(self.cached_fn);
+        let into_future_cached_no_context = IntoFutureCachedNoContext::new(self.cached_fn);
+        let into_future_cached_with_context = IntoFutureCachedWithContext::new(self.cached_fn);
+        let execute_fn = ExecuteFn::new(self.cached_fn);
+        let public_fn = PublicFn::new(self.cached_fn);
+
+        quote! {
+            #impl_fn
+            #call_struct
+            #call_impl_new
+            #call_impl_backend
+            #call_impl_policy
+            #call_impl_with_context
+            #cached_call_struct
+            #call_impl_cache
+            #cached_call_impl_with_context
+            #into_future_call_no_context
+            #into_future_call_with_context
+            #into_future_cached_no_context
+            #into_future_cached_with_context
+            #execute_fn
+            #public_fn
         }
+    }
+}
+
+impl ToTokens for Generator<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.extend(self.generate());
     }
 }

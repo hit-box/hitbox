@@ -25,3 +25,4 @@ async-trait = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
 serde = { workspace = true }
 hitbox-moka = { path = "../hitbox-moka" }
+hitbox-derive = { path = "../hitbox-derive" }

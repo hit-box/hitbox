@@ -1,24 +1,63 @@
-use convert_case::{Case, Casing};
-use proc_macro2::TokenStream;
-use syn::parse::Parser;
-use syn::{Error, Ident, ItemFn, Pat, PatIdent, PatType, ReturnType, Signature, Type, Visibility};
+//! Parser for the `#[cached]` macro.
 
-/// Attributes for the `#[cached]` macro.
+use convert_case::{Case, Casing};
+use darling::{FromMeta, ast::NestedMeta};
+use proc_macro2::TokenStream;
+use syn::{
+    Error, GenericParam, Ident, ItemFn, LifetimeParam, Pat, PatIdent, PatType, ReturnType,
+    Signature, Type, TypeParam, Visibility,
+};
+
+/// Wrapper type for parsing a list of identifiers from `skip(a, b, c)` syntax.
 #[derive(Debug, Default)]
+pub struct SkipList(pub Vec<Ident>);
+
+impl FromMeta for SkipList {
+    fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
+        let mut idents = Vec::new();
+        for item in items {
+            match item {
+                darling::ast::NestedMeta::Meta(syn::Meta::Path(path)) => {
+                    if let Some(ident) = path.get_ident() {
+                        idents.push(ident.clone());
+                    } else {
+                        return Err(darling::Error::custom("expected identifier").with_span(path));
+                    }
+                }
+                _ => {
+                    return Err(darling::Error::custom("expected identifier"));
+                }
+            }
+        }
+        Ok(SkipList(idents))
+    }
+}
+
+/// Attributes for the `#[cached]` macro, parsed using Darling.
+///
+/// Supports:
+/// - `prefix = "custom_prefix"` - Custom cache key prefix
+/// - `skip(param1, param2)` - Parameters to exclude from cache key
+#[derive(Debug, Default, FromMeta)]
 pub struct CachedAttrs {
     /// Custom prefix for the cache key.
     /// If not specified, the function name is used.
+    #[darling(default)]
     pub prefix: Option<String>,
+
     /// Parameter names to skip from cache key generation.
-    pub skip: Vec<String>,
+    #[darling(default)]
+    pub skip: SkipList,
 }
 
+/// Represents a function argument.
 #[derive(Debug)]
 pub struct Argument {
     pub name: Ident,
     pub ty: Type,
 }
 
+/// Parsed representation of a function annotated with `#[cached]`.
 #[derive(Debug)]
 pub struct CachedFn {
     pub vis: Visibility,
@@ -34,6 +73,10 @@ pub struct CachedFn {
     pub prefix: Option<String>,
     /// Parameter names to skip from cache key generation.
     pub skip: Vec<String>,
+    /// Lifetime parameters from the function signature.
+    pub lifetimes: Vec<LifetimeParam>,
+    /// Type parameters from the function signature.
+    pub type_params: Vec<TypeParam>,
 }
 
 impl CachedFn {
@@ -57,6 +100,8 @@ impl CachedFn {
         let execute_name = Ident::new(&format!("__execute_cached_{}", name), name.span());
 
         let args = Self::parse_args(sig)?;
+        let lifetimes = Self::parse_lifetimes(sig);
+        let type_params = Self::parse_type_params(sig);
 
         let return_type = match &sig.output {
             ReturnType::Default => {
@@ -67,6 +112,9 @@ impl CachedFn {
             }
             ReturnType::Type(_, ty) => (**ty).clone(),
         };
+
+        // Convert Ident skip list to String for easier comparison
+        let skip: Vec<String> = attrs.skip.0.iter().map(|i| i.to_string()).collect();
 
         Ok(Self {
             vis: item.vis,
@@ -79,51 +127,23 @@ impl CachedFn {
             return_type,
             body: (*item.block).clone(),
             prefix: attrs.prefix,
-            skip: attrs.skip,
+            skip,
+            lifetimes,
+            type_params,
         })
     }
 
+    /// Parse macro attributes using Darling.
     fn parse_attrs(attr: TokenStream) -> Result<CachedAttrs, Error> {
         if attr.is_empty() {
             return Ok(CachedAttrs::default());
         }
 
-        // Parse as a list of meta items (e.g., `prefix = "value"`, `skip(a, b)`)
-        let parser = syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated;
-        let metas = parser.parse2(attr)?;
-
-        let mut attrs = CachedAttrs::default();
-        for meta in metas {
-            match &meta {
-                syn::Meta::NameValue(nv) if nv.path.is_ident("prefix") => {
-                    if let syn::Expr::Lit(syn::ExprLit {
-                        lit: syn::Lit::Str(s),
-                        ..
-                    }) = &nv.value
-                    {
-                        attrs.prefix = Some(s.value());
-                    } else {
-                        return Err(Error::new_spanned(&nv.value, "expected string literal"));
-                    }
-                }
-                syn::Meta::List(list) if list.path.is_ident("skip") => {
-                    let parser =
-                        syn::punctuated::Punctuated::<syn::Ident, syn::Token![,]>::parse_terminated;
-                    let idents = parser.parse2(list.tokens.clone())?;
-                    attrs.skip = idents.into_iter().map(|i| i.to_string()).collect();
-                }
-                _ => {
-                    return Err(Error::new_spanned(
-                        &meta,
-                        format!("unknown attribute: {}", quote::quote!(#meta)),
-                    ));
-                }
-            }
-        }
-
-        Ok(attrs)
+        let meta_list = NestedMeta::parse_meta_list(attr)?;
+        CachedAttrs::from_list(&meta_list).map_err(|e| e.into())
     }
 
+    /// Parse function arguments from signature.
     fn parse_args(sig: &Signature) -> Result<Vec<Argument>, Error> {
         let mut args = Vec::new();
 
@@ -155,6 +175,82 @@ impl CachedFn {
 
         Ok(args)
     }
+
+    /// Extract lifetime parameters from function signature.
+    fn parse_lifetimes(sig: &Signature) -> Vec<LifetimeParam> {
+        sig.generics
+            .params
+            .iter()
+            .filter_map(|param| {
+                if let GenericParam::Lifetime(lt) = param {
+                    Some(lt.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Extract type parameters from function signature.
+    fn parse_type_params(sig: &Signature) -> Vec<TypeParam> {
+        sig.generics
+            .params
+            .iter()
+            .filter_map(|param| {
+                if let GenericParam::Type(tp) = param {
+                    Some(tp.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    // =========================================================================
+    // Generic helpers (lifetimes + type parameters)
+    // =========================================================================
+
+    /// Returns true if the function has any generic parameters (lifetimes or type params).
+    pub fn has_generics(&self) -> bool {
+        !self.lifetimes.is_empty() || !self.type_params.is_empty()
+    }
+
+    /// Returns true if the function has any lifetime parameters.
+    pub fn has_lifetimes(&self) -> bool {
+        !self.lifetimes.is_empty()
+    }
+
+    /// Returns all generic parameters (lifetimes + type params with bounds) for declarations.
+    /// Example: `'a, 'b, T: Clone, U: Debug` (without angle brackets)
+    pub fn generic_params(&self) -> TokenStream {
+        let lifetimes = &self.lifetimes;
+        let type_params = &self.type_params;
+
+        match (self.lifetimes.is_empty(), self.type_params.is_empty()) {
+            (true, true) => quote::quote! {},
+            (false, true) => quote::quote! { #(#lifetimes),* },
+            (true, false) => quote::quote! { #(#type_params),* },
+            (false, false) => quote::quote! { #(#lifetimes),*, #(#type_params),* },
+        }
+    }
+
+    /// Returns all generic arguments (lifetimes + type idents without bounds) for type applications.
+    /// Example: `'a, 'b, T, U` (without angle brackets)
+    pub fn generic_args(&self) -> TokenStream {
+        let lifetimes: Vec<_> = self.lifetimes.iter().map(|lt| &lt.lifetime).collect();
+        let type_idents: Vec<_> = self.type_params.iter().map(|tp| &tp.ident).collect();
+
+        match (self.lifetimes.is_empty(), self.type_params.is_empty()) {
+            (true, true) => quote::quote! {},
+            (false, true) => quote::quote! { #(#lifetimes),* },
+            (true, false) => quote::quote! { #(#type_idents),* },
+            (false, false) => quote::quote! { #(#lifetimes),*, #(#type_idents),* },
+        }
+    }
+
+    // =========================================================================
+    // Argument tuple helpers
+    // =========================================================================
 
     /// Returns the tuple type with each argument wrapped in `Arg<T>` or `Skipped<T>`.
     /// Example: `(Skipped<String>, Arg<i64>)`

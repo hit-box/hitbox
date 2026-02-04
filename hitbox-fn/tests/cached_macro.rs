@@ -1,10 +1,11 @@
-//! Integration tests for #[cached] macro with skip(...) attribute.
+//! Integration tests for #[cached] macro with skip(...) attribute and lifetime support.
 
 use std::time::Duration;
 
 use hitbox::CacheStatus;
+use hitbox::policy::PolicyConfig;
+use hitbox_derive::cached;
 use hitbox_fn::Cache;
-use hitbox_fn::prelude::*;
 use hitbox_moka::MokaBackend;
 
 // =============================================================================
@@ -63,6 +64,52 @@ pub async fn last_param_skipped(keep: i64, _skip: i64) -> i64 {
 #[cached(prefix = "with_db", skip(_db))]
 pub async fn with_db_connection(_db: DbConnection, user_id: i64) -> String {
     format!("user_{}", user_id)
+}
+
+// =============================================================================
+// Generic type parameter support
+// =============================================================================
+
+use hitbox_core::KeyPart;
+use hitbox_fn::KeyExtract;
+
+/// A type that implements KeyExtract for use in generic tests.
+#[derive(Debug, Clone)]
+pub struct TypedId {
+    id: i64,
+    label: &'static str,
+}
+
+impl TypedId {
+    pub fn new(id: i64, label: &'static str) -> Self {
+        Self { id, label }
+    }
+}
+
+impl KeyExtract for TypedId {
+    fn extract(&self) -> Vec<KeyPart> {
+        vec![
+            KeyPart::new("label", Some(self.label.to_string())),
+            KeyPart::new("id", Some(self.id.to_string())),
+        ]
+    }
+}
+
+/// Function with a generic type parameter.
+#[cached(prefix = "generic")]
+pub async fn generic_function<T: KeyExtract + Clone + std::fmt::Debug + Send + Sync + 'static>(
+    value: T,
+) -> String {
+    format!("{:?}", value)
+}
+
+/// Function with generic type and skipped parameter.
+#[cached(prefix = "generic_skip", skip(_ctx))]
+pub async fn generic_with_skip<T: KeyExtract + Clone + std::fmt::Debug + Send + Sync + 'static>(
+    _ctx: String,
+    value: T,
+) -> String {
+    format!("{:?}", value)
 }
 
 // =============================================================================
@@ -228,6 +275,80 @@ async fn test_skipped_type_without_key_extract() {
         .await;
 
     // Same user_id = cache hit, despite different DbConnection
+    assert_eq!(r1, r2);
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+// =============================================================================
+// Generic type parameter tests
+// =============================================================================
+
+#[tokio::test]
+async fn test_generic_function_same_value() {
+    let cache = create_cache();
+
+    let id1 = TypedId::new(42, "user");
+    let id2 = TypedId::new(42, "user");
+
+    let (r1, c1) = generic_function(id1).cache(&cache).with_context().await;
+    let (r2, c2) = generic_function(id2).cache(&cache).with_context().await;
+
+    // Same value = cache hit
+    assert_eq!(r1, r2);
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+#[tokio::test]
+async fn test_generic_function_different_value() {
+    let cache = create_cache();
+
+    let id1 = TypedId::new(1, "user");
+    let id2 = TypedId::new(2, "user");
+
+    let (_, c1) = generic_function(id1).cache(&cache).with_context().await;
+    let (_, c2) = generic_function(id2).cache(&cache).with_context().await;
+
+    // Different value = cache miss
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Miss);
+}
+
+#[tokio::test]
+async fn test_generic_function_different_label() {
+    let cache = create_cache();
+
+    // Same id but different label = different cache key
+    let id1 = TypedId::new(42, "user");
+    let id2 = TypedId::new(42, "product");
+
+    let (_, c1) = generic_function(id1).cache(&cache).with_context().await;
+    let (_, c2) = generic_function(id2).cache(&cache).with_context().await;
+
+    // Different label = cache miss
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Miss);
+}
+
+#[tokio::test]
+async fn test_generic_with_skip() {
+    let cache = create_cache();
+
+    let id1 = TypedId::new(42, "user");
+    let id2 = TypedId::new(42, "user");
+
+    // Different ctx values should not affect cache key
+    let (r1, c1) = generic_with_skip("ctx-1".to_string(), id1)
+        .cache(&cache)
+        .with_context()
+        .await;
+    let (r2, c2) = generic_with_skip("ctx-2".to_string(), id2)
+        .cache(&cache)
+        .with_context()
+        .await;
+
+    // Same value, different ctx (skipped) = cache hit
     assert_eq!(r1, r2);
     assert_eq!(c1.status, CacheStatus::Miss);
     assert_eq!(c2.status, CacheStatus::Hit);

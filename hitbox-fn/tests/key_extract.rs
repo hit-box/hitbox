@@ -1,6 +1,7 @@
 //! Integration tests for KeyExtract derive macro.
 
 use hitbox::Extractor;
+use hitbox_derive::KeyExtract;
 use hitbox_fn::prelude::*;
 
 // =============================================================================
