@@ -26,14 +26,14 @@ use crate::CacheKey;
 ///
 /// # Variants
 ///
-/// - [`Keyed`](OffloadKey::Keyed): Key derived from a cache key (enables deduplication).
+/// - [`Keyed`](OffloadKey::Keyed): Key derived from a cache key.
 /// - [`Explicit`](OffloadKey::Explicit): Key with explicit id provided by caller.
 /// - [`Auto`](OffloadKey::Auto): Key with auto-assigned id (manager assigns).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OffloadKey {
-    /// Key derived from cache key (enables deduplication for cache operations).
+    /// Key derived from cache key.
     Keyed {
-        /// The cache key used for deduplication.
+        /// The cache key.
         key: CacheKey,
         /// Kind of the task (e.g., "revalidate", "cache_write").
         kind: SmolStr,
@@ -199,35 +199,24 @@ pub trait Offload<'a>: Send + Sync + Clone {
 
     /// Register a future to be executed in the background.
     ///
-    /// This is the primary method for spawning background tasks. It accepts an
-    /// [`OffloadKey`] which determines whether the task can be deduplicated.
+    /// This is the primary method for spawning background tasks.
     ///
     /// # Arguments
     ///
-    /// * `key` - The key identifying this task. Use [`OffloadKey::named`] for
-    ///   deduplication based on cache key, or [`OffloadKey::generated`] for
-    ///   non-deduplicating tasks. A tuple `(CacheKey, &str)` can also be passed.
+    /// * `key` - The key identifying this task. A tuple `(CacheKey, &str)` can also be passed.
     /// * `future` - The future to execute in the background. Must be `Send + 'a`.
-    ///
-    /// # Deduplication
-    ///
-    /// When using a `Named` key, implementations may skip spawning the task if
-    /// another task with the same cache key is already in flight. This prevents
-    /// redundant work (e.g., multiple concurrent revalidations for the same key).
     ///
     /// # Example
     ///
     /// ```ignore
     /// use hitbox_core::{Offload, OffloadKey, CacheKey};
     ///
-    /// // With deduplication (using cache key)
-    /// let cache_key = CacheKey::new("user", "123");
+    /// let cache_key = CacheKey::from_str("user", "123");
     /// offload.register((cache_key, "revalidate"), async {
     ///     // Revalidate cache entry
     /// });
     ///
-    /// // Without deduplication
-    /// offload.register(OffloadKey::generated("cleanup", 1), async {
+    /// offload.register(OffloadKey::explicit("cleanup", 1), async {
     ///     // Cleanup task
     /// });
     /// ```
