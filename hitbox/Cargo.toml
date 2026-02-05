@@ -1,6 +1,6 @@
 [package]
 name = "hitbox"
-version = "0.2.0"
+version = "0.2.1"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -38,7 +38,7 @@ rkyv_format = ["hitbox-core/rkyv_format", "hitbox-backend/rkyv_format"]
 [dev-dependencies]
 lazy_static = "1"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "rt", "time"] }
-hitbox-moka = { path = "../hitbox-moka" }
+hitbox-moka = { path = "../hitbox-moka", version = "0.2" }
 futures = { workspace = true }
 
 [package.metadata.docs.rs]

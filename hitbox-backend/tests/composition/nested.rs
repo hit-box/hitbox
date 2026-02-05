@@ -8,30 +8,15 @@ use std::sync::Arc;
 
 use hitbox_backend::{CacheBackend, CompositionBackend, SyncBackend};
 use hitbox_core::{
-    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig, Offload,
+    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig,
     Predicate,
 };
 use serde::{Deserialize, Serialize};
-use smol_str::SmolStr;
-use std::future::Future;
 
 #[cfg(feature = "rkyv_format")]
 use rkyv::{Archive, Serialize as RkyvSerialize};
 
-use crate::common::TestBackend;
-
-/// Test offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct TestOffload;
-
-impl Offload<'static> for TestOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-}
+use crate::common::{TestBackend, TestOffloadManager};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[cfg_attr(
@@ -83,10 +68,10 @@ async fn test_nested_composition_static_dispatch() {
     let l3 = TestBackend::new();
 
     // Create inner composition: L2 + L3
-    let l2_l3 = CompositionBackend::new(l2.clone(), l3.clone(), TestOffload);
+    let l2_l3 = CompositionBackend::new(l2.clone(), l3.clone(), TestOffloadManager);
 
     // Create outer composition: L1 + (L2 + L3)
-    let cache = CompositionBackend::new(l1.clone(), l2_l3, TestOffload);
+    let cache = CompositionBackend::new(l1.clone(), l2_l3, TestOffloadManager);
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(
@@ -347,10 +332,10 @@ async fn test_deep_nested_refill_3_levels() {
     let l2 = TestBackend::new();
     let l3 = TestBackend::new();
 
-    let inner =
-        CompositionBackend::new(l2.clone(), l3.clone(), TestOffload).refill(RefillPolicy::Always);
+    let inner = CompositionBackend::new(l2.clone(), l3.clone(), TestOffloadManager)
+        .refill(RefillPolicy::Always);
     let outer =
-        CompositionBackend::new(l1.clone(), inner, TestOffload).refill(RefillPolicy::Always);
+        CompositionBackend::new(l1.clone(), inner, TestOffloadManager).refill(RefillPolicy::Always);
 
     run_refill_3_levels_test(outer, &l1, &l2, &l3, "static").await;
 }
@@ -364,12 +349,12 @@ async fn test_deep_nested_refill_4_levels() {
     let l3 = TestBackend::new();
     let l4 = TestBackend::new();
 
-    let innermost =
-        CompositionBackend::new(l3.clone(), l4.clone(), TestOffload).refill(RefillPolicy::Always);
-    let middle =
-        CompositionBackend::new(l2.clone(), innermost, TestOffload).refill(RefillPolicy::Always);
-    let outer =
-        CompositionBackend::new(l1.clone(), middle, TestOffload).refill(RefillPolicy::Always);
+    let innermost = CompositionBackend::new(l3.clone(), l4.clone(), TestOffloadManager)
+        .refill(RefillPolicy::Always);
+    let middle = CompositionBackend::new(l2.clone(), innermost, TestOffloadManager)
+        .refill(RefillPolicy::Always);
+    let outer = CompositionBackend::new(l1.clone(), middle, TestOffloadManager)
+        .refill(RefillPolicy::Always);
 
     run_refill_4_levels_test(outer, &l1, &l2, &l3, &l4, "static").await;
 }
@@ -382,9 +367,10 @@ async fn test_deep_nested_no_refill_with_never_policy() {
     let l2 = TestBackend::new();
     let l3 = TestBackend::new();
 
-    let inner =
-        CompositionBackend::new(l2.clone(), l3.clone(), TestOffload).refill(RefillPolicy::Never);
-    let outer = CompositionBackend::new(l1.clone(), inner, TestOffload).refill(RefillPolicy::Never);
+    let inner = CompositionBackend::new(l2.clone(), l3.clone(), TestOffloadManager)
+        .refill(RefillPolicy::Never);
+    let outer =
+        CompositionBackend::new(l1.clone(), inner, TestOffloadManager).refill(RefillPolicy::Never);
 
     run_no_refill_never_policy_test(outer, &l1, &l2, &l3, "static").await;
 }
@@ -397,9 +383,10 @@ async fn test_never_policy_skips_refill_even_with_refill_mode() {
     let l2 = TestBackend::new();
     let l3 = TestBackend::new();
 
-    let inner =
-        CompositionBackend::new(l2.clone(), l3.clone(), TestOffload).refill(RefillPolicy::Never);
-    let outer = CompositionBackend::new(l1.clone(), inner, TestOffload).refill(RefillPolicy::Never);
+    let inner = CompositionBackend::new(l2.clone(), l3.clone(), TestOffloadManager)
+        .refill(RefillPolicy::Never);
+    let outer =
+        CompositionBackend::new(l1.clone(), inner, TestOffloadManager).refill(RefillPolicy::Never);
 
     run_never_policy_skips_refill_test(outer, &l1, &l2, &l3, "static").await;
 }
@@ -420,8 +407,10 @@ async fn test_deep_nested_refill_3_levels_arc_sync() {
     let l2_arc: Arc<SyncBackend> = Arc::new(l2.clone());
     let l3_arc: Arc<SyncBackend> = Arc::new(l3.clone());
 
-    let inner = CompositionBackend::new(l2_arc, l3_arc, TestOffload).refill(RefillPolicy::Always);
-    let outer = CompositionBackend::new(l1_arc, inner, TestOffload).refill(RefillPolicy::Always);
+    let inner =
+        CompositionBackend::new(l2_arc, l3_arc, TestOffloadManager).refill(RefillPolicy::Always);
+    let outer =
+        CompositionBackend::new(l1_arc, inner, TestOffloadManager).refill(RefillPolicy::Always);
 
     run_refill_3_levels_test(outer, &l1, &l2, &l3, "arc_sync").await;
 }
@@ -441,10 +430,11 @@ async fn test_deep_nested_refill_4_levels_arc_sync() {
     let l4_arc: Arc<SyncBackend> = Arc::new(l4.clone());
 
     let innermost =
-        CompositionBackend::new(l3_arc, l4_arc, TestOffload).refill(RefillPolicy::Always);
+        CompositionBackend::new(l3_arc, l4_arc, TestOffloadManager).refill(RefillPolicy::Always);
     let middle =
-        CompositionBackend::new(l2_arc, innermost, TestOffload).refill(RefillPolicy::Always);
-    let outer = CompositionBackend::new(l1_arc, middle, TestOffload).refill(RefillPolicy::Always);
+        CompositionBackend::new(l2_arc, innermost, TestOffloadManager).refill(RefillPolicy::Always);
+    let outer =
+        CompositionBackend::new(l1_arc, middle, TestOffloadManager).refill(RefillPolicy::Always);
 
     run_refill_4_levels_test(outer, &l1, &l2, &l3, &l4, "arc_sync").await;
 }
@@ -461,8 +451,10 @@ async fn test_deep_nested_no_refill_with_never_policy_arc_sync() {
     let l2_arc: Arc<SyncBackend> = Arc::new(l2.clone());
     let l3_arc: Arc<SyncBackend> = Arc::new(l3.clone());
 
-    let inner = CompositionBackend::new(l2_arc, l3_arc, TestOffload).refill(RefillPolicy::Never);
-    let outer = CompositionBackend::new(l1_arc, inner, TestOffload).refill(RefillPolicy::Never);
+    let inner =
+        CompositionBackend::new(l2_arc, l3_arc, TestOffloadManager).refill(RefillPolicy::Never);
+    let outer =
+        CompositionBackend::new(l1_arc, inner, TestOffloadManager).refill(RefillPolicy::Never);
 
     run_no_refill_never_policy_test(outer, &l1, &l2, &l3, "arc_sync").await;
 }
@@ -479,8 +471,10 @@ async fn test_never_policy_skips_refill_even_with_refill_mode_arc_sync() {
     let l2_arc: Arc<SyncBackend> = Arc::new(l2.clone());
     let l3_arc: Arc<SyncBackend> = Arc::new(l3.clone());
 
-    let inner = CompositionBackend::new(l2_arc, l3_arc, TestOffload).refill(RefillPolicy::Never);
-    let outer = CompositionBackend::new(l1_arc, inner, TestOffload).refill(RefillPolicy::Never);
+    let inner =
+        CompositionBackend::new(l2_arc, l3_arc, TestOffloadManager).refill(RefillPolicy::Never);
+    let outer =
+        CompositionBackend::new(l1_arc, inner, TestOffloadManager).refill(RefillPolicy::Never);
 
     run_never_policy_skips_refill_test(outer, &l1, &l2, &l3, "arc_sync").await;
 }
@@ -498,10 +492,10 @@ async fn test_nested_composition_dynamic_dispatch() {
     let l3: Arc<SyncBackend> = Arc::new(TestBackend::new());
 
     // Create inner composition as trait object
-    let l2_l3: Arc<SyncBackend> = Arc::new(CompositionBackend::new(l2, l3, TestOffload));
+    let l2_l3: Arc<SyncBackend> = Arc::new(CompositionBackend::new(l2, l3, TestOffloadManager));
 
     // Create outer composition with trait object
-    let cache = CompositionBackend::new(l1, l2_l3, TestOffload);
+    let cache = CompositionBackend::new(l1, l2_l3, TestOffloadManager);
 
     let key = CacheKey::from_str("test", "dyn_key");
     let value = CacheValue::new(
@@ -548,8 +542,8 @@ async fn test_nested_composition_dynamic_as_trait_object() {
     );
 
     // Create nested composition
-    let l2_l3 = CompositionBackend::new(l2, l3, TestOffload);
-    let nested = CompositionBackend::new(l1, l2_l3, TestOffload);
+    let l2_l3 = CompositionBackend::new(l2, l3, TestOffloadManager);
+    let nested = CompositionBackend::new(l1, l2_l3, TestOffloadManager);
 
     // Use the entire nested composition as a trait object
     let backend: Arc<SyncBackend> = Arc::new(nested);
@@ -748,21 +742,24 @@ async fn run_no_ttl_no_stale_test<B: CacheBackend + Send + Sync>(cache: B, l1: &
 #[tokio::test]
 async fn test_ttl_preserved_concrete() {
     let backends = TtlTestBackends::two_level();
-    let cache = CompositionBackend::new(backends.l1.clone(), backends.l2.clone(), TestOffload);
+    let cache =
+        CompositionBackend::new(backends.l1.clone(), backends.l2.clone(), TestOffloadManager);
     run_ttl_preserved_test(cache, &backends.l1, &backends.l2).await;
 }
 
 #[tokio::test]
 async fn test_stale_preserved_concrete() {
     let backends = TtlTestBackends::two_level();
-    let cache = CompositionBackend::new(backends.l1.clone(), backends.l2.clone(), TestOffload);
+    let cache =
+        CompositionBackend::new(backends.l1.clone(), backends.l2.clone(), TestOffloadManager);
     run_stale_preserved_test(cache, &backends.l1, &backends.l2).await;
 }
 
 #[tokio::test]
 async fn test_no_ttl_no_stale_concrete() {
     let backends = TtlTestBackends::two_level();
-    let cache = CompositionBackend::new(backends.l1.clone(), backends.l2.clone(), TestOffload);
+    let cache =
+        CompositionBackend::new(backends.l1.clone(), backends.l2.clone(), TestOffloadManager);
     run_no_ttl_no_stale_test(cache, &backends.l1).await;
 }
 
@@ -775,7 +772,7 @@ async fn test_ttl_preserved_arc_sync() {
     let backends = TtlTestBackends::two_level();
     let l1: Arc<SyncBackend> = Arc::new(backends.l1.clone());
     let l2: Arc<SyncBackend> = Arc::new(backends.l2.clone());
-    let cache = CompositionBackend::new(l1, l2, TestOffload);
+    let cache = CompositionBackend::new(l1, l2, TestOffloadManager);
     run_ttl_preserved_test(cache, &backends.l1, &backends.l2).await;
 }
 
@@ -784,7 +781,7 @@ async fn test_stale_preserved_arc_sync() {
     let backends = TtlTestBackends::two_level();
     let l1: Arc<SyncBackend> = Arc::new(backends.l1.clone());
     let l2: Arc<SyncBackend> = Arc::new(backends.l2.clone());
-    let cache = CompositionBackend::new(l1, l2, TestOffload);
+    let cache = CompositionBackend::new(l1, l2, TestOffloadManager);
     run_stale_preserved_test(cache, &backends.l1, &backends.l2).await;
 }
 
@@ -793,7 +790,7 @@ async fn test_no_ttl_no_stale_arc_sync() {
     let backends = TtlTestBackends::two_level();
     let l1: Arc<SyncBackend> = Arc::new(backends.l1.clone());
     let l2: Arc<SyncBackend> = Arc::new(backends.l2.clone());
-    let cache = CompositionBackend::new(l1, l2, TestOffload);
+    let cache = CompositionBackend::new(l1, l2, TestOffloadManager);
     run_no_ttl_no_stale_test(cache, &backends.l1).await;
 }
 
@@ -828,8 +825,8 @@ async fn test_nested_composition_delete_cascades() {
     assert!(l3.has(&key));
 
     // Create nested composition and delete
-    let l2_l3 = CompositionBackend::new(l2.clone(), l3.clone(), TestOffload);
-    let cache = CompositionBackend::new(l1.clone(), l2_l3, TestOffload);
+    let l2_l3 = CompositionBackend::new(l2.clone(), l3.clone(), TestOffloadManager);
+    let cache = CompositionBackend::new(l1.clone(), l2_l3, TestOffloadManager);
 
     let mut ctx: BoxContext = CacheContext::default().boxed();
     cache.delete(&key, &mut ctx).await.unwrap();
