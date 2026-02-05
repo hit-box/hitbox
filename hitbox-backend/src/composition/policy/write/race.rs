@@ -109,9 +109,12 @@ impl CompositionWritePolicy for RaceWritePolicy {
                         tracing::trace!("L1 write succeeded (won race)");
                         match self.loser_policy {
                             RaceLoserPolicy::Offload => {
-                                offload.spawn("race_write_l2_loser", async move {
-                                    let _ = l2_fut.await;
-                                });
+                                offload.register(
+                                    hitbox_core::OffloadKey::auto("race_write_l2_loser"),
+                                    async move {
+                                        let _ = l2_fut.await;
+                                    },
+                                );
                             }
                             RaceLoserPolicy::Drop => {
                                 drop(l2_fut);
@@ -149,9 +152,12 @@ impl CompositionWritePolicy for RaceWritePolicy {
                         tracing::trace!("L2 write succeeded (won race)");
                         match self.loser_policy {
                             RaceLoserPolicy::Offload => {
-                                offload.spawn("race_write_l1_loser", async move {
-                                    let _ = l1_fut.await;
-                                });
+                                offload.register(
+                                    hitbox_core::OffloadKey::auto("race_write_l1_loser"),
+                                    async move {
+                                        let _ = l1_fut.await;
+                                    },
+                                );
                             }
                             RaceLoserPolicy::Drop => {
                                 drop(l1_fut);

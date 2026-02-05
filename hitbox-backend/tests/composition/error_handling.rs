@@ -1,5 +1,3 @@
-use std::future::Future;
-
 use async_trait::async_trait;
 use chrono::Utc;
 use hitbox_backend::format::{Format, JsonFormat};
@@ -8,24 +6,12 @@ use hitbox_backend::{
     Compressor, DeleteStatus, PassthroughCompressor,
 };
 use hitbox_core::{
-    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig, Offload,
+    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig,
     Predicate, Raw,
 };
 use serde::{Deserialize, Serialize};
-use smol_str::SmolStr;
 
-/// Test offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct TestOffload;
-
-impl Offload<'static> for TestOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-}
+use crate::common::TestOffloadManager;
 
 #[cfg(feature = "rkyv_format")]
 use rkyv::{Archive, Serialize as RkyvSerialize};
@@ -115,7 +101,7 @@ impl CacheableResponse for TestValue {
 async fn test_both_layers_fail_set() {
     let l1 = FailingBackend::new("L1 connection timeout");
     let l2 = FailingBackend::new("L2 authentication failed");
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(
@@ -163,7 +149,7 @@ async fn test_both_layers_fail_set() {
 async fn test_both_layers_fail_delete() {
     let l1 = FailingBackend::new("L1 disk full");
     let l2 = FailingBackend::new("L2 network unreachable");
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     let key = CacheKey::from_str("test", "key1");
 
@@ -203,7 +189,7 @@ async fn test_both_layers_fail_delete() {
 async fn test_both_layers_fail_backend_write() {
     let l1 = FailingBackend::new("L1 quota exceeded");
     let l2 = FailingBackend::new("L2 permission denied");
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(
@@ -245,7 +231,7 @@ async fn test_both_layers_fail_backend_write() {
 async fn test_both_layers_fail_backend_remove() {
     let l1 = FailingBackend::new("L1 service unavailable");
     let l2 = FailingBackend::new("L2 read-only mode");
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     let key = CacheKey::from_str("test", "key1");
 

@@ -25,9 +25,9 @@ body utilities for transparent request/response handling.
 ```rust
 use std::time::Duration;
 
+use hitbox::Config;
 use hitbox::policy::PolicyConfig;
 use hitbox::predicate::PredicateExt;
-use hitbox_configuration::Endpoint;
 use hitbox_http::{
     extractors::{Method, path::PathExtractor, query::QueryExtractor},
     predicates::{
@@ -38,28 +38,35 @@ use hitbox_http::{
 
 # use bytes::Bytes;
 # use http_body_util::Empty;
+// Skip cache when Cache-Control: no-cache is present
+let request_predicate = Header::new(HeaderOperation::Contains(
+    http::header::CACHE_CONTROL,
+    "no-cache".to_string(),
+)).not();
+
+// Only cache successful responses
+let response_predicate = StatusCode::new(http::StatusCode::OK);
+
+// Build cache key from method, path parameters, and query
+let extractor = Method::new()
+    .path("/users/{user_id}/posts/{post_id}")
+    .query("page".to_string());
+
 // Build a cache configuration for an endpoint
-let config = Endpoint::builder()
-    // Skip cache when Cache-Control: no-cache is present
-    .request_predicate(
-        Header::new(HeaderOperation::Contains(
-            http::header::CACHE_CONTROL,
-            "no-cache".to_string(),
-        ))
-        .not(),
-    )
-    // Only cache successful responses
-    .response_predicate(StatusCode::new(http::StatusCode::OK))
-    // Build cache key from method, path parameters, and query
-    .extractor(
-        Method::new()
-            .path("/users/{user_id}/posts/{post_id}")
-            .query("page".to_string()),
-    )
-    // Cache for 5 minutes
+let config = Config::builder()
+    .request_predicate(request_predicate)
+    .response_predicate(response_predicate)
+    .extractor(extractor)
     .policy(PolicyConfig::builder().ttl(Duration::from_secs(300)).build())
     .build();
-# let _: Endpoint<Empty<Bytes>, Empty<Bytes>> = config;
+# use hitbox::predicate::Not;
+# use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+# use hitbox_http::extractors::{NeutralExtractor, Path, query::Query};
+# let _: Config<
+#     Not<Header<NeutralRequestPredicate<Empty<Bytes>>>>,
+#     StatusCode<NeutralResponsePredicate<Empty<Bytes>>>,
+#     Query<Path<Method<NeutralExtractor<Empty<Bytes>>>>>,
+# > = config;
 ```
 
 ## Predicates
