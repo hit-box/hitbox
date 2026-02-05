@@ -105,9 +105,12 @@ impl CompositionReadPolicy for RaceReadPolicy {
                     // Handle losing L2 future based on policy
                     match self.loser_policy {
                         RaceLoserPolicy::Offload => {
-                            offload.spawn("race_read_l2_loser", async move {
-                                let _ = l2_fut.await;
-                            });
+                            offload.register(
+                                hitbox_core::OffloadKey::auto("race_read_l2_loser"),
+                                async move {
+                                    let _ = l2_fut.await;
+                                },
+                            );
                         }
                         RaceLoserPolicy::Drop => {
                             drop(l2_fut);
@@ -171,9 +174,12 @@ impl CompositionReadPolicy for RaceReadPolicy {
                     // Handle losing L1 future based on policy
                     match self.loser_policy {
                         RaceLoserPolicy::Offload => {
-                            offload.spawn("race_read_l1_loser", async move {
-                                let _ = l1_fut.await;
-                            });
+                            offload.register(
+                                hitbox_core::OffloadKey::auto("race_read_l1_loser"),
+                                async move {
+                                    let _ = l1_fut.await;
+                                },
+                            );
                         }
                         RaceLoserPolicy::Drop => {
                             drop(l1_fut);

@@ -10,36 +10,16 @@
 //!
 //! Run with: cargo bench -p hitbox-test --bench cache_future_reference
 
-use std::future::{Future, Ready};
+use std::future::Ready;
 use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
-use hitbox_core::{CacheKey, DisabledOffload, Offload, SmolStr};
-
-/// Offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct BenchOffload;
-
-impl Offload<'static> for BenchOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-
-    fn spawn_with_key<F>(&self, _key: CacheKey, kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        self.spawn(kind, future);
-    }
-}
 use criterion::{Criterion, criterion_group, criterion_main};
 use hitbox::CacheableResponse;
 use hitbox::concurrency::NoopConcurrencyManager;
 use hitbox::fsm::CacheFuture;
+use hitbox::offload::OffloadManager;
 use hitbox::policy::{EnabledCacheConfig, PolicyConfig};
 use hitbox::predicate::Predicate;
 use hitbox_backend::composition::policy::{
@@ -48,6 +28,7 @@ use hitbox_backend::composition::policy::{
 use hitbox_backend::format::BincodeFormat;
 use hitbox_backend::{CacheBackend, CompositionBackend, PassthroughCompressor};
 use hitbox_configuration::{Backend as ConfigBackend, ConfigEndpoint};
+use hitbox_core::DisabledOffload;
 use hitbox_core::Upstream;
 use hitbox_http::extractors::NeutralExtractor;
 use hitbox_http::extractors::body::{BodyExtraction, BodyExtractor, JqExtraction};
@@ -443,8 +424,8 @@ fn bench_compare_composition_read(c: &mut Criterion) {
         .compressor(PassthroughCompressor)
         .build();
     // Use RaceReadPolicy for read benchmarks
-    let static_composition = CompositionBackend::new(static_l1, static_l2, BenchOffload)
-        .with_policy(
+    let static_composition =
+        CompositionBackend::new(static_l1, static_l2, OffloadManager::default()).with_policy(
             CompositionPolicy::new()
                 .read(RaceReadPolicy::new())
                 .refill(RefillPolicy::Never),
@@ -492,7 +473,7 @@ fn bench_compare_composition_read(c: &mut Criterion) {
     // CompositionBackend with dyn Backend inner layers, wrapped as dyn Backend
     // Use RaceReadPolicy for read benchmarks
     let dyn_composition: Arc<dyn Backend + Send> = Arc::new(
-        CompositionBackend::new(dyn_l1, dyn_l2, BenchOffload).with_policy(
+        CompositionBackend::new(dyn_l1, dyn_l2, OffloadManager::default()).with_policy(
             CompositionPolicy::new()
                 .read(RaceReadPolicy::new())
                 .refill(RefillPolicy::Never),
@@ -560,8 +541,8 @@ fn bench_compare_composition_write(c: &mut Criterion) {
         .compressor(PassthroughCompressor)
         .build();
     // Use OptimisticParallelWritePolicy for write benchmarks
-    let static_composition = CompositionBackend::new(static_l1, static_l2, BenchOffload)
-        .with_policy(
+    let static_composition =
+        CompositionBackend::new(static_l1, static_l2, OffloadManager::default()).with_policy(
             CompositionPolicy::new()
                 .write(OptimisticParallelWritePolicy::new())
                 .refill(RefillPolicy::Never),
@@ -600,7 +581,7 @@ fn bench_compare_composition_write(c: &mut Criterion) {
     // CompositionBackend with dyn Backend inner layers, wrapped as dyn Backend
     // Use OptimisticParallelWritePolicy for write benchmarks
     let dyn_composition: Arc<dyn Backend + Send> = Arc::new(
-        CompositionBackend::new(dyn_l1, dyn_l2, BenchOffload).with_policy(
+        CompositionBackend::new(dyn_l1, dyn_l2, OffloadManager::default()).with_policy(
             CompositionPolicy::new()
                 .write(OptimisticParallelWritePolicy::new())
                 .refill(RefillPolicy::Never),

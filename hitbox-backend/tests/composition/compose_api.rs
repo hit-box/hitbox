@@ -2,39 +2,16 @@
 //!
 //! These tests demonstrate the fluent API for building CompositionBackend hierarchies.
 
-use std::future::Future;
-
 use chrono::Utc;
 use hitbox_backend::composition::CompositionPolicy;
 use hitbox_backend::composition::policy::{RaceReadPolicy, RefillPolicy};
 use hitbox_backend::{CacheBackend, Compose};
-use hitbox_core::{BoxContext, CacheContext, CacheKey, CacheValue, Offload};
-use smol_str::SmolStr;
+use hitbox_core::{BoxContext, CacheContext, CacheKey, CacheValue};
 
-use crate::common::TestBackend;
+use crate::common::{TestBackend, TestOffloadManager};
 
 // Reuse TestValue from nested tests
 use super::nested::TestValue;
-
-/// Test offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct TestOffload;
-
-impl Offload<'static> for TestOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-
-    fn spawn_with_key<F>(&self, _key: CacheKey, kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        self.spawn(kind, future);
-    }
-}
 
 #[tokio::test]
 async fn test_compose_trait_basic_usage() {
@@ -42,7 +19,7 @@ async fn test_compose_trait_basic_usage() {
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
 
-    let cache = l1.clone().compose(l2.clone(), TestOffload);
+    let cache = l1.clone().compose(l2.clone(), TestOffloadManager);
 
     // Use from_slice to test that API path
     let key = CacheKey::from_slice(&[("test", Some("key1"))]);
@@ -87,7 +64,9 @@ async fn test_compose_with_custom_policy() {
         .read(RaceReadPolicy::new())
         .refill(RefillPolicy::Never);
 
-    let cache = l1.clone().compose_with(l2.clone(), TestOffload, policy);
+    let cache = l1
+        .clone()
+        .compose_with(l2.clone(), TestOffloadManager, policy);
 
     let key = CacheKey::from_str("test", "custom_policy");
     let value = CacheValue::new(
@@ -125,9 +104,10 @@ async fn test_compose_nested_3_levels() {
     let l3 = TestBackend::new();
 
     // Build: L1 + (L2 + L3)
-    let cache = l1
-        .clone()
-        .compose(l2.clone().compose(l3.clone(), TestOffload), TestOffload);
+    let cache = l1.clone().compose(
+        l2.clone().compose(l3.clone(), TestOffloadManager),
+        TestOffloadManager,
+    );
 
     let key = CacheKey::from_str("test", "nested_compose");
     let value = CacheValue::new(
@@ -169,7 +149,7 @@ async fn test_compose_with_builder_chaining() {
 
     let cache = l1
         .clone()
-        .compose(l2.clone(), TestOffload)
+        .compose(l2.clone(), TestOffloadManager)
         .read(RaceReadPolicy::new())
         .refill(RefillPolicy::Never);
 

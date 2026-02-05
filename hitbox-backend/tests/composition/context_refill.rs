@@ -2,38 +2,18 @@
 //!
 //! Note: Refill tests have been moved to hitbox crate where CacheFuture handles refill.
 
-use std::future::Future;
 use std::sync::Arc;
 
 use chrono::Utc;
 use hitbox_backend::composition::CompositionBackend;
 use hitbox_backend::{CacheBackend, SyncBackend};
 use hitbox_core::{
-    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig, Offload,
+    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig,
     Predicate,
 };
 use serde::{Deserialize, Serialize};
-use smol_str::SmolStr;
 
-/// Test offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct TestOffload;
-
-impl Offload<'static> for TestOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-
-    fn spawn_with_key<F>(&self, _key: CacheKey, kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        self.spawn(kind, future);
-    }
-}
+use crate::common::TestOffloadManager;
 
 #[cfg(feature = "rkyv_format")]
 use rkyv::{Archive, Serialize as RkyvSerialize};
@@ -92,7 +72,7 @@ async fn test_direct_write_through_trait_object() {
     );
 
     // Create composition as trait object
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
     let backend: Arc<SyncBackend> = Arc::new(composition);
 
     // Direct write through trait object

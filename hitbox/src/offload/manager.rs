@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use dashmap::DashMap;
+use hitbox_core::OffloadKey as CoreOffloadKey;
 use smol_str::SmolStr;
 use tokio::task::JoinHandle;
 use tracing::{Instrument, debug, info_span, warn};
@@ -22,6 +23,14 @@ use crate::metrics::{
 };
 
 /// Key for identifying offloaded tasks.
+///
+/// # Deprecation
+///
+/// This type will be removed in version 0.3. Use [`hitbox_core::OffloadKey`] instead.
+#[deprecated(
+    since = "0.2.1",
+    note = "use `hitbox_core::OffloadKey` instead, will be removed in 0.3"
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OffloadKey {
     /// Key derived from cache key (enables deduplication for cache operations).
@@ -35,6 +44,7 @@ pub enum OffloadKey {
     },
 }
 
+#[allow(deprecated)]
 impl OffloadKey {
     /// Returns the key type for metrics labels.
     ///
@@ -48,6 +58,7 @@ impl OffloadKey {
     }
 }
 
+#[allow(deprecated)]
 impl From<CacheKey> for OffloadKey {
     fn from(key: CacheKey) -> Self {
         Self::Cache(key)
@@ -76,7 +87,7 @@ impl OffloadHandle {
 #[derive(Debug)]
 struct OffloadManagerInner {
     config: OffloadConfig,
-    tasks: DashMap<OffloadKey, OffloadHandle>,
+    tasks: DashMap<CoreOffloadKey, OffloadHandle>,
     key_counter: AtomicU64,
 }
 
@@ -105,73 +116,122 @@ impl OffloadManager {
         Self::new(OffloadConfig::default())
     }
 
-    /// Generate next auto-incrementing key with the given kind.
-    fn next_key(&self, kind: impl Into<SmolStr>) -> OffloadKey {
-        let id = self.inner.key_counter.fetch_add(1, Ordering::Relaxed);
-        OffloadKey::Generated {
-            kind: kind.into(),
-            id,
-        }
+    /// Generate next auto-incrementing id.
+    fn next_id(&self) -> u64 {
+        self.inner.key_counter.fetch_add(1, Ordering::Relaxed)
     }
 
-    /// Spawn a task with auto-generated key and specified kind.
+    /// Register a task with the given key.
     ///
-    /// The kind is used for metrics labels and tracing.
+    /// If deduplication is enabled and a task with the same `Keyed` key is
+    /// already in flight, the new task will be skipped.
+    ///
+    /// Returns `true` if the task was spawned, `false` if it was deduplicated.
     ///
     /// # Example
     /// ```ignore
-    /// manager.spawn("revalidate", async { /* ... */ });
-    /// manager.spawn("warmup", async { /* ... */ });
+    /// use hitbox_core::OffloadKey;
+    ///
+    /// // With potential deduplication (Keyed)
+    /// manager.register((cache_key, "revalidate"), async { /* ... */ });
+    ///
+    /// // Without deduplication (Explicit id)
+    /// manager.register(OffloadKey::explicit("cleanup", 42), async { /* ... */ });
+    ///
+    /// // Auto-assigned id
+    /// manager.register(OffloadKey::auto("background"), async { /* ... */ });
     /// ```
-    pub fn spawn<F>(&self, kind: impl Into<SmolStr>, task: F) -> OffloadKey
+    pub fn register<K, F>(&self, key: K, task: F) -> bool
     where
+        K: Into<CoreOffloadKey>,
         F: Future<Output = ()> + Send + 'static,
     {
-        let key = self.next_key(kind);
-        self.spawn_with_key(key.clone(), task);
-        key
-    }
+        // Convert Auto keys to Explicit with auto-assigned id
+        let key = match key.into() {
+            CoreOffloadKey::Auto { kind } => CoreOffloadKey::Explicit {
+                kind,
+                id: self.next_id(),
+            },
+            other => other,
+        };
 
-    /// Spawn a task with a specific key.
-    ///
-    /// If a task with the same key is already in flight and deduplication
-    /// is enabled, the new task will be skipped.
-    ///
-    /// Returns `true` if the task was spawned, `false` if it was deduplicated.
-    pub fn spawn_with_key<K, F>(&self, key: K, task: F) -> bool
-    where
-        K: Into<OffloadKey>,
-        F: Future<Output = ()> + Send + 'static,
-    {
-        let key = key.into();
-
-        // Check for deduplication (only for Cache keys)
+        // Check for deduplication (only for Keyed keys when enabled)
         if self.inner.config.deduplicate
-            && matches!(&key, OffloadKey::Cache(_))
+            && matches!(&key, CoreOffloadKey::Keyed { .. })
             && self.inner.tasks.contains_key(&key)
         {
             debug!(?key, "Task deduplicated - already in flight");
             #[cfg(feature = "metrics")]
-            metrics::counter!(*OFFLOAD_TASKS_DEDUPLICATED, "key_type" => key.key_type().to_string())
+            metrics::counter!(*OFFLOAD_TASKS_DEDUPLICATED, "kind" => key.kind().to_string())
                 .increment(1);
             return false;
         }
 
         #[cfg(feature = "metrics")]
-        let key_type = key.key_type();
+        let key_kind = key.kind().clone();
 
         let handle = self.spawn_inner(task, key.clone());
         self.inner.tasks.insert(key, handle);
 
         #[cfg(feature = "metrics")]
         {
-            metrics::counter!(*OFFLOAD_TASKS_SPAWNED, "key_type" => key_type.to_string())
-                .increment(1);
-            metrics::gauge!(*OFFLOAD_TASKS_ACTIVE, "key_type" => key_type.to_string())
-                .increment(1.0);
+            metrics::counter!(*OFFLOAD_TASKS_SPAWNED, "kind" => key_kind.to_string()).increment(1);
+            metrics::gauge!(*OFFLOAD_TASKS_ACTIVE, "kind" => key_kind.to_string()).increment(1.0);
         }
 
         true
+    }
+
+    /// Spawn a task with auto-generated key and specified kind.
+    ///
+    /// The kind is used for metrics labels and tracing.
+    ///
+    /// # Deprecation
+    ///
+    /// This method will be removed in version 0.3. Use [`register`](Self::register) instead.
+    ///
+    /// # Example
+    /// ```ignore
+    /// manager.spawn("revalidate", async { /* ... */ });
+    /// manager.spawn("warmup", async { /* ... */ });
+    /// ```
+    #[deprecated(
+        since = "0.2.1",
+        note = "use `register` instead, will be removed in 0.3"
+    )]
+    pub fn spawn<F>(&self, kind: impl Into<SmolStr>, task: F) -> CoreOffloadKey
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        let kind = kind.into();
+        let id = self.next_id();
+        let key = CoreOffloadKey::explicit(kind, id);
+        self.register(key.clone(), task);
+        key
+    }
+
+    /// Spawn a task with a specific cache key.
+    ///
+    /// # Deprecation
+    ///
+    /// This method will be removed in version 0.3. Use [`register`](Self::register) instead:
+    ///
+    /// ```ignore
+    /// // Before
+    /// manager.spawn_with_key(cache_key, "revalidate", task);
+    ///
+    /// // After
+    /// manager.register((cache_key, "revalidate"), task);
+    /// ```
+    #[deprecated(
+        since = "0.2.1",
+        note = "use `register` instead, will be removed in 0.3"
+    )]
+    pub fn spawn_with_key<F>(&self, key: CacheKey, kind: impl Into<SmolStr>, task: F) -> bool
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        self.register((key, kind), task)
     }
 
     /// Get the number of currently active tasks.
@@ -197,7 +257,7 @@ impl OffloadManager {
     }
 
     /// Cancel a specific task by key.
-    pub fn cancel(&self, key: &OffloadKey) -> bool {
+    pub fn cancel(&self, key: &CoreOffloadKey) -> bool {
         if let Some(entry) = self.inner.tasks.get(key) {
             entry.abort();
             true
@@ -207,7 +267,7 @@ impl OffloadManager {
     }
 
     /// Check if a task with the given key is in flight.
-    pub fn is_in_flight(&self, key: &OffloadKey) -> bool {
+    pub fn is_in_flight(&self, key: &CoreOffloadKey) -> bool {
         self.inner.tasks.get(key).is_some_and(|h| !h.is_finished())
     }
 
@@ -241,17 +301,17 @@ impl OffloadManager {
         }
     }
 
-    fn spawn_inner<F>(&self, task: F, key: OffloadKey) -> OffloadHandle
+    fn spawn_inner<F>(&self, task: F, key: CoreOffloadKey) -> OffloadHandle
     where
         F: Future<Output = ()> + Send + 'static,
     {
         let timeout_policy = self.inner.config.timeout_policy.clone();
         let inner = self.inner.clone();
-        let key_type = key.key_type();
+        let key_kind = key.kind().clone();
 
         let span = info_span!(
             "offload_task",
-            key_type = %key_type,
+            kind = %key_kind,
             key = ?key,
         );
 
@@ -263,7 +323,7 @@ impl OffloadManager {
                     task.await;
                     inner.tasks.remove(&key);
                     #[cfg(feature = "metrics")]
-                    Self::record_completion(start, &key_type);
+                    Self::record_completion(start, &key_kind);
                 }
                 .instrument(span),
             ),
@@ -274,12 +334,12 @@ impl OffloadManager {
                     match tokio::time::timeout(duration, task).await {
                         Ok(()) => {
                             #[cfg(feature = "metrics")]
-                            Self::record_completion(start, &key_type);
+                            Self::record_completion(start, &key_kind);
                         }
                         Err(_) => {
                             warn!(?key, "Offload task cancelled due to timeout");
                             #[cfg(feature = "metrics")]
-                            Self::record_timeout(start, &key_type);
+                            Self::record_timeout(start, &key_kind);
                         }
                     }
                     inner.tasks.remove(&key);
@@ -301,7 +361,7 @@ impl OffloadManager {
                     }
                     inner.tasks.remove(&key);
                     #[cfg(feature = "metrics")]
-                    Self::record_completion(start, &key_type);
+                    Self::record_completion(start, &key_kind);
                 }
                 .instrument(span),
             ),
@@ -311,21 +371,20 @@ impl OffloadManager {
     }
 
     #[cfg(feature = "metrics")]
-    fn record_completion(start: Instant, key_type: &SmolStr) {
+    fn record_completion(start: Instant, key_kind: &SmolStr) {
         let duration = start.elapsed().as_secs_f64();
-        metrics::counter!(*OFFLOAD_TASKS_COMPLETED, "key_type" => key_type.to_string())
-            .increment(1);
-        metrics::gauge!(*OFFLOAD_TASKS_ACTIVE, "key_type" => key_type.to_string()).decrement(1.0);
-        metrics::histogram!(*OFFLOAD_TASK_DURATION, "key_type" => key_type.to_string())
+        metrics::counter!(*OFFLOAD_TASKS_COMPLETED, "kind" => key_kind.to_string()).increment(1);
+        metrics::gauge!(*OFFLOAD_TASKS_ACTIVE, "kind" => key_kind.to_string()).decrement(1.0);
+        metrics::histogram!(*OFFLOAD_TASK_DURATION, "kind" => key_kind.to_string())
             .record(duration);
     }
 
     #[cfg(feature = "metrics")]
-    fn record_timeout(start: Instant, key_type: &SmolStr) {
+    fn record_timeout(start: Instant, key_kind: &SmolStr) {
         let duration = start.elapsed().as_secs_f64();
-        metrics::counter!(*OFFLOAD_TASKS_TIMEOUT, "key_type" => key_type.to_string()).increment(1);
-        metrics::gauge!(*OFFLOAD_TASKS_ACTIVE, "key_type" => key_type.to_string()).decrement(1.0);
-        metrics::histogram!(*OFFLOAD_TASK_DURATION, "key_type" => key_type.to_string())
+        metrics::counter!(*OFFLOAD_TASKS_TIMEOUT, "kind" => key_kind.to_string()).increment(1);
+        metrics::gauge!(*OFFLOAD_TASKS_ACTIVE, "kind" => key_kind.to_string()).decrement(1.0);
+        metrics::histogram!(*OFFLOAD_TASK_DURATION, "kind" => key_kind.to_string())
             .record(duration);
     }
 }
@@ -337,6 +396,7 @@ impl Default for OffloadManager {
 }
 
 impl hitbox_core::Offload<'static> for OffloadManager {
+    #[allow(deprecated)]
     fn spawn<F>(&self, kind: impl Into<SmolStr>, future: F)
     where
         F: Future<Output = ()> + Send + 'static,
@@ -344,10 +404,11 @@ impl hitbox_core::Offload<'static> for OffloadManager {
         OffloadManager::spawn(self, kind, future);
     }
 
-    fn spawn_with_key<F>(&self, key: hitbox_core::CacheKey, _kind: impl Into<SmolStr>, future: F)
+    fn register<K, F>(&self, key: K, future: F)
     where
+        K: Into<CoreOffloadKey>,
         F: Future<Output = ()> + Send + 'static,
     {
-        OffloadManager::spawn_with_key(self, key, future);
+        OffloadManager::register(self, key, future);
     }
 }

@@ -21,6 +21,7 @@
 mod manager;
 mod policy;
 
+#[allow(deprecated)]
 pub use manager::{OffloadHandle, OffloadKey, OffloadManager};
 pub use policy::{OffloadConfig, OffloadConfigBuilder, TimeoutPolicy};
 pub use smol_str::SmolStr;

@@ -1,5 +1,6 @@
-use std::future::Future;
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -9,33 +10,12 @@ use hitbox_backend::{
     DeleteStatus, PassthroughCompressor, SyncBackend,
 };
 use hitbox_core::{
-    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig, Offload,
+    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig,
     Predicate, Raw,
 };
 use serde::{Deserialize, Serialize};
-use smol_str::SmolStr;
-use std::collections::HashMap;
-use std::sync::Mutex;
 
-/// Test offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct TestOffload;
-
-impl Offload<'static> for TestOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-
-    fn spawn_with_key<F>(&self, _key: CacheKey, kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        self.spawn(kind, future);
-    }
-}
+use crate::common::TestOffloadManager;
 
 #[cfg(feature = "rkyv_format")]
 use rkyv::{Archive, Serialize as RkyvSerialize};
@@ -123,7 +103,7 @@ impl CacheableResponse for TestValue {
 async fn test_boxed_composition_backend() {
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     // Box the CompositionBackend itself
     let boxed: Box<CompositionBackend<_, _, _>> = Box::new(composition);
@@ -153,7 +133,7 @@ async fn test_boxed_composition_backend() {
 async fn test_arc_composition_backend() {
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     // Arc the CompositionBackend itself
     let arc: Arc<CompositionBackend<_, _, _>> = Arc::new(composition);
@@ -185,7 +165,7 @@ async fn test_arc_composition_backend() {
 async fn test_ref_composition_backend() {
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(
@@ -212,7 +192,7 @@ async fn test_ref_composition_backend() {
 async fn test_composition_as_dyn_backend() {
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     // Use CompositionBackend as trait object
     let backend: &dyn Backend = &composition;
@@ -242,7 +222,7 @@ async fn test_composition_as_dyn_backend() {
 async fn test_arc_composition_as_dyn_backend() {
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     // Arc CompositionBackend and use as trait object
     let backend: Arc<SyncBackend> = Arc::new(composition);
@@ -272,7 +252,7 @@ async fn test_arc_composition_as_dyn_backend() {
 async fn test_arc_sync_composition_as_dyn_backend() {
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     // Arc CompositionBackend and use as SyncBackend trait object
     let backend: Arc<SyncBackend> = Arc::new(composition);

@@ -1,7 +1,6 @@
 //! Tests for CompositionPolicy builder pattern.
 
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -17,31 +16,12 @@ use hitbox_backend::{
     DeleteStatus, PassthroughCompressor,
 };
 use hitbox_core::{
-    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig, Offload,
+    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig,
     Predicate, Raw,
 };
 use serde::{Deserialize, Serialize};
-use smol_str::SmolStr;
 
-/// Test offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct TestOffload;
-
-impl Offload<'static> for TestOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-
-    fn spawn_with_key<F>(&self, _key: CacheKey, kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        self.spawn(kind, future);
-    }
-}
+use crate::common::TestOffloadManager;
 
 #[cfg(feature = "rkyv_format")]
 use rkyv::{Archive, Serialize as RkyvSerialize};
@@ -184,7 +164,7 @@ async fn test_backend_with_composition_policy() {
         .write(SequentialWritePolicy::new())
         .refill(RefillPolicy::Never);
 
-    let backend = CompositionBackend::new(l1, l2, TestOffload).with_policy(policy);
+    let backend = CompositionBackend::new(l1, l2, TestOffloadManager).with_policy(policy);
 
     // All custom policies should be set
     let _ = backend.read_policy();
@@ -202,7 +182,8 @@ async fn test_backend_with_policy_functional() {
         .write(OptimisticParallelWritePolicy::new())
         .refill(RefillPolicy::Always);
 
-    let backend = CompositionBackend::new(l1.clone(), l2.clone(), TestOffload).with_policy(policy);
+    let backend =
+        CompositionBackend::new(l1.clone(), l2.clone(), TestOffloadManager).with_policy(policy);
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(

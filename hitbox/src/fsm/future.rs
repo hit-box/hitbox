@@ -13,7 +13,7 @@ use std::{
 
 use crate::{CacheContext, CacheStatus, CacheableResponse, ResponseSource};
 use futures::ready;
-use hitbox_core::{Cacheable, DisabledOffload, Offload, Upstream};
+use hitbox_core::{Cacheable, DisabledOffload, Offload, OffloadKey, Upstream};
 use pin_project::pin_project;
 use tracing::{Level, Span, debug, span, trace};
 
@@ -286,7 +286,7 @@ where
                     let result = handle_stale_state.transition(response, ctx, this.policy.as_ref());
 
                     // Handle offload revalidation if requested
-                    // Note: DisabledOffload::spawn_with_key is a no-op, so this does nothing when offload is disabled
+                    // Note: DisabledOffload::register is a no-op, so this does nothing when offload is disabled
                     if let Some(offload_data) = result.offload_data
                         && let Some(response_predicates) = this.response_predicates.take()
                     {
@@ -308,12 +308,14 @@ where
                                 policy,
                             );
 
-                        // Use spawn_with_key with the cache key for proper deduplication
+                        // Use register with Keyed key for proper deduplication
                         // This ensures only one revalidation task runs per cache key
-                        this.offload
-                            .spawn_with_key(cache_key, "revalidate", async move {
+                        this.offload.register(
+                            OffloadKey::keyed(cache_key, "revalidate"),
+                            async move {
                                 let _ = revalidate_future.await;
-                            });
+                            },
+                        );
                     }
 
                     result.transition.into_state(&*this.span)

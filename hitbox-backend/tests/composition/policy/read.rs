@@ -5,31 +5,9 @@ use hitbox_backend::Backend;
 use hitbox_backend::composition::policy::{
     CompositionReadPolicy, ParallelReadPolicy, RaceReadPolicy, SequentialReadPolicy,
 };
-use hitbox_core::{BoxContext, CacheContext, CacheKey, CacheValue, Offload};
-use smol_str::SmolStr;
-use std::future::Future;
+use hitbox_core::{BoxContext, CacheContext, CacheKey, CacheValue};
 
-use crate::common::{ErrorBackend, TestBackend};
-
-/// Test offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct TestOffload;
-
-impl Offload<'static> for TestOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-
-    fn spawn_with_key<F>(&self, _key: CacheKey, kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        self.spawn(kind, future);
-    }
-}
+use crate::common::{ErrorBackend, TestBackend, TestOffloadManager};
 
 /// Helper to create a default context for tests
 fn default_ctx() -> BoxContext {
@@ -45,7 +23,7 @@ async fn test_sequential_l1_hit() {
     let policy = SequentialReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("from_l1"), None, None);
@@ -71,7 +49,7 @@ async fn test_sequential_l2_hit() {
     let policy = SequentialReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("from_l2"), None, None);
@@ -97,7 +75,7 @@ async fn test_sequential_both_miss() {
     let policy = SequentialReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
 
@@ -119,7 +97,7 @@ async fn test_sequential_l1_error_l2_hit() {
     let policy = SequentialReadPolicy::new();
     let l1 = ErrorBackend;
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("from_l2"), None, None);
@@ -148,7 +126,7 @@ async fn test_race_l1_hit() {
     let policy = RaceReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("from_l1"), None, None);
@@ -174,7 +152,7 @@ async fn test_race_l2_hit() {
     let policy = RaceReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("from_l2"), None, None);
@@ -200,7 +178,7 @@ async fn test_race_both_miss() {
     let policy = RaceReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
 
@@ -222,7 +200,7 @@ async fn test_race_l1_error_l2_hit() {
     let policy = RaceReadPolicy::new();
     let l1 = ErrorBackend;
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("from_l2"), None, None);
@@ -251,7 +229,7 @@ async fn test_parallel_both_hit_prefer_l1() {
     let policy = ParallelReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
 
@@ -282,7 +260,7 @@ async fn test_parallel_l1_miss_l2_hit() {
     let policy = ParallelReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("from_l2"), None, None);
@@ -308,7 +286,7 @@ async fn test_parallel_both_miss() {
     let policy = ParallelReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
 
@@ -330,7 +308,7 @@ async fn test_parallel_l1_error_l2_hit() {
     let policy = ParallelReadPolicy::new();
     let l1 = ErrorBackend;
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("from_l2"), None, None);
@@ -361,7 +339,7 @@ async fn test_parallel_both_hit_l2_fresher_ttl() {
     let policy = ParallelReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let now = Utc::now();
@@ -405,7 +383,7 @@ async fn test_parallel_both_hit_l1_fresher_ttl() {
     let policy = ParallelReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let now = Utc::now();
@@ -449,7 +427,7 @@ async fn test_parallel_both_hit_equal_ttl() {
     let policy = ParallelReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let now = Utc::now();
@@ -485,7 +463,7 @@ async fn test_parallel_both_hit_l2_no_expiry() {
     let policy = ParallelReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let now = Utc::now();
@@ -525,7 +503,7 @@ async fn test_parallel_both_hit_l1_no_expiry() {
     let policy = ParallelReadPolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let now = Utc::now();
