@@ -3,7 +3,7 @@
 Persistent cache backend for the Hitbox caching framework.
 
 This crate provides [`FeOxDbBackend`], a disk-based cache backend powered by
-[FeOxDB](https://github.com/nicholasVilela/feoxdb), a pure Rust embedded database.
+[FeOxDB](https://github.com/mehrantsi/feoxdb), a pure Rust embedded database.
 It offers data persistence across restarts and native per-key TTL support.
 
 ## Overview
