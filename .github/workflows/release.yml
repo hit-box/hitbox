@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*-v[0-9]+.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse tag
+        id: parse
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Extract crate name (everything before -v)
+          CRATE_NAME="${TAG%-v*}"
+          # Extract version (everything after -v)
+          VERSION="${TAG##*-v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "crate_name=$CRATE_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.parse.outputs.tag }}" \
+            --title "${{ steps.parse.outputs.crate_name }} v${{ steps.parse.outputs.version }}" \
+            --generate-notes \
+            --verify-tag
