@@ -14,6 +14,12 @@
 use std::time::Duration;
 
 #[cfg(feature = "metrics")]
+use std::collections::HashSet;
+
+#[cfg(feature = "metrics")]
+use std::sync::{Arc, RwLock};
+
+#[cfg(feature = "metrics")]
 use std::time::Instant;
 
 #[cfg(feature = "metrics")]
@@ -62,6 +68,13 @@ impl Default for Timer {
 
 #[cfg(feature = "metrics")]
 lazy_static! {
+    /// Interned backend labels used for metrics keys.
+    ///
+    /// `metrics` requires `'static` label values for borrowed strings.
+    /// We store shared `Arc<str>` values so each unique backend label is
+    /// allocated once and reused across operations.
+    static ref BACKEND_LABEL_INTERNS: RwLock<HashSet<Arc<str>>> = RwLock::new(HashSet::new());
+
     // Read operation metrics
 
     /// Metric name for total read operations counter.
@@ -183,14 +196,40 @@ lazy_static! {
     };
 }
 
+/// Intern backend labels for cheap reuse in metrics keys.
+#[cfg(feature = "metrics")]
+#[inline]
+fn intern_backend_label(backend: &str) -> Arc<str> {
+    {
+        let labels = BACKEND_LABEL_INTERNS
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(existing) = labels.get(backend) {
+            return Arc::clone(existing);
+        }
+    }
+
+    let mut labels = BACKEND_LABEL_INTERNS
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(existing) = labels.get(backend) {
+        return Arc::clone(existing);
+    }
+
+    let interned: Arc<str> = Arc::from(backend);
+    labels.insert(Arc::clone(&interned));
+    interned
+}
+
 // Read metrics
 
 /// Record a read operation with duration.
 #[cfg(feature = "metrics")]
 #[inline]
 pub fn record_read(backend: &str, duration: Duration) {
-    metrics::counter!(*BACKEND_READ_TOTAL, "backend" => backend.to_string()).increment(1);
-    metrics::histogram!(*BACKEND_READ_DURATION, "backend" => backend.to_string())
+    let backend = intern_backend_label(backend);
+    metrics::counter!(*BACKEND_READ_TOTAL, "backend" => Arc::clone(&backend)).increment(1);
+    metrics::histogram!(*BACKEND_READ_DURATION, "backend" => backend)
         .record(duration.as_secs_f64());
 }
 
@@ -203,8 +242,8 @@ pub fn record_read(_backend: &str, _duration: Duration) {}
 #[cfg(feature = "metrics")]
 #[inline]
 pub fn record_read_bytes(backend: &str, bytes: usize) {
-    metrics::counter!(*BACKEND_READ_BYTES, "backend" => backend.to_string())
-        .increment(bytes as u64);
+    let backend = intern_backend_label(backend);
+    metrics::counter!(*BACKEND_READ_BYTES, "backend" => backend).increment(bytes as u64);
 }
 
 /// Record bytes read (no-op when `metrics` feature disabled).
@@ -216,7 +255,8 @@ pub fn record_read_bytes(_backend: &str, _bytes: usize) {}
 #[cfg(feature = "metrics")]
 #[inline]
 pub fn record_read_error(backend: &str) {
-    metrics::counter!(*BACKEND_READ_ERRORS, "backend" => backend.to_string()).increment(1);
+    let backend = intern_backend_label(backend);
+    metrics::counter!(*BACKEND_READ_ERRORS, "backend" => backend).increment(1);
 }
 
 /// Record a read error (no-op when `metrics` feature disabled).
@@ -230,8 +270,9 @@ pub fn record_read_error(_backend: &str) {}
 #[cfg(feature = "metrics")]
 #[inline]
 pub fn record_write(backend: &str, duration: Duration) {
-    metrics::counter!(*BACKEND_WRITE_TOTAL, "backend" => backend.to_string()).increment(1);
-    metrics::histogram!(*BACKEND_WRITE_DURATION, "backend" => backend.to_string())
+    let backend = intern_backend_label(backend);
+    metrics::counter!(*BACKEND_WRITE_TOTAL, "backend" => Arc::clone(&backend)).increment(1);
+    metrics::histogram!(*BACKEND_WRITE_DURATION, "backend" => backend)
         .record(duration.as_secs_f64());
 }
 
@@ -244,8 +285,8 @@ pub fn record_write(_backend: &str, _duration: Duration) {}
 #[cfg(feature = "metrics")]
 #[inline]
 pub fn record_write_bytes(backend: &str, bytes: usize) {
-    metrics::counter!(*BACKEND_WRITE_BYTES, "backend" => backend.to_string())
-        .increment(bytes as u64);
+    let backend = intern_backend_label(backend);
+    metrics::counter!(*BACKEND_WRITE_BYTES, "backend" => backend).increment(bytes as u64);
 }
 
 /// Record bytes written (no-op when `metrics` feature disabled).
@@ -257,7 +298,8 @@ pub fn record_write_bytes(_backend: &str, _bytes: usize) {}
 #[cfg(feature = "metrics")]
 #[inline]
 pub fn record_write_error(backend: &str) {
-    metrics::counter!(*BACKEND_WRITE_ERRORS, "backend" => backend.to_string()).increment(1);
+    let backend = intern_backend_label(backend);
+    metrics::counter!(*BACKEND_WRITE_ERRORS, "backend" => backend).increment(1);
 }
 
 /// Record a write error (no-op when `metrics` feature disabled).
@@ -271,7 +313,8 @@ pub fn record_write_error(_backend: &str) {}
 #[cfg(feature = "metrics")]
 #[inline]
 pub fn record_decompress(backend: &str, duration: Duration) {
-    metrics::histogram!(*BACKEND_DECOMPRESS_DURATION, "backend" => backend.to_string())
+    let backend = intern_backend_label(backend);
+    metrics::histogram!(*BACKEND_DECOMPRESS_DURATION, "backend" => backend)
         .record(duration.as_secs_f64());
 }
 
@@ -284,7 +327,8 @@ pub fn record_decompress(_backend: &str, _duration: Duration) {}
 #[cfg(feature = "metrics")]
 #[inline]
 pub fn record_compress(backend: &str, duration: Duration) {
-    metrics::histogram!(*BACKEND_COMPRESS_DURATION, "backend" => backend.to_string())
+    let backend = intern_backend_label(backend);
+    metrics::histogram!(*BACKEND_COMPRESS_DURATION, "backend" => backend)
         .record(duration.as_secs_f64());
 }
 
@@ -297,7 +341,8 @@ pub fn record_compress(_backend: &str, _duration: Duration) {}
 #[cfg(feature = "metrics")]
 #[inline]
 pub fn record_deserialize(backend: &str, duration: Duration) {
-    metrics::histogram!(*BACKEND_DESERIALIZE_DURATION, "backend" => backend.to_string())
+    let backend = intern_backend_label(backend);
+    metrics::histogram!(*BACKEND_DESERIALIZE_DURATION, "backend" => backend)
         .record(duration.as_secs_f64());
 }
 
@@ -310,7 +355,8 @@ pub fn record_deserialize(_backend: &str, _duration: Duration) {}
 #[cfg(feature = "metrics")]
 #[inline]
 pub fn record_serialize(backend: &str, duration: Duration) {
-    metrics::histogram!(*BACKEND_SERIALIZE_DURATION, "backend" => backend.to_string())
+    let backend = intern_backend_label(backend);
+    metrics::histogram!(*BACKEND_SERIALIZE_DURATION, "backend" => backend)
         .record(duration.as_secs_f64());
 }
 
