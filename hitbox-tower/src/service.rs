@@ -4,12 +4,12 @@
 //! `Service` that performs the actual caching logic. Users typically don't construct
 //! this directly — it's created by the [`Cache`](crate::Cache) layer.
 
-use hitbox::concurrency::ConcurrencyManager;
-use hitbox::config::CacheConfig;
-use hitbox_core::{DisabledOffload, Offload};
-use std::sync::Arc;
+use std::{future::Future, pin::Pin, sync::Arc};
 
-use hitbox::{backend::CacheBackend, fsm::CacheFuture};
+use hitbox::concurrency::ConcurrencyManager;
+use hitbox::config::{CacheConfigRouter, RouteMatch};
+use hitbox::{CacheContext, backend::CacheBackend, fsm::CacheFuture};
+use hitbox_core::{DisabledOffload, Offload, Upstream};
 use hitbox_http::{BufferedBody, CacheableHttpRequest, CacheableHttpResponse};
 use http::header::HeaderName;
 use http::{Request, Response};
@@ -104,9 +104,13 @@ where
         + 'static,
     B: CacheBackend + Clone + Send + Sync + 'static,
     S::Future: Send,
-    C: CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>,
+    C: CacheConfigRouter<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     CM: ConcurrencyManager<Result<CacheableHttpResponse<ResBody>, S::Error>> + Clone + 'static,
-    O: Offload<'static> + Clone,
+    O: Offload<'static> + Clone + 'static,
     ReqBody: HttpBody + Send + 'static,
     ReqBody::Error: Send,
     ResBody: HttpBody + Send + 'static,
@@ -117,17 +121,15 @@ where
     type Response = Response<BufferedBody<ResBody>>;
     type Error = S::Error;
     type Future = CacheServiceFuture<
-        CacheFuture<
-            'static,
-            B,
-            CacheableHttpRequest<ReqBody>,
-            Result<CacheableHttpResponse<ResBody>, S::Error>,
-            TowerUpstream<S, ReqBody, ResBody>,
-            C::RequestPredicate,
-            C::ResponsePredicate,
-            C::Extractor,
-            CM,
-            O,
+        Pin<
+            Box<
+                dyn Future<
+                        Output = (
+                            Result<CacheableHttpResponse<ResBody>, S::Error>,
+                            CacheContext,
+                        ),
+                    > + Send,
+            >,
         >,
         ResBody,
         S::Error,
@@ -141,30 +143,49 @@ where
     }
 
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        let configuration = &self.configuration;
-
         // Convert incoming Request<ReqBody> to CacheableHttpRequest<ReqBody>
         let (parts, body) = req.into_parts();
         let buffered_request = Request::from_parts(parts, BufferedBody::Passthrough(body));
         let cacheable_req = CacheableHttpRequest::from_request(buffered_request);
 
-        // Create upstream adapter that handles Tower service calls
-        let upstream = TowerUpstream::new(self.upstream.clone());
+        let backend = self.backend.clone();
+        let configuration = self.configuration.clone();
+        let offload = self.offload.clone();
+        let concurrency_manager = self.concurrency_manager.clone();
+        let upstream = self.upstream.clone();
 
-        // Create CacheFuture with cacheable types only
-        let cache_future = CacheFuture::new(
-            self.backend.clone(),
-            cacheable_req,
-            upstream,
-            configuration.request_predicates(),
-            configuration.response_predicates(),
-            configuration.extractors(),
-            Arc::new(configuration.policy().clone()),
-            self.offload.clone(),
-            self.concurrency_manager.clone(),
-        );
+        let future = Box::pin(async move {
+            match configuration.route(cacheable_req).await {
+                RouteMatch::Matched {
+                    request,
+                    request_predicates,
+                    response_predicates,
+                    extractors,
+                    policy,
+                } => {
+                    let upstream = TowerUpstream::new(upstream);
+                    CacheFuture::new(
+                        backend,
+                        request,
+                        upstream,
+                        request_predicates,
+                        response_predicates,
+                        extractors,
+                        Arc::new(policy),
+                        offload,
+                        concurrency_manager,
+                    )
+                    .await
+                }
+                RouteMatch::Miss(request) => {
+                    let mut upstream = TowerUpstream::new(upstream);
+                    let response = upstream.call(request).await;
+                    (response, CacheContext::default())
+                }
+            }
+        });
 
         // Wrap in CacheServiceFuture to add cache headers
-        CacheServiceFuture::new(cache_future, self.cache_status_header.clone())
+        CacheServiceFuture::new(future, self.cache_status_header.clone())
     }
 }

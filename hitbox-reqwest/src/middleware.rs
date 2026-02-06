@@ -9,12 +9,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use hitbox::CacheContext;
 use hitbox::CacheStatusExt;
 use hitbox::backend::CacheBackend;
 use hitbox::concurrency::{ConcurrencyManager, NoopConcurrencyManager};
-use hitbox::config::CacheConfig;
+use hitbox::config::{CacheConfigRouter, RouteMatch};
 use hitbox::fsm::CacheFuture;
-use hitbox_core::DisabledOffload;
+use hitbox_core::{DisabledOffload, Upstream};
 use hitbox_http::{
     BufferedBody, CacheableHttpRequest, CacheableHttpResponse, DEFAULT_CACHE_STATUS_HEADER,
 };
@@ -95,14 +96,10 @@ where
 impl<B, C, CM> Middleware for CacheMiddleware<B, C, CM>
 where
     B: CacheBackend + Send + Sync + 'static,
-    C: CacheConfig<CacheableHttpRequest<reqwest::Body>, CacheableHttpResponse<reqwest::Body>>
-        + Clone
+    C: CacheConfigRouter<CacheableHttpRequest<reqwest::Body>, CacheableHttpResponse<reqwest::Body>>
         + Send
         + Sync
         + 'static,
-    C::RequestPredicate: Clone + Send + Sync + 'static,
-    C::ResponsePredicate: Clone + Send + Sync + 'static,
-    C::Extractor: Clone + Send + Sync + 'static,
     CM: ConcurrencyManager<Result<CacheableHttpResponse<reqwest::Body>>>
         + Clone
         + Send
@@ -125,36 +122,47 @@ where
         let buffered_request = http::Request::from_parts(parts, BufferedBody::Passthrough(body));
         let cacheable_req = CacheableHttpRequest::from_request(buffered_request);
 
-        // Create upstream wrapper
-        let upstream = ReqwestUpstream::new(next.clone(), extensions.clone());
+        let (response, cache_context) = match self.configuration.route(cacheable_req).await {
+            RouteMatch::Matched {
+                request,
+                request_predicates,
+                response_predicates,
+                extractors,
+                policy,
+            } => {
+                // Create CacheFuture with DisabledOffload (no background revalidation)
+                // This allows us to use non-'static lifetimes
+                let cache_future: CacheFuture<
+                    '_,
+                    B,
+                    CacheableHttpRequest<reqwest::Body>,
+                    Result<CacheableHttpResponse<reqwest::Body>>,
+                    ReqwestUpstream<'_>,
+                    C::RequestPredicate,
+                    C::ResponsePredicate,
+                    C::Extractor,
+                    CM,
+                    DisabledOffload,
+                > = CacheFuture::new(
+                    self.backend.clone(),
+                    request,
+                    ReqwestUpstream::new(next.clone(), extensions.clone()),
+                    request_predicates,
+                    response_predicates,
+                    extractors,
+                    Arc::new(policy),
+                    DisabledOffload,
+                    self.concurrency_manager.clone(),
+                );
 
-        // Create CacheFuture with DisabledOffload (no background revalidation)
-        // This allows us to use non-'static lifetimes
-        let cache_future: CacheFuture<
-            '_,
-            B,
-            CacheableHttpRequest<reqwest::Body>,
-            Result<CacheableHttpResponse<reqwest::Body>>,
-            ReqwestUpstream<'_>,
-            C::RequestPredicate,
-            C::ResponsePredicate,
-            C::Extractor,
-            CM,
-            DisabledOffload,
-        > = CacheFuture::new(
-            self.backend.clone(),
-            cacheable_req,
-            upstream,
-            self.configuration.request_predicates(),
-            self.configuration.response_predicates(),
-            self.configuration.extractors(),
-            Arc::new(self.configuration.policy().clone()),
-            DisabledOffload,
-            self.concurrency_manager.clone(),
-        );
-
-        // Execute cache future
-        let (response, cache_context) = cache_future.await;
+                cache_future.await
+            }
+            RouteMatch::Miss(request) => {
+                let mut upstream = ReqwestUpstream::new(next.clone(), extensions.clone());
+                let response = upstream.call(request).await;
+                (response, CacheContext::default())
+            }
+        };
 
         // Convert CacheableHttpResponse back to reqwest::Response
         let mut cacheable_response = response?;
