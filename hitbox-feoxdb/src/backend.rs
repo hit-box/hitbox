@@ -359,15 +359,10 @@ where
             .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
         tokio::task::spawn_blocking(move || {
-            let exists = store.contains_key(&key_bytes);
-
-            if exists {
-                store
-                    .delete(&key_bytes)
-                    .map_err(|e| BackendError::InternalError(Box::new(e)))?;
-                Ok(DeleteStatus::Deleted(1))
-            } else {
-                Ok(DeleteStatus::Missing)
+            match store.delete(&key_bytes) {
+                Ok(()) => Ok(DeleteStatus::Deleted(1)),
+                Err(FeoxError::KeyNotFound) => Ok(DeleteStatus::Missing),
+                Err(e) => Err(BackendError::InternalError(Box::new(e))),
             }
         })
         .await
