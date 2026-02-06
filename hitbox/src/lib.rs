@@ -68,7 +68,9 @@ pub mod context;
 /// the [`OffloadManager`](offload::OffloadManager) for handling these background tasks.
 pub mod offload;
 
-pub use config::{CacheConfig, Config, ConfigBuilder, NotSet};
+pub use config::{
+    CacheConfig, CacheConfigRouter, Config, ConfigBuilder, MultiConfig, NotSet, RouteMatch,
+};
 pub use context::{BoxContext, CacheContext, CacheStatus, CacheStatusExt, Context, ResponseSource};
 
 /// Policy configuration for cache behavior.

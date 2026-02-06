@@ -46,6 +46,14 @@ pub enum ConfigError {
     /// Empty path list in 'in' operation
     #[error("Path 'in' operation requires at least one pattern")]
     EmptyPathList,
+
+    /// Inline endpoint fields and routes were both provided.
+    #[error("Cannot mix inline endpoint fields with 'routes'; choose one configuration mode")]
+    MixedRouteAndInlineConfig,
+
+    /// Multiple route configs used where a single endpoint was expected.
+    #[error("Multiple route configurations found ({0}); use into_routed_endpoint()")]
+    MultipleRouteConfigurations(usize),
 }
 
 impl From<http::method::InvalidMethod> for ConfigError {

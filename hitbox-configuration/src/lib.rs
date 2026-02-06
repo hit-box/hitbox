@@ -11,8 +11,9 @@ pub mod predicates;
 pub mod types;
 
 pub use backend::Backend;
-pub use config::ConfigEndpoint;
+pub use config::{ConfigEndpoint, ConfigRoute};
 pub use endpoint::{
     Endpoint, EndpointBuilder, RequestExtractor, RequestPredicate, ResponsePredicate,
+    RoutedEndpoint,
 };
 pub use error::{ConfigError, parse_config};
