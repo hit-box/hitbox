@@ -46,7 +46,7 @@ where
     backend: Arc<B>,
     cache_key: Option<CacheKey>,
     #[pin]
-    state: State<Res, Req, U, ReqP, E>,
+    state: State<'offload, Res, Req, U, ReqP, E>,
     response_predicates: Option<ResP>,
     policy: Arc<crate::policy::PolicyConfig>,
     /// Offload for background revalidation (SWR).
@@ -128,7 +128,7 @@ impl<'offload, B, Req, Res, U, ReqP, ResP, E>
     >
 where
     U: Upstream<Req, Response = Res>,
-    U::Future: Send + 'offload,
+    U::Future<'offload>: Send + 'offload,
     B: CacheBackend,
     Res: CacheableResponse,
     Req: CacheableRequest,
@@ -195,14 +195,14 @@ impl<'offload, B, Req, Res, U, ReqP, ResP, E, C, O> Future
     for CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O>
 where
     U: Upstream<Req, Response = Res> + Send + 'offload,
-    U::Future: Send + 'offload,
+    U::Future<'offload>: Send + 'offload,
     B: CacheBackend + Send + Sync + 'static,
     Res: CacheableResponse + Send + 'static,
     Res::Cached: Cacheable + Send,
-    Req: CacheableRequest + Send + 'static,
-    ReqP: Predicate<Subject = Req> + Send + Sync + 'static,
+    Req: CacheableRequest + Send + 'offload,
+    ReqP: Predicate<Subject = Req> + Send + Sync + 'offload,
     ResP: Predicate<Subject = Res::Subject> + Send + Sync + 'static,
-    E: Extractor<Subject = Req> + Send + Sync + 'static,
+    E: Extractor<Subject = Req> + Send + Sync + 'offload,
     C: ConcurrencyManager<Res> + 'static,
     O: Offload<'offload>,
 {

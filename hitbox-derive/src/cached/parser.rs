@@ -66,6 +66,8 @@ pub struct CachedFn {
     pub call_name: Ident,
     pub cached_call_name: Ident,
     pub execute_name: Ident,
+    pub upstream_name: Ident,
+    pub cache_future_name: Ident,
     pub args: Vec<Argument>,
     pub return_type: Type,
     pub body: syn::Block,
@@ -98,6 +100,8 @@ impl CachedFn {
         let call_name = Ident::new(&format!("{}Call", pascal_name), name.span());
         let cached_call_name = Ident::new(&format!("{}CallCached", pascal_name), name.span());
         let execute_name = Ident::new(&format!("__execute_cached_{}", name), name.span());
+        let upstream_name = Ident::new(&format!("__{}Upstream", pascal_name), name.span());
+        let cache_future_name = Ident::new(&format!("__{}CacheFuture", pascal_name), name.span());
 
         let args = Self::parse_args(sig)?;
         let lifetimes = Self::parse_lifetimes(sig);
@@ -123,6 +127,8 @@ impl CachedFn {
             call_name,
             cached_call_name,
             execute_name,
+            upstream_name,
+            cache_future_name,
             args,
             return_type,
             body: (*item.block).clone(),
@@ -340,5 +346,31 @@ impl CachedFn {
     /// Uses custom prefix if specified, otherwise falls back to function name.
     pub fn fn_path(&self) -> String {
         self.prefix.clone().unwrap_or_else(|| self.name.to_string())
+    }
+
+    /// Returns the expression to instantiate the upstream struct.
+    ///
+    /// - For functions with type params: `UpstreamName(std::marker::PhantomData)`
+    /// - For functions with lifetimes: `UpstreamName(std::marker::PhantomData)`
+    /// - For functions without generics: `UpstreamName`
+    pub fn upstream_instance(&self) -> TokenStream {
+        let upstream_name = &self.upstream_name;
+        if !self.type_params.is_empty() || self.has_lifetimes() {
+            quote::quote! { #upstream_name(std::marker::PhantomData) }
+        } else {
+            quote::quote! { #upstream_name }
+        }
+    }
+
+    /// Returns the offload lifetime for bounds.
+    ///
+    /// Uses the first lifetime parameter if present, otherwise `'static`.
+    pub fn offload_lifetime(&self) -> TokenStream {
+        if self.has_lifetimes() {
+            let first_lt = &self.lifetimes[0].lifetime;
+            quote::quote! { #first_lt }
+        } else {
+            quote::quote! { 'static }
+        }
     }
 }

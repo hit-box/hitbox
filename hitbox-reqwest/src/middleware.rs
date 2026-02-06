@@ -6,9 +6,10 @@
 //!
 //! See the [crate-level documentation](crate) for usage examples.
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use hitbox::CacheStatusExt;
 use hitbox::backend::CacheBackend;
 use hitbox::concurrency::{ConcurrencyManager, NoopConcurrencyManager};
@@ -91,6 +92,8 @@ where
     }
 }
 
+use async_trait::async_trait;
+
 #[async_trait]
 impl<B, C, CM> Middleware for CacheMiddleware<B, C, CM>
 where
@@ -122,26 +125,16 @@ where
 
         // Wrap body with BufferedBody and create CacheableHttpRequest
         let (parts, body) = http_request.into_parts();
-        let buffered_request = http::Request::from_parts(parts, BufferedBody::Passthrough(body));
+        let buffered_request =
+            http::Request::from_parts(parts, BufferedBody::Passthrough(body));
         let cacheable_req = CacheableHttpRequest::from_request(buffered_request);
 
         // Create upstream wrapper
         let upstream = ReqwestUpstream::new(next.clone(), extensions.clone());
 
-        // Create CacheFuture with DisabledOffload (no background revalidation)
-        // This allows us to use non-'static lifetimes
-        let cache_future: CacheFuture<
-            '_,
-            B,
-            CacheableHttpRequest<reqwest::Body>,
-            Result<CacheableHttpResponse<reqwest::Body>>,
-            ReqwestUpstream<'_>,
-            C::RequestPredicate,
-            C::ResponsePredicate,
-            C::Extractor,
-            CM,
-            DisabledOffload,
-        > = CacheFuture::new(
+        // Create the cache future and box it to erase the problematic types
+        // before capturing in the async_trait's boxed future
+        let cache_future: Pin<Box<dyn Future<Output = _> + Send + '_>> = Box::pin(CacheFuture::new(
             self.backend.clone(),
             cacheable_req,
             upstream,
@@ -151,7 +144,7 @@ where
             Arc::new(self.configuration.policy().clone()),
             DisabledOffload,
             self.concurrency_manager.clone(),
-        );
+        ));
 
         // Execute cache future
         let (response, cache_context) = cache_future.await;

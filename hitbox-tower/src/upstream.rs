@@ -115,16 +115,20 @@ where
         + Clone
         + Send
         + 'static,
-    S::Future: Send,
+    S::Future: Send + 'static,
     S::Error: Send,
     ReqBody: HttpBody + Send + 'static,
     ReqBody::Error: Send,
     ResBody: HttpBody + Send + 'static,
 {
     type Response = Result<CacheableHttpResponse<ResBody>, S::Error>;
-    type Future = TowerUpstreamFuture<S::Future, ResBody, S::Error>;
+    type Future<'a> = TowerUpstreamFuture<S::Future, ResBody, S::Error> where Self: 'a, CacheableHttpRequest<ReqBody>: 'a;
 
-    fn call(&mut self, req: CacheableHttpRequest<ReqBody>) -> Self::Future {
+    fn call<'a>(&mut self, req: CacheableHttpRequest<ReqBody>) -> Self::Future<'a>
+    where
+        Self: 'a,
+        CacheableHttpRequest<ReqBody>: 'a,
+    {
         let http_req = req.into_request();
         let inner = self.service.call(http_req);
         TowerUpstreamFuture::new(inner)

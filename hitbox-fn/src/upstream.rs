@@ -34,12 +34,16 @@ impl<F> FnUpstream<F> {
 impl<F, Args, Fut, Res> Upstream<Args> for FnUpstream<F>
 where
     F: FnMut(Args) -> Fut,
-    Fut: Future<Output = Res> + Send,
+    Fut: Future<Output = Res> + Send + 'static,
 {
     type Response = Res;
-    type Future = Fut;
+    type Future<'a> = Fut where Self: 'a, Args: 'a;
 
-    fn call(&mut self, req: Args) -> Self::Future {
+    fn call<'a>(&mut self, req: Args) -> Self::Future<'a>
+    where
+        Self: 'a,
+        Args: 'a,
+    {
         (self.func)(req)
     }
 }

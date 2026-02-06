@@ -24,26 +24,39 @@ impl<'a> ToTokens for CacheableRequestImpl<'a> {
 
         let expanded = quote! {
             impl #impl_generics hitbox_core::CacheableRequest for #name #ty_generics #where_clause {
-                async fn cache_policy<__P, __E>(
+                type CachePolicyFuture<'__a, __P, __E> = ::std::pin::Pin<
+                    ::std::boxed::Box<
+                        dyn ::std::future::Future<Output = hitbox_core::RequestCachePolicy<Self>> + Send + '__a
+                    >
+                >
+                where
+                    Self: '__a,
+                    __P: hitbox_core::predicate::Predicate<Subject = Self> + Send + Sync + '__a,
+                    __E: hitbox_core::Extractor<Subject = Self> + Send + Sync + '__a;
+
+                fn cache_policy<'__a, __P, __E>(
                     self,
                     predicates: __P,
                     extractors: __E,
-                ) -> hitbox_core::RequestCachePolicy<Self>
+                ) -> Self::CachePolicyFuture<'__a, __P, __E>
                 where
-                    __P: hitbox_core::predicate::Predicate<Subject = Self> + Send + Sync,
-                    __E: hitbox_core::Extractor<Subject = Self> + Send + Sync,
+                    Self: '__a,
+                    __P: hitbox_core::predicate::Predicate<Subject = Self> + Send + Sync + '__a,
+                    __E: hitbox_core::Extractor<Subject = Self> + Send + Sync + '__a,
                 {
-                    match predicates.check(self).await {
-                        hitbox_core::predicate::PredicateResult::Cacheable(subject) => {
-                            let (subject, key) = extractors.get(subject).await.into_cache_key();
-                            hitbox_core::CachePolicy::Cacheable(
-                                hitbox_core::CacheablePolicyData::new(key, subject)
-                            )
+                    ::std::boxed::Box::pin(async move {
+                        match predicates.check(self).await {
+                            hitbox_core::predicate::PredicateResult::Cacheable(subject) => {
+                                let (subject, key) = extractors.get(subject).await.into_cache_key();
+                                hitbox_core::CachePolicy::Cacheable(
+                                    hitbox_core::CacheablePolicyData::new(key, subject)
+                                )
+                            }
+                            hitbox_core::predicate::PredicateResult::NonCacheable(subject) => {
+                                hitbox_core::CachePolicy::NonCacheable(subject)
+                            }
                         }
-                        hitbox_core::predicate::PredicateResult::NonCacheable(subject) => {
-                            hitbox_core::CachePolicy::NonCacheable(subject)
-                        }
-                    }
+                    })
                 }
             }
         };

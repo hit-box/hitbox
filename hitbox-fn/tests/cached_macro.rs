@@ -353,3 +353,105 @@ async fn test_generic_with_skip() {
     assert_eq!(c1.status, CacheStatus::Miss);
     assert_eq!(c2.status, CacheStatus::Hit);
 }
+
+// =============================================================================
+// Reference parameter support
+// =============================================================================
+//
+// NOTE: Reference parameter support requires additional work due to complex
+// lifetime interactions between GATs, the Upstream trait, and the CacheFuture.
+// The issue is that Rust requires the Upstream impl to work for any combination
+// of lifetimes, but our impl only works when the struct's lifetime matches the
+// Args' inner lifetime. This is a known limitation with GATs.
+//
+// TODO: Investigate alternative approaches:
+// 1. Using higher-rank trait bounds (HRTB)
+// 2. Different struct design (not carrying lifetime)
+// 3. Boxed dyn Upstream instead of concrete types
+//
+// For now, reference parameters are not supported. Use owned types or
+// clone the data before passing to cached functions.
+
+/// Function with a reference parameter.
+#[cached(prefix = "ref_param")]
+pub async fn with_reference<'a>(data: &'a str) -> String {
+    data.to_uppercase()
+}
+
+/// Function with reference and owned parameters.
+#[cached(prefix = "ref_mixed")]
+pub async fn with_mixed_params<'a>(prefix: &'a str, id: i64) -> String {
+    format!("{}_{}", prefix, id)
+}
+
+/// Function with skipped reference parameter.
+#[cached(prefix = "ref_skip", skip(_ctx))]
+pub async fn with_skipped_reference<'a>(_ctx: &'a str, value: i64) -> i64 {
+    value * 2
+}
+
+#[tokio::test]
+async fn test_reference_param() {
+    let cache = create_cache();
+
+    let data = String::from("hello");
+    let (r1, c1) = with_reference(&data).cache(&cache).with_context().await;
+    let (r2, c2) = with_reference(&data).cache(&cache).with_context().await;
+
+    assert_eq!(r1, "HELLO");
+    assert_eq!(r2, "HELLO");
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+#[tokio::test]
+async fn test_reference_different_values() {
+    let cache = create_cache();
+
+    let (_, c1) = with_reference("hello").cache(&cache).with_context().await;
+    let (_, c2) = with_reference("world").cache(&cache).with_context().await;
+
+    // Different values = different cache keys
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Miss);
+}
+
+#[tokio::test]
+async fn test_mixed_ref_and_owned() {
+    let cache = create_cache();
+
+    let prefix = "user";
+    let (r1, c1) = with_mixed_params(prefix, 42)
+        .cache(&cache)
+        .with_context()
+        .await;
+    let (r2, c2) = with_mixed_params(prefix, 42)
+        .cache(&cache)
+        .with_context()
+        .await;
+
+    assert_eq!(r1, "user_42");
+    assert_eq!(r2, "user_42");
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+#[tokio::test]
+async fn test_skipped_reference() {
+    let cache = create_cache();
+
+    // Different context (skipped) should hit same cache key
+    let (r1, c1) = with_skipped_reference("ctx-1", 21)
+        .cache(&cache)
+        .with_context()
+        .await;
+    let (r2, c2) = with_skipped_reference("ctx-2", 21)
+        .cache(&cache)
+        .with_context()
+        .await;
+
+    assert_eq!(r1, 42);
+    assert_eq!(r2, 42);
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}

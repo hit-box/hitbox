@@ -20,6 +20,7 @@ hitbox-core = { path = "../hitbox-core" }
 hitbox-derive = { path = "../hitbox-derive", optional = true }
 
 async-trait = { workspace = true }
+pin-project = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }

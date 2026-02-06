@@ -237,7 +237,9 @@ impl<T0: KeyExtract, T1: KeyExtract, T2: KeyExtract, T3: KeyExtract, T4: KeyExtr
 /// ```
 pub struct FnExtractor<T> {
     fn_path: &'static str,
-    _marker: PhantomData<T>,
+    // Use fn() -> T instead of T to avoid requiring T: 'static for FnExtractor<T>: 'static.
+    // This allows FnExtractor to work with types containing non-'static lifetimes.
+    _marker: PhantomData<fn() -> T>,
 }
 
 impl<T> FnExtractor<T> {

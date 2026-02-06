@@ -122,101 +122,149 @@ impl<T> Args<T> {
 
 // CacheableRequest implementations for Args<tuples>
 
+use std::pin::Pin;
+use std::future::Future;
+
 impl CacheableRequest for Args<()> {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    type CachePolicyFuture<'a, P, E> = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-        E: Extractor<Subject = Self> + Send + Sync,
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a;
+
+    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
     {
-        match predicates.check(self).await {
-            PredicateResult::Cacheable(subject) => {
-                let (subject, key) = extractors.get(subject).await.into_cache_key();
-                CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+        Box::pin(async move {
+            match predicates.check(self).await {
+                PredicateResult::Cacheable(subject) => {
+                    let (subject, key) = extractors.get(subject).await.into_cache_key();
+                    CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                }
+                PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
             }
-            PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-        }
+        })
     }
 }
 
 impl<T0> CacheableRequest for Args<(T0,)>
 where
-    T0: Send + Sync + 'static,
+    T0: Send + Sync,
 {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    type CachePolicyFuture<'a, P, E> = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-        E: Extractor<Subject = Self> + Send + Sync,
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a;
+
+    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
     {
-        match predicates.check(self).await {
-            PredicateResult::Cacheable(subject) => {
-                let (subject, key) = extractors.get(subject).await.into_cache_key();
-                CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+        Box::pin(async move {
+            match predicates.check(self).await {
+                PredicateResult::Cacheable(subject) => {
+                    let (subject, key) = extractors.get(subject).await.into_cache_key();
+                    CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                }
+                PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
             }
-            PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-        }
+        })
     }
 }
 
 impl<T0, T1> CacheableRequest for Args<(T0, T1)>
 where
-    T0: Send + Sync + 'static,
-    T1: Send + Sync + 'static,
+    T0: Send + Sync,
+    T1: Send + Sync,
 {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    type CachePolicyFuture<'a, P, E> = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-        E: Extractor<Subject = Self> + Send + Sync,
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a;
+
+    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
     {
-        match predicates.check(self).await {
-            PredicateResult::Cacheable(subject) => {
-                let (subject, key) = extractors.get(subject).await.into_cache_key();
-                CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+        Box::pin(async move {
+            match predicates.check(self).await {
+                PredicateResult::Cacheable(subject) => {
+                    let (subject, key) = extractors.get(subject).await.into_cache_key();
+                    CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                }
+                PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
             }
-            PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-        }
+        })
     }
 }
 
 impl<T0, T1, T2> CacheableRequest for Args<(T0, T1, T2)>
 where
-    T0: Send + Sync + 'static,
-    T1: Send + Sync + 'static,
-    T2: Send + Sync + 'static,
+    T0: Send + Sync,
+    T1: Send + Sync,
+    T2: Send + Sync,
 {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    type CachePolicyFuture<'a, P, E> = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-        E: Extractor<Subject = Self> + Send + Sync,
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a;
+
+    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
     {
-        match predicates.check(self).await {
-            PredicateResult::Cacheable(subject) => {
-                let (subject, key) = extractors.get(subject).await.into_cache_key();
-                CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+        Box::pin(async move {
+            match predicates.check(self).await {
+                PredicateResult::Cacheable(subject) => {
+                    let (subject, key) = extractors.get(subject).await.into_cache_key();
+                    CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                }
+                PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
             }
-            PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-        }
+        })
     }
 }
 
 impl<T0, T1, T2, T3> CacheableRequest for Args<(T0, T1, T2, T3)>
 where
-    T0: Send + Sync + 'static,
-    T1: Send + Sync + 'static,
-    T2: Send + Sync + 'static,
-    T3: Send + Sync + 'static,
+    T0: Send + Sync,
+    T1: Send + Sync,
+    T2: Send + Sync,
+    T3: Send + Sync,
 {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    type CachePolicyFuture<'a, P, E> = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-        E: Extractor<Subject = Self> + Send + Sync,
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a;
+
+    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
     {
-        match predicates.check(self).await {
-            PredicateResult::Cacheable(subject) => {
-                let (subject, key) = extractors.get(subject).await.into_cache_key();
-                CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+        Box::pin(async move {
+            match predicates.check(self).await {
+                PredicateResult::Cacheable(subject) => {
+                    let (subject, key) = extractors.get(subject).await.into_cache_key();
+                    CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                }
+                PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
             }
-            PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-        }
+        })
     }
 }
 
