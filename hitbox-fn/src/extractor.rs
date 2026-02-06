@@ -14,7 +14,7 @@ use crate::Args;
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
 /// use hitbox_fn::KeyExtract;
 /// use hitbox_core::KeyPart;
 ///
@@ -32,12 +32,27 @@ use crate::Args;
 /// When all elements of a tuple implement `KeyExtract`, the tuple automatically
 /// implements it too by concatenating all key parts:
 ///
-/// ```ignore
-/// // If UserId and TenantId both implement KeyExtract,
-/// // then Args<(UserId, TenantId)> automatically implements KeyExtract
+/// ```
+/// use hitbox_fn::{Args, KeyExtract};
+/// use hitbox_core::KeyPart;
+///
+/// struct UserId(u64);
+/// impl KeyExtract for UserId {
+///     fn extract(&self) -> Vec<KeyPart> {
+///         vec![KeyPart::new("user_id", Some(self.0.to_string()))]
+///     }
+/// }
+///
+/// struct TenantId(String);
+/// impl KeyExtract for TenantId {
+///     fn extract(&self) -> Vec<KeyPart> {
+///         vec![KeyPart::new("tenant", Some(self.0.clone()))]
+///     }
+/// }
+///
 /// let args = Args((UserId(42), TenantId("acme".into())));
 /// let parts = args.extract();
-/// // parts = [KeyPart("user_id", "42"), KeyPart("tenant", "acme")]
+/// assert_eq!(parts.len(), 2);
 /// ```
 pub trait KeyExtract {
     /// Extract key parts from this value.
@@ -230,10 +245,10 @@ impl<T0: KeyExtract, T1: KeyExtract, T2: KeyExtract, T3: KeyExtract, T4: KeyExtr
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
 /// use hitbox_fn::{Args, FnExtractor};
 ///
-/// let extractor = FnExtractor::<Args<(UserId, TenantId)>>::new("my_module::fetch_user");
+/// let extractor = FnExtractor::<Args<(u64, String)>>::new("my_module::fetch_user");
 /// ```
 pub struct FnExtractor<T> {
     fn_path: &'static str,

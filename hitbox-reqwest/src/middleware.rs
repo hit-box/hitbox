@@ -125,8 +125,7 @@ where
 
         // Wrap body with BufferedBody and create CacheableHttpRequest
         let (parts, body) = http_request.into_parts();
-        let buffered_request =
-            http::Request::from_parts(parts, BufferedBody::Passthrough(body));
+        let buffered_request = http::Request::from_parts(parts, BufferedBody::Passthrough(body));
         let cacheable_req = CacheableHttpRequest::from_request(buffered_request);
 
         // Create upstream wrapper
@@ -134,17 +133,18 @@ where
 
         // Create the cache future and box it to erase the problematic types
         // before capturing in the async_trait's boxed future
-        let cache_future: Pin<Box<dyn Future<Output = _> + Send + '_>> = Box::pin(CacheFuture::new(
-            self.backend.clone(),
-            cacheable_req,
-            upstream,
-            self.configuration.request_predicates(),
-            self.configuration.response_predicates(),
-            self.configuration.extractors(),
-            Arc::new(self.configuration.policy().clone()),
-            DisabledOffload,
-            self.concurrency_manager.clone(),
-        ));
+        let cache_future: Pin<Box<dyn Future<Output = _> + Send + '_>> =
+            Box::pin(CacheFuture::new(
+                self.backend.clone(),
+                cacheable_req,
+                upstream,
+                self.configuration.request_predicates(),
+                self.configuration.response_predicates(),
+                self.configuration.extractors(),
+                Arc::new(self.configuration.policy().clone()),
+                DisabledOffload,
+                self.concurrency_manager.clone(),
+            ));
 
         // Execute cache future
         let (response, cache_context) = cache_future.await;

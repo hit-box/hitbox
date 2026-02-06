@@ -11,11 +11,11 @@ use hitbox_core::Upstream;
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
 /// use hitbox_fn::FnUpstream;
 ///
-/// async fn fetch_data(id: u64) -> Data {
-///     // fetch from database
+/// async fn fetch_data(id: u64) -> String {
+///     format!("data_{id}")
 /// }
 ///
 /// let upstream = FnUpstream::new(fetch_data);
@@ -34,16 +34,12 @@ impl<F> FnUpstream<F> {
 impl<F, Args, Fut, Res> Upstream<Args> for FnUpstream<F>
 where
     F: FnMut(Args) -> Fut,
-    Fut: Future<Output = Res> + Send + 'static,
+    Fut: Future<Output = Res> + Send,
 {
     type Response = Res;
-    type Future<'a> = Fut where Self: 'a, Args: 'a;
+    type Future = Fut;
 
-    fn call<'a>(&mut self, req: Args) -> Self::Future<'a>
-    where
-        Self: 'a,
-        Args: 'a,
-    {
+    fn call(mut self, req: Args) -> Self::Future {
         (self.func)(req)
     }
 }

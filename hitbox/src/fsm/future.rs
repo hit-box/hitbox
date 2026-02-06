@@ -128,7 +128,7 @@ impl<'offload, B, Req, Res, U, ReqP, ResP, E>
     >
 where
     U: Upstream<Req, Response = Res>,
-    U::Future<'offload>: Send + 'offload,
+    U::Future: Send + 'offload,
     B: CacheBackend,
     Res: CacheableResponse,
     Req: CacheableRequest,
@@ -156,7 +156,7 @@ where
         backend: Arc<B>,
         cache_key: CacheKey,
         request: Req,
-        mut upstream: U,
+        upstream: U,
         response_predicates: ResP,
         policy: Arc<crate::policy::PolicyConfig>,
     ) -> Self {
@@ -195,7 +195,7 @@ impl<'offload, B, Req, Res, U, ReqP, ResP, E, C, O> Future
     for CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O>
 where
     U: Upstream<Req, Response = Res> + Send + 'offload,
-    U::Future<'offload>: Send + 'offload,
+    U::Future: Send + 'offload,
     B: CacheBackend + Send + Sync + 'static,
     Res: CacheableResponse + Send + 'static,
     Res::Cached: Cacheable + Send,

@@ -877,7 +877,7 @@ impl ToTokens for UpstreamStruct<'_> {
         let type_params = &self.cached_fn.type_params;
         let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
 
-        let _future_lifetime = self.cached_fn.offload_lifetime();
+        let future_lifetime = self.cached_fn.offload_lifetime();
 
         // Build the function call with turbofish only if type parameters are present.
         // Lifetimes are late-bound and cannot be specified with turbofish.
@@ -887,19 +887,11 @@ impl ToTokens for UpstreamStruct<'_> {
             quote! { #impl_name(args) }
         };
 
-        // For functions with lifetime parameters, we use FnUpstream wrapper
-        // which takes `self` by value instead of `&mut self`, avoiding
-        // the "borrowed data escapes" error.
-        //
-        // For functions without lifetime parameters, we use a simpler unit struct
-        // with `'static` future.
-        //
-        // All implementations use GAT (Generic Associated Types) for the Future type
-        // to support requests containing references.
+        // All patterns generate a struct that implements Upstream with:
+        // - `type Future = Pin<Box<dyn Future + Send + 'lifetime>>` (no GAT)
+        // - `fn call(self, args)` consuming self
+        // The future lifetime comes from offload_lifetime(): first lifetime param or 'static.
         if self.cached_fn.has_lifetimes() {
-            // Functions with lifetime parameters use the same pattern as other cases:
-            // unit struct (or PhantomData struct for type params) with boxed future.
-            // The Args<...>: '__req bound ensures lifetimes in args outlive '__req.
             if !self.cached_fn.type_params.is_empty() {
                 // Lifetimes + type params: use PhantomData struct
                 tokens.extend(quote! {
@@ -910,16 +902,9 @@ impl ToTokens for UpstreamStruct<'_> {
 
                     impl<#( #lifetimes, )* #( #type_params, )*> hitbox_core::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name<#( #type_idents, )*> {
                         type Response = #return_type;
-                        type Future<'__req> = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + '__req>>
-                        where
-                            Self: '__req,
-                            hitbox_fn::Args<#args_tuple>: '__req;
+                        type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + #future_lifetime>>;
 
-                        fn call<'__req>(&mut self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future<'__req>
-                        where
-                            Self: '__req,
-                            hitbox_fn::Args<#args_tuple>: '__req,
-                        {
+                        fn call(self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future {
                             Box::pin(#fn_call)
                         }
                     }
@@ -934,23 +919,16 @@ impl ToTokens for UpstreamStruct<'_> {
 
                     impl<#( #lifetimes, )*> hitbox_core::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name<#( #lifetime_idents, )*> {
                         type Response = #return_type;
-                        type Future<'__req> = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + '__req>>
-                        where
-                            Self: '__req,
-                            hitbox_fn::Args<#args_tuple>: '__req;
+                        type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + #future_lifetime>>;
 
-                        fn call<'__req>(&mut self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future<'__req>
-                        where
-                            Self: '__req,
-                            hitbox_fn::Args<#args_tuple>: '__req,
-                        {
+                        fn call(self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future {
                             Box::pin(#fn_call)
                         }
                     }
                 });
             }
         } else if !self.cached_fn.type_params.is_empty() {
-            // Type params but no lifetimes - use PhantomData for variance
+            // Type params but no lifetimes
             tokens.extend(quote! {
                 #[derive(Clone, Copy)]
                 struct #upstream_name<#( #type_params, )*>(
@@ -959,16 +937,9 @@ impl ToTokens for UpstreamStruct<'_> {
 
                 impl<#( #type_params, )*> hitbox_core::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name<#( #type_idents, )*> {
                     type Response = #return_type;
-                    type Future<'__req> = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + '__req>>
-                    where
-                        Self: '__req,
-                        hitbox_fn::Args<#args_tuple>: '__req;
+                    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + #future_lifetime>>;
 
-                    fn call<'__req>(&mut self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future<'__req>
-                    where
-                        Self: '__req,
-                        hitbox_fn::Args<#args_tuple>: '__req,
-                    {
+                    fn call(self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future {
                         Box::pin(#fn_call)
                     }
                 }
@@ -981,16 +952,9 @@ impl ToTokens for UpstreamStruct<'_> {
 
                 impl hitbox_core::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name {
                     type Response = #return_type;
-                    type Future<'__req> = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + '__req>>
-                    where
-                        Self: '__req,
-                        hitbox_fn::Args<#args_tuple>: '__req;
+                    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + #future_lifetime>>;
 
-                    fn call<'__req>(&mut self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future<'__req>
-                    where
-                        Self: '__req,
-                        hitbox_fn::Args<#args_tuple>: '__req,
-                    {
+                    fn call(self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future {
                         Box::pin(#fn_call)
                     }
                 }
@@ -1030,26 +994,32 @@ impl ToTokens for CacheFutureTypeAlias<'_> {
         let lifetimes = &self.cached_fn.lifetimes;
         let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
         // Type alias parameters don't have bounds - just use idents
-        let type_idents: Vec<_> = self.cached_fn.type_params.iter().map(|tp| &tp.ident).collect();
+        let type_idents: Vec<_> = self
+            .cached_fn
+            .type_params
+            .iter()
+            .map(|tp| &tp.ident)
+            .collect();
 
         // The CacheFuture lifetime parameter
         let cache_future_lifetime = self.cached_fn.offload_lifetime();
 
         // The upstream type with generic arguments (lifetimes + type params)
-        let upstream_type = if !self.cached_fn.type_params.is_empty() || self.cached_fn.has_lifetimes() {
-            if self.cached_fn.has_lifetimes() && !self.cached_fn.type_params.is_empty() {
-                // Both lifetimes and type params - but struct only has type params
-                quote! { #upstream_name<#( #type_idents, )*> }
-            } else if self.cached_fn.has_lifetimes() {
-                // Only lifetimes - struct has lifetimes
-                quote! { #upstream_name<#( #lifetime_idents, )*> }
+        let upstream_type =
+            if !self.cached_fn.type_params.is_empty() || self.cached_fn.has_lifetimes() {
+                if self.cached_fn.has_lifetimes() && !self.cached_fn.type_params.is_empty() {
+                    // Both lifetimes and type params - but struct only has type params
+                    quote! { #upstream_name<#( #type_idents, )*> }
+                } else if self.cached_fn.has_lifetimes() {
+                    // Only lifetimes - struct has lifetimes
+                    quote! { #upstream_name<#( #lifetime_idents, )*> }
+                } else {
+                    // Only type params
+                    quote! { #upstream_name<#( #type_idents, )*> }
+                }
             } else {
-                // Only type params
-                quote! { #upstream_name<#( #type_idents, )*> }
-            }
-        } else {
-            quote! { #upstream_name }
-        };
+                quote! { #upstream_name }
+            };
 
         // Make CM and O generic so both Call and CachedCall paths can reuse this
         tokens.extend(quote! {

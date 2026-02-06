@@ -37,7 +37,7 @@ where
     },
     /// Cache is disabled - poll upstream directly
     PollUpstream {
-        upstream_future: U::Future<'req>,
+        upstream_future: U::Future,
         ctx: BoxContext,
     },
 }
@@ -98,11 +98,10 @@ where
 // =============================================================================
 
 /// Transitions from CheckRequestCachePolicy state.
-pub enum CheckRequestCachePolicyTransition<'req, Req, Res, U>
+pub enum CheckRequestCachePolicyTransition<Req, Res, U>
 where
     Res: CacheableResponse,
-    U: Upstream<Req, Response = Res> + 'req,
-    Req: 'req,
+    U: Upstream<Req, Response = Res>,
 {
     /// Request is cacheable - poll cache
     PollCache {
@@ -113,20 +112,20 @@ where
     },
     /// Request is not cacheable - poll upstream directly
     PollUpstream {
-        upstream_future: U::Future<'req>,
+        upstream_future: U::Future,
         ctx: BoxContext,
     },
 }
 
-impl<'req, Req, Res, U> CheckRequestCachePolicyTransition<'req, Req, Res, U>
+impl<Req, Res, U> CheckRequestCachePolicyTransition<Req, Res, U>
 where
     Res: CacheableResponse,
-    U: Upstream<Req, Response = Res> + 'req,
-    Req: 'req,
+    U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -155,7 +154,7 @@ where
     }
 }
 
-impl<Req, Res, U> std::fmt::Debug for CheckRequestCachePolicyTransition<'_, Req, Res, U>
+impl<Req, Res, U> std::fmt::Debug for CheckRequestCachePolicyTransition<Req, Res, U>
 where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
@@ -175,11 +174,10 @@ where
 // =============================================================================
 
 /// Transitions from PollCache state.
-pub enum PollCacheTransition<'req, Res, Req, U>
+pub enum PollCacheTransition<Res, Req, U>
 where
     Res: CacheableResponse,
-    U: Upstream<Req, Response = Res> + 'req,
-    Req: 'req,
+    U: Upstream<Req, Response = Res>,
 {
     /// Cache hit (actual) with refill needed - update cache then return
     UpdateCache {
@@ -199,7 +197,7 @@ where
     },
     /// Cache miss/expired - poll upstream directly
     PollUpstream {
-        upstream_future: U::Future<'req>,
+        upstream_future: U::Future,
         permit: Option<OwnedSemaphorePermit>,
         ctx: BoxContext,
         cache_key: CacheKey,
@@ -214,15 +212,15 @@ where
     },
 }
 
-impl<'req, Res, Req, U> PollCacheTransition<'req, Res, Req, U>
+impl<Res, Req, U> PollCacheTransition<Res, Req, U>
 where
     Res: CacheableResponse,
-    U: Upstream<Req, Response = Res> + 'req,
-    Req: 'req,
+    U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -283,7 +281,7 @@ where
     }
 }
 
-impl<Res, Req, U> std::fmt::Debug for PollCacheTransition<'_, Res, Req, U>
+impl<Res, Req, U> std::fmt::Debug for PollCacheTransition<Res, Req, U>
 where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
@@ -309,7 +307,10 @@ pub enum ConvertResponseTransition<Res> {
 }
 
 impl<Res> ConvertResponseTransition<Res> {
-    pub fn into_state<'req, Req, U, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E>
     where
         Res: CacheableResponse,
         Req: CacheableRequest + 'req,
@@ -341,30 +342,29 @@ impl<Res> std::fmt::Debug for ConvertResponseTransition<Res> {
 ///
 /// Note: `Req` type parameter is needed for the `Upstream` trait bound, even though
 /// it's not directly used in the enum variants after removing `ResponseWithOffload`.
-pub enum HandleStaleTransition<'req, Res, Req, U>
+pub enum HandleStaleTransition<Res, Req, U>
 where
-    U: Upstream<Req, Response = Res> + 'req,
-    Req: 'req,
+    U: Upstream<Req, Response = Res>,
 {
     /// Return stale response immediately (includes offload case - spawning handled in transition)
     Response(Response<Res>),
     /// Revalidate synchronously - block and wait for fresh data
     Revalidate {
-        upstream_future: U::Future<'req>,
+        upstream_future: U::Future,
         ctx: BoxContext,
         cache_key: CacheKey,
     },
 }
 
-impl<'req, Res, Req, U> HandleStaleTransition<'req, Res, Req, U>
+impl<Res, Req, U> HandleStaleTransition<Res, Req, U>
 where
     Res: CacheableResponse,
-    U: Upstream<Req, Response = Res> + 'req,
-    Req: 'req,
+    U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -388,7 +388,7 @@ where
     }
 }
 
-impl<Res, Req, U> std::fmt::Debug for HandleStaleTransition<'_, Res, Req, U>
+impl<Res, Req, U> std::fmt::Debug for HandleStaleTransition<Res, Req, U>
 where
     U: Upstream<Req, Response = Res>,
 {
@@ -405,28 +405,27 @@ where
 // =============================================================================
 
 /// Transitions from AwaitResponse state.
-pub enum AwaitResponseTransition<'req, Res, Req, U>
+pub enum AwaitResponseTransition<Res, Req, U>
 where
-    U: Upstream<Req, Response = Res> + 'req,
-    Req: 'req,
+    U: Upstream<Req, Response = Res>,
 {
     Response(Response<Res>),
     PollUpstream {
-        upstream_future: U::Future<'req>,
+        upstream_future: U::Future,
         ctx: BoxContext,
         cache_key: CacheKey,
     },
 }
 
-impl<'req, Res, Req, U> AwaitResponseTransition<'req, Res, Req, U>
+impl<Res, Req, U> AwaitResponseTransition<Res, Req, U>
 where
     Res: CacheableResponse,
-    U: Upstream<Req, Response = Res> + 'req,
-    Req: 'req,
+    U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -450,7 +449,7 @@ where
     }
 }
 
-impl<Res, Req, U> std::fmt::Debug for AwaitResponseTransition<'_, Res, Req, U>
+impl<Res, Req, U> std::fmt::Debug for AwaitResponseTransition<Res, Req, U>
 where
     U: Upstream<Req, Response = Res>,
 {
@@ -486,7 +485,10 @@ impl<Res> PollUpstreamTransition<Res>
 where
     Res: CacheableResponse,
 {
-    pub fn into_state<'req, Req, U, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E>
     where
         Req: CacheableRequest + 'req,
         U: Upstream<Req, Response = Res> + 'req,
@@ -547,7 +549,10 @@ impl<Res> CheckResponseCachePolicyTransition<Res>
 where
     Res: CacheableResponse,
 {
-    pub fn into_state<'req, Req, U, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E>
     where
         Req: CacheableRequest + 'req,
         U: Upstream<Req, Response = Res> + 'req,
@@ -592,7 +597,10 @@ pub enum UpdateCacheTransition<Res> {
 }
 
 impl<Res> UpdateCacheTransition<Res> {
-    pub fn into_state<'req, Req, U, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E>
     where
         Res: CacheableResponse,
         Req: CacheableRequest + 'req,

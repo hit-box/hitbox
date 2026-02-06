@@ -64,18 +64,11 @@ impl<'middleware> ReqwestUpstream<'middleware> {
 /// [`Upstream`]: hitbox_core::Upstream
 impl<'middleware> Upstream<CacheableHttpRequest<reqwest::Body>> for ReqwestUpstream<'middleware> {
     type Response = Result<CacheableHttpResponse<reqwest::Body>>;
-    type Future<'a> = Pin<Box<dyn Future<Output = Self::Response> + Send + 'a>>
-    where
-        Self: 'a,
-        CacheableHttpRequest<reqwest::Body>: 'a;
+    type Future = Pin<Box<dyn Future<Output = Self::Response> + Send + 'middleware>>;
 
-    fn call<'a>(&mut self, req: CacheableHttpRequest<reqwest::Body>) -> Self::Future<'a>
-    where
-        Self: 'a,
-        CacheableHttpRequest<reqwest::Body>: 'a,
-    {
-        let next = self.next.clone();
-        let mut extensions = std::mem::take(&mut self.extensions);
+    fn call(self, req: CacheableHttpRequest<reqwest::Body>) -> Self::Future {
+        let next = self.next;
+        let mut extensions = self.extensions;
 
         Box::pin(async move {
             // Convert CacheableHttpRequest back to reqwest::Request

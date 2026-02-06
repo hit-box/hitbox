@@ -147,7 +147,7 @@ where
     /// Polling upstream service
     PollUpstream {
         #[pin]
-        upstream_future: Instrumented<U::Future<'req>>,
+        upstream_future: Instrumented<U::Future>,
         state: Option<PollUpstream>,
     },
     /// Checking if response should be cached
@@ -240,7 +240,7 @@ where
     /// Based on policy configuration:
     /// - Enabled: create CheckRequestCachePolicy future
     /// - Disabled: call upstream directly
-    pub fn transition<'req>(mut self, policy: &PolicyConfig) -> InitialTransition<'req, Req, U>
+    pub fn transition<'req>(self, policy: &PolicyConfig) -> InitialTransition<'req, Req, U>
     where
         Req: 'req,
         ReqP: 'req,
@@ -546,17 +546,17 @@ impl<U> CheckRequestCachePolicy<U> {
     }
 
     /// Transition from CheckRequestCachePolicy state after future completes.
-    pub fn transition<'req, Req, Res, B>(
-        mut self,
+    pub fn transition<Req, Res, B>(
+        self,
         policy: RequestCachePolicy<Req>,
         backend: Arc<B>,
         cache_key_storage: &mut Option<CacheKey>,
-    ) -> CheckRequestCachePolicyTransition<'req, Req, Res, U>
+    ) -> CheckRequestCachePolicyTransition<Req, Res, U>
     where
-        Req: CacheableRequest + 'req,
+        Req: CacheableRequest,
         Res: CacheableResponse,
         Res::Cached: Cacheable + Send,
-        U: Upstream<Req, Response = Res> + 'req,
+        U: Upstream<Req, Response = Res>,
         B: CacheBackend + Send + Sync + 'static,
     {
         // Record cacheable decision to span
@@ -634,20 +634,19 @@ impl<Req, U> PollCache<Req, U> {
     ///
     /// On cache miss or expired, checks concurrency policy and transitions directly
     /// to either `ConcurrentPollUpstream` or `PollUpstream`.
-    pub fn transition<'req, Res, B, C>(
+    pub fn transition<Res, B, C>(
         self,
         cache_result: CacheResult<Res::Cached>,
         mut ctx: BoxContext,
         backend: Arc<B>,
         policy: &PolicyConfig,
         concurrency_manager: &C,
-    ) -> PollCacheTransition<'req, Res, Req, U>
+    ) -> PollCacheTransition<Res, Req, U>
     where
         Res: CacheableResponse + Send + 'static,
         Res::Cached: Cacheable + Send,
         B: CacheBackend + Send + Sync + 'static,
-        U: Upstream<Req, Response = Res> + 'req,
-        Req: 'req,
+        U: Upstream<Req, Response = Res>,
         C: ConcurrencyManager<Res>,
     {
         let cached = cache_result
@@ -707,16 +706,15 @@ impl<Req, U> PollCache<Req, U> {
     }
 
     /// Helper to transition to upstream based on concurrency policy.
-    fn transition_to_upstream<'req, Res, C>(
-        mut self,
+    fn transition_to_upstream<Res, C>(
+        self,
         ctx: BoxContext,
         policy: &PolicyConfig,
         concurrency_manager: &C,
-    ) -> PollCacheTransition<'req, Res, Req, U>
+    ) -> PollCacheTransition<Res, Req, U>
     where
         Res: CacheableResponse,
-        U: Upstream<Req, Response = Res> + 'req,
-        Req: 'req,
+        U: Upstream<Req, Response = Res>,
         C: ConcurrencyManager<Res>,
     {
         match policy {
@@ -857,12 +855,11 @@ pub struct OffloadData<Req, U> {
 }
 
 /// Result of HandleStale transition, including optional offload data.
-pub struct HandleStaleResult<'req, Res, Req, U>
+pub struct HandleStaleResult<Res, Req, U>
 where
-    U: Upstream<Req, Response = Res> + 'req,
-    Req: 'req,
+    U: Upstream<Req, Response = Res>,
 {
-    pub transition: HandleStaleTransition<'req, Res, Req, U>,
+    pub transition: HandleStaleTransition<Res, Req, U>,
     pub offload_data: Option<OffloadData<Req, U>>,
 }
 
@@ -872,16 +869,15 @@ impl<Req, U> HandleStale<Req, U> {
     /// Returns a result containing the transition and optional offload data.
     /// For `StalePolicy::OffloadRevalidate`, the caller is responsible for spawning
     /// the background revalidation using the returned `offload_data`.
-    pub fn transition<'req, Res>(
-        mut self,
+    pub fn transition<Res>(
+        self,
         response: Res,
         mut ctx: BoxContext,
         policy: &PolicyConfig,
-    ) -> HandleStaleResult<'req, Res, Req, U>
+    ) -> HandleStaleResult<Res, Req, U>
     where
         Res: CacheableResponse,
-        U: Upstream<Req, Response = Res> + 'req,
-        Req: 'req,
+        U: Upstream<Req, Response = Res>,
     {
         let stale_policy = match policy {
             PolicyConfig::Enabled(EnabledCacheConfig { policy, .. }) => policy.stale,
@@ -981,15 +977,14 @@ impl<Req, U> AwaitResponse<Req, U> {
     ///
     /// On success, returns the response directly.
     /// On concurrency error, falls back to calling upstream.
-    pub fn transition<'req, Res, C>(
-        mut self,
+    pub fn transition<Res, C>(
+        self,
         result: Result<Res, ConcurrencyError>,
         concurrency_manager: &C,
-    ) -> AwaitResponseTransition<'req, Res, Req, U>
+    ) -> AwaitResponseTransition<Res, Req, U>
     where
         Res: CacheableResponse,
-        U: Upstream<Req, Response = Res> + 'req,
-        Req: 'req,
+        U: Upstream<Req, Response = Res>,
         C: ConcurrencyManager<Res>,
     {
         let ctx = self.ctx;

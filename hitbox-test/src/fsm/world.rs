@@ -29,13 +29,18 @@ use crate::tracing::{SpanCollector, create_span_collector};
 pub struct SimpleRequest(pub u32);
 
 impl CacheableRequest for SimpleRequest {
-    type CachePolicyFuture<'a, P, E> = std::pin::Pin<Box<dyn std::future::Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
+    type CachePolicyFuture<'a, P, E>
+        = std::pin::Pin<Box<dyn std::future::Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
         E: Extractor<Subject = Self> + Send + Sync + 'a;
 
-    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    fn cache_policy<'a, P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Self::CachePolicyFuture<'a, P, E>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
@@ -169,15 +174,10 @@ impl ConfigurableUpstream {
 
 impl Upstream<SimpleRequest> for ConfigurableUpstream {
     type Response = SimpleResponse;
-    type Future<'req> = std::pin::Pin<Box<dyn std::future::Future<Output = SimpleResponse> + Send + 'req>>
-    where
-        SimpleRequest: 'req;
+    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = SimpleResponse> + Send>>;
 
-    fn call<'req>(&mut self, request: SimpleRequest) -> Self::Future<'req>
-    where
-        SimpleRequest: 'req,
-    {
-        let call_count = self.call_count.clone();
+    fn call(self, request: SimpleRequest) -> Self::Future {
+        let call_count = self.call_count;
         let delay_ms = self.delay_ms;
         let response_value = request.0;
         Box::pin(async move {

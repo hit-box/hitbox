@@ -14,7 +14,7 @@ use crate::KeyExtract;
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
 /// use hitbox_fn::Arg;
 ///
 /// // Argument included in cache key
@@ -56,11 +56,11 @@ impl<T: KeyExtract> KeyExtract for Arg<T> {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
 /// use hitbox_fn::Skipped;
 ///
 /// // Argument excluded from cache key (no KeyExtract bound needed)
-/// let skipped = Skipped::new(db_connection);
+/// let skipped = Skipped::new("connection_string");
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Skipped<T>(T);
@@ -96,11 +96,11 @@ impl<T> KeyExtract for Skipped<T> {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
 /// use hitbox_fn::Args;
 ///
 /// // Wrap function arguments
-/// let args = Args((user_id, tenant_id));
+/// let args = Args((42u64, "tenant_1"));
 ///
 /// // Access inner tuple
 /// let (user_id, tenant_id) = args.0;
@@ -122,17 +122,22 @@ impl<T> Args<T> {
 
 // CacheableRequest implementations for Args<tuples>
 
-use std::pin::Pin;
 use std::future::Future;
+use std::pin::Pin;
 
 impl CacheableRequest for Args<()> {
-    type CachePolicyFuture<'a, P, E> = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
+    type CachePolicyFuture<'a, P, E>
+        = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
         E: Extractor<Subject = Self> + Send + Sync + 'a;
 
-    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    fn cache_policy<'a, P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Self::CachePolicyFuture<'a, P, E>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
@@ -154,13 +159,18 @@ impl<T0> CacheableRequest for Args<(T0,)>
 where
     T0: Send + Sync,
 {
-    type CachePolicyFuture<'a, P, E> = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
+    type CachePolicyFuture<'a, P, E>
+        = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
         E: Extractor<Subject = Self> + Send + Sync + 'a;
 
-    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    fn cache_policy<'a, P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Self::CachePolicyFuture<'a, P, E>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
@@ -183,13 +193,18 @@ where
     T0: Send + Sync,
     T1: Send + Sync,
 {
-    type CachePolicyFuture<'a, P, E> = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
+    type CachePolicyFuture<'a, P, E>
+        = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
         E: Extractor<Subject = Self> + Send + Sync + 'a;
 
-    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    fn cache_policy<'a, P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Self::CachePolicyFuture<'a, P, E>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
@@ -213,13 +228,18 @@ where
     T1: Send + Sync,
     T2: Send + Sync,
 {
-    type CachePolicyFuture<'a, P, E> = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
+    type CachePolicyFuture<'a, P, E>
+        = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
         E: Extractor<Subject = Self> + Send + Sync + 'a;
 
-    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    fn cache_policy<'a, P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Self::CachePolicyFuture<'a, P, E>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
@@ -244,13 +264,18 @@ where
     T2: Send + Sync,
     T3: Send + Sync,
 {
-    type CachePolicyFuture<'a, P, E> = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
+    type CachePolicyFuture<'a, P, E>
+        = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
         E: Extractor<Subject = Self> + Send + Sync + 'a;
 
-    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    fn cache_policy<'a, P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Self::CachePolicyFuture<'a, P, E>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,

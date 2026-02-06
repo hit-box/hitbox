@@ -144,13 +144,18 @@ where
     ReqBody: HttpBody + Send + 'static,
     ReqBody::Error: Send,
 {
-    type CachePolicyFuture<'a, P, E> = std::pin::Pin<Box<dyn std::future::Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
+    type CachePolicyFuture<'a, P, E>
+        = std::pin::Pin<Box<dyn std::future::Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
         E: Extractor<Subject = Self> + Send + Sync + 'a;
 
-    fn cache_policy<'a, P, E>(self, predicates: P, extractors: E) -> Self::CachePolicyFuture<'a, P, E>
+    fn cache_policy<'a, P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Self::CachePolicyFuture<'a, P, E>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,

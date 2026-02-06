@@ -33,8 +33,9 @@
 //!
 //! ## Manual implementation
 //!
-//! ```ignore
+//! ```
 //! use hitbox_fn::{Args, KeyExtract, FnExtractor, Cache};
+//! use hitbox_core::KeyPart;
 //!
 //! struct UserId(u64);
 //!
