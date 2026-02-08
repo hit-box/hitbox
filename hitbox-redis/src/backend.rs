@@ -7,7 +7,8 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use hitbox::{BackendLabel, CacheKey, CacheValue, Raw};
 use hitbox_backend::{
-    Backend, BackendResult, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor,
+    Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus,
+    PassthroughCompressor,
     format::{BincodeFormat, Format},
 };
 use redis::Client;
@@ -854,7 +855,15 @@ where
         if let Some(ttl_duration) = value.ttl() {
             pipe.cmd("PEXPIRE")
                 .arg(&cache_key)
-                .arg(ttl_duration.as_millis() as u64)
+                .arg(u64::try_from(ttl_duration.as_millis()).map_err(|_| {
+                    BackendError::InternalError(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!(
+                            "TTL overflow: {}ms exceeds u64 range",
+                            ttl_duration.as_millis()
+                        ),
+                    )))
+                })?)
                 .ignore();
         }
 
