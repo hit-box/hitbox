@@ -123,10 +123,11 @@ impl OffloadManager {
 
     /// Register a task with the given key.
     ///
-    /// If deduplication is enabled and a task with the same `Keyed` key is
-    /// already in flight, the new task will be skipped.
+    /// Returns `false` (task not spawned) when:
+    /// - The `max_concurrent_tasks` limit has been reached.
+    /// - Deduplication is enabled and a task with the same `Keyed` key is already in flight.
     ///
-    /// Returns `true` if the task was spawned, `false` if it was deduplicated.
+    /// Returns `true` if the task was spawned.
     ///
     /// # Example
     /// ```ignore
@@ -146,6 +147,14 @@ impl OffloadManager {
         K: Into<CoreOffloadKey>,
         F: Future<Output = ()> + Send + 'static,
     {
+        // Check max concurrent tasks limit
+        if let Some(max) = self.inner.config.max_concurrent_tasks
+            && self.inner.tasks.len() >= max
+        {
+            debug!(max, "Task rejected - max concurrent tasks reached");
+            return false;
+        }
+
         // Convert Auto keys to Explicit with auto-assigned id
         let key = match key.into() {
             CoreOffloadKey::Auto { kind } => CoreOffloadKey::Explicit {

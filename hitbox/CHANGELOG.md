@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `OffloadManager::register` now enforces the `max_concurrent_tasks` limit ([#209](https://github.com/hit-box/hitbox/issues/209))
+
 ## [0.2.1] - 2026-02-05
 
 ### Added
