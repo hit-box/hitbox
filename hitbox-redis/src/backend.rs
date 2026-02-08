@@ -389,7 +389,7 @@ impl RedisConnection {
 /// # Performance
 ///
 /// - **Read operations**: Single pipelined request (`HMGET` + `PTTL`)
-/// - **Write operations**: Single pipelined request (`HSET` + `EXPIRE`)
+/// - **Write operations**: Single pipelined request (`HSET` + `PEXPIRE`)
 /// - **Connection**: Established lazily on first use, multiplexed for concurrent access
 ///
 /// # Caveats
@@ -848,13 +848,13 @@ where
             cmd.arg("s").arg(stale.timestamp_millis());
         }
 
-        // Pipeline: HSET + optional EXPIRE (computed from value.ttl())
+        // Pipeline: HSET + optional PEXPIRE (computed from value.ttl())
         let mut pipe = redis::pipe();
         pipe.add_command(cmd).ignore();
         if let Some(ttl_duration) = value.ttl() {
-            pipe.cmd("EXPIRE")
+            pipe.cmd("PEXPIRE")
                 .arg(&cache_key)
-                .arg(ttl_duration.as_secs())
+                .arg(ttl_duration.as_millis() as u64)
                 .ignore();
         }
 
