@@ -42,7 +42,6 @@ prost = "0.14"
 prost-reflect = { version = "0.16", features = ["serde", "derive"] }
 protox = "0.9"
 regex = { workspace = true }
-tracing = { workspace = true }
 sha2 = "0.10"
 hex = "0.4"
 
