@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-09
+
 ### Added
 - `#[cached]` proc macro for transparent async function memoization ([#203](https://github.com/hit-box/hitbox/pull/203))
 - `#[derive(KeyExtract)]` derive macro for automatic cache key extraction from structs ([#203](https://github.com/hit-box/hitbox/pull/203))
