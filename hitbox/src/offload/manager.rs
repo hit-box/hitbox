@@ -10,6 +10,7 @@ use dashmap::DashMap;
 use dashmap::mapref::entry::Entry;
 use hitbox_core::OffloadKey as CoreOffloadKey;
 use smol_str::SmolStr;
+use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 use tracing::{Instrument, debug, info_span, warn};
 
@@ -90,6 +91,7 @@ struct OffloadManagerInner {
     config: OffloadConfig,
     tasks: DashMap<CoreOffloadKey, OffloadHandle>,
     key_counter: AtomicU64,
+    task_completed: Notify,
 }
 
 /// Manager for offloading tasks to background execution.
@@ -108,6 +110,7 @@ impl OffloadManager {
                 config,
                 tasks: DashMap::new(),
                 key_counter: AtomicU64::new(0),
+                task_completed: Notify::new(),
             }),
         }
     }
@@ -293,21 +296,13 @@ impl OffloadManager {
     }
 
     /// Wait for all currently tracked tasks to complete.
-    ///
-    /// This polls active tasks until all are finished, with a small yield
-    /// between checks to avoid busy-waiting.
     pub async fn wait_all(&self) {
         loop {
-            // Clean up finished tasks
             self.cleanup_finished();
-
-            // Check if any tasks are still active
             if self.inner.tasks.is_empty() {
                 break;
             }
-
-            // Yield to allow tasks to make progress
-            tokio::task::yield_now().await;
+            self.inner.task_completed.notified().await;
         }
     }
 
@@ -343,6 +338,7 @@ impl OffloadManager {
                     let start = Instant::now();
                     task.await;
                     inner.tasks.remove(&key);
+                    inner.task_completed.notify_waiters();
                     #[cfg(feature = "metrics")]
                     Self::record_completion(start, &key_kind);
                 }
@@ -364,6 +360,7 @@ impl OffloadManager {
                         }
                     }
                     inner.tasks.remove(&key);
+                    inner.task_completed.notify_waiters();
                 }
                 .instrument(span),
             ),
@@ -381,6 +378,7 @@ impl OffloadManager {
                         );
                     }
                     inner.tasks.remove(&key);
+                    inner.task_completed.notify_waiters();
                     #[cfg(feature = "metrics")]
                     Self::record_completion(start, &key_kind);
                 }
