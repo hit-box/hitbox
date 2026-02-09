@@ -34,7 +34,18 @@ impl<'a> ToTokens for Generator<'a> {
                 };
 
                 quote! {
-                    parts.push(hitbox_core::KeyPart::new(#key_name, Some(#field_access.to_string())));
+                    {
+                        let __inner = hitbox_fn::KeyExtract::extract(#field_access);
+                        if __inner.len() == 1 {
+                            for __part in __inner {
+                                parts.push(__part.with_key(#key_name));
+                            }
+                        } else {
+                            for __part in __inner {
+                                parts.push(__part.prefixed(#key_name));
+                            }
+                        }
+                    }
                 }
             })
             .collect();

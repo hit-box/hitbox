@@ -89,10 +89,14 @@ pub enum CacheState<Cached> {
 ///
 /// # Example Implementation
 ///
-/// ```ignore
+/// ```
 /// use hitbox_core::{CacheableResponse, CachePolicy, EntityPolicyConfig};
-/// use hitbox_core::predicate::Predicate;
+/// use hitbox_core::predicate::{Predicate, PredicateResult};
+/// use hitbox_core::response::ResponseCachePolicy;
+/// use hitbox_core::value::CacheValue;
+/// use chrono::Utc;
 ///
+/// #[derive(Clone)]
 /// struct MyResponse {
 ///     body: String,
 ///     status: u16,
@@ -110,9 +114,19 @@ pub enum CacheState<Cached> {
 ///         config: &EntityPolicyConfig,
 ///     ) -> ResponseCachePolicy<Self>
 ///     where
-///         P: Predicate<Subject = Self::Subject> + Send + Sync
+///         P: Predicate<Subject = Self::Subject> + Send + Sync,
 ///     {
-///         // Implementation details...
+///         match predicates.check(self).await {
+///             PredicateResult::Cacheable(data) => {
+///                 let cached = data.body.clone();
+///                 CachePolicy::Cacheable(CacheValue::new(
+///                     cached,
+///                     config.ttl.map(|d| Utc::now() + d),
+///                     config.stale_ttl.map(|d| Utc::now() + d),
+///                 ))
+///             }
+///             PredicateResult::NonCacheable(data) => CachePolicy::NonCacheable(data),
+///         }
 ///     }
 ///
 ///     fn into_cached(self) -> Self::IntoCachedFuture {

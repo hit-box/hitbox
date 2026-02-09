@@ -12,12 +12,13 @@ rust-version.workspace = true
 [features]
 default = []
 derive = ["hitbox-derive"]
-rkyv_format = ["hitbox/rkyv_format", "hitbox-core/rkyv_format"]
+rkyv_format = ["hitbox/rkyv_format", "hitbox-core/rkyv_format", "dep:rkyv"]
 
 [dependencies]
 hitbox = { path = "../hitbox" }
 hitbox-core = { path = "../hitbox-core" }
 hitbox-derive = { path = "../hitbox-derive", optional = true }
+rkyv = { workspace = true, optional = true }
 
 async-trait = { workspace = true }
 
@@ -26,3 +27,6 @@ tokio = { workspace = true, features = ["rt", "macros"] }
 serde = { workspace = true }
 hitbox-moka = { path = "../hitbox-moka" }
 hitbox-derive = { path = "../hitbox-derive" }
+hitbox-backend = { path = "../hitbox-backend" }
+dashmap = { workspace = true }
+trybuild = "1"

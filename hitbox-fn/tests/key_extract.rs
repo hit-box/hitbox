@@ -235,6 +235,47 @@ fn test_scalar_bool() {
 }
 
 #[test]
+fn test_scalar_remaining_numeric_types() {
+    // u8, u16, u128, usize
+    assert_eq!(42u8.extract()[0].key(), "u8");
+    assert_eq!(42u8.extract()[0].value(), Some("42"));
+
+    assert_eq!(1000u16.extract()[0].key(), "u16");
+    assert_eq!(1000u16.extract()[0].value(), Some("1000"));
+
+    assert_eq!(1u128.extract()[0].key(), "u128");
+    assert_eq!(1u128.extract()[0].value(), Some("1"));
+
+    assert_eq!(99usize.extract()[0].key(), "usize");
+    assert_eq!(99usize.extract()[0].value(), Some("99"));
+
+    // i8, i16, i128, isize
+    assert_eq!((-1i8).extract()[0].key(), "i8");
+    assert_eq!((-1i8).extract()[0].value(), Some("-1"));
+
+    assert_eq!((-500i16).extract()[0].key(), "i16");
+    assert_eq!((-500i16).extract()[0].value(), Some("-500"));
+
+    assert_eq!(1i128.extract()[0].key(), "i128");
+    assert_eq!(1i128.extract()[0].value(), Some("1"));
+
+    assert_eq!(0isize.extract()[0].key(), "isize");
+    assert_eq!(0isize.extract()[0].value(), Some("0"));
+}
+
+#[test]
+fn test_key_extract_for_ref() {
+    // Exercise KeyExtract for &T (explicit trait call, not auto-deref)
+    let value = 42u64;
+    let ref_value: &u64 = &value;
+    let parts = KeyExtract::extract(&ref_value);
+
+    assert_eq!(parts.len(), 1);
+    assert_eq!(parts[0].key(), "u64");
+    assert_eq!(parts[0].value(), Some("42"));
+}
+
+#[test]
 fn test_scalar_option_some() {
     let value: Option<u64> = Some(42);
     let parts = value.extract();
@@ -308,4 +349,98 @@ fn test_reference_to_scalar() {
     assert_eq!(parts.len(), 1);
     assert_eq!(parts[0].key(), "u64");
     assert_eq!(parts[0].value(), Some("123"));
+}
+
+// =============================================================================
+// Nested struct tests (recursive KeyExtract)
+// =============================================================================
+
+/// Nested struct containing another KeyExtract type.
+/// Single-part inner field → key replaced with field name.
+#[derive(KeyExtract)]
+struct Request {
+    user_id: UserId,
+    tenant: TenantId,
+}
+
+/// Deeply nested struct with another KeyExtract struct as a field.
+/// Multi-part inner field → keys prefixed with field name.
+#[derive(KeyExtract)]
+struct PaginatedRequest {
+    req: Request,
+    page: u32,
+}
+
+#[test]
+fn test_nested_single_part_fields() {
+    let req = Request {
+        user_id: UserId(42),
+        tenant: TenantId("acme".into()),
+    };
+    let parts = req.extract();
+
+    // UserId returns 1 part → key replaced with "user_id"
+    // TenantId returns 1 part → key replaced with "tenant"
+    assert_eq!(parts.len(), 2);
+    assert_eq!(parts[0].key(), "user_id");
+    assert_eq!(parts[0].value(), Some("42"));
+    assert_eq!(parts[1].key(), "tenant");
+    assert_eq!(parts[1].value(), Some("acme"));
+}
+
+#[test]
+fn test_nested_multi_part_field() {
+    let req = PaginatedRequest {
+        req: Request {
+            user_id: UserId(7),
+            tenant: TenantId("corp".into()),
+        },
+        page: 3,
+    };
+    let parts = req.extract();
+
+    // Request returns 2 parts → each prefixed with "req."
+    // u32 returns 1 part → key replaced with "page"
+    assert_eq!(parts.len(), 3);
+    assert_eq!(parts[0].key(), "req.user_id");
+    assert_eq!(parts[0].value(), Some("7"));
+    assert_eq!(parts[1].key(), "req.tenant");
+    assert_eq!(parts[1].value(), Some("corp"));
+    assert_eq!(parts[2].key(), "page");
+    assert_eq!(parts[2].value(), Some("3"));
+}
+
+/// Three levels of nesting.
+#[derive(KeyExtract)]
+struct ApiCall {
+    request: PaginatedRequest,
+    #[key_extract(name = "method")]
+    http_method: String,
+}
+
+#[test]
+fn test_deeply_nested_structs() {
+    let call = ApiCall {
+        request: PaginatedRequest {
+            req: Request {
+                user_id: UserId(1),
+                tenant: TenantId("t".into()),
+            },
+            page: 5,
+        },
+        http_method: "GET".into(),
+    };
+    let parts = call.extract();
+
+    // PaginatedRequest returns 3 parts → each prefixed with "request."
+    // String returns 1 part → key replaced with "method"
+    assert_eq!(parts.len(), 4);
+    assert_eq!(parts[0].key(), "request.req.user_id");
+    assert_eq!(parts[0].value(), Some("1"));
+    assert_eq!(parts[1].key(), "request.req.tenant");
+    assert_eq!(parts[1].value(), Some("t"));
+    assert_eq!(parts[2].key(), "request.page");
+    assert_eq!(parts[2].value(), Some("5"));
+    assert_eq!(parts[3].key(), "method");
+    assert_eq!(parts[3].value(), Some("GET"));
 }

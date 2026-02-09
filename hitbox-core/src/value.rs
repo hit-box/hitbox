@@ -46,6 +46,7 @@ use std::mem::size_of;
 use std::time::Duration;
 
 use crate::Raw;
+use crate::policy::EntityPolicyConfig;
 use crate::response::CacheState;
 
 /// A cached value with expiration metadata.
@@ -100,6 +101,18 @@ impl<T> CacheValue<T> {
             expire,
             stale,
         }
+    }
+
+    /// Creates a new cache value using timestamps derived from an [`EntityPolicyConfig`].
+    ///
+    /// Converts the config's TTL and stale TTL durations into absolute timestamps
+    /// relative to the current time.
+    pub fn from_config(data: T, config: &EntityPolicyConfig) -> Self {
+        Self::new(
+            data,
+            config.ttl.map(|d| Utc::now() + d),
+            config.stale_ttl.map(|d| Utc::now() + d),
+        )
     }
 
     /// Returns a reference to the cached data.

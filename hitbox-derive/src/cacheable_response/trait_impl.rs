@@ -52,11 +52,9 @@ impl<'a> CacheableResponseImpl<'a> {
                     match predicates.check(self).await {
                         hitbox_core::predicate::PredicateResult::Cacheable(data) => {
                             let cached = data.clone();
-                            hitbox_core::CachePolicy::Cacheable(hitbox_core::CacheValue::new(
-                                cached,
-                                config.ttl.map(|d| chrono::Utc::now() + d),
-                                config.stale_ttl.map(|d| chrono::Utc::now() + d),
-                            ))
+                            hitbox_core::CachePolicy::Cacheable(
+                                hitbox_core::CacheValue::from_config(cached, config),
+                            )
                         }
                         hitbox_core::predicate::PredicateResult::NonCacheable(data) => {
                             hitbox_core::CachePolicy::NonCacheable(data)
@@ -82,26 +80,13 @@ impl<'a> CacheableResponseImpl<'a> {
         let cached_name = cached_type.ident();
         let (impl_generics, ty_generics, where_clause) = self.source.generics.split_for_impl();
 
-        // Generate field assignments for all fields (both cached and skipped)
-        let all_fields: Vec<_> = self
+        // All fields are copied through — Cached type has every field.
+        // Skipped fields are handled by custom Clone (defaults on clone)
+        // and serde (skip on serialization).
+        let field_idents: Vec<_> = self
             .source
             .fields()
             .map(|f| f.ident.as_ref().expect("named field"))
-            .collect();
-
-        let into_cached_fields: Vec<_> = all_fields
-            .iter()
-            .map(|ident| quote! { #ident: self.#ident })
-            .collect();
-
-        let cache_policy_fields: Vec<_> = all_fields
-            .iter()
-            .map(|ident| quote! { #ident: data.#ident })
-            .collect();
-
-        let from_cached_fields: Vec<_> = all_fields
-            .iter()
-            .map(|ident| quote! { #ident: cached.#ident })
             .collect();
 
         let expanded = quote! {
@@ -122,13 +107,11 @@ impl<'a> CacheableResponseImpl<'a> {
                     match predicates.check(self).await {
                         hitbox_core::predicate::PredicateResult::Cacheable(data) => {
                             let cached = #cached_name {
-                                #(#cache_policy_fields,)*
+                                #(#field_idents: data.#field_idents,)*
                             };
-                            hitbox_core::CachePolicy::Cacheable(hitbox_core::CacheValue::new(
-                                cached,
-                                config.ttl.map(|d| chrono::Utc::now() + d),
-                                config.stale_ttl.map(|d| chrono::Utc::now() + d),
-                            ))
+                            hitbox_core::CachePolicy::Cacheable(
+                                hitbox_core::CacheValue::from_config(cached, config),
+                            )
                         }
                         hitbox_core::predicate::PredicateResult::NonCacheable(data) => {
                             hitbox_core::CachePolicy::NonCacheable(data)
@@ -138,14 +121,14 @@ impl<'a> CacheableResponseImpl<'a> {
 
                 fn into_cached(self) -> Self::IntoCachedFuture {
                     let cached = #cached_name {
-                        #(#into_cached_fields,)*
+                        #(#field_idents: self.#field_idents,)*
                     };
                     std::future::ready(hitbox_core::CachePolicy::Cacheable(cached))
                 }
 
                 fn from_cached(cached: Self::Cached) -> Self::FromCachedFuture {
                     std::future::ready(#name {
-                        #(#from_cached_fields,)*
+                        #(#field_idents: cached.#field_idents,)*
                     })
                 }
             }

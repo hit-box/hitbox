@@ -1,50 +1,4 @@
-//! Function memoization for hitbox caching framework.
-//!
-//! This crate provides tools for caching async function results using the hitbox FSM.
-//!
-//! # Overview
-//!
-//! - [`Args`] - Wrapper for function arguments (tuple)
-//! - [`KeyExtract`] - Trait for types to describe their cache key contribution
-//! - [`FnExtractor`] - Bridges `KeyExtract` to hitbox's `Extractor` trait
-//! - [`FnUpstream`] - Adapts async functions to hitbox's `Upstream` trait
-//! - [`Cache`] - Pre-configured cache with backend and policy
-//!
-//! # Usage
-//!
-//! ## With derive macros (requires `derive` feature)
-//!
-//! ```ignore
-//! use hitbox_fn::prelude::*;
-//!
-//! #[derive(KeyExtract)]
-//! struct UserId(u64);
-//!
-//! #[cached]
-//! async fn fetch_user(id: UserId) -> Result<User, Error> {
-//!     // expensive operation
-//! }
-//!
-//! // Usage
-//! let user = fetch_user(UserId(42))
-//!     .cache(&cache)
-//!     .await?;
-//! ```
-//!
-//! ## Manual implementation
-//!
-//! ```ignore
-//! use hitbox_fn::{Args, KeyExtract, FnExtractor, Cache};
-//!
-//! struct UserId(u64);
-//!
-//! impl KeyExtract for UserId {
-//!     fn extract(&self) -> Vec<KeyPart> {
-//!         vec![KeyPart::new("user_id", Some(self.0.to_string()))]
-//!     }
-//! }
-//! ```
-
+#![doc = include_str!("../README.md")]
 #![warn(missing_docs)]
 
 mod args;
@@ -53,8 +7,50 @@ mod extractor;
 mod upstream;
 
 pub use args::{Arg, Args, Skipped};
+
+/// Marker trait for types that can be used as skipped fields in `#[derive(CacheableResponse)]`.
+///
+/// Skipped fields are not stored in the cache. On cache hit, they are reconstructed
+/// using `Default::default()`. This trait provides a clear compile error when a
+/// skipped field type doesn't implement `Default`.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` cannot be used as a skipped field in `#[derive(CacheableResponse)]`",
+    note = "skipped fields are not stored in cache and are reconstructed using `Default::default()` on cache hit",
+    note = "either implement `Default` for `{Self}` or remove the `#[cacheable_response(skip)]` attribute"
+)]
+pub trait SkippedFieldDefault {
+    /// Create a default value for a skipped field.
+    fn skipped_default() -> Self;
+}
+
+impl<T: Default> SkippedFieldDefault for T {
+    fn skipped_default() -> Self {
+        Self::default()
+    }
+}
+
+/// Marker trait for types that can be used as cached (non-skipped) fields in `#[derive(CacheableResponse)]`.
+///
+/// Non-skipped fields are stored in the cache and must be cloneable for cache storage.
+/// This trait provides a clear compile error when a cached field type doesn't implement `Clone`.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` cannot be used as a cached field in `#[derive(CacheableResponse)]`",
+    note = "non-skipped fields are stored in cache and must implement `Clone` for cache storage",
+    note = "either implement `Clone` for `{Self}` or add the `#[cacheable_response(skip)]` attribute"
+)]
+pub trait CachedFieldClone {
+    /// Clone this field for cache storage.
+    fn cached_clone(&self) -> Self;
+}
+
+impl<T: Clone> CachedFieldClone for T {
+    fn cached_clone(&self) -> Self {
+        self.clone()
+    }
+}
 pub use cache::{
-    Cache, CacheBuilder, NoBackend, NoContext, NoPolicy, WithBackend, WithContext, WithPolicy,
+    Cache, CacheAccess, CacheBuilder, NoBackend, NoContext, NoPolicy, WithBackend, WithContext,
+    WithPolicy,
 };
 pub use extractor::{FnExtractor, KeyExtract};
 pub use upstream::FnUpstream;

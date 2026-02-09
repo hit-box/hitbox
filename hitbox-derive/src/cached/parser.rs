@@ -4,8 +4,8 @@ use convert_case::{Case, Casing};
 use darling::{FromMeta, ast::NestedMeta};
 use proc_macro2::TokenStream;
 use syn::{
-    Error, GenericParam, Ident, ItemFn, LifetimeParam, Pat, PatIdent, PatType, ReturnType,
-    Signature, Type, TypeParam, Visibility,
+    Error, GenericParam, Ident, ItemFn, Pat, PatIdent, PatType, ReturnType, Signature, Type,
+    TypeParam, Visibility,
 };
 
 /// Wrapper type for parsing a list of identifiers from `skip(a, b, c)` syntax.
@@ -73,8 +73,6 @@ pub struct CachedFn {
     pub prefix: Option<String>,
     /// Parameter names to skip from cache key generation.
     pub skip: Vec<String>,
-    /// Lifetime parameters from the function signature.
-    pub lifetimes: Vec<LifetimeParam>,
     /// Type parameters from the function signature.
     pub type_params: Vec<TypeParam>,
 }
@@ -99,8 +97,17 @@ impl CachedFn {
         let cached_call_name = Ident::new(&format!("{}CallCached", pascal_name), name.span());
         let execute_name = Ident::new(&format!("__execute_cached_{}", name), name.span());
 
+        // Reject lifetime parameters — borrowed args are not yet supported (see #206)
+        for param in &sig.generics.params {
+            if let GenericParam::Lifetime(lt) = param {
+                return Err(Error::new_spanned(
+                    lt,
+                    "#[cached] does not support lifetime parameters; borrowed arguments are planned for 0.3 (see #206)",
+                ));
+            }
+        }
+
         let args = Self::parse_args(sig)?;
-        let lifetimes = Self::parse_lifetimes(sig);
         let type_params = Self::parse_type_params(sig);
 
         let return_type = match &sig.output {
@@ -116,6 +123,21 @@ impl CachedFn {
         // Convert Ident skip list to String for easier comparison
         let skip: Vec<String> = attrs.skip.0.iter().map(|i| i.to_string()).collect();
 
+        // Validate that all skip names correspond to actual function parameters
+        let arg_names = args.iter().map(|a| a.name.to_string()).collect::<Vec<_>>();
+        for skip_ident in &attrs.skip.0 {
+            if !arg_names.contains(&skip_ident.to_string()) {
+                return Err(Error::new_spanned(
+                    skip_ident,
+                    format!(
+                        "unknown parameter `{}` in skip list; available parameters: {}",
+                        skip_ident,
+                        arg_names.join(", "),
+                    ),
+                ));
+            }
+        }
+
         Ok(Self {
             vis: item.vis,
             name,
@@ -128,7 +150,6 @@ impl CachedFn {
             body: (*item.block).clone(),
             prefix: attrs.prefix,
             skip,
-            lifetimes,
             type_params,
         })
     }
@@ -176,21 +197,6 @@ impl CachedFn {
         Ok(args)
     }
 
-    /// Extract lifetime parameters from function signature.
-    fn parse_lifetimes(sig: &Signature) -> Vec<LifetimeParam> {
-        sig.generics
-            .params
-            .iter()
-            .filter_map(|param| {
-                if let GenericParam::Lifetime(lt) = param {
-                    Some(lt.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
     /// Extract type parameters from function signature.
     fn parse_type_params(sig: &Signature) -> Vec<TypeParam> {
         sig.generics
@@ -207,45 +213,26 @@ impl CachedFn {
     }
 
     // =========================================================================
-    // Generic helpers (lifetimes + type parameters)
+    // Generic helpers (type parameters only; lifetimes rejected in parser)
     // =========================================================================
 
-    /// Returns true if the function has any generic parameters (lifetimes or type params).
+    /// Returns true if the function has any type parameters.
     pub fn has_generics(&self) -> bool {
-        !self.lifetimes.is_empty() || !self.type_params.is_empty()
+        !self.type_params.is_empty()
     }
 
-    /// Returns true if the function has any lifetime parameters.
-    pub fn has_lifetimes(&self) -> bool {
-        !self.lifetimes.is_empty()
-    }
-
-    /// Returns all generic parameters (lifetimes + type params with bounds) for declarations.
-    /// Example: `'a, 'b, T: Clone, U: Debug` (without angle brackets)
+    /// Returns type parameters with bounds for declarations.
+    /// Example: `T: Clone, U: Debug`
     pub fn generic_params(&self) -> TokenStream {
-        let lifetimes = &self.lifetimes;
         let type_params = &self.type_params;
-
-        match (self.lifetimes.is_empty(), self.type_params.is_empty()) {
-            (true, true) => quote::quote! {},
-            (false, true) => quote::quote! { #(#lifetimes),* },
-            (true, false) => quote::quote! { #(#type_params),* },
-            (false, false) => quote::quote! { #(#lifetimes),*, #(#type_params),* },
-        }
+        quote::quote! { #(#type_params),* }
     }
 
-    /// Returns all generic arguments (lifetimes + type idents without bounds) for type applications.
-    /// Example: `'a, 'b, T, U` (without angle brackets)
+    /// Returns type parameter idents without bounds for type applications.
+    /// Example: `T, U`
     pub fn generic_args(&self) -> TokenStream {
-        let lifetimes: Vec<_> = self.lifetimes.iter().map(|lt| &lt.lifetime).collect();
         let type_idents: Vec<_> = self.type_params.iter().map(|tp| &tp.ident).collect();
-
-        match (self.lifetimes.is_empty(), self.type_params.is_empty()) {
-            (true, true) => quote::quote! {},
-            (false, true) => quote::quote! { #(#lifetimes),* },
-            (true, false) => quote::quote! { #(#type_idents),* },
-            (false, false) => quote::quote! { #(#lifetimes),*, #(#type_idents),* },
-        }
+        quote::quote! { #(#type_idents),* }
     }
 
     // =========================================================================
@@ -277,7 +264,7 @@ impl CachedFn {
     }
 
     /// Returns the tuple expression with each argument wrapped in `Arg::new()` or `Skipped::new()`.
-    /// Example: `(Skipped::new(request_id), Arg::new(value))`
+    /// Example: `(Skipped::new(request_id), Arg::new("value", value))`
     pub fn args_tuple_expr(&self) -> TokenStream {
         let exprs: Vec<_> = self
             .args
@@ -288,7 +275,8 @@ impl CachedFn {
                 if is_skipped {
                     quote::quote! { hitbox_fn::Skipped::new(#name) }
                 } else {
-                    quote::quote! { hitbox_fn::Arg::new(#name) }
+                    let name_str = name.to_string();
+                    quote::quote! { hitbox_fn::Arg::new(#name_str, #name) }
                 }
             })
             .collect();
