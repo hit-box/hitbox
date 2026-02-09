@@ -395,9 +395,10 @@ where
 // use as Box<dyn Backend> trait object
 //
 // PERFORMANCE NOTE: Negligible overhead - only metadata (expire/stale timestamps + envelope
-// discriminant) is serialized using bitcode. The already-serialized cached data (Bytes) is
-// copied into the buffer as-is without re-serialization. When using CompositionBackend
-// directly via CacheBackend::get/set, even this minimal envelope overhead is avoided.
+// discriminant) is packed into a fixed-size repr(C) header using bytemuck. The already-serialized
+// cached data (Bytes) is copied into the buffer as-is without re-serialization. When using
+// CompositionBackend directly via CacheBackend::get/set, even this minimal envelope overhead
+// is avoided.
 #[async_trait]
 impl<L1, L2, O, R, W> Backend for CompositionBackend<L1, L2, O, R, W>
 where
