@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-02-09
+
 ### Added
 - `KeyPart::with_key()` method to replace key while keeping the value ([#203](https://github.com/hit-box/hitbox/pull/203))
 - `KeyPart::prefixed()` method to add dot-separated prefix to key ([#203](https://github.com/hit-box/hitbox/pull/203))
