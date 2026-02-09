@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `KeyPart::with_key()` method to replace key while keeping the value ([#203](https://github.com/hit-box/hitbox/pull/203))
+- `KeyPart::prefixed()` method to add dot-separated prefix to key ([#203](https://github.com/hit-box/hitbox/pull/203))
+- `CacheValue::from_config()` constructor from `EntityPolicyConfig` ([#203](https://github.com/hit-box/hitbox/pull/203))
+
 ## [0.2.1] - 2026-02-05
 
 ### Added

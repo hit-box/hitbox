@@ -28,6 +28,8 @@ pub use predicate::{And, Neutral, Not, Or, Predicate, PredicateExt, PredicateRes
 pub use request::{CacheablePolicyData, CacheableRequest, RequestCachePolicy};
 pub use response::{CacheState, CacheableResponse, ResponseCachePolicy};
 #[doc(hidden)]
+pub use serde;
+#[doc(hidden)]
 pub use smallbox::space::S4;
 #[doc(hidden)]
 pub use smol_str::SmolStr;

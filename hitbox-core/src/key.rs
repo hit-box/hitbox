@@ -499,6 +499,24 @@ impl KeyPart {
     pub fn value(&self) -> Option<&str> {
         self.value.as_deref()
     }
+
+    /// Returns a new `KeyPart` with the key replaced, keeping the value.
+    pub fn with_key(self, key: impl AsRef<str>) -> Self {
+        KeyPart {
+            key: SmolStr::new(key),
+            ..self
+        }
+    }
+
+    /// Returns a new `KeyPart` with the key prefixed by `prefix.`.
+    ///
+    /// For example, `KeyPart("id", "42").prefixed("user")` produces `KeyPart("user.id", "42")`.
+    pub fn prefixed(self, prefix: impl AsRef<str>) -> Self {
+        KeyPart {
+            key: SmolStr::new(format!("{}.{}", prefix.as_ref(), self.key)),
+            ..self
+        }
+    }
 }
 
 /// Builder for accumulating cache key parts during extraction.

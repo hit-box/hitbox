@@ -8,7 +8,7 @@ Highly customizable async caching framework for Rust designed for high-performan
 
 Protocol-agnostic async core + first-class HTTP support via hitbox-http. Pluggable backends from in-memory to distributed solutions such as Redis. Built on tower, works with any tokio-based service.
 
-There are two common approaches to caching frameworks. The first is a low-level approach where you work directly with a cache instance, calling `get`, `set`, and `delete` methods and deciding exactly when and where to use them in your code. The second is a higher-level approach where the framework wraps your handlers or clients and automatically decides when to cache or invalidate data. Hitbox follows the second approach - its flexible configuration keeps caching logic out of your business code. 
+There are several common approaches to caching. The first is a low-level approach where you work directly with a cache instance, calling `get`, `set`, and `delete` methods and deciding exactly when and where to use them in your code. The second is a middleware approach where a caching layer wraps your handlers or services transparently, keeping your business logic clean and business-focused. The third is function-level memoization — like Python decorators — where you simply annotate a function and work with it as if no caching exists. Hitbox supports the second and third approaches, keeping caching logic out of your business code in both cases.
 
 While Hitbox is designed for large, high-load projects, it works equally well for small and simple ones. The configuration complexity scales with your project: simple projects need only simple settings.
 

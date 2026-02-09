@@ -115,5 +115,5 @@ containing: `["GET", "123", "2", "en"]`.
 [`Extractor`]: crate::Extractor
 [Moka]: https://github.com/moka-rs/moka
 [Redis]: https://redis.io/
-[FeOxDB]: https://github.com/nicholasVilela/feoxdb
+[FeOxDB]: https://github.com/mehrantsi/feoxdb
 [Tower]: https://docs.rs/tower
