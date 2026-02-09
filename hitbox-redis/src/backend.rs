@@ -7,7 +7,8 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use hitbox::{BackendLabel, CacheKey, CacheValue, Raw};
 use hitbox_backend::{
-    Backend, BackendResult, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor,
+    Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus,
+    PassthroughCompressor,
     format::{BincodeFormat, Format},
 };
 use redis::Client;
@@ -389,7 +390,7 @@ impl RedisConnection {
 /// # Performance
 ///
 /// - **Read operations**: Single pipelined request (`HMGET` + `PTTL`)
-/// - **Write operations**: Single pipelined request (`HSET` + `EXPIRE`)
+/// - **Write operations**: Single pipelined request (`HSET` + `PEXPIRE`)
 /// - **Connection**: Established lazily on first use, multiplexed for concurrent access
 ///
 /// # Caveats
@@ -848,13 +849,21 @@ where
             cmd.arg("s").arg(stale.timestamp_millis());
         }
 
-        // Pipeline: HSET + optional EXPIRE (computed from value.ttl())
+        // Pipeline: HSET + optional PEXPIRE (computed from value.ttl())
         let mut pipe = redis::pipe();
         pipe.add_command(cmd).ignore();
         if let Some(ttl_duration) = value.ttl() {
-            pipe.cmd("EXPIRE")
+            pipe.cmd("PEXPIRE")
                 .arg(&cache_key)
-                .arg(ttl_duration.as_secs())
+                .arg(u64::try_from(ttl_duration.as_millis()).map_err(|_| {
+                    BackendError::InternalError(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!(
+                            "TTL overflow: {}ms exceeds u64 range",
+                            ttl_duration.as_millis()
+                        ),
+                    )))
+                })?)
                 .ignore();
         }
 
