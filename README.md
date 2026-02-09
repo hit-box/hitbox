@@ -138,8 +138,9 @@ async fn main() {
 
 ### Function Memoization
 
-For caching individual async functions with `#[cached]` macro, use [`hitbox-fn`](./hitbox-fn).
-See the [memoization_derive](./examples/examples/memoization_derive.rs) example for a complete walkthrough.
+The [`hitbox-fn`](./hitbox-fn) crate provides function-level memoization — cache async function results without touching your business logic. Annotate functions with `#[cached]`, derive `KeyExtract` on argument types to control cache key generation, and derive `CacheableResponse` on return types to control what gets stored. Build a reusable `Cache` instance with a backend and policy, then call your function via `.cache(&cache)`. Enable the `derive` feature flag for macro support.
+
+See the [memoization_derive](./examples/examples/memoization_derive.rs) example for a complete walkthrough including multi-argument functions, skipped fields, and `CacheableResponse` with excluded fields.
 
 ### What's Next
 
@@ -161,6 +162,7 @@ See the [memoization_derive](./examples/examples/memoization_derive.rs) example 
 - [Compression](#compression) Reduce storage size with zstd or gzip compression
 - [Observability](#observability) Track cache status, latency, backend I/O, and offload tasks
 - [Predicate and Extractor Traits](#predicate-and-extractor-traits) Protocol-agnostic traits to control caching and generate cache keys
+- [Function Memoization](#function-memoization) Cache async function results with `#[cached]` macro and derive-based cache key extraction
 
 ### HTTP Caching Features
 - [HTTP Predicates](#http-predicates) Control caching with rules based on any part of request or response, including body
