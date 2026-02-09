@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-02-09
+
 ### Fixed
 - Replace `wait_all()` busy-wait loop with `Notify`-based wakeup to avoid burning CPU ([#210](https://github.com/hit-box/hitbox/issues/210))
 - Use `DashMap::entry()` to prevent TOCTOU race in offload deduplication check ([#214](https://github.com/hit-box/hitbox/issues/214))
