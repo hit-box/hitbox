@@ -7,3 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Initial release
+
+### Fixed
+- Remove redundant double `Arc::clone` in `Endpoint::clone` for the `extractors` field ([#214](https://github.com/hit-box/hitbox/issues/214))
