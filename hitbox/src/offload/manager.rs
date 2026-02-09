@@ -151,7 +151,7 @@ impl OffloadManager {
         if let Some(max) = self.inner.config.max_concurrent_tasks
             && self.inner.tasks.len() >= max
         {
-            debug!(max, "Task rejected - max concurrent tasks reached");
+            warn!(max, "Task rejected - max concurrent tasks reached");
             return false;
         }
 
