@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-09
+
 ### Fixed
 - Use `PEXPIRE` (milliseconds) for writes to match `PTTL` read precision, preventing TTL truncation ([#212](https://github.com/hit-box/hitbox/issues/212))
 
