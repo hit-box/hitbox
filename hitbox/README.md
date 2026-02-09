@@ -12,6 +12,7 @@ If you need to add caching to your project, choose the appropriate integration b
 
 | Use Case | Crate | Description |
 |----------|-------|-------------|
+| **Function memoization** | [`hitbox-fn`] | `#[cached]` macro for async function caching |
 | **Server-side** (Axum, Tower-based frameworks) | [`hitbox-tower`] | Tower middleware layer for HTTP handlers |
 | **Client-side** (Hyper) | [`hitbox-tower`] | Tower middleware layer for hyper client |
 | **Client-side** (Reqwest) | [`hitbox-reqwest`] | Cache responses from external APIs via reqwest-middleware |
@@ -30,13 +31,14 @@ Hitbox is organized as a collection of crates, each with a specific responsibili
 | [`hitbox`] | Main crate — re-exports core types, policy configuration, error types |
 | [`hitbox-core`] | Protocol-agnostic core traits ([`Predicate`], [`Extractor`], [`CacheableRequest`], [`CacheableResponse`]) |
 | [`hitbox-backend`] | [`Backend`] trait and utilities for implementing storage backends |
+| [`hitbox-fn`] | Function memoization with `#[cached]` macro and cache key extraction |
+| [`hitbox-derive`] | Derive macros (`#[cached]`, `KeyExtract`, `CacheableResponse`, `CacheableRequest`) |
 | [`hitbox-http`] | HTTP-specific predicates and extractors for request/response caching |
 | [`hitbox-tower`] | Tower middleware (`Cache` layer) for server-side caching |
 | [`hitbox-moka`] | In-memory backend using [Moka] |
 | [`hitbox-redis`] | Distributed backend using [Redis] (single node and cluster) |
 | [`hitbox-feoxdb`] | Embedded persistent backend using FeOxDB |
 | [`hitbox-reqwest`] | Client-side caching for Reqwest via reqwest-middleware |
-| [`hitbox-test`] | Testing utilities including `MockTime` for deterministic cache tests |
 
 ### Core Principles
 
@@ -103,13 +105,14 @@ containing: `["GET", "123", "2", "en"]`.
 [`hitbox`]: https://docs.rs/hitbox
 [`hitbox-core`]: https://docs.rs/hitbox-core
 [`hitbox-backend`]: https://docs.rs/hitbox-backend
+[`hitbox-fn`]: https://docs.rs/hitbox-fn
+[`hitbox-derive`]: https://docs.rs/hitbox-derive
 [`hitbox-http`]: https://docs.rs/hitbox-http
 [`hitbox-tower`]: https://docs.rs/hitbox-tower
 [`hitbox-moka`]: https://docs.rs/hitbox-moka
 [`hitbox-redis`]: https://docs.rs/hitbox-redis
 [`hitbox-feoxdb`]: https://docs.rs/hitbox-feoxdb
 [`hitbox-reqwest`]: https://docs.rs/hitbox-reqwest
-[`hitbox-test`]: https://docs.rs/hitbox-test
 [`Backend`]: hitbox_backend::Backend
 [`Upstream`]: hitbox_core::Upstream
 [`Extractor`]: crate::Extractor

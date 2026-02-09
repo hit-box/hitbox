@@ -35,7 +35,9 @@ At the same time, Hitbox is not just an abstract foundation. It already provides
 
 ## Quick Start
 
-### Cargo.toml
+### HTTP Middleware (Axum / Tower)
+
+#### Cargo.toml
 
 ```toml
 [package]
@@ -53,7 +55,7 @@ hitbox-tower = "0.2"
 http = "1"
 ```
 
-### Basic Usage
+#### Basic Usage
 
 ```rust
 use std::time::Duration;
@@ -133,6 +135,11 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 ```
+
+### Function Memoization
+
+For caching individual async functions with `#[cached]` macro, use [`hitbox-fn`](./hitbox-fn).
+See the [memoization_derive](./examples/examples/memoization_derive.rs) example for a complete walkthrough.
 
 ### What's Next
 
@@ -458,6 +465,8 @@ Change caching rules at runtime - no recompilation needed.
 | `hitbox` | Main crate with policy configuration, stale cache, and feature flags for backends |
 | `hitbox-core` | Core traits (`Predicate`, `Extractor`) and types for protocol-agnostic caching |
 | `hitbox-backend` | `Backend` trait and utilities for implementing storage backends |
+| `hitbox-fn` | Function memoization with `#[cached]` macro and cache key extraction |
+| `hitbox-derive` | Derive macros (`#[cached]`, `KeyExtract`, `CacheableResponse`, `CacheableRequest`) |
 | `hitbox-http` | HTTP-specific predicates and extractors for request/response caching |
 | `hitbox-tower` | Tower middleware integration (`Cache` layer) for server-side caching |
 | `hitbox-configuration` | YAML/file-based configuration support |
