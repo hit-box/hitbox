@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Replace `wait_all()` busy-wait loop with `Notify`-based wakeup to avoid burning CPU ([#210](https://github.com/hit-box/hitbox/issues/210))
+- Use `DashMap::entry()` to prevent TOCTOU race in offload deduplication check ([#214](https://github.com/hit-box/hitbox/issues/214))
+- `OffloadManager::register` now enforces the `max_concurrent_tasks` limit ([#209](https://github.com/hit-box/hitbox/issues/209))
 
 ## [0.2.1] - 2026-02-05
 

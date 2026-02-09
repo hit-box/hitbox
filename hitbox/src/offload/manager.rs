@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use dashmap::DashMap;
+use dashmap::mapref::entry::Entry;
 use hitbox_core::OffloadKey as CoreOffloadKey;
 use smol_str::SmolStr;
 use tokio::sync::Notify;
@@ -126,10 +127,11 @@ impl OffloadManager {
 
     /// Register a task with the given key.
     ///
-    /// If deduplication is enabled and a task with the same `Keyed` key is
-    /// already in flight, the new task will be skipped.
+    /// Returns `false` (task not spawned) when:
+    /// - The `max_concurrent_tasks` limit has been reached.
+    /// - Deduplication is enabled and a task with the same `Keyed` key is already in flight.
     ///
-    /// Returns `true` if the task was spawned, `false` if it was deduplicated.
+    /// Returns `true` if the task was spawned.
     ///
     /// # Example
     /// ```ignore
@@ -149,6 +151,14 @@ impl OffloadManager {
         K: Into<CoreOffloadKey>,
         F: Future<Output = ()> + Send + 'static,
     {
+        // Check max concurrent tasks limit
+        if let Some(max) = self.inner.config.max_concurrent_tasks
+            && self.inner.tasks.len() >= max
+        {
+            warn!(max, "Task rejected - max concurrent tasks reached");
+            return false;
+        }
+
         // Convert Auto keys to Explicit with auto-assigned id
         let key = match key.into() {
             CoreOffloadKey::Auto { kind } => CoreOffloadKey::Explicit {
@@ -158,31 +168,42 @@ impl OffloadManager {
             other => other,
         };
 
-        // Check for deduplication (only for Keyed keys when enabled)
-        if self.inner.config.deduplicate
-            && matches!(&key, CoreOffloadKey::Keyed { .. })
-            && self.inner.tasks.contains_key(&key)
-        {
-            debug!(?key, "Task deduplicated - already in flight");
-            #[cfg(feature = "metrics")]
-            metrics::counter!(*OFFLOAD_TASKS_DEDUPLICATED, "kind" => key.kind().to_string())
-                .increment(1);
-            return false;
+        // Use entry() for atomic check-and-insert (avoids TOCTOU race in dedup path)
+        match self.inner.tasks.entry(key) {
+            Entry::Occupied(occupied)
+                if self.inner.config.deduplicate
+                    && matches!(occupied.key(), CoreOffloadKey::Keyed { .. }) =>
+            {
+                debug!(key = ?occupied.key(), "Task deduplicated - already in flight");
+                #[cfg(feature = "metrics")]
+                metrics::counter!(*OFFLOAD_TASKS_DEDUPLICATED, "kind" => occupied.key().kind().to_string())
+                    .increment(1);
+                false
+            }
+            entry => {
+                #[cfg(feature = "metrics")]
+                let key_kind = entry.key().kind().clone();
+                let key_clone = entry.key().clone();
+                let handle = self.spawn_inner(task, key_clone);
+                match entry {
+                    Entry::Occupied(mut occupied) => {
+                        occupied.insert(handle);
+                    }
+                    Entry::Vacant(vacant) => {
+                        vacant.insert(handle);
+                    }
+                }
+
+                #[cfg(feature = "metrics")]
+                {
+                    metrics::counter!(*OFFLOAD_TASKS_SPAWNED, "kind" => key_kind.to_string())
+                        .increment(1);
+                    metrics::gauge!(*OFFLOAD_TASKS_ACTIVE, "kind" => key_kind.to_string())
+                        .increment(1.0);
+                }
+                true
+            }
         }
-
-        #[cfg(feature = "metrics")]
-        let key_kind = key.kind().clone();
-
-        let handle = self.spawn_inner(task, key.clone());
-        self.inner.tasks.insert(key, handle);
-
-        #[cfg(feature = "metrics")]
-        {
-            metrics::counter!(*OFFLOAD_TASKS_SPAWNED, "kind" => key_kind.to_string()).increment(1);
-            metrics::gauge!(*OFFLOAD_TASKS_ACTIVE, "kind" => key_kind.to_string()).increment(1.0);
-        }
-
-        true
     }
 
     /// Spawn a task with auto-generated key and specified kind.
