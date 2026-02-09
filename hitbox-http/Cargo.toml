@@ -32,7 +32,7 @@ hyper = { workspace = true }
 futures = { workspace = true }
 pin-project = { workspace = true }
 actix-router = "0.5"
-serde_qs = "0.15"
+serde_qs = "1.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 jaq-core = "2.1.0"
