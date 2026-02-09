@@ -14,8 +14,7 @@ use std::num::NonZeroU16;
 fn test_response_expression_flat_deserialize() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Status: 200
   - Status: 201
@@ -39,8 +38,7 @@ response:
 fn test_undefined_response_predicates() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 ";
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
     let expected = ConfigEndpoint {
@@ -55,8 +53,7 @@ fn test_null_response_predicates() {
     let yaml_str = r"
 response: null
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 ";
     let endpoint: ConfigEndpoint = serde_saphyr::from_str(yaml_str).unwrap();
     let expected = ConfigEndpoint {
@@ -71,8 +68,7 @@ fn test_response_expression_into_predicates() {
     let yaml_str = r"
 extractors: []
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   And:
   - Status: 203
@@ -102,8 +98,7 @@ response:
 fn test_invalid_status_range_rejected() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Status:
       range: [299, 200]
@@ -119,8 +114,7 @@ response:
 fn test_valid_status_range_accepted() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Status:
       range: [200, 299]
@@ -137,8 +131,7 @@ response:
 fn test_response_header_eq_deserialize() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Header:
       content-type: application/json
@@ -167,8 +160,7 @@ response:
 fn test_response_header_exist_deserialize() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Header:
       x-custom-header:
@@ -193,8 +185,7 @@ response:
 fn test_response_header_in_deserialize() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Header:
       content-type:
@@ -230,8 +221,7 @@ response:
 fn test_response_header_combined_with_status() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Status: 200
   - Header:
@@ -261,8 +251,7 @@ response:
 fn test_response_header_contains_deserialize() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Header:
       content-type:
@@ -293,8 +282,7 @@ response:
 fn test_response_header_regex_deserialize() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Header:
       content-type:
@@ -329,8 +317,7 @@ response:
 fn test_invalid_regex_pattern_rejected() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Header:
       content-type:
@@ -358,8 +345,7 @@ response:
 fn test_valid_regex_pattern_accepted() {
     let yaml_str = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 response:
   - Header:
       content-type:
