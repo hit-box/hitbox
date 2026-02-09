@@ -15,9 +15,9 @@ derive = ["hitbox-derive"]
 rkyv_format = ["hitbox/rkyv_format", "hitbox-core/rkyv_format", "dep:rkyv"]
 
 [dependencies]
-hitbox = { path = "../hitbox" }
-hitbox-core = { path = "../hitbox-core" }
-hitbox-derive = { path = "../hitbox-derive", optional = true }
+hitbox = { path = "../hitbox", version = "0.2" }
+hitbox-core = { path = "../hitbox-core", version = "0.2" }
+hitbox-derive = { path = "../hitbox-derive", version = "0.2", optional = true }
 rkyv = { workspace = true, optional = true }
 
 async-trait = { workspace = true }
