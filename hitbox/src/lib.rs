@@ -74,8 +74,8 @@ pub use context::{BoxContext, CacheContext, CacheStatus, CacheStatusExt, Context
 /// Policy configuration for cache behavior.
 ///
 /// Defines [`PolicyConfig`](policy::PolicyConfig) with:
-/// - **TTL** — how long cached data remains fresh
-/// - **Stale window** — grace period after TTL where stale data can be served
+/// - **TTL** — time until cached data expires and becomes invalid
+/// - **Stale** — time from cache write until data becomes stale (for background refresh)
 /// - **Stale policy** — how to handle stale data (`Return`, `Revalidate`, `OffloadRevalidate`)
 /// - **Concurrency** — limit for dogpile prevention
 pub mod policy;

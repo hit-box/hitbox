@@ -71,7 +71,3 @@ criterion = "0.8"
 # SmallBox for inline trait objects
 smallbox = "0.8"
 
-# Hurl dependencies - our fork
-hurl = { git = "https://github.com/hit-box/hurl.git", branch = "master" }
-hurl_core = { git = "https://github.com/hit-box/hurl.git", branch = "master" }
-
