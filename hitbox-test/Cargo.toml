@@ -26,7 +26,7 @@ hitbox-moka = { path = "../hitbox-moka", version = "0.2" }
 hitbox-feoxdb = { path = "../hitbox-feoxdb", version = "0.2" }
 hitbox-redis = { path = "../hitbox-redis", version = "0.2" }
 hitbox-tower = { path = "../hitbox-tower", version = "0.2" }
-hitbox-configuration = { path = "../hitbox-configuration", version = "0.1", features = [
+hitbox-configuration = { path = "../hitbox-configuration", version = "0.2", features = [
     "moka",
 ] }
 chrono = { workspace = true }
