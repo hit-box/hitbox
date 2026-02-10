@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-02-10
+
 ### Fixed
 - Correct `stale` field documentation — it is time from cache write until entry becomes stale, not a window after TTL
 - Remove arbitrary 5s default TTL from `EnabledCacheConfig` — default is now `None` (cache indefinitely), consistent with `PolicyConfigBuilder` and `EntityPolicyConfig`
