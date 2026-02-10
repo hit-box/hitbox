@@ -27,11 +27,35 @@ jobs:
           echo "crate_name=$CRATE_NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Extract changelog notes
+        id: changelog
+        run: |
+          CRATE_NAME="${{ steps.parse.outputs.crate_name }}"
+          VERSION="${{ steps.parse.outputs.version }}"
+          CHANGELOG_FILE="${CRATE_NAME}/CHANGELOG.md"
+
+          NOTES=""
+          if [ -f "$CHANGELOG_FILE" ]; then
+            # Extract content between ## [VERSION] and the next ## [ heading
+            NOTES=$(sed -n "/^## \[${VERSION}\]/,/^## \[/{/^## \[/d;p}" "$CHANGELOG_FILE" | sed '/^$/N;/^\n$/d')
+          fi
+
+          if [ -n "$NOTES" ]; then
+            echo "$NOTES" > /tmp/release-notes.md
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.parse.outputs.tag }}" \
-            --title "${{ steps.parse.outputs.crate_name }} v${{ steps.parse.outputs.version }}" \
-            --generate-notes \
-            --verify-tag
+          TAG="${{ steps.parse.outputs.tag }}"
+          TITLE="${{ steps.parse.outputs.crate_name }} v${{ steps.parse.outputs.version }}"
+
+          if [ "${{ steps.changelog.outputs.found }}" = "true" ]; then
+            gh release create "$TAG" --title "$TITLE" --notes-file /tmp/release-notes.md --verify-tag
+          else
+            gh release create "$TAG" --title "$TITLE" --generate-notes --verify-tag
+          fi
