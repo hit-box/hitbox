@@ -26,7 +26,7 @@ pub struct ConfigEndpoint {
     pub response: MaybeUndefined<Response>,
     #[serde(default)]
     pub extractors: MaybeUndefined<Vec<Extractor>>,
-    pub policy: PolicyConfig,
+    pub policy: Arc<PolicyConfig>,
 }
 
 impl ConfigEndpoint {

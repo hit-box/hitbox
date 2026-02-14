@@ -3,6 +3,7 @@
 //! Controls how long data stays fresh, when stale data can be served,
 //! and how concurrent requests are coordinated during cache misses.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use bounded_integer::BoundedU8;
@@ -125,14 +126,14 @@ impl PolicyConfigBuilder {
     }
 
     /// Build the PolicyConfig with enabled caching.
-    pub fn build(self) -> PolicyConfig {
-        PolicyConfig::Enabled(EnabledCacheConfig {
+    pub fn build(self) -> Arc<PolicyConfig> {
+        Arc::new(PolicyConfig::Enabled(EnabledCacheConfig {
             ttl: self.ttl,
             stale: self.stale,
             policy: CacheBehaviorPolicy {
                 stale: self.stale_policy,
             },
             concurrency: self.concurrency,
-        })
+        }))
     }
 }

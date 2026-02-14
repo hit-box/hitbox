@@ -640,7 +640,7 @@ async fn test_key_zero_args() {
     // Reconstruct a second cache from accessors of the first one
     let cache2 = Cache::builder()
         .backend(SpyBackend::new())
-        .policy(cache.policy().as_ref().clone())
+        .policy(cache.policy().clone())
         .concurrency_manager(cache.concurrency_manager().clone())
         .offload(*cache.offload())
         .build();

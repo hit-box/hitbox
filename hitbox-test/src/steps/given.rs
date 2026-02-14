@@ -14,12 +14,13 @@ use serde::{Deserialize, Serialize};
 
 #[given(regex = r"hitbox with policy")]
 fn hitbox_with_policy(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    let policy = step
-        .docstring_content()
-        .as_deref()
-        .map(serde_saphyr::from_str::<PolicyConfig>)
-        .transpose()?
-        .unwrap_or_default();
+    let policy = Arc::new(
+        step.docstring_content()
+            .as_deref()
+            .map(serde_saphyr::from_str::<PolicyConfig>)
+            .transpose()?
+            .unwrap_or_default(),
+    );
     world.config.policy = policy;
     Ok(())
 }

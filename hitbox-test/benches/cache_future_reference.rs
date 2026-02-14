@@ -809,7 +809,7 @@ fn bench_compare_cache_future_hit(c: &mut Criterion) {
         .endpoint
         .into_endpoint::<InnerBody, InnerBody>()
         .expect("Failed to create endpoint");
-    let dyn_policy = Arc::new(endpoint.policy.clone());
+    let dyn_policy = endpoint.policy.clone();
 
     // Pre-populate dynamic cache
     let request = CacheableHttpRequest::from_request(create_reference_request());
@@ -941,7 +941,7 @@ fn bench_compare_cache_future_miss(c: &mut Criterion) {
         .endpoint
         .into_endpoint::<InnerBody, InnerBody>()
         .expect("Failed to create endpoint");
-    let dyn_policy = Arc::new(endpoint.policy.clone());
+    let dyn_policy = endpoint.policy.clone();
     let dyn_backend_arc: Arc<DynBackend> = Arc::new(dyn_backend);
 
     // Use atomic counters for unique request IDs
@@ -1192,7 +1192,7 @@ fn bench_compare_body_cache_future_hit(c: &mut Criterion) {
         .endpoint
         .into_endpoint::<InnerBody, InnerBody>()
         .expect("Failed to create endpoint");
-    let dyn_policy = Arc::new(endpoint.policy.clone());
+    let dyn_policy = endpoint.policy.clone();
 
     // Pre-populate dynamic cache
     let request = CacheableHttpRequest::from_request(create_reference_request());
@@ -1323,7 +1323,7 @@ fn bench_compare_body_cache_future_miss(c: &mut Criterion) {
         .endpoint
         .into_endpoint::<InnerBody, InnerBody>()
         .expect("Failed to create endpoint");
-    let dyn_policy = Arc::new(endpoint.policy.clone());
+    let dyn_policy = endpoint.policy.clone();
     let dyn_backend_arc: Arc<DynBackend> = Arc::new(dyn_backend);
 
     // Use atomic counters for unique request IDs

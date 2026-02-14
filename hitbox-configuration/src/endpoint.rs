@@ -28,7 +28,7 @@ where
     pub request_predicates: ArcRequestPredicate<ReqBody>,
     pub response_predicates: ArcResponsePredicate<ResBody>,
     pub extractors: ArcRequestExtractor<ReqBody>,
-    pub policy: PolicyConfig,
+    pub policy: Arc<PolicyConfig>,
 }
 
 impl<ReqBody, ResBody> Debug for Endpoint<ReqBody, ResBody>
@@ -56,7 +56,7 @@ where
             request_predicates: Arc::clone(&self.request_predicates),
             response_predicates: Arc::clone(&self.response_predicates),
             extractors: Arc::clone(&self.extractors),
-            policy: self.policy.clone(),
+            policy: Arc::clone(&self.policy),
         }
     }
 }
@@ -103,8 +103,8 @@ where
         Arc::clone(&self.extractors)
     }
 
-    fn policy(&self) -> &PolicyConfig {
-        &self.policy
+    fn policy(&self) -> Arc<PolicyConfig> {
+        Arc::clone(&self.policy)
     }
 }
 
@@ -128,7 +128,7 @@ where
     request_predicates: Option<ArcRequestPredicate<ReqBody>>,
     response_predicates: Option<ArcResponsePredicate<ResBody>>,
     extractors: Option<ArcRequestExtractor<ReqBody>>,
-    policy: PolicyConfig,
+    policy: Arc<PolicyConfig>,
 }
 
 impl<ReqBody, ResBody> EndpointBuilder<ReqBody, ResBody>
@@ -142,7 +142,7 @@ where
             request_predicates: None,
             response_predicates: None,
             extractors: None,
-            policy: PolicyConfig::default(),
+            policy: Arc::new(PolicyConfig::default()),
         }
     }
 
@@ -180,7 +180,7 @@ where
     }
 
     /// Set the cache policy.
-    pub fn policy(self, policy: PolicyConfig) -> Self {
+    pub fn policy(self, policy: Arc<PolicyConfig>) -> Self {
         Self { policy, ..self }
     }
 

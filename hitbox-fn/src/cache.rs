@@ -229,10 +229,10 @@ impl<B, CM, O> CacheBuilder<B, NoPolicy, CM, O> {
     /// let builder = Cache::builder()
     ///     .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build());
     /// ```
-    pub fn policy(self, policy: PolicyConfig) -> CacheBuilder<B, WithPolicy, CM, O> {
+    pub fn policy(self, policy: Arc<PolicyConfig>) -> CacheBuilder<B, WithPolicy, CM, O> {
         CacheBuilder {
             backend: self.backend,
-            policy: WithPolicy(Arc::new(policy)),
+            policy: WithPolicy(policy),
             concurrency_manager: self.concurrency_manager,
             offload: self.offload,
         }

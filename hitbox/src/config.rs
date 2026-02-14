@@ -34,7 +34,7 @@ pub trait CacheConfig<Req, Res> {
     /// Returns extractors that generate cache keys from requests.
     fn extractors(&self) -> Self::Extractor;
     /// Returns TTL and behavior policy for cached entries.
-    fn policy(&self) -> &PolicyConfig;
+    fn policy(&self) -> Arc<PolicyConfig>;
 }
 
 /// Generic cache configuration.
@@ -72,7 +72,7 @@ pub struct Config<ReqPred, ResPred, Ext> {
     request_predicate: Arc<ReqPred>,
     response_predicate: Arc<ResPred>,
     extractor: Arc<Ext>,
-    policy: PolicyConfig,
+    policy: Arc<PolicyConfig>,
 }
 
 impl<ReqPred, ResPred, Ext> Clone for Config<ReqPred, ResPred, Ext> {
@@ -81,7 +81,7 @@ impl<ReqPred, ResPred, Ext> Clone for Config<ReqPred, ResPred, Ext> {
             request_predicate: Arc::clone(&self.request_predicate),
             response_predicate: Arc::clone(&self.response_predicate),
             extractor: Arc::clone(&self.extractor),
-            policy: self.policy.clone(),
+            policy: Arc::clone(&self.policy),
         }
     }
 }
@@ -121,8 +121,8 @@ where
         Arc::clone(&self.extractor)
     }
 
-    fn policy(&self) -> &PolicyConfig {
-        &self.policy
+    fn policy(&self) -> Arc<PolicyConfig> {
+        Arc::clone(&self.policy)
     }
 }
 
@@ -133,7 +133,7 @@ pub struct ConfigBuilder<ReqPred, ResPred, Ext> {
     request_predicate: ReqPred,
     response_predicate: ResPred,
     extractor: Ext,
-    policy: PolicyConfig,
+    policy: Arc<PolicyConfig>,
 }
 
 /// Marker type for unset builder fields.
@@ -157,7 +157,7 @@ impl ConfigBuilder<NotSet, NotSet, NotSet> {
             request_predicate: NotSet,
             response_predicate: NotSet,
             extractor: NotSet,
-            policy: PolicyConfig::default(),
+            policy: Arc::new(PolicyConfig::default()),
         }
     }
 }
@@ -206,7 +206,7 @@ impl<ReqPred, ResPred, Ext> ConfigBuilder<ReqPred, ResPred, Ext> {
     }
 
     /// Sets the cache policy.
-    pub fn policy(self, policy: PolicyConfig) -> Self {
+    pub fn policy(self, policy: Arc<PolicyConfig>) -> Self {
         Self { policy, ..self }
     }
 }
@@ -251,7 +251,7 @@ where
         self.as_ref().extractors()
     }
 
-    fn policy(&self) -> &PolicyConfig {
+    fn policy(&self) -> Arc<PolicyConfig> {
         self.as_ref().policy()
     }
 }

@@ -159,7 +159,7 @@ where
             configuration.request_predicates(),
             configuration.response_predicates(),
             configuration.extractors(),
-            Arc::new(configuration.policy().clone()),
+            configuration.policy().clone(),
             self.offload.clone(),
             self.concurrency_manager.clone(),
         );

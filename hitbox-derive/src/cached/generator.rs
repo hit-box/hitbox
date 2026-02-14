@@ -243,11 +243,11 @@ impl ToTokens for CallImplPolicy<'_> {
 
         tokens.extend(quote! {
             impl #impl_generics #call_name #type_generics_no_policy {
-                pub fn policy(self, policy: hitbox::policy::PolicyConfig) -> #call_name #type_generics_with_policy {
+                pub fn policy(self, policy: std::sync::Arc<hitbox::policy::PolicyConfig>) -> #call_name #type_generics_with_policy {
                     #call_name {
                         args: self.args,
                         backend: self.backend,
-                        policy: hitbox_fn::WithPolicy(std::sync::Arc::new(policy)),
+                        policy: hitbox_fn::WithPolicy(policy),
                         _context: std::marker::PhantomData,
                     }
                 }

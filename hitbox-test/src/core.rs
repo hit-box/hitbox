@@ -39,7 +39,7 @@ pub struct TestConfig {
     pub request_predicate: Arc<BoxRequestPredicate>,
     pub response_predicate: Arc<BoxResponsePredicate>,
     pub extractor: Arc<BoxExtractor>,
-    pub policy: PolicyConfig,
+    pub policy: Arc<PolicyConfig>,
 }
 
 impl std::fmt::Debug for TestConfig {
@@ -59,7 +59,7 @@ impl Clone for TestConfig {
             request_predicate: Arc::clone(&self.request_predicate),
             response_predicate: Arc::clone(&self.response_predicate),
             extractor: Arc::clone(&self.extractor),
-            policy: self.policy.clone(),
+            policy: Arc::clone(&self.policy),
         }
     }
 }
@@ -75,7 +75,7 @@ impl Default for TestConfig {
             request_predicate: Arc::new(request_predicate),
             response_predicate: Arc::new(response_predicate),
             extractor: Arc::new(extractor),
-            policy: PolicyConfig::default(),
+            policy: Arc::new(PolicyConfig::default()),
         }
     }
 }
