@@ -75,10 +75,6 @@ name = "axum"
 path = "examples/axum.rs"
 
 [[example]]
-name = "axum-products"
-path = "examples/axum-products.rs"
-
-[[example]]
 name = "reqwest"
 path = "examples/reqwest.rs"
 
