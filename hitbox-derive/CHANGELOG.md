@@ -9,10 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.1] - 2026-02-17
 
 ### Fixed
-- Derive macros now emit `hitbox::` paths instead of `hitbox_core::` — users no longer need `hitbox-core` as a direct dependency
+- Derive macros now emit `hitbox::` paths instead of `hitbox_core::` — users no longer need `hitbox-core` as a direct dependency ([#252](https://github.com/hit-box/hitbox/pull/252))
 
 ### Added
-- `IntoFuture` passthrough for unconfigured `#[cached]` functions — `cached_fn(args).await` works without cache configuration, calling the underlying function directly
+- `IntoFuture` passthrough for unconfigured `#[cached]` functions — `cached_fn(args).await` works without cache configuration, calling the underlying function directly ([#252](https://github.com/hit-box/hitbox/pull/252))
 
 ## [0.2.0] - 2026-02-09
 
