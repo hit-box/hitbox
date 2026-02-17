@@ -525,7 +525,7 @@ impl ToTokens for IntoFutureCallNoContext<'_> {
                             backend,
                             policy,
                             hitbox::concurrency::NoopConcurrencyManager,
-                            hitbox_core::DisabledOffload,
+                            hitbox::DisabledOffload,
                             args
                         ).await;
                         result
@@ -589,7 +589,7 @@ impl ToTokens for IntoFutureCallWithContext<'_> {
                             backend,
                             policy,
                             hitbox::concurrency::NoopConcurrencyManager,
-                            hitbox_core::DisabledOffload,
+                            hitbox::DisabledOffload,
                             args
                         ).await
                     })
@@ -629,7 +629,7 @@ impl ToTokens for IntoFutureCachedNoContext<'_> {
                 CC: hitbox_fn::CacheAccess,
                 CC::Backend: hitbox::backend::CacheBackend + Send + Sync + 'static,
                 CC::ConcurrencyManager: hitbox::concurrency::ConcurrencyManager<#return_type> + Clone + 'static,
-                CC::Offload: hitbox_core::Offload<'static> + Clone + 'static,
+                CC::Offload: hitbox::Offload<'static> + Clone + 'static,
             {
                 type Output = #return_type;
                 type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + 'static>>;
@@ -681,7 +681,7 @@ impl ToTokens for IntoFutureCachedWithContext<'_> {
                 CC: hitbox_fn::CacheAccess,
                 CC::Backend: hitbox::backend::CacheBackend + Send + Sync + 'static,
                 CC::ConcurrencyManager: hitbox::concurrency::ConcurrencyManager<#return_type> + Clone + 'static,
-                CC::Offload: hitbox_core::Offload<'static> + Clone + 'static,
+                CC::Offload: hitbox::Offload<'static> + Clone + 'static,
             {
                 type Output = (#return_type, hitbox::context::CacheContext);
                 type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + 'static>>;
@@ -743,7 +743,7 @@ impl ToTokens for ExecuteFn<'_> {
             where
                 B: hitbox::backend::CacheBackend + Send + Sync + 'static,
                 CM: hitbox::concurrency::ConcurrencyManager<#return_type> + 'static,
-                O: hitbox_core::Offload<'static> + 'static,
+                O: hitbox::Offload<'static> + 'static,
             {
                 let upstream = hitbox_fn::FnUpstream::new(#impl_name);
                 let extractor = hitbox_fn::FnExtractor::<hitbox_fn::Args<#args_tuple>>::new(#fn_path);
