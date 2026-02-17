@@ -8,6 +8,7 @@ This crate provides procedural macros to reduce boilerplate when using `hitbox-f
 
 - **`#[cached]`** - Attribute macro that transforms an async function into a cacheable function
   with a builder-style API for configuring backend, policy, and context.
+  Can also be called directly with `.await` for a transparent passthrough (no caching).
 
 - **`#[derive(KeyExtract)]`** - Derive the `KeyExtract` trait for structs to control
   how they contribute to cache keys. Supports `#[key_extract(skip)]` and
@@ -25,7 +26,7 @@ This crate is typically used through `hitbox-fn` with the `derive` feature enabl
 
 ```toml
 [dependencies]
-hitbox-fn = { version = "0.1", features = ["derive"] }
+hitbox-fn = { version = "0.2", features = ["derive"] }
 ```
 
 ```rust,ignore

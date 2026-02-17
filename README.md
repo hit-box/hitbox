@@ -138,7 +138,7 @@ async fn main() {
 
 ### Function Memoization
 
-The [`hitbox-fn`](./hitbox-fn) crate provides function-level memoization — cache async function results without touching your business logic. Annotate functions with `#[cached]`, derive `KeyExtract` on argument types to control cache key generation, and derive `CacheableResponse` on return types to control what gets stored. Build a reusable `Cache` instance with a backend and policy, then call your function via `.cache(&cache)`. Enable the `derive` feature flag for macro support.
+The [`hitbox-fn`](./hitbox-fn) crate provides function-level memoization — cache async function results without touching your business logic. Annotate functions with `#[cached]`, derive `KeyExtract` on argument types to control cache key generation, and derive `CacheableResponse` on return types to control what gets stored. Build a reusable `Cache` instance with a backend and policy, then call your function via `.cache(&cache)`. Without cache configuration, `#[cached]` functions can be called directly with `.await` — a transparent passthrough to the underlying function. Enable the `derive` feature flag for macro support.
 
 See the [memoization_derive](./examples/examples/memoization_derive.rs) example for a complete walkthrough including multi-argument functions, skipped fields, and `CacheableResponse` with excluded fields.
 
