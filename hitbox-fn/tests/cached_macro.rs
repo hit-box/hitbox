@@ -526,6 +526,29 @@ async fn test_zero_args_generated_key() {
 }
 
 // =============================================================================
+// Passthrough tests (no backend, no policy — direct function call)
+// =============================================================================
+
+#[tokio::test]
+async fn test_passthrough_no_backend() {
+    let result = compute_with_skip("req-1".into(), 10).await;
+    assert_eq!(result, 20);
+}
+
+#[tokio::test]
+async fn test_passthrough_zero_args() {
+    let result = no_args_function().await;
+    assert_eq!(result, 42);
+}
+
+#[tokio::test]
+async fn test_passthrough_generic() {
+    let id = TypedId::new(42, "user");
+    let result = generic_function(id).await;
+    assert!(result.contains("42"));
+}
+
+// =============================================================================
 // Inline .backend().policy() path tests
 // =============================================================================
 

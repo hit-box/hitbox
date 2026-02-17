@@ -421,6 +421,58 @@ impl ToTokens for CachedCallImplWithContext<'_> {
 }
 
 // =============================================================================
+// IntoFuture passthrough (no backend, no policy, no context)
+// =============================================================================
+
+/// Generates `IntoFuture` impl for Call without any configuration.
+/// Calls the underlying function directly — no caching.
+pub struct IntoFuturePassthrough<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> IntoFuturePassthrough<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for IntoFuturePassthrough<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let call_name = &self.cached_fn.call_name;
+        let impl_name = &self.cached_fn.impl_name;
+        let return_type = &self.cached_fn.return_type;
+
+        let (impl_generics, type_generics) = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            let generic_args = self.cached_fn.generic_args();
+            (
+                quote! { <#generic_params> },
+                quote! { <#generic_args, hitbox_fn::NoBackend, hitbox_fn::NoPolicy, hitbox_fn::NoContext> },
+            )
+        } else {
+            (
+                quote! {},
+                quote! { <hitbox_fn::NoBackend, hitbox_fn::NoPolicy, hitbox_fn::NoContext> },
+            )
+        };
+
+        tokens.extend(quote! {
+            impl #impl_generics std::future::IntoFuture for #call_name #type_generics {
+                type Output = #return_type;
+                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + 'static>>;
+
+                fn into_future(self) -> Self::IntoFuture {
+                    let args = self.args;
+                    Box::pin(async move {
+                        #impl_name(args).await
+                    })
+                }
+            }
+        });
+    }
+}
+
+// =============================================================================
 // IntoFuture for Call (no context)
 // =============================================================================
 
@@ -787,6 +839,7 @@ impl<'a> Generator<'a> {
         let cached_call_struct = CachedCallStruct::new(self.cached_fn);
         let call_impl_cache = CallImplCache::new(self.cached_fn);
         let cached_call_impl_with_context = CachedCallImplWithContext::new(self.cached_fn);
+        let into_future_passthrough = IntoFuturePassthrough::new(self.cached_fn);
         let into_future_call_no_context = IntoFutureCallNoContext::new(self.cached_fn);
         let into_future_call_with_context = IntoFutureCallWithContext::new(self.cached_fn);
         let into_future_cached_no_context = IntoFutureCachedNoContext::new(self.cached_fn);
@@ -804,6 +857,7 @@ impl<'a> Generator<'a> {
             #cached_call_struct
             #call_impl_cache
             #cached_call_impl_with_context
+            #into_future_passthrough
             #into_future_call_no_context
             #into_future_call_with_context
             #into_future_cached_no_context
