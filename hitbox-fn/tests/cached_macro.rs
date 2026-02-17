@@ -31,7 +31,7 @@ impl DbConnection {
 // =============================================================================
 
 /// Function with no arguments at all.
-#[cached(prefix = "no_args")]
+#[cached]
 pub async fn no_args_function() -> i64 {
     42
 }
@@ -107,7 +107,7 @@ impl KeyExtract for TypedId {
 }
 
 /// Function with a generic type parameter.
-#[cached(prefix = "generic")]
+#[cached]
 pub async fn generic_function<T: KeyExtract + Clone + std::fmt::Debug + Send + Sync + 'static>(
     value: T,
 ) -> String {
@@ -115,7 +115,7 @@ pub async fn generic_function<T: KeyExtract + Clone + std::fmt::Debug + Send + S
 }
 
 /// Function with generic type and skipped parameter.
-#[cached(prefix = "generic_skip", skip(_ctx))]
+#[cached(skip(_ctx))]
 pub async fn generic_with_skip<T: KeyExtract + Clone + std::fmt::Debug + Send + Sync + 'static>(
     _ctx: String,
     value: T,
@@ -383,7 +383,7 @@ pub struct AuthResult {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AuthError;
 
-#[cached(prefix = "auth")]
+#[cached]
 pub async fn authenticate(user_id: i64) -> Result<AuthResult, AuthError> {
     Ok(AuthResult {
         user_id: user_id as u64,
@@ -518,11 +518,11 @@ async fn test_zero_args_generated_key() {
     let skipped = Skipped::new("ctx");
     assert_eq!(*skipped.value(), "ctx");
 
-    let extractor = FnExtractor::<Args<()>>::new("no_args");
+    let extractor = FnExtractor::<Args<()>>::new("no_args_function");
     let (_, key) = extractor.get(Args(())).await.into_cache_key();
 
-    // Zero-arg function should produce key with only the function prefix
-    assert_eq!(key.to_string(), "fn=no_args");
+    // Zero-arg function should produce key with only the function name
+    assert_eq!(key.to_string(), "fn=no_args_function");
 }
 
 // =============================================================================
@@ -658,7 +658,7 @@ async fn test_key_zero_args() {
 
     let keys = cache.backend().keys();
     assert_eq!(keys.len(), 1);
-    assert_eq!(keys[0], "fn=no_args");
+    assert_eq!(keys[0], "fn=no_args_function");
 
     // Reconstruct a second cache from accessors of the first one
     let cache2 = Cache::builder()
@@ -672,7 +672,7 @@ async fn test_key_zero_args() {
 
     let keys2 = cache2.backend().keys();
     assert_eq!(keys2.len(), 1);
-    assert_eq!(keys2[0], "fn=no_args");
+    assert_eq!(keys2[0], "fn=no_args_function");
 }
 
 #[tokio::test]
@@ -718,7 +718,7 @@ async fn test_value_i64() {
 
     no_args_function().cache(&cache).await;
 
-    let ron = cache.backend().value_as_ron("fn=no_args").unwrap();
+    let ron = cache.backend().value_as_ron("fn=no_args_function").unwrap();
     assert_eq!(ron, "42");
 }
 
@@ -762,7 +762,10 @@ async fn test_value_skipped_response_field() {
 
     let _ = authenticate(1).cache(&cache).await;
 
-    let ron = cache.backend().value_as_ron("fn=auth&user_id=1").unwrap();
+    let ron = cache
+        .backend()
+        .value_as_ron("fn=authenticate&user_id=1")
+        .unwrap();
 
     // The cached value should contain user_id and permissions
     assert!(ron.contains("user_id:1"));
