@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Re-export `DisabledOffload`, `Offload`, and `serde` from `hitbox-core` — derive macros now resolve all types through `hitbox::`
+
 ## [0.2.3] - 2026-02-10
 
 ### Fixed

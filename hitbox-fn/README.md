@@ -46,6 +46,9 @@ let (user, ctx) = fetch_user(UserId(42))
     .cache(&cache)
     .with_context()
     .await;
+
+// Or call directly without caching (passthrough)
+let user = fetch_user(UserId(42)).await?;
 ```
 
 ## Feature Flags

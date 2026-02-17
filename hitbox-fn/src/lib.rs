@@ -69,7 +69,7 @@ pub mod prelude {
     pub use hitbox_derive::{CacheableRequest, CacheableResponse, cached};
 
     // Re-export commonly used hitbox types
+    pub use hitbox::KeyPart;
     pub use hitbox::policy::PolicyConfig;
     pub use hitbox::{CacheContext, CacheStatus, ResponseSource};
-    pub use hitbox_core::KeyPart;
 }

@@ -51,8 +51,8 @@ impl<'a> ToTokens for CachedType<'a> {
 
         let expanded = quote! {
             /// Auto-generated cached representation.
-            #[derive(hitbox_core::serde::Serialize, hitbox_core::serde::Deserialize)]
-            #[serde(crate = "hitbox_core::serde")]
+            #[derive(hitbox::serde::Serialize, hitbox::serde::Deserialize)]
+            #[serde(crate = "hitbox::serde")]
             #[cfg_attr(
                 feature = "rkyv_format",
                 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
