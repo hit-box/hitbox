@@ -25,7 +25,6 @@ use async_trait::async_trait;
 use hitbox::{Extractor, KeyPart, KeyParts};
 use regex::Regex;
 
-use super::NeutralExtractor;
 pub use super::transform::Transform;
 use super::transform::apply_transform_chain;
 use crate::CacheableHttpRequest;
@@ -147,38 +146,6 @@ pub struct Query<E> {
     transforms: Vec<Transform>,
 }
 
-impl<S> Query<NeutralExtractor<S>> {
-    /// Creates a query extractor for a single parameter by exact name.
-    ///
-    /// The parameter value becomes a cache key part with the parameter name
-    /// as key. For more complex extraction (prefix matching, regex, transforms),
-    /// use [`Query::new_with`].
-    ///
-    /// Chain onto existing extractors using [`QueryExtractor::query`] instead
-    /// if you already have an extractor chain.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use hitbox_http::extractors::query::Query;
-    ///
-    /// # use bytes::Bytes;
-    /// # use http_body_util::Empty;
-    /// # use hitbox_http::extractors::NeutralExtractor;
-    /// // Extract the "page" query parameter
-    /// let extractor = Query::new("page".to_string());
-    /// # let _: &Query<NeutralExtractor<Empty<Bytes>>> = &extractor;
-    /// ```
-    pub fn new(name: String) -> Self {
-        Self {
-            inner: NeutralExtractor::new(),
-            name_selector: NameSelector::Exact(name),
-            value_extractor: ValueExtractor::Full,
-            transforms: Vec::new(),
-        }
-    }
-}
-
 impl<E> Query<E> {
     /// Creates a query parameter extractor with full configuration options.
     ///
@@ -187,8 +154,8 @@ impl<E> Query<E> {
     /// - Extract full values or use regex capture groups
     /// - Apply transformations (hash, lowercase, uppercase)
     ///
-    /// For simple exact-name extraction without transforms, use [`Query::new`]
-    /// or [`QueryExtractor::query`] instead.
+    /// For simple exact-name extraction without transforms, use
+    /// [`QueryExtractor::query`] instead.
     pub fn new_with(
         inner: E,
         name_selector: NameSelector,

@@ -62,7 +62,7 @@ use std::time::Duration;
 
 use axum::{Router, extract::Path, routing::get};
 use hitbox::policy::PolicyConfig;
-use hitbox::{Config, Neutral};
+use hitbox::Config;
 use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
 use hitbox_http::predicates::request::{MethodPredicate, PathPredicate};
 use hitbox_http::predicates::response::{StatusClass, StatusCodePredicate};
@@ -85,7 +85,7 @@ async fn main() {
     // Users list - long TTL (60s)
     let users_config = Config::builder()
         .request_predicate(request::predicate().method(http::Method::GET).path("/api/users"))
-        .response_predicate(Neutral::new().status_code_class(StatusClass::Success))
+        .response_predicate(response::predicate().status(StatusClass::Success))
         .extractor(request::extractor().method(MethodConfig::new()).path("/api/users"))
         .policy(
             PolicyConfig::builder()
@@ -98,7 +98,7 @@ async fn main() {
     // Single user - short TTL (10s)
     let user_config = Config::builder()
         .request_predicate(request::predicate().method(http::Method::GET).path("/api/users/{id}"))
-        .response_predicate(Neutral::new().status_code_class(StatusClass::Success))
+        .response_predicate(response::predicate().status(StatusClass::Success))
         .extractor(request::extractor().method(MethodConfig::new()).path("/api/users/{id}"))
         .policy(
             PolicyConfig::builder()

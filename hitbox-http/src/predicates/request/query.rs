@@ -4,7 +4,6 @@
 
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
-use hitbox::Neutral;
 use hitbox::predicate::{Predicate, PredicateResult};
 
 /// Operations for matching query parameters.
@@ -62,40 +61,25 @@ impl From<(&str, &str)> for Operation {
 ///
 /// # Type Parameters
 ///
-/// * `P` - The inner predicate to chain with. Use [`Query::new`] to start
-///   a new predicate chain (uses [`Neutral`] internally), or use the
-///   [`QueryPredicate`] extension trait to chain onto an existing predicate.
+/// * `P` - The inner predicate to chain with. Use [`request::predicate()`](super::predicate)
+///   to start a new chain, then call `.query(...)`.
 ///
 /// # Examples
 ///
 /// ```
-/// use hitbox_http::predicates::request::query::{Query, Operation};
+/// use hitbox_http::predicates::request::{self, QueryPredicate};
+/// use hitbox_http::predicates::request::query::Operation;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox::Neutral;
-/// # use hitbox_http::CacheableHttpRequest;
-/// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 /// // Cache only when "format" query parameter is "json"
-/// let predicate = Query::new(Operation::eq("format", "json"));
-/// # let _: &Query<Neutral<Subject>> = &predicate;
+/// let predicate = request::predicate::<Empty<Bytes>>()
+///     .query(Operation::eq("format", "json"));
 /// ```
 #[derive(Debug)]
 pub struct Query<P> {
     pub(crate) operation: Operation,
     pub(crate) inner: P,
-}
-
-impl<S> Query<Neutral<S>> {
-    /// Creates a standalone query predicate from an [`Operation`].
-    ///
-    /// For chaining, use the [`QueryPredicate`] extension trait directly.
-    pub fn new(operation: Operation) -> Self {
-        Self {
-            operation,
-            inner: Neutral::new(),
-        }
-    }
 }
 
 /// Extension trait for adding query parameter matching to a predicate chain.

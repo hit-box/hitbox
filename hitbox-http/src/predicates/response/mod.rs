@@ -8,36 +8,28 @@
 //! Cache only successful responses:
 //!
 //! ```
-//! use hitbox_http::predicates::response::{StatusCode, StatusClass, status};
+//! use hitbox_http::predicates::response::{self, StatusCodePredicate, StatusClass, status};
 //!
 //! # use bytes::Bytes;
 //! # use http_body_util::Empty;
-//! # use hitbox::Neutral;
-//! # use hitbox_http::CacheableHttpResponse;
-//! # type Subject = CacheableHttpResponse<Empty<Bytes>>;
 //! // Match 200 OK
-//! let predicate = StatusCode::new(status::Operation::eq(http::StatusCode::OK));
-//! # let _: &StatusCode<Neutral<Subject>> = &predicate;
+//! let predicate = response::predicate::<Empty<Bytes>>()
+//!     .status(status::Operation::eq(http::StatusCode::OK));
+//!
 //! // Or match the entire success class
-//! let predicate = StatusCode::new(status::Operation::class(StatusClass::Success));
-//! # let _: &StatusCode<Neutral<Subject>> = &predicate;
+//! let predicate = response::predicate::<Empty<Bytes>>()
+//!     .status(status::Operation::class(StatusClass::Success));
 //! ```
 //!
 //! Cache responses with non-empty JSON arrays:
 //!
 //! ```
-//! use hitbox_http::predicates::response::{Body, Operation, JqExpression, JqOperation};
+//! use hitbox_http::predicates::response::{self, BodyPredicate, Operation, JqOperation};
 //!
 //! # use bytes::Bytes;
 //! # use http_body_util::Empty;
-//! # use hitbox::Neutral;
-//! # use hitbox_http::CacheableHttpResponse;
-//! # type Subject = CacheableHttpResponse<Empty<Bytes>>;
-//! let predicate = Body::new(Operation::Jq {
-//!     filter: JqExpression::compile(".items | length > 0").unwrap(),
-//!     operation: JqOperation::Eq(serde_json::Value::Bool(true)),
-//! });
-//! # let _: &Body<Neutral<Subject>> = &predicate;
+//! let predicate = response::predicate::<Empty<Bytes>>()
+//!     .body(Operation::jq(".items | length > 0", JqOperation::Eq(serde_json::Value::Bool(true))).unwrap());
 //! ```
 
 pub mod body;

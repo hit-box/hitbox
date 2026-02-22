@@ -3,7 +3,6 @@
 //! Provides [`Body`] predicate for matching request or response bodies.
 
 use async_trait::async_trait;
-use hitbox::Neutral;
 use hitbox::predicate::{Predicate, PredicateResult};
 use hyper::body::Body as HttpBody;
 
@@ -17,23 +16,21 @@ use crate::CacheableSubject;
 ///
 /// # Type Parameters
 ///
-/// * `P` - The inner predicate to chain with. Use [`Body::new`] to start
-///   a new predicate chain (uses [`Neutral`] internally), or use the
-///   [`BodyPredicate`] extension trait to chain onto an existing predicate.
+/// * `P` - The inner predicate to chain with. Use the `predicate()` entry point
+///   from [`request`](crate::predicates::request) or [`response`](crate::predicates::response)
+///   to start a new chain, then call `.body(...)`.
 ///
 /// # Examples
 ///
 /// ```
-/// use hitbox_http::predicates::body::{Body, Operation};
+/// use hitbox_http::predicates::body::{BodyPredicate, Operation};
+/// use hitbox_http::predicates::response;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox::Neutral;
-/// # use hitbox_http::CacheableHttpRequest;
-/// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 /// // Only cache responses smaller than 1MB
-/// let predicate = Body::new(Operation::Limit { bytes: 1024 * 1024 });
-/// # let _: &Body<Neutral<Subject>> = &predicate;
+/// let predicate = response::predicate::<Empty<Bytes>>()
+///     .body(Operation::limit(1024 * 1024));
 /// ```
 ///
 /// # Caveats
@@ -45,18 +42,6 @@ use crate::CacheableSubject;
 pub struct Body<P> {
     pub(crate) operation: Operation,
     pub(crate) inner: P,
-}
-
-impl<S> Body<Neutral<S>> {
-    /// Creates a standalone body predicate from an [`Operation`].
-    ///
-    /// For chaining, use the [`BodyPredicate`] extension trait directly.
-    pub fn new(operation: Operation) -> Self {
-        Self {
-            operation,
-            inner: Neutral::new(),
-        }
-    }
 }
 
 /// Extension trait for adding body matching to a predicate chain.

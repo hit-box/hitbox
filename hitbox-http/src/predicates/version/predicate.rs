@@ -1,7 +1,6 @@
 //! HTTP version predicate implementation.
 
 use async_trait::async_trait;
-use hitbox::Neutral;
 use hitbox::predicate::{Predicate, PredicateResult};
 use http::Version;
 
@@ -14,41 +13,27 @@ use super::operation::Operation;
 ///
 /// # Type Parameters
 ///
-/// * `P` - The inner predicate to chain with. Use [`HttpVersion::new`] to start
-///   a new predicate chain (uses [`Neutral`] internally), or use the
-///   [`VersionPredicate`] extension trait to chain onto an existing predicate.
+/// * `P` - The inner predicate to chain with. Use the `predicate()` entry point
+///   from [`request`](crate::predicates::request) or [`response`](crate::predicates::response)
+///   to start a new chain, then call `.version(...)`.
 ///
 /// # Examples
 ///
 /// ```
-/// use hitbox_http::predicates::version::{HttpVersion, Operation};
+/// use hitbox_http::predicates::request;
+/// use hitbox_http::predicates::version::{Operation, VersionPredicate};
 /// use http::Version;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox::Neutral;
-/// # use hitbox_http::CacheableHttpRequest;
-/// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 /// // Cache only HTTP/2 requests
-/// let predicate = HttpVersion::new(Operation::Eq(Version::HTTP_2));
-/// # let _: &HttpVersion<Neutral<Subject>> = &predicate;
+/// let predicate = request::predicate::<Empty<Bytes>>()
+///     .version(Operation::Eq(Version::HTTP_2));
 /// ```
 #[derive(Debug)]
 pub struct HttpVersion<P> {
     pub(crate) operation: Operation,
     pub(crate) inner: P,
-}
-
-impl<S> HttpVersion<Neutral<S>> {
-    /// Creates a standalone version predicate from an [`Operation`].
-    ///
-    /// For chaining, use the [`VersionPredicate`] extension trait directly.
-    pub fn new(operation: Operation) -> Self {
-        Self {
-            operation,
-            inner: Neutral::new(),
-        }
-    }
 }
 
 /// Extension trait for adding version matching to a predicate chain.

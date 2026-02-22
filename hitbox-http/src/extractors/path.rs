@@ -2,7 +2,6 @@ use actix_router::ResourceDef;
 use async_trait::async_trait;
 use hitbox::{Extractor, KeyPart, KeyParts};
 
-use super::NeutralExtractor;
 use crate::CacheableHttpRequest;
 
 /// Extracts path parameters as cache key parts.
@@ -53,22 +52,6 @@ use crate::CacheableHttpRequest;
 pub struct Path<E> {
     inner: E,
     resource: ResourceDef,
-}
-
-impl<S> Path<NeutralExtractor<S>> {
-    /// Creates a path extractor that captures named segments from request paths.
-    ///
-    /// Each captured segment becomes a cache key part with the segment name
-    /// as key. See the struct documentation for pattern syntax.
-    ///
-    /// Chain onto existing extractors using [`PathExtractor::path`] instead
-    /// if you already have an extractor chain.
-    pub fn new(resource: &str) -> Self {
-        Self {
-            inner: NeutralExtractor::new(),
-            resource: ResourceDef::from(resource),
-        }
-    }
 }
 
 /// Configuration for the path extractor.

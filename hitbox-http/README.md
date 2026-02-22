@@ -88,26 +88,25 @@ Use [`PredicateExt`] methods to combine predicates:
 
 ```rust
 use hitbox::predicate::PredicateExt;
-use hitbox_http::predicates::header::{Header, Operation};
+use hitbox_http::predicates::header::{HeaderPredicate, Operation};
+use hitbox_http::predicates::request;
 
 # use bytes::Bytes;
 # use http_body_util::Empty;
-# use hitbox::Neutral;
-# use hitbox_http::CacheableHttpRequest;
-# type Subject = CacheableHttpRequest<Empty<Bytes>>;
 
 // Skip cache when Cache-Control contains "no-cache"
-let skip_no_cache = Header::new(Operation::Contains(
-    http::header::CACHE_CONTROL,
-    "no-cache".to_string(),
-));
-# let _: &Header<Neutral<Subject>> = &skip_no_cache;
+let skip_no_cache = request::predicate::<Empty<Bytes>>()
+    .header(Operation::contains(
+        http::header::CACHE_CONTROL,
+        "no-cache",
+    ));
 let skip_no_cache = skip_no_cache.not();
 
 // Skip cache when Authorization header exists
-let skip_auth = Header::new(Operation::Exist(
-    http::header::AUTHORIZATION,
-)).not();
+let skip_auth = request::predicate::<Empty<Bytes>>()
+    .header(Operation::exist(
+        http::header::AUTHORIZATION,
+    )).not();
 
 // Combine: cache only if BOTH conditions pass
 let combined = skip_no_cache.and(skip_auth);

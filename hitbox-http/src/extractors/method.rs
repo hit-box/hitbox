@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use hitbox::{Extractor, KeyPart, KeyParts};
 
-use super::NeutralExtractor;
 use crate::CacheableHttpRequest;
 
 /// Extracts the HTTP method as a cache key part.
@@ -37,28 +36,6 @@ use crate::CacheableHttpRequest;
 #[derive(Debug)]
 pub struct Method<E> {
     inner: E,
-}
-
-impl<S> Method<NeutralExtractor<S>> {
-    /// Creates a method extractor as the starting point for cache key generation.
-    ///
-    /// Adds a key part with name `"method"` and the HTTP method as value
-    /// (e.g., `"GET"`, `"POST"`). Chain additional extractors to build
-    /// a complete cache key.
-    ///
-    /// Chain onto existing extractors using [`MethodExtractor::method`] instead
-    /// if you already have an extractor chain.
-    pub fn new() -> Self {
-        Self {
-            inner: NeutralExtractor::new(),
-        }
-    }
-}
-
-impl<S> Default for Method<NeutralExtractor<S>> {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 /// Configuration for the method extractor.

@@ -46,7 +46,6 @@ use hitbox::policy::PolicyConfig;
 use hitbox_tower::Cache;
 use hitbox_moka::MokaBackend;
 use hitbox_http::extractors::{MethodConfig, MethodExtractor};
-use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
 use hitbox_http::request;
 use tower::{ServiceBuilder, service_fn};
 # use http_body_util::Full;
@@ -57,16 +56,11 @@ let backend = MokaBackend::builder().max_entries(1000).build();
 
 // 2. Configure caching behavior
 let config = Config::builder()
-    .request_predicate(NeutralRequestPredicate::new())
-    .response_predicate(NeutralResponsePredicate::new())
-    .extractor(request::extractor().method(MethodConfig::new()))
+    .request_predicate(request::predicate::<Body>())
+    .response_predicate(hitbox_http::response::predicate::<Body>())
+    .extractor(request::extractor::<Body>().method(MethodConfig::new()))
     .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
     .build();
-# let _: Config<
-#     NeutralRequestPredicate<Body>,
-#     NeutralResponsePredicate<Body>,
-#     hitbox_http::extractors::Method<hitbox_http::extractors::NeutralExtractor<Body>>,
-# > = config;
 
 // 3. Build the cache layer
 let cache_layer = Cache::builder()

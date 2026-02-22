@@ -6,7 +6,6 @@
 use crate::CacheableHttpRequest;
 use actix_router::ResourceDef;
 use async_trait::async_trait;
-use hitbox::Neutral;
 use hitbox::predicate::{Predicate, PredicateResult};
 
 /// Matching operations for request paths.
@@ -56,41 +55,25 @@ impl From<String> for Operation {
 ///
 /// # Type Parameters
 ///
-/// * `P` - The inner predicate to chain with. Use [`Path::new`] to start
-///   a new predicate chain (uses [`Neutral`] internally), or use the
-///   [`PathPredicate`] extension trait to chain onto an existing predicate.
+/// * `P` - The inner predicate to chain with. Use [`request::predicate()`](super::predicate)
+///   to start a new chain, then call `.path(...)`.
 ///
 /// # Examples
 ///
 /// ```
+/// use hitbox_http::predicates::request::{self, PathPredicate};
 /// use hitbox_http::predicates::request::path::Operation;
-/// use hitbox_http::predicates::request::Path;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox::Neutral;
-/// # use hitbox_http::CacheableHttpRequest;
-/// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 /// // Match requests to /api/users/{id}
-/// let predicate = Path::new(Operation::pattern("/api/users/{id}"));
-/// # let _: &Path<Neutral<Subject>> = &predicate;
+/// let predicate = request::predicate::<Empty<Bytes>>()
+///     .path(Operation::pattern("/api/users/{id}"));
 /// ```
 #[derive(Debug)]
 pub struct Path<P> {
     pub(crate) operation: Operation,
     pub(crate) inner: P,
-}
-
-impl<S> Path<Neutral<S>> {
-    /// Creates a standalone path predicate from an [`Operation`].
-    ///
-    /// For chaining, use the [`PathPredicate`] extension trait directly.
-    pub fn new(operation: Operation) -> Self {
-        Path {
-            operation,
-            inner: Neutral::new(),
-        }
-    }
 }
 
 /// Extension trait for adding path matching to a predicate chain.

@@ -8,41 +8,37 @@
 //! Cache only GET and HEAD requests:
 //!
 //! ```
-//! use hitbox_http::predicates::request::{Method, method};
+//! use hitbox_http::predicates::request::{self, MethodPredicate};
+//! use hitbox_http::predicates::request::method;
 //!
 //! # use bytes::Bytes;
 //! # use http_body_util::Empty;
-//! # use hitbox::Neutral;
-//! # use hitbox_http::CacheableHttpRequest;
-//! # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 //! // Single method
-//! let predicate = Method::new(method::Operation::eq(http::Method::GET));
-//! # let _: &Method<Neutral<Subject>> = &predicate;
+//! let predicate = request::predicate::<Empty<Bytes>>()
+//!     .method(method::Operation::eq(http::Method::GET));
 //!
 //! // Multiple methods
-//! let predicate = Method::new(method::Operation::any(vec![
-//!     http::Method::GET,
-//!     http::Method::HEAD,
-//! ]));
-//! # let _: &Method<Neutral<Subject>> = &predicate;
+//! let predicate = request::predicate::<Empty<Bytes>>()
+//!     .method(method::Operation::any(vec![
+//!         http::Method::GET,
+//!         http::Method::HEAD,
+//!     ]));
 //! ```
 //!
 //! Skip cache for requests with `Cache-Control: no-cache`:
 //!
 //! ```
 //! use hitbox::predicate::PredicateExt;
-//! use hitbox_http::predicates::header::{Header, Operation};
+//! use hitbox_http::predicates::header::{HeaderPredicate, Operation};
+//! use hitbox_http::predicates::request;
 //!
 //! # use bytes::Bytes;
 //! # use http_body_util::Empty;
-//! # use hitbox::Neutral;
-//! # use hitbox_http::CacheableHttpRequest;
-//! # type Subject = CacheableHttpRequest<Empty<Bytes>>;
-//! let predicate = Header::new(Operation::Contains(
-//!     http::header::CACHE_CONTROL,
-//!     "no-cache".to_string(),
-//! ));
-//! # let _: &Header<Neutral<Subject>> = &predicate;
+//! let predicate = request::predicate::<Empty<Bytes>>()
+//!     .header(Operation::Contains(
+//!         http::header::CACHE_CONTROL,
+//!         "no-cache".to_string(),
+//!     ));
 //! let predicate = predicate.not();
 //! ```
 

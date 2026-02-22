@@ -1,7 +1,6 @@
 //! Header predicate implementation.
 
 use async_trait::async_trait;
-use hitbox::Neutral;
 use hitbox::predicate::{Predicate, PredicateResult};
 use http::HeaderMap;
 
@@ -14,44 +13,30 @@ use super::operation::Operation;
 ///
 /// # Type Parameters
 ///
-/// * `P` - The inner predicate to chain with. Use [`Header::new`] to start
-///   a new predicate chain (uses [`Neutral`] internally), or use the
-///   [`HeaderPredicate`] extension trait to chain onto an existing predicate.
+/// * `P` - The inner predicate to chain with. Use the `predicate()` entry point
+///   from [`request`](crate::predicates::request) or [`response`](crate::predicates::response)
+///   to start a new chain, then call `.header(...)`.
 ///
 /// # Examples
 ///
 /// ```
-/// use hitbox_http::predicates::header::{Header, Operation};
+/// use hitbox_http::predicates::header::{HeaderPredicate, Operation};
+/// use hitbox_http::predicates::request;
 /// use http::header::CACHE_CONTROL;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox::Neutral;
-/// # use hitbox_http::CacheableHttpRequest;
-/// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 /// // Skip caching when Cache-Control contains "no-cache"
-/// let predicate = Header::new(Operation::Contains(
-///     CACHE_CONTROL,
-///     "no-cache".to_string(),
-/// ));
-/// # let _: &Header<Neutral<Subject>> = &predicate;
+/// let predicate = request::predicate::<Empty<Bytes>>()
+///     .header(Operation::Contains(
+///         CACHE_CONTROL,
+///         "no-cache".to_string(),
+///     ));
 /// ```
 #[derive(Debug)]
 pub struct Header<P> {
     pub(crate) operation: Operation,
     pub(crate) inner: P,
-}
-
-impl<S> Header<Neutral<S>> {
-    /// Creates a standalone header predicate from an [`Operation`].
-    ///
-    /// For chaining, use the [`HeaderPredicate`] extension trait directly.
-    pub fn new(operation: Operation) -> Self {
-        Self {
-            operation,
-            inner: Neutral::new(),
-        }
-    }
 }
 
 /// Extension trait for adding header matching to a predicate chain.

@@ -411,16 +411,6 @@ pub struct Body<E> {
     extraction: BodyExtraction,
 }
 
-impl<S> Body<super::NeutralExtractor<S>> {
-    /// Creates a body extractor with the given extraction mode.
-    pub fn new(extraction: BodyExtraction) -> Self {
-        Self {
-            inner: super::NeutralExtractor::new(),
-            extraction,
-        }
-    }
-}
-
 /// Extension trait for adding body extraction to an extractor chain.
 ///
 /// # For Callers

@@ -1,6 +1,5 @@
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
-use hitbox::Neutral;
 use hitbox::predicate::{Predicate, PredicateResult};
 
 /// Matching operations for HTTP methods.
@@ -34,57 +33,38 @@ impl From<http::Method> for Operation {
 ///
 /// # Type Parameters
 ///
-/// * `P` - The inner predicate to chain with. Use [`Method::new`] to start
-///   a new predicate chain (uses [`Neutral`] internally), or use the
-///   [`MethodPredicate`] extension trait to chain onto an existing predicate.
+/// * `P` - The inner predicate to chain with. Use [`request::predicate()`](super::predicate)
+///   to start a new chain, then call `.method(...)`.
 ///
 /// # Examples
 ///
 /// Match only GET requests:
 ///
 /// ```
+/// use hitbox_http::predicates::request::{self, MethodPredicate};
 /// use hitbox_http::predicates::request::method::Operation;
-/// use hitbox_http::predicates::request::Method;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox::Neutral;
-/// # use hitbox_http::CacheableHttpRequest;
-/// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
-/// let predicate = Method::new(Operation::eq(http::Method::GET));
-/// # let _: &Method<Neutral<Subject>> = &predicate;
+/// let predicate = request::predicate::<Empty<Bytes>>()
+///     .method(Operation::eq(http::Method::GET));
 /// ```
 ///
 /// Match GET or HEAD requests:
 ///
 /// ```
+/// use hitbox_http::predicates::request::{self, MethodPredicate};
 /// use hitbox_http::predicates::request::method::Operation;
-/// use hitbox_http::predicates::request::Method;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox::Neutral;
-/// # use hitbox_http::CacheableHttpRequest;
-/// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
-/// let predicate = Method::new(Operation::any(vec![http::Method::GET, http::Method::HEAD]));
-/// # let _: &Method<Neutral<Subject>> = &predicate;
+/// let predicate = request::predicate::<Empty<Bytes>>()
+///     .method(Operation::any(vec![http::Method::GET, http::Method::HEAD]));
 /// ```
 #[derive(Debug)]
 pub struct Method<P> {
     pub(crate) operation: Operation,
     pub(crate) inner: P,
-}
-
-impl<S> Method<Neutral<S>> {
-    /// Creates a standalone method predicate from an [`Operation`].
-    ///
-    /// For chaining, use the [`MethodPredicate`] extension trait directly.
-    pub fn new(operation: Operation) -> Self {
-        Method {
-            operation,
-            inner: Neutral::new(),
-        }
-    }
 }
 
 /// Extension trait for adding method matching to a predicate chain.

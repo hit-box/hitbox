@@ -2,7 +2,7 @@
 
 use hitbox_http::predicates::conditions::Or;
 use hitbox_http::predicates::request::path::Operation;
-use hitbox_http::predicates::request::{Path, PathPredicate};
+use hitbox_http::predicates::request::{self, PathPredicate};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
@@ -47,7 +47,7 @@ impl PathOperation {
             PathOperation::In { r#in: patterns } => patterns
                 .into_iter()
                 .map(|pattern| -> RequestPredicate<ReqBody> {
-                    Box::new(Path::new(Operation::pattern(pattern)))
+                    Box::new(request::predicate().path(Operation::pattern(pattern)))
                 })
                 .reduce(|acc, predicate| Box::new(Or::new(predicate, acc)))
                 .ok_or(ConfigError::EmptyPathList),

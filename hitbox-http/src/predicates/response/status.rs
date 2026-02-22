@@ -1,6 +1,5 @@
 use crate::CacheableHttpResponse;
 use async_trait::async_trait;
-use hitbox::Neutral;
 use hitbox::predicate::{Predicate, PredicateResult};
 
 /// HTTP status code classes for broad matching.
@@ -114,58 +113,40 @@ impl Operation {
 ///
 /// # Type Parameters
 ///
-/// * `P` - The inner predicate to chain with. Use [`StatusCode::new`] to start
-///   a new predicate chain (uses [`Neutral`] internally), or use the
-///   [`StatusCodePredicate`] extension trait to chain onto an existing predicate.
+/// * `P` - The inner predicate to chain with. Use [`response::predicate()`](super::predicate)
+///   to start a new chain, then call `.status(...)`.
 ///
 /// # Examples
 ///
 /// Match only 200 OK responses:
 ///
 /// ```
-/// use hitbox_http::predicates::response::status::{StatusCode, Operation};
+/// use hitbox_http::predicates::response::{self, StatusCodePredicate};
+/// use hitbox_http::predicates::response::status::Operation;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox::Neutral;
-/// # use hitbox_http::CacheableHttpResponse;
-/// # type Subject = CacheableHttpResponse<Empty<Bytes>>;
-/// let predicate = StatusCode::new(Operation::eq(http::StatusCode::OK));
-/// # let _: &StatusCode<Neutral<Subject>> = &predicate;
+/// let predicate = response::predicate::<Empty<Bytes>>()
+///     .status(Operation::eq(http::StatusCode::OK));
 /// ```
 ///
 /// Chain with body predicate:
 ///
 /// ```
-/// use hitbox_http::predicates::response::status::{StatusCode, Operation};
-/// use hitbox_http::predicates::body::{BodyPredicate, Operation as BodyOperation, PlainOperation};
+/// use hitbox_http::predicates::response::{self, StatusCodePredicate, BodyPredicate};
+/// use hitbox_http::predicates::response::status::Operation;
+/// use hitbox_http::predicates::body::{Operation as BodyOperation, PlainOperation};
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox::Neutral;
-/// # use hitbox_http::CacheableHttpResponse;
-/// # use hitbox_http::predicates::body::Body;
-/// # type Subject = CacheableHttpResponse<Empty<Bytes>>;
-/// let predicate = StatusCode::new(Operation::eq(http::StatusCode::OK))
+/// let predicate = response::predicate::<Empty<Bytes>>()
+///     .status(Operation::eq(http::StatusCode::OK))
 ///     .body(BodyOperation::Plain(PlainOperation::Contains("success".into())));
-/// # let _: &Body<StatusCode<Neutral<Subject>>> = &predicate;
 /// ```
 #[derive(Debug)]
 pub struct StatusCode<P> {
     pub(crate) operation: Operation,
     pub(crate) inner: P,
-}
-
-impl<S> StatusCode<Neutral<S>> {
-    /// Creates a standalone status code predicate from an [`Operation`].
-    ///
-    /// For chaining, use the [`StatusCodePredicate`] extension trait directly.
-    pub fn new(operation: Operation) -> Self {
-        Self {
-            operation,
-            inner: Neutral::new(),
-        }
-    }
 }
 
 /// Extension trait for adding status code matching to a predicate chain.

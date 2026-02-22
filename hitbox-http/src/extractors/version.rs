@@ -6,7 +6,6 @@
 use async_trait::async_trait;
 use hitbox::{Extractor, KeyPart, KeyParts};
 
-use super::NeutralExtractor;
 use crate::CacheableHttpRequest;
 
 /// Extracts the HTTP protocol version as a cache key part.
@@ -30,27 +29,6 @@ use crate::CacheableHttpRequest;
 #[derive(Debug)]
 pub struct Version<E> {
     inner: E,
-}
-
-impl<S> Version<NeutralExtractor<S>> {
-    /// Creates a version extractor for cache key generation.
-    ///
-    /// Adds a key part with name `"version"` and the HTTP protocol version
-    /// as value (e.g., `"HTTP/1.1"`, `"HTTP/2"`).
-    ///
-    /// Chain onto existing extractors using [`VersionExtractor::version`] instead
-    /// if you already have an extractor chain.
-    pub fn new() -> Self {
-        Self {
-            inner: NeutralExtractor::new(),
-        }
-    }
-}
-
-impl<S> Default for Version<NeutralExtractor<S>> {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 /// Configuration for the version extractor.

@@ -105,10 +105,16 @@ pub struct NeutralExtractor<ReqBody> {
     _res: PhantomData<fn(ReqBody) -> ReqBody>,
 }
 
+impl<ResBody> Default for NeutralExtractor<ResBody> {
+    fn default() -> Self {
+        NeutralExtractor { _res: PhantomData }
+    }
+}
+
 impl<ResBody> NeutralExtractor<ResBody> {
     /// Creates a new neutral extractor.
     pub fn new() -> Self {
-        NeutralExtractor { _res: PhantomData }
+        Self::default()
     }
 }
 
@@ -122,12 +128,6 @@ where
 
     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
         KeyParts::new(subject)
-    }
-}
-
-impl<ResBody> Default for NeutralExtractor<ResBody> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

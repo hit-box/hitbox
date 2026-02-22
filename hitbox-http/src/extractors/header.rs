@@ -25,7 +25,6 @@ use hitbox::{Extractor, KeyPart, KeyParts};
 use http::HeaderValue;
 use regex::Regex;
 
-use super::NeutralExtractor;
 pub use super::transform::Transform;
 use super::transform::apply_transform_chain;
 use crate::CacheableHttpRequest;
@@ -138,25 +137,6 @@ pub struct Header<E> {
     transforms: Vec<Transform>,
 }
 
-impl<S> Header<NeutralExtractor<S>> {
-    /// Creates a header extractor for a single header by exact name.
-    ///
-    /// The header value becomes a cache key part with the header name
-    /// as key. For more complex extraction (prefix matching, regex, transforms),
-    /// use [`Header::new_with`].
-    ///
-    /// Chain onto existing extractors using [`HeaderExtractor::header`] instead
-    /// if you already have an extractor chain.
-    pub fn new(name: String) -> Self {
-        Self {
-            inner: NeutralExtractor::new(),
-            name_selector: NameSelector::Exact(name),
-            value_extractor: ValueExtractor::Full,
-            transforms: Vec::new(),
-        }
-    }
-}
-
 impl<E> Header<E> {
     /// Creates a header extractor with full configuration options.
     ///
@@ -165,8 +145,8 @@ impl<E> Header<E> {
     /// - Extract full values or use regex capture groups
     /// - Apply transformations (hash, lowercase, uppercase)
     ///
-    /// For simple exact-name extraction without transforms, use [`Header::new`]
-    /// or [`HeaderExtractor::header`] instead.
+    /// For simple exact-name extraction without transforms, use
+    /// [`HeaderExtractor::header`] instead.
     pub fn new_with(
         inner: E,
         name_selector: NameSelector,
