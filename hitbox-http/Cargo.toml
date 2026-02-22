@@ -1,6 +1,6 @@
 [package]
 name = "hitbox-http"
-version = "0.2.0"
+version = "0.2.1"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -42,6 +42,7 @@ prost = "0.14"
 prost-reflect = { version = "0.16", features = ["serde", "derive"] }
 protox = "0.9"
 regex = { workspace = true }
+tracing = { workspace = true }
 sha2 = "0.10"
 hex = "0.4"
 

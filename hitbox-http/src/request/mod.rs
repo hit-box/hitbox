@@ -1,3 +1,6 @@
+pub use crate::extractors::extractor;
+pub use crate::predicates::request::predicate;
+
 use hitbox::{
     CacheablePolicyData, RequestCachePolicy,
     predicate::{Predicate, PredicateResult},

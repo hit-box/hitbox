@@ -1,0 +1,47 @@
+name: Changelog Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled, unlabeled]
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check changelogs for modified crates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Skip if labeled
+          if gh pr view ${{ github.event.pull_request.number }} --json labels -q '.labels[].name' | grep -q 'skip-changelog'; then
+            echo "skip-changelog label found, skipping check"
+            exit 0
+          fi
+
+          # Published crates only
+          CRATES="hitbox hitbox-backend hitbox-core hitbox-derive hitbox-fn hitbox-http hitbox-redis hitbox-feoxdb hitbox-moka hitbox-tower hitbox-reqwest hitbox-configuration"
+
+          CHANGED=$(gh pr diff ${{ github.event.pull_request.number }} --name-only)
+          MISSING=""
+
+          for crate in $CRATES; do
+            # Check if crate has source changes
+            if echo "$CHANGED" | grep -qE "^${crate}/(src/|Cargo\.toml)"; then
+              # Check if changelog is also changed
+              if ! echo "$CHANGED" | grep -q "^${crate}/CHANGELOG.md"; then
+                MISSING="${MISSING}  - ${crate}\n"
+              fi
+            fi
+          done
+
+          if [ -n "$MISSING" ]; then
+            echo "::error::Missing CHANGELOG.md updates for modified crates:"
+            printf "$MISSING"
+            echo ""
+            echo "Add changelog entries under ## [Unreleased] or add the 'skip-changelog' label to skip."
+            exit 1
+          fi
+
+          echo "All modified crates have changelog entries."

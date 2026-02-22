@@ -22,11 +22,12 @@ let extractor = Method::new()
 
 **After:**
 ```rust
-use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathExtractor};
+use hitbox_http::request;
+use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
 use hitbox_http::extractors::query::QueryExtractor;
 use hitbox_http::extractors::header::HeaderExtractor;
 
-let extractor = extractors::extractor()
+let extractor = request::extractor()
     .method(MethodConfig::new())
     .path("/users/{id}")
     .query("page")
@@ -50,7 +51,7 @@ response::predicate()
 
 **After:**
 ```rust
-use hitbox_http::predicates::{request, response};
+use hitbox_http::{request, response};
 
 request::predicate()
     .method(Method::GET)
@@ -81,7 +82,7 @@ use hitbox_http::extractors::body::{BodyConfig, BodyExtractor};
 
 | Old | New |
 |-----|-----|
-| `Method::new()` | `extractors::extractor().method(MethodConfig::new())` |
+| `Method::new()` | `request::extractor().method(MethodConfig::new())` |
 | `.path(String)` | `.path(&str)` |
 | `.query(String)` | `.query(&str)` |
 | `.header(String)` | `.header(&str)` |

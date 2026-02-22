@@ -25,8 +25,9 @@ use std::time::Duration;
 use hitbox::Config;
 use hitbox::policy::PolicyConfig;
 use hitbox_http::{
-    extractors::{self, MethodConfig, MethodExtractor, PathExtractor},
-    predicates::{request, request::MethodPredicate, response},
+    extractors::{MethodConfig, MethodExtractor, PathExtractor},
+    predicates::request::MethodPredicate,
+    request, response,
 };
 use hitbox_moka::MokaBackend;
 use hitbox_reqwest::CacheMiddleware;
@@ -51,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .request_predicate(request::predicate().method(http::Method::GET))
         .response_predicate(response::predicate())
         .extractor(
-            extractors::extractor()
+            request::extractor()
                 .method(MethodConfig::new())
                 .path("/{path}*"),
         )

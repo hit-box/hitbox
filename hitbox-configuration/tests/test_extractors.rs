@@ -19,8 +19,7 @@ fn test_extractors_serialize() {
     println!("{}", &yaml_str);
     let config = r"
 policy:
-  Enabled:
-    ttl: 5s
+  Enabled: {}
 extractors:
   - Method: {}
   - Path: /greet/{name}

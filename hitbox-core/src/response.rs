@@ -89,10 +89,14 @@ pub enum CacheState<Cached> {
 ///
 /// # Example Implementation
 ///
-/// ```ignore
+/// ```
 /// use hitbox_core::{CacheableResponse, CachePolicy, EntityPolicyConfig};
-/// use hitbox_core::predicate::Predicate;
+/// use hitbox_core::predicate::{Predicate, PredicateResult};
+/// use hitbox_core::response::ResponseCachePolicy;
+/// use hitbox_core::value::CacheValue;
+/// use chrono::Utc;
 ///
+/// #[derive(Clone)]
 /// struct MyResponse {
 ///     body: String,
 ///     status: u16,
@@ -110,9 +114,19 @@ pub enum CacheState<Cached> {
 ///         config: &EntityPolicyConfig,
 ///     ) -> ResponseCachePolicy<Self>
 ///     where
-///         P: Predicate<Subject = Self::Subject> + Send + Sync
+///         P: Predicate<Subject = Self::Subject> + Send + Sync,
 ///     {
-///         // Implementation details...
+///         match predicates.check(self).await {
+///             PredicateResult::Cacheable(data) => {
+///                 let cached = data.body.clone();
+///                 CachePolicy::Cacheable(CacheValue::new(
+///                     cached,
+///                     config.ttl.map(|d| Utc::now() + d),
+///                     config.stale_ttl.map(|d| Utc::now() + d),
+///                 ))
+///             }
+///             PredicateResult::NonCacheable(data) => CachePolicy::NonCacheable(data),
+///         }
 ///     }
 ///
 ///     fn into_cached(self) -> Self::IntoCachedFuture {
@@ -171,6 +185,106 @@ where
     ///
     /// Creates a new response instance from previously cached data.
     fn from_cached(cached: Self::Cached) -> Self::FromCachedFuture;
+}
+
+// =============================================================================
+// Scalar type implementations
+// =============================================================================
+
+macro_rules! impl_cacheable_response_for_scalar {
+    ($($ty:ty),* $(,)?) => {
+        $(
+            impl CacheableResponse for $ty {
+                type Cached = Self;
+                type Subject = Self;
+                type IntoCachedFuture = std::future::Ready<CachePolicy<Self, Self>>;
+                type FromCachedFuture = std::future::Ready<Self>;
+
+                async fn cache_policy<P>(
+                    self,
+                    predicates: P,
+                    config: &EntityPolicyConfig,
+                ) -> ResponseCachePolicy<Self>
+                where
+                    P: Predicate<Subject = Self::Subject> + Send + Sync,
+                {
+                    match predicates.check(self).await {
+                        PredicateResult::Cacheable(data) => {
+                            let cached = data.clone();
+                            CachePolicy::Cacheable(CacheValue::new(
+                                cached,
+                                config.ttl.map(|d| Utc::now() + d),
+                                config.stale_ttl.map(|d| Utc::now() + d),
+                            ))
+                        }
+                        PredicateResult::NonCacheable(data) => CachePolicy::NonCacheable(data),
+                    }
+                }
+
+                fn into_cached(self) -> Self::IntoCachedFuture {
+                    std::future::ready(CachePolicy::Cacheable(self))
+                }
+
+                fn from_cached(cached: Self) -> Self::FromCachedFuture {
+                    std::future::ready(cached)
+                }
+            }
+        )*
+    };
+}
+
+impl_cacheable_response_for_scalar! {
+    // Unsigned integers
+    u8, u16, u32, u64, u128, usize,
+    // Signed integers
+    i8, i16, i32, i64, i128, isize,
+    // Other primitives
+    bool, char,
+    // Common types
+    String,
+}
+
+// =============================================================================
+// Vec<T> implementation
+// =============================================================================
+
+impl<T> CacheableResponse for Vec<T>
+where
+    T: CacheableResponse<Cached = T, Subject = T> + Clone + Send + 'static,
+{
+    type Cached = Self;
+    type Subject = Self;
+    type IntoCachedFuture = std::future::Ready<CachePolicy<Self, Self>>;
+    type FromCachedFuture = std::future::Ready<Self>;
+
+    async fn cache_policy<P>(
+        self,
+        predicates: P,
+        config: &EntityPolicyConfig,
+    ) -> ResponseCachePolicy<Self>
+    where
+        P: Predicate<Subject = Self::Subject> + Send + Sync,
+    {
+        match predicates.check(self).await {
+            PredicateResult::Cacheable(data) => {
+                let cached = data.clone();
+                CachePolicy::Cacheable(CacheValue::new(
+                    cached,
+                    config.ttl.map(|d| Utc::now() + d),
+                    config.stale_ttl.map(|d| Utc::now() + d),
+                ))
+            }
+            PredicateResult::NonCacheable(data) => CachePolicy::NonCacheable(data),
+        }
+    }
+
+    fn into_cached(self) -> Self::IntoCachedFuture {
+        std::future::ready(CachePolicy::Cacheable(self))
+    }
+
+    fn from_cached(cached: Self) -> Self::FromCachedFuture {
+        std::future::ready(cached)
+    }
 }
 
 // =============================================================================

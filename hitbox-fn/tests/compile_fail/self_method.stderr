@@ -1,0 +1,5 @@
+error: #[cached] cannot be applied to methods with self
+ --> tests/compile_fail/self_method.rs:7:25
+  |
+7 |     pub async fn method(&self, x: i64) -> i64 {
+  |                         ^^^^^

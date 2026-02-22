@@ -23,13 +23,12 @@ in configuration files, enabling runtime changes without recompilation.
 
 ```rust
 use std::time::Duration;
+use bytes::Bytes;
+use http_body_util::Empty;
 use hitbox::policy::PolicyConfig;
 use hitbox_configuration::Endpoint;
 use hitbox_http::extractors::Method;
 use hitbox_http::predicates::{request, response};
-
-use bytes::Bytes;
-use http_body_util::Empty;
 
 let config = Endpoint::<Empty<Bytes>, Empty<Bytes>>::builder()
     .request_predicate(request::predicate())

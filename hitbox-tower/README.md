@@ -45,8 +45,9 @@ use hitbox::Config;
 use hitbox::policy::PolicyConfig;
 use hitbox_tower::Cache;
 use hitbox_moka::MokaBackend;
-use hitbox_http::extractors::{self, MethodConfig, MethodExtractor};
+use hitbox_http::extractors::{MethodConfig, MethodExtractor};
 use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+use hitbox_http::request;
 use tower::{ServiceBuilder, service_fn};
 # use http_body_util::Full;
 # type Body = Full<bytes::Bytes>;
@@ -58,7 +59,7 @@ let backend = MokaBackend::builder().max_entries(1000).build();
 let config = Config::builder()
     .request_predicate(NeutralRequestPredicate::new())
     .response_predicate(NeutralResponsePredicate::new())
-    .extractor(extractors::extractor().method(MethodConfig::new()))
+    .extractor(request::extractor().method(MethodConfig::new()))
     .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
     .build();
 # let _: Config<

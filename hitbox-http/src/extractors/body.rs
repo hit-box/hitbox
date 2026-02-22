@@ -27,6 +27,7 @@ use jaq_core::{Bind, Ctx, Exn, Filter, Native, RcIter};
 use jaq_json::Val;
 use regex::Regex;
 use serde_json::Value;
+use tracing::warn;
 
 pub use super::transform::Transform;
 use super::transform::{apply_hash, apply_transform_chain};
@@ -596,11 +597,17 @@ where
                 let hash = apply_hash(&body_str);
                 vec![KeyPart::new("body", Some(hash))]
             }
-            BodyExtraction::Jq(jq) => {
-                let json_value = serde_json::from_str(&body_str).unwrap_or(Value::Null);
-                let results = jq.apply(json_value);
-                extract_jq_parts(results)
-            }
+            BodyExtraction::Jq(jq) => match serde_json::from_str(&body_str) {
+                Ok(json_value) => {
+                    let results = jq.apply(json_value);
+                    extract_jq_parts(results)
+                }
+                Err(err) => {
+                    warn!(%err, "Jq body extraction failed: invalid JSON, falling back to body hash");
+                    let hash = apply_hash(&body_str);
+                    vec![KeyPart::new("body", Some(hash))]
+                }
+            },
             BodyExtraction::Regex(regex_ext) => extract_regex_parts(
                 &body_str,
                 &regex_ext.regex,

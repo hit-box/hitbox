@@ -1,0 +1,32 @@
+[package]
+name = "hitbox-fn"
+version = "0.2.1"
+description = "Function memoization for hitbox caching framework"
+keywords = ["cache", "memoization", "async", "function"]
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+derive = ["hitbox-derive"]
+rkyv_format = ["hitbox/rkyv_format", "hitbox-core/rkyv_format", "dep:rkyv"]
+
+[dependencies]
+hitbox = { path = "../hitbox", version = "0.2" }
+hitbox-core = { path = "../hitbox-core", version = "0.2" }
+hitbox-derive = { path = "../hitbox-derive", version = "0.2", optional = true }
+rkyv = { workspace = true, optional = true }
+
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+serde = { workspace = true }
+hitbox-moka = { path = "../hitbox-moka" }
+hitbox-derive = { path = "../hitbox-derive" }
+hitbox-backend = { path = "../hitbox-backend" }
+dashmap = { workspace = true }
+trybuild = "1"

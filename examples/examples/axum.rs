@@ -40,13 +40,14 @@ use hitbox::Config;
 use hitbox::policy::PolicyConfig;
 use hitbox::predicate::PredicateExt;
 use hitbox_http::{
-    extractors::{self, MethodConfig, MethodExtractor, PathExtractor, query::QueryExtractor},
+    extractors::{MethodConfig, MethodExtractor, PathExtractor, query::QueryExtractor},
     predicates::{
         body::{BodyPredicate, JqExpression, JqOperation, Operation as BodyOperation},
         header::Operation as HeaderOperation,
-        request::{self, HeaderPredicate},
-        response::{self, StatusCodePredicate},
+        request::HeaderPredicate,
+        response::StatusCodePredicate,
     },
+    request, response,
 };
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
@@ -226,7 +227,7 @@ async fn main() {
                 }),
         )
         .extractor(
-            extractors::extractor()
+            request::extractor()
                 .method(MethodConfig::new())
                 .query("page")
                 .query("limit")
@@ -249,7 +250,7 @@ async fn main() {
         )
         .response_predicate(response::predicate().status(http::StatusCode::OK))
         .extractor(
-            extractors::extractor()
+            request::extractor()
                 .method(MethodConfig::new())
                 .path("/tasks/{task_id}"),
         )

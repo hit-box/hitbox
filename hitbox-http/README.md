@@ -29,16 +29,15 @@ use hitbox::Config;
 use hitbox::policy::PolicyConfig;
 use hitbox::predicate::PredicateExt;
 use hitbox_http::{
-    extractors::{self, MethodConfig, MethodExtractor, PathExtractor, query::QueryExtractor},
+    extractors::{MethodConfig, MethodExtractor, PathExtractor, query::QueryExtractor},
     predicates::{
         header::Operation as HeaderOperation,
-        request::{self, HeaderPredicate},
-        response::{self, StatusCodePredicate, status},
-   },
+        request::HeaderPredicate,
+        response::StatusCodePredicate,
+    },
+    request, response,
 };
 
-# use bytes::Bytes;
-# use http_body_util::Empty;
 // Build a cache configuration for an endpoint
 let config = Config::builder()
     // Skip cache when Cache-Control: no-cache is present
@@ -51,7 +50,7 @@ let config = Config::builder()
     .response_predicate(response::predicate::<Empty<Bytes>>().status(http::StatusCode::OK))
     // Build cache key from method, path parameters, and query
     .extractor(
-        extractors::extractor::<Empty<Bytes>>()
+        request::extractor::<Empty<Bytes>>()
             .method(MethodConfig::new())
             .path("/users/{user_id}/posts/{post_id}")
             .query("page"),
@@ -120,13 +119,14 @@ Extractors generate cache key parts from HTTP components. Chain them using
 the builder pattern:
 
 ```rust
-use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathExtractor};
+use hitbox_http::request;
+use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
 use hitbox_http::extractors::query::QueryExtractor;
 
 # use bytes::Bytes;
 # use http_body_util::Empty;
 # use hitbox_http::extractors::{NeutralExtractor, Method, Path, query::Query};
-let extractor = extractors::extractor::<Empty<Bytes>>()
+let extractor = request::extractor::<Empty<Bytes>>()
     .method(MethodConfig::new())
     .path("/users/{user_id}")
     .query("page")

@@ -56,8 +56,9 @@ use reqwest_middleware::ClientBuilder;
 use hitbox_reqwest::CacheMiddleware;
 use hitbox::Config;
 use hitbox_http::{
-    extractors::{self, MethodConfig, MethodExtractor, PathExtractor},
-    predicates::{request, request::MethodPredicate, response},
+    extractors::{MethodConfig, MethodExtractor, PathExtractor},
+    predicates::request::MethodPredicate,
+    request, response,
 };
 use hitbox::policy::PolicyConfig;
 use hitbox_moka::MokaBackend;
@@ -71,7 +72,7 @@ let backend = MokaBackend::builder().max_entries(1000).build();
 let config = Config::builder()
     .request_predicate(request::predicate().method(http::Method::GET))
     .response_predicate(response::predicate())
-    .extractor(extractors::extractor().method(MethodConfig::new()).path("/{path}*"))  // Key from method+path
+    .extractor(request::extractor().method(MethodConfig::new()).path("/{path}*"))  // Key from method+path
     .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
     .build();
 

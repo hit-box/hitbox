@@ -44,11 +44,10 @@ use hitbox::Config;
 use hitbox::concurrency::NoopConcurrencyManager;
 use hitbox::policy::PolicyConfig;
 use hitbox_http::{
-    extractors::{self, MethodConfig, MethodExtractor, PathExtractor},
-    predicates::{
-        NeutralResponsePredicate,
-        request::{self, MethodPredicate, PathPredicate},
-    },
+    extractors::{MethodConfig, MethodExtractor, PathExtractor},
+    predicates::NeutralResponsePredicate,
+    predicates::request::{MethodPredicate, PathPredicate},
+    request, response,
 };
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
@@ -189,7 +188,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .request_predicate(request::predicate().method(http::Method::GET).path("/"))
         .response_predicate(NeutralResponsePredicate::new())
         .extractor(
-            extractors::extractor()
+            request::extractor()
                 .method(MethodConfig::new())
                 .path("/"),
         )
@@ -213,7 +212,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .response_predicate(NeutralResponsePredicate::new())
         .extractor(
-            extractors::extractor()
+            request::extractor()
                 .method(MethodConfig::new())
                 .path("/greet/{name}"),
         )
@@ -236,7 +235,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .response_predicate(NeutralResponsePredicate::new())
         .extractor(
-            extractors::extractor()
+            request::extractor()
                 .method(MethodConfig::new())
                 .path("/health"),
         )

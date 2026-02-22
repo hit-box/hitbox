@@ -34,8 +34,9 @@ use hitbox::offload::OffloadManager;
 use hitbox::policy::PolicyConfig;
 use hitbox_backend::composition::{Compose, policy::RefillPolicy};
 use hitbox_feoxdb::FeOxDbBackend;
-use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathExtractor};
+use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
 use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+use hitbox_http::request;
 use hitbox_moka::MokaBackend;
 use hitbox_redis::{ConnectionMode, RedisBackend};
 use hitbox_tower::Cache;
@@ -89,7 +90,7 @@ async fn main() {
         .request_predicate(NeutralRequestPredicate::new())
         .response_predicate(NeutralResponsePredicate::new())
         .extractor(
-            extractors::extractor()
+            request::extractor()
                 .method(MethodConfig::new())
                 .path("/"),
         )
