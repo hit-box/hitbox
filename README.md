@@ -3,6 +3,7 @@
 [![Build status](https://github.com/hit-box/hitbox/actions/workflows/CI.yml/badge.svg)](https://github.com/hit-box/hitbox/actions?query=workflow)
 [![Coverage Status](https://codecov.io/gh/hit-box/hitbox/branch/main/graph/badge.svg?token=tgAm8OBLkY)](https://codecov.io/gh/hit-box/hitbox)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Blog](https://img.shields.io/badge/blog-hitbox.rs-orange)](https://blog.hitbox.rs/)
 
 Highly customizable async caching framework for Rust designed for high-performance applications.
 
@@ -147,6 +148,7 @@ See the [memoization_derive](./examples/examples/memoization_derive.rs) example 
 - [Stale Cache](#stale-cache) - Configure TTL and background revalidation
 - [Composable Backends](#composable-backends) - Add Redis as L2
 - [Examples](./examples) - More complete examples
+- [Blog](https://blog.hitbox.rs/) - Find useful information on using Hitbox
 
 ---
 
