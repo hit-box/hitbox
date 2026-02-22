@@ -47,7 +47,7 @@ use hitbox_http::{
     extractors::{MethodConfig, MethodExtractor, PathExtractor},
     predicates::NeutralResponsePredicate,
     predicates::request::{MethodPredicate, PathPredicate},
-    request, response,
+    request,
 };
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
@@ -187,11 +187,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root_config = Config::builder()
         .request_predicate(request::predicate().method(http::Method::GET).path("/"))
         .response_predicate(NeutralResponsePredicate::new())
-        .extractor(
-            request::extractor()
-                .method(MethodConfig::new())
-                .path("/"),
-        )
+        .extractor(request::extractor().method(MethodConfig::new()).path("/"))
         .policy(
             PolicyConfig::builder()
                 .ttl(Duration::from_secs(60))

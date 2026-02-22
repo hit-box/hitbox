@@ -89,11 +89,7 @@ async fn main() {
     let config = Config::builder()
         .request_predicate(NeutralRequestPredicate::new())
         .response_predicate(NeutralResponsePredicate::new())
-        .extractor(
-            request::extractor()
-                .method(MethodConfig::new())
-                .path("/"),
-        )
+        .extractor(request::extractor().method(MethodConfig::new()).path("/"))
         .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
         .build();
 

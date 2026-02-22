@@ -12,7 +12,7 @@ pub mod query;
 /// Contains [`CacheableHttpRequest`] — the core wrapper that pairs request
 /// metadata with a [`BufferedBody`] for predicate/extractor inspection.
 ///
-/// Also re-exports [`predicate()`] and [`extractor()`] entry points for
+/// Also re-exports [`request::predicate()`] and [`request::extractor()`] entry points for
 /// building request-side predicate and extractor chains.
 pub mod request;
 /// HTTP response types, cache storage, and serialization.
@@ -20,7 +20,7 @@ pub mod request;
 /// Contains [`CacheableHttpResponse`] for cache policy evaluation and
 /// [`SerializableHttpResponse`] — the serialized form stored in cache backends.
 ///
-/// Also re-exports [`predicate()`] entry point for building response predicate chains.
+/// Also re-exports [`response::predicate()`] entry point for building response predicate chains.
 pub mod response;
 
 pub use body::{BufferedBody, CollectExactResult, PartialBufferedBody, Remaining};
