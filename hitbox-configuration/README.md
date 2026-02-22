@@ -27,8 +27,12 @@ use hitbox::policy::PolicyConfig;
 use hitbox_configuration::Endpoint;
 use hitbox_http::extractors::Method;
 use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+use http_body_util::Full;
+use bytes::Bytes;
 
-let config = Endpoint::builder()
+type Body = Full<Bytes>;
+
+let config = Endpoint::<Body, Body>::builder()
     .request_predicate(NeutralRequestPredicate::new())
     .response_predicate(NeutralResponsePredicate::new())
     .extractor(Method::new())

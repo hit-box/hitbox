@@ -5,10 +5,10 @@ use std::time::Duration;
 
 use chrono::Utc;
 use cucumber::World;
-use hitbox::CacheContext;
 use hitbox::concurrency::BroadcastConcurrencyManager;
-use hitbox::fsm::CacheFuture;
+use hitbox::fsm::{CacheFuture, SelectiveCacheFuture};
 use hitbox::policy::{ConcurrencyLimit, EnabledCacheConfig, PolicyConfig};
+use hitbox::{CacheContext, SelectiveConfig};
 use hitbox_backend::composition::CompositionPolicy;
 use hitbox_backend::composition::policy::RefillPolicy;
 use hitbox_backend::{CacheBackend, CompositionBackend};
@@ -295,6 +295,8 @@ pub struct FsmWorld {
     pub l2_backend: MokaBackend,
     /// Span collector for capturing FSM state transitions
     pub span_collector: SpanCollector,
+    /// Configs for SelectiveCacheFuture scenarios
+    pub selective_configs: Vec<FsmConfig>,
 }
 
 impl FsmWorld {
@@ -319,6 +321,7 @@ impl FsmWorld {
             l1_backend: MokaBackend::builder().max_entries(100).build(),
             l2_backend: MokaBackend::builder().max_entries(100).build(),
             span_collector: create_span_collector(),
+            selective_configs: Vec::new(),
         }
     }
 
@@ -431,6 +434,97 @@ impl FsmWorld {
 
                                 cache_future.await
                             }
+                        })
+                    })
+                })
+            });
+
+            handles.push(handle);
+        }
+
+        let responses: Vec<_> = futures::future::join_all(handles)
+            .await
+            .into_iter()
+            .map(|r| r.expect("Task should not panic"))
+            .collect();
+
+        self.results = TestResults {
+            responses,
+            upstream_call_count: upstream_call_count.load(Ordering::SeqCst),
+        };
+    }
+
+    pub async fn run_selective_requests(&mut self, num_requests: usize, request_value: u32) {
+        let upstream_call_count = Arc::new(AtomicUsize::new(0));
+        let concurrency_manager = Arc::new(BroadcastConcurrencyManager::<SimpleResponse>::new());
+
+        // Build SelectiveConfig from selective_configs
+        let configs = SelectiveConfig::new(
+            self.selective_configs
+                .iter()
+                .map(|cfg| {
+                    let policy = if cfg.cache_enabled {
+                        PolicyConfig::Enabled(EnabledCacheConfig {
+                            ttl: cfg.ttl,
+                            stale: cfg.stale,
+                            concurrency: cfg.concurrency,
+                            policy: Default::default(),
+                        })
+                    } else {
+                        PolicyConfig::Disabled
+                    };
+                    hitbox::Config::builder()
+                        .request_predicate(ConfigurableRequestPredicate {
+                            cacheable: cfg.request_cacheable,
+                        })
+                        .response_predicate(ConfigurableResponsePredicate {
+                            cacheable: cfg.response_cacheable,
+                        })
+                        .extractor(FixedKeyExtractor)
+                        .policy(policy)
+                        .build()
+                })
+                .collect(),
+        );
+
+        // Pre-populate cache
+        let backend = Arc::new(self.backend.clone());
+        self.prepopulate_cache(&backend).await;
+
+        // Clear any previously captured spans
+        self.span_collector.clear();
+
+        let mut handles = Vec::new();
+
+        for i in 0..num_requests {
+            let configs = configs.clone();
+            let backend = backend.clone();
+            let concurrency_manager = concurrency_manager.clone();
+            let upstream_call_count = upstream_call_count.clone();
+            let upstream_delay_ms = self.upstream_delay_ms;
+            let request_delay_ms = self.request_delay_ms;
+            let dispatch = self.span_collector.dispatch().clone();
+
+            let handle = tokio::spawn(async move {
+                if request_delay_ms > 0 && i > 0 {
+                    tokio::time::sleep(Duration::from_millis(i as u64 * request_delay_ms)).await;
+                }
+
+                let upstream = ConfigurableUpstream::new(upstream_call_count, upstream_delay_ms);
+
+                tracing::dispatcher::with_default(&dispatch, || {
+                    tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async {
+                            let selective_future = SelectiveCacheFuture::new(
+                                configs,
+                                backend,
+                                SimpleRequest(request_value),
+                                upstream,
+                                hitbox_core::DisabledOffload,
+                                concurrency_manager,
+                            );
+
+                            selective_future.await
                         })
                     })
                 })
@@ -642,6 +736,7 @@ impl std::fmt::Debug for FsmWorld {
             .field("request_delay_ms", &self.request_delay_ms)
             .field("results", &self.results)
             .field("composition", &self.composition)
+            .field("selective_configs", &self.selective_configs)
             .finish_non_exhaustive()
     }
 }

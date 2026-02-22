@@ -2,7 +2,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{
     Extractor, Predicate,
-    config::{BoxExtractor, BoxPredicate, CacheConfig},
+    config::{BoxExtractor, BoxPredicate, CacheConfig, CacheConfigs},
     policy::PolicyConfig,
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
@@ -105,6 +105,23 @@ where
 
     fn policy(&self) -> &PolicyConfig {
         &self.policy
+    }
+}
+
+impl<ReqBody, ResBody> CacheConfigs<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>
+    for Endpoint<ReqBody, ResBody>
+where
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
+    ReqBody::Data: Send,
+    ResBody: hyper::body::Body + Send + 'static,
+    ResBody::Error: Send,
+    ResBody::Data: Send,
+{
+    type Config = Self;
+
+    fn configs(&self) -> &[Self::Config] {
+        std::slice::from_ref(self)
     }
 }
 

@@ -27,6 +27,7 @@ serde_json = { workspace = true }
 serde-saphyr = { workspace = true }
 indexmap = { version = "2.10", features = ["serde"] }
 thiserror = { workspace = true }
+humantime-serde = "1"
 regex = { workspace = true }
 bytes = { workspace = true }
 bytesize = { version = "2", features = ["serde"] }

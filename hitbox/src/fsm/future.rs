@@ -191,6 +191,74 @@ where
     }
 }
 
+impl<'offload, B, Req, Res, U, ReqP, ResP, E, C, O>
+    CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O>
+where
+    U: Upstream<Req, Response = Res>,
+    B: CacheBackend + Send + Sync + 'static,
+    Res: CacheableResponse,
+    Res::Cached: Cacheable + Send,
+    Req: CacheableRequest,
+    ReqP: Predicate<Subject = Req> + Send + Sync,
+    ResP: Predicate<Subject = Res::Subject> + Send + Sync,
+    E: Extractor<Subject = Req> + Send + Sync,
+    C: ConcurrencyManager<Res>,
+    O: Offload<'offload>,
+{
+    /// Create a CacheFuture starting at `PollCache` state, skipping predicate
+    /// evaluation and key extraction.
+    ///
+    /// Used by [`MultiCacheFuture`] after the routing FSM has already evaluated
+    /// request predicates and extracted the cache key.
+    ///
+    /// Note: `ReqP` and `E` are phantom types in this path — the FSM starts
+    /// past the states that use them (same pattern as [`revalidate`](Self::revalidate)).
+    pub fn poll_cache(
+        backend: Arc<B>,
+        cache_key: CacheKey,
+        request: Req,
+        upstream: U,
+        response_predicates: ResP,
+        policy: Arc<crate::policy::PolicyConfig>,
+        offload: O,
+        concurrency_manager: C,
+    ) -> Self {
+        let parent_span = span!(Level::DEBUG, "hitbox.cache");
+        let cache_key_for_get = cache_key.clone();
+        let backend_for_get = backend.clone();
+        let mut ctx = CacheContext::default().boxed();
+        let poll_cache = Box::pin(async move {
+            let result = backend_for_get
+                .get::<Res>(&cache_key_for_get, &mut ctx)
+                .await;
+            debug!(
+                found = result.as_ref().map(|r| r.is_some()).unwrap_or(false),
+                "FSM cache lookup result"
+            );
+            (result, ctx)
+        });
+        let poll_cache_state =
+            states::PollCache::new(request, cache_key.clone(), upstream, &parent_span);
+
+        CacheFuture {
+            backend,
+            cache_key: Some(cache_key),
+            state: State::PollCache {
+                poll_cache,
+                state: Some(poll_cache_state),
+            },
+            response_predicates: Some(response_predicates),
+            policy,
+            offload,
+            is_revalidation: false,
+            concurrency_manager,
+            start_time: Instant::now(),
+            span: parent_span,
+            _lifetime: std::marker::PhantomData,
+        }
+    }
+}
+
 impl<'offload, B, Req, Res, U, ReqP, ResP, E, C, O> Future
     for CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O>
 where

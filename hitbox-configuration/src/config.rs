@@ -1,6 +1,6 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, num::NonZeroU8, sync::Arc, time::Duration};
 
-use hitbox::policy::PolicyConfig;
+use hitbox::policy;
 use hitbox_http::{
     extractors::{NeutralExtractor, method::MethodExtractor, path::PathExtractor},
     predicates::{
@@ -17,6 +17,100 @@ use crate::{
     extractors::Extractor,
     types::MaybeUndefined,
 };
+
+// =============================================================================
+// Serde-enabled policy types for configuration parsing
+// =============================================================================
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Default)]
+pub enum StalePolicy {
+    #[default]
+    Return,
+    Revalidate,
+    OffloadRevalidate,
+}
+
+impl From<StalePolicy> for policy::StalePolicy {
+    fn from(s: StalePolicy) -> Self {
+        match s {
+            StalePolicy::Return => policy::StalePolicy::Return,
+            StalePolicy::Revalidate => policy::StalePolicy::Revalidate,
+            StalePolicy::OffloadRevalidate => policy::StalePolicy::OffloadRevalidate,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+pub struct CacheBehaviorPolicy {
+    #[serde(default)]
+    stale: StalePolicy,
+}
+
+impl From<CacheBehaviorPolicy> for policy::CacheBehaviorPolicy {
+    fn from(s: CacheBehaviorPolicy) -> Self {
+        policy::CacheBehaviorPolicy {
+            stale: s.stale.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct EnabledCacheConfig {
+    #[serde(default, with = "humantime_serde")]
+    ttl: Option<Duration>,
+    #[serde(default, with = "humantime_serde")]
+    stale: Option<Duration>,
+    #[serde(default)]
+    policy: CacheBehaviorPolicy,
+    concurrency: Option<NonZeroU8>,
+}
+
+impl Default for EnabledCacheConfig {
+    fn default() -> Self {
+        Self {
+            ttl: Some(Duration::from_secs(5)),
+            stale: None,
+            policy: CacheBehaviorPolicy::default(),
+            concurrency: None,
+        }
+    }
+}
+
+impl From<EnabledCacheConfig> for policy::EnabledCacheConfig {
+    fn from(s: EnabledCacheConfig) -> Self {
+        policy::EnabledCacheConfig {
+            ttl: s.ttl,
+            stale: s.stale,
+            policy: s.policy.into(),
+            concurrency: s.concurrency,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub enum PolicyConfig {
+    Enabled(EnabledCacheConfig),
+    Disabled,
+}
+
+impl Default for PolicyConfig {
+    fn default() -> Self {
+        PolicyConfig::Enabled(EnabledCacheConfig::default())
+    }
+}
+
+impl From<PolicyConfig> for policy::PolicyConfig {
+    fn from(s: PolicyConfig) -> Self {
+        match s {
+            PolicyConfig::Enabled(config) => policy::PolicyConfig::Enabled(config.into()),
+            PolicyConfig::Disabled => policy::PolicyConfig::Disabled,
+        }
+    }
+}
+
+// =============================================================================
+// ConfigEndpoint
+// =============================================================================
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ConfigEndpoint {
@@ -82,7 +176,7 @@ impl ConfigEndpoint {
             extractors,
             request_predicates,
             response_predicates,
-            policy: self.policy,
+            policy: self.policy.into(),
         })
     }
 }

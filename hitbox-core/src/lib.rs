@@ -2,6 +2,7 @@
 #![warn(missing_docs)]
 
 pub mod cacheable;
+pub mod config;
 pub mod context;
 pub mod extractor;
 pub mod key;
@@ -15,6 +16,7 @@ pub mod upstream;
 pub mod value;
 
 pub use cacheable::Cacheable;
+pub use config::{CacheConfig, CacheConfigs};
 pub use context::{
     BoxContext, CacheContext, CacheStatus, CacheStatusExt, Context, ReadMode, ResponseSource,
     finalize_context,
@@ -23,7 +25,10 @@ pub use extractor::Extractor;
 pub use key::{CacheKey, KeyPart, KeyParts};
 pub use label::BackendLabel;
 pub use offload::{DisabledOffload, Offload};
-pub use policy::{CachePolicy, EntityPolicyConfig};
+pub use policy::{
+    CacheBehaviorPolicy, CachePolicy, ConcurrencyLimit, EnabledCacheConfig, EntityPolicyConfig,
+    PolicyConfig, PolicyConfigBuilder, StalePolicy,
+};
 pub use predicate::{And, Neutral, Not, Or, Predicate, PredicateExt, PredicateResult};
 pub use request::{CacheablePolicyData, CacheableRequest, RequestCachePolicy};
 pub use response::{CacheState, CacheableResponse, ResponseCachePolicy};

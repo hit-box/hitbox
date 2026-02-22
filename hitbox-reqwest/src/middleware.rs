@@ -13,9 +13,8 @@ use std::sync::Arc;
 use hitbox::CacheStatusExt;
 use hitbox::backend::CacheBackend;
 use hitbox::concurrency::{ConcurrencyManager, NoopConcurrencyManager};
-use hitbox::config::CacheConfig;
-use hitbox::fsm::CacheFuture;
-use hitbox_core::DisabledOffload;
+use hitbox::fsm::SelectiveCacheFuture;
+use hitbox_core::{CacheConfigs, DisabledOffload};
 use hitbox_http::{
     BufferedBody, CacheableHttpRequest, CacheableHttpResponse, DEFAULT_CACHE_STATUS_HEADER,
 };
@@ -98,14 +97,11 @@ use async_trait::async_trait;
 impl<B, C, CM> Middleware for CacheMiddleware<B, C, CM>
 where
     B: CacheBackend + Send + Sync + 'static,
-    C: CacheConfig<CacheableHttpRequest<reqwest::Body>, CacheableHttpResponse<reqwest::Body>>
+    C: CacheConfigs<CacheableHttpRequest<reqwest::Body>, CacheableHttpResponse<reqwest::Body>>
         + Clone
         + Send
         + Sync
         + 'static,
-    C::RequestPredicate: Clone + Send + Sync + 'static,
-    C::ResponsePredicate: Clone + Send + Sync + 'static,
-    C::Extractor: Clone + Send + Sync + 'static,
     CM: ConcurrencyManager<Result<CacheableHttpResponse<reqwest::Body>>>
         + Clone
         + Send
@@ -134,14 +130,11 @@ where
         // Create the cache future and box it to erase the problematic types
         // before capturing in the async_trait's boxed future
         let cache_future: Pin<Box<dyn Future<Output = _> + Send + '_>> =
-            Box::pin(CacheFuture::new(
+            Box::pin(SelectiveCacheFuture::new(
+                self.configuration.clone(),
                 self.backend.clone(),
                 cacheable_req,
                 upstream,
-                self.configuration.request_predicates(),
-                self.configuration.response_predicates(),
-                self.configuration.extractors(),
-                Arc::new(self.configuration.policy().clone()),
                 DisabledOffload,
                 self.concurrency_manager.clone(),
             ));
