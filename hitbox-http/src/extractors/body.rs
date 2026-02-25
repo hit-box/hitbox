@@ -5,7 +5,7 @@
 //!
 //! # Extraction Modes
 //!
-//! - **Hash**: SHA256 hash of the entire body (truncated to 16 hex chars)
+//! - **Hash**: Full SHA256 hash of the entire body (64 hex characters)
 //! - **Jq**: Extract values from JSON bodies using jq expressions
 //! - **Regex**: Extract values using regular expression capture groups
 //!
@@ -42,7 +42,7 @@ use crate::CacheableHttpRequest;
 /// - [`Regex`](Self::Regex): Extract using regular expression captures
 #[derive(Debug, Clone)]
 pub enum BodyExtraction {
-    /// Hash the entire body using SHA256 (truncated to 16 hex chars).
+    /// Hash the entire body using SHA256 (full 64 hex characters).
     Hash,
     /// Extract values from JSON body using a jq expression.
     Jq(JqExtraction),
@@ -204,6 +204,18 @@ pub struct RegexExtraction {
 ///
 /// Apply hash, lowercase, or other transforms to captured values
 /// before using them in cache keys.
+///
+/// Use [`Transforms::builder()`] for ergonomic construction:
+///
+/// ```
+/// use hitbox_http::extractors::body::Transforms;
+/// use hitbox_http::extractors::transform::Transform;
+///
+/// let t: Transforms = Transforms::builder()
+///     .full(Transform::Hash)
+///     .full(Transform::Truncate(16))
+///     .into();
+/// ```
 #[derive(Debug, Clone, Default)]
 pub enum Transforms {
     /// No transformations applied.
@@ -213,6 +225,111 @@ pub enum Transforms {
     FullBody(Vec<Transform>),
     /// Apply different transforms per capture group name.
     PerKey(HashMap<String, Vec<Transform>>),
+}
+
+impl Transforms {
+    /// Create a [`TransformBuilder`] for ergonomic construction.
+    pub fn builder() -> TransformBuilder<BuilderEmpty> {
+        TransformBuilder {
+            state: BuilderEmpty,
+        }
+    }
+}
+
+/// Builder for [`Transforms`], created via [`Transforms::builder()`].
+///
+/// Uses typestate to enforce at compile time that `.full()` and `.key()`
+/// cannot be mixed.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::body::Transforms;
+/// use hitbox_http::extractors::transform::Transform;
+///
+/// // Full-body transform chain
+/// let transforms = Transforms::builder()
+///     .full(Transform::Hash)
+///     .full(Transform::Truncate(16));
+///
+/// // Per-key transforms
+/// let transforms = Transforms::builder()
+///     .key("token", Transform::Hash)
+///     .key("name", Transform::Lowercase);
+/// ```
+#[derive(Debug, Clone)]
+pub struct TransformBuilder<S> {
+    state: S,
+}
+
+/// Initial state: no transforms added yet.
+#[derive(Debug, Clone)]
+pub struct BuilderEmpty;
+
+/// State after adding full-body transforms.
+#[derive(Debug, Clone)]
+pub struct BuilderFull(Vec<Transform>);
+
+/// State after adding per-key transforms.
+#[derive(Debug, Clone)]
+pub struct BuilderPerKey(HashMap<String, Vec<Transform>>);
+
+impl TransformBuilder<BuilderEmpty> {
+    /// Add a transform applied to all captured values.
+    ///
+    /// Transitions to full-body mode. Only `.full()` can be called after this.
+    pub fn full(self, t: Transform) -> TransformBuilder<BuilderFull> {
+        TransformBuilder {
+            state: BuilderFull(vec![t]),
+        }
+    }
+
+    /// Add a transform for a specific capture group by name.
+    ///
+    /// Transitions to per-key mode. Only `.key()` can be called after this.
+    pub fn key(self, name: impl Into<String>, t: Transform) -> TransformBuilder<BuilderPerKey> {
+        let mut map = HashMap::new();
+        map.insert(name.into(), vec![t]);
+        TransformBuilder {
+            state: BuilderPerKey(map),
+        }
+    }
+}
+
+impl TransformBuilder<BuilderFull> {
+    /// Add another transform to the full-body chain.
+    pub fn full(mut self, t: Transform) -> Self {
+        self.state.0.push(t);
+        self
+    }
+}
+
+impl TransformBuilder<BuilderPerKey> {
+    /// Add a transform for a specific capture group by name.
+    ///
+    /// Multiple calls for the same key chain transforms in order.
+    pub fn key(mut self, name: impl Into<String>, t: Transform) -> Self {
+        self.state.0.entry(name.into()).or_default().push(t);
+        self
+    }
+}
+
+impl From<TransformBuilder<BuilderEmpty>> for Transforms {
+    fn from(_: TransformBuilder<BuilderEmpty>) -> Self {
+        Transforms::None
+    }
+}
+
+impl From<TransformBuilder<BuilderFull>> for Transforms {
+    fn from(builder: TransformBuilder<BuilderFull>) -> Self {
+        Transforms::FullBody(builder.state.0)
+    }
+}
+
+impl From<TransformBuilder<BuilderPerKey>> for Transforms {
+    fn from(builder: TransformBuilder<BuilderPerKey>) -> Self {
+        Transforms::PerKey(builder.state.0)
+    }
 }
 
 /// Trait for converting a body extraction config into a [`BodyExtraction`].
@@ -300,8 +417,10 @@ impl<M> BodyConfig<M> {
     }
 
     /// Set transforms for extracted values.
-    pub fn transforms(mut self, transforms: Transforms) -> Self {
-        self.transforms = transforms;
+    ///
+    /// Accepts [`Transforms`] directly or a [`TransformBuilder`].
+    pub fn transforms(mut self, transforms: impl Into<Transforms>) -> Self {
+        self.transforms = transforms.into();
         self
     }
 }

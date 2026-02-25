@@ -44,9 +44,10 @@
 //! # Transforms
 //!
 //! Header and query extractors support value transformations via [`transform::Transform`]:
-//! - `Hash`: SHA256 hash (truncated to 16 hex chars)
+//! - `Hash`: Full SHA256 hash (64 hex chars)
 //! - `Lowercase`: Convert to lowercase
 //! - `Uppercase`: Convert to uppercase
+//! - `Truncate(n)`: Truncate to `n` characters
 //!
 //! [`Extractor`]: hitbox::Extractor
 //! [`KeyPart`]: hitbox::KeyPart

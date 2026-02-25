@@ -50,3 +50,30 @@ async fn test_request_path_predicates_non_match() {
     let prediction = predicate.check(request).await;
     assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }
+
+#[tokio::test]
+async fn test_request_path_from_conversions() {
+    // From<&str>
+    let request = CacheableHttpRequest::from_request(
+        Request::builder()
+            .uri("/api/users/42")
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
+            .unwrap(),
+    );
+    let op: path::Operation = "/api/users/{id}".into();
+    let predicate = NeutralRequestPredicate::new().path(op);
+    let prediction = predicate.check(request).await;
+    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+
+    // From<String>
+    let request = CacheableHttpRequest::from_request(
+        Request::builder()
+            .uri("/api/users/42")
+            .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
+            .unwrap(),
+    );
+    let op: path::Operation = String::from("/api/users/{id}").into();
+    let predicate = NeutralRequestPredicate::new().path(op);
+    let prediction = predicate.check(request).await;
+    assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+}

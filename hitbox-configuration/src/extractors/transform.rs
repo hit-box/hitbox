@@ -7,12 +7,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum Transform {
-    /// SHA256 hash (truncated to 16 hex chars)
+    /// Full SHA256 hash (64 hex chars)
     Hash,
     /// Convert to lowercase
     Lowercase,
     /// Convert to uppercase
     Uppercase,
+    /// Truncate to the given number of characters
+    Truncate(usize),
 }
 
 impl Transform {
@@ -22,6 +24,7 @@ impl Transform {
             Transform::Hash => HttpTransform::Hash,
             Transform::Lowercase => HttpTransform::Lowercase,
             Transform::Uppercase => HttpTransform::Uppercase,
+            Transform::Truncate(n) => HttpTransform::Truncate(n),
         }
     }
 }
