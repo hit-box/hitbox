@@ -6,14 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- `extractor()` entry point and Config-based API for all extractors
-- `Into<Operation>` shorthands for predicates (e.g., `.method(Method::GET)`, `.status(StatusCode::OK)`)
-- `Into<Config>` shorthands for extractors (e.g., `.path("/users/{id}")`, `.query("page")`)
-
 ### Changed
-- Extractor chain methods now take Config types instead of raw values
-- `PathConfig::new()` renamed to `PathConfig::pattern()`
+- **Breaking:** Unified Config-based extractor/predicate API with `Into` shorthands, `Transform::Truncate`, `Transforms::builder()` with typestate, and full 64-char SHA256 for `Hash` ([#202](https://github.com/hit-box/hitbox/pull/202))
 
 ## [0.2.1] - 2026-02-09
 

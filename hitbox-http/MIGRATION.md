@@ -2,92 +2,60 @@
 
 ## Migrating from 0.2 to 0.3
 
-This guide covers the breaking changes introduced in hitbox-http 0.3.
-
-### Summary
-
-Version 0.3 introduces a unified Config-based API for extractors and `Into<Operation>` shorthands for predicates, making the API more ergonomic and consistent.
-
 ### Extractors
 
-**Before:**
+Entry point changed to `request::extractor()` with Config-based chaining. String arguments accepted directly.
+
 ```rust
-use hitbox_http::extractors::{Method, path::PathExtractor, query::QueryExtractor};
-
-let extractor = Method::new()
-    .path("/users/{id}")
-    .query("page".to_string())
-    .header("x-api-key".to_string());
-```
-
-**After:**
-```rust
-use hitbox_http::request;
-use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
-use hitbox_http::extractors::query::QueryExtractor;
-use hitbox_http::extractors::header::HeaderExtractor;
-
-let extractor = request::extractor()
-    .method(MethodConfig::new())
-    .path("/users/{id}")
-    .query("page")
-    .header("x-api-key");
+// Before
+Method::new().path("/users/{id}").query("page".to_string())
+// After
+request::extractor().method(MethodConfig::new()).path("/users/{id}").query("page")
 ```
 
 ### Predicates
 
-**Before:**
+Operation wrappers removed — pass values directly via `Into<Operation>`.
+
 ```rust
-use hitbox_http::predicates::request::{self, method, path};
-use hitbox_http::predicates::response::status;
-
-request::predicate()
-    .method(method::Operation::eq(Method::GET))
-    .path(path::Operation::pattern("/users/{id}"))
-
-response::predicate()
-    .status(status::Operation::eq(StatusCode::OK))
-```
-
-**After:**
-```rust
-use hitbox_http::{request, response};
-
-request::predicate()
-    .method(Method::GET)
-    .path("/users/{id}")
-
-response::predicate()
-    .status(StatusCode::OK)
+// Before
+request::predicate().method(method::Operation::eq(Method::GET)).path(path::Operation::pattern("/users/{id}"))
+// After
+request::predicate().method(Method::GET).path("/users/{id}")
 ```
 
 ### Body Extractor
 
-**Before:**
+Raw `BodyExtraction` enum replaced by `BodyConfig` builder with `.hash()`, `.jq()`, `.regex()` modes.
+
 ```rust
+// Before
 .body(BodyExtraction::Hash)
-.body(BodyExtraction::Regex(RegexExtraction { ... }))
-```
-
-**After:**
-```rust
-use hitbox_http::extractors::body::{BodyConfig, BodyExtractor};
-
+// After
 .body(BodyConfig::new().hash())
 .body(BodyConfig::new().regex(r"token=(\w+)")?.key("api-token").global())
-.body(BodyConfig::new().jq(".data.id")?)
 ```
 
-### Quick Reference
+### Hash Transform
 
-| Old | New |
-|-----|-----|
-| `Method::new()` | `request::extractor().method(MethodConfig::new())` |
-| `.path(String)` | `.path(&str)` |
-| `.query(String)` | `.query(&str)` |
-| `.header(String)` | `.header(&str)` |
-| `.body(BodyExtraction::Hash)` | `.body(BodyConfig::new().hash())` |
-| `method::Operation::eq(M)` | `M` (direct) |
-| `path::Operation::pattern(p)` | `p` (direct) |
-| `status::Operation::eq(s)` | `s` (direct) |
-| `PathConfig::new(p)` | `PathConfig::pattern(p)` |
+`Transform::Hash` now returns full 64-char SHA256 (was 16-char truncated). Chain `Truncate` for old behavior.
+
+```rust
+// Before: 16-char hash
+.transform(Transform::Hash)
+// After: 64-char hash, or truncate explicitly
+.transform(Transform::Hash).transform(Transform::Truncate(16))
+```
+
+### Body Transforms Builder
+
+`Transforms::builder()` replaces manual `Transforms::FullBody(vec![...])` / `Transforms::PerKey(HashMap)` construction. Typestate prevents mixing `.full()` and `.key()`.
+
+```rust
+// Before
+.transforms(Transforms::FullBody(vec![Transform::Hash]))
+// After
+.transforms(Transforms::builder().full(Transform::Hash))
+.transforms(Transforms::builder().key("token", Transform::Hash).key("name", Transform::Lowercase))
+```
+
