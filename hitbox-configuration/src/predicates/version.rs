@@ -1,7 +1,5 @@
 use hitbox::predicate::Predicate;
-use hitbox_http::predicates::version::{
-    HttpVersion, Operation as VersionOperation, VersionPredicate,
-};
+use hitbox_http::predicates::version::{Operation, VersionPredicate};
 use http::Version;
 use serde::{Deserialize, Serialize};
 
@@ -17,32 +15,24 @@ pub enum VersionOperationConfig {
     In(Vec<String>),
 }
 
-impl VersionOperationConfig {
-    /// Convert to hitbox-http version operation
-    pub fn into_operation(self) -> Result<VersionOperation, ConfigError> {
-        match self {
-            VersionOperationConfig::Eq(version) => {
-                let v = parse_version(&version)?;
-                Ok(VersionOperation::Eq(v))
-            }
-            VersionOperationConfig::In(versions) => {
-                let vs = parse_versions(&versions)?;
-                Ok(VersionOperation::In(vs))
-            }
-        }
-    }
-}
-
 /// Convert version operation config into predicates for any subject that implements HasVersion
 pub fn into_predicates<P>(
     operation: VersionOperationConfig,
     inner: P,
-) -> Result<HttpVersion<P>, ConfigError>
+) -> Result<hitbox_http::predicates::version::HttpVersion<P>, ConfigError>
 where
     P: Predicate,
 {
-    let op = operation.into_operation()?;
-    Ok(inner.version(op))
+    match operation {
+        VersionOperationConfig::Eq(version) => {
+            let v = parse_version(&version)?;
+            Ok(inner.version(Operation::eq(v)))
+        }
+        VersionOperationConfig::In(versions) => {
+            let vs = parse_versions(&versions)?;
+            Ok(inner.version(Operation::any(vs)))
+        }
+    }
 }
 
 fn parse_version(version: &str) -> Result<Version, ConfigError> {

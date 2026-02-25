@@ -27,13 +27,14 @@ use bytes::Bytes;
 use http_body_util::Empty;
 use hitbox::policy::PolicyConfig;
 use hitbox_configuration::Endpoint;
-use hitbox_http::extractors::Method;
-use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+use hitbox_http::extractors::{MethodConfig, MethodExtractor};
+use hitbox_http::predicates::{request, response};
+use hitbox_http::request as req;
 
-let config: Endpoint<Empty<Bytes>, Empty<Bytes>> = Endpoint::builder()
-    .request_predicate(NeutralRequestPredicate::new())
-    .response_predicate(NeutralResponsePredicate::new())
-    .extractor(Method::new())
+let config = Endpoint::<Empty<Bytes>, Empty<Bytes>>::builder()
+    .request_predicate(request::predicate())
+    .response_predicate(response::predicate())
+    .extractor(req::extractor().method(MethodConfig::new()))
     .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
     .build();
 ```

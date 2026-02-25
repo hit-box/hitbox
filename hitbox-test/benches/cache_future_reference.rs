@@ -30,6 +30,7 @@ use hitbox_backend::{CacheBackend, CompositionBackend, PassthroughCompressor};
 use hitbox_configuration::{Backend as ConfigBackend, ConfigEndpoint};
 use hitbox_core::DisabledOffload;
 use hitbox_core::Upstream;
+use hitbox_http::extractors::MethodConfig;
 use hitbox_http::extractors::NeutralExtractor;
 use hitbox_http::extractors::body::{BodyExtraction, BodyExtractor, JqExtraction};
 use hitbox_http::extractors::header::{
@@ -48,8 +49,9 @@ use hitbox_http::predicates::header::HeaderPredicate;
 use hitbox_http::predicates::request::header::Operation as HeaderOperation;
 use hitbox_http::predicates::request::method::MethodPredicate;
 use hitbox_http::predicates::request::path::PathPredicate;
+use hitbox_http::predicates::response::StatusCodePredicate as _;
 use hitbox_http::predicates::response::header::Operation as ResponseHeaderOperation;
-use hitbox_http::predicates::response::status::{StatusClass, StatusCodePredicate};
+use hitbox_http::predicates::response::status::StatusClass;
 use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
 use hitbox_http::{BufferedBody, CacheableHttpRequest, CacheableHttpResponse};
 use hitbox_moka::MokaBackend;
@@ -147,7 +149,7 @@ fn create_response_predicates()
 -> impl Predicate<Subject = <BenchResponse as CacheableResponse>::Subject> + Send + Sync {
     NeutralResponsePredicate::<InnerBody>::new()
         // Only cache 2xx successful responses
-        .status_code_class(StatusClass::Success)
+        .status(StatusClass::Success)
         // Require content-type header
         .header(ResponseHeaderOperation::Exist(
             "content-type".parse().unwrap(),
@@ -163,7 +165,7 @@ fn create_extractors() -> impl hitbox::Extractor<Subject = BenchRequest> + Send 
     let base = NeutralExtractor::<InnerBody>::new();
 
     // Method extractor
-    let with_method = base.method();
+    let with_method = base.method(MethodConfig::new());
 
     // Path extractor (extracts user_id)
     let with_path = with_method.path("/v1/users/{user_id}/orders");

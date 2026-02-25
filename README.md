@@ -62,11 +62,11 @@ use std::time::Duration;
 
 use axum::{Router, extract::Path, routing::get};
 use hitbox::policy::PolicyConfig;
-use hitbox::{Config, Neutral};
-use hitbox_http::extractors::Method as MethodExtractor;
-use hitbox_http::extractors::path::PathExtractor;
-use hitbox_http::predicates::request::Method;
+use hitbox::Config;
+use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
+use hitbox_http::predicates::request::{MethodPredicate, PathPredicate};
 use hitbox_http::predicates::response::{StatusClass, StatusCodePredicate};
+use hitbox_http::{request, response};
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
 
@@ -84,9 +84,9 @@ async fn main() {
 
     // Users list - long TTL (60s)
     let users_config = Config::builder()
-        .request_predicate(Method::new(http::Method::GET).unwrap())
-        .response_predicate(Neutral::new().status_code_class(StatusClass::Success))
-        .extractor(MethodExtractor::new().path("/api/users"))
+        .request_predicate(request::predicate().method(http::Method::GET).path("/api/users"))
+        .response_predicate(response::predicate().status(StatusClass::Success))
+        .extractor(request::extractor().method(MethodConfig::new()).path("/api/users"))
         .policy(
             PolicyConfig::builder()
                 .ttl(Duration::from_secs(60))
@@ -97,10 +97,9 @@ async fn main() {
 
     // Single user - short TTL (10s)
     let user_config = Config::builder()
-        .request_predicate(Method::new(http::Method::GET).unwrap())
-        .response_predicate(Neutral::new().status_code_class(StatusClass::Success))
-
-        .extractor(MethodExtractor::new().path("/api/users/{id}"))
+        .request_predicate(request::predicate().method(http::Method::GET).path("/api/users/{id}"))
+        .response_predicate(response::predicate().status(StatusClass::Success))
+        .extractor(request::extractor().method(MethodConfig::new()).path("/api/users/{id}"))
         .policy(
             PolicyConfig::builder()
                 .ttl(Duration::from_secs(10))
@@ -384,18 +383,17 @@ HTTP Extractors build cache keys from request components. They extract values fr
 **Code example**
 
 ```rust
-use hitbox_http::extractors::{
-    Method as MethodExtractor,
-    Path as PathExtractor,
-    query::QueryExtractor,
-    header::HeaderExtractor,
-};
+use hitbox_http::request;
+use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
+use hitbox_http::extractors::query::QueryExtractor;
+use hitbox_http::extractors::header::HeaderExtractor;
 
 // Extract method, path params, query params, and headers for cache key
-MethodExtractor::new()
+request::extractor()
+    .method(MethodConfig::new())
     .path("/v1/authors/{author_id}/books/{book_id}")
-    .query("page".to_string())
-    .header("Accept-Language".to_string())
+    .query("page")
+    .header("Accept-Language")
 ```
 
 A request to `/v1/authors/123/books/456?page=1` with `Accept-Language: en` produces a cache key with `method`, `author_id`, `book_id`, `page`, and `Accept-Language` components.

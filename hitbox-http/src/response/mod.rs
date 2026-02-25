@@ -1,3 +1,5 @@
+pub use crate::predicates::response::predicate;
+
 use std::fmt::Debug;
 use std::future::Ready;
 
