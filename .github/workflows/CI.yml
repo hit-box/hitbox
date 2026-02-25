@@ -109,6 +109,8 @@ jobs:
           files: lcov.info
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+          override_branch: ${{ github.head_ref || github.ref_name }}
+          override_pr: ${{ github.event.pull_request.number }}
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
