@@ -1,0 +1,40 @@
+[package]
+name = "hitbox-proto"
+version = "0.2.0"
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+categories = [
+    "caching",
+    "asynchronous",
+    "network-programming",
+]
+description = "Protobuf predicates and extractors for Hitbox caching framework"
+readme = "README.md"
+keywords = ["cache", "async", "protobuf", "grpc", "hitbox"]
+
+[dependencies]
+hitbox-core = { path = "../hitbox-core", version = "0.2" }
+hitbox-http = { path = "../hitbox-http", version = "0.2" }
+hitbox = { path = "../hitbox", version = "0.2" }
+prost = "0.14"
+prost-reflect = { version = "0.16", features = ["serde", "derive"] }
+protox = "0.9"
+async-trait = { workspace = true }
+bytes = { workspace = true }
+http = { workspace = true }
+http-body = { workspace = true }
+hyper = { workspace = true }
+tracing = { workspace = true }
+sha2 = "0.10"
+hex = "0.4"
+
+[dev-dependencies]
+tokio = { workspace = true, features = [
+    "test-util",
+    "macros",
+    "rt-multi-thread",
+] }
+http-body-util = { workspace = true }

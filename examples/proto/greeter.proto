@@ -1,0 +1,22 @@
+// Greeter service definition for the gRPC caching example.
+//
+// This file is used with grpcurl for testing. The example server
+// uses inline prost types and does not require code generation.
+
+syntax = "proto3";
+package greeter;
+
+service Greeter {
+    rpc SayHello (HelloRequest) returns (HelloReply);
+    rpc GetTime (Empty) returns (HelloReply);
+}
+
+message HelloRequest {
+    string name = 1;
+}
+
+message HelloReply {
+    string message = 1;
+}
+
+message Empty {}

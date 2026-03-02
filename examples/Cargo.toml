@@ -30,6 +30,7 @@ hitbox-redis = { path = "../hitbox-redis" }
 hitbox-reqwest = { path = "../hitbox-reqwest" }
 hitbox-feoxdb = { path = "../hitbox-feoxdb" }
 hitbox-fn = { path = "../hitbox-fn", features = ["derive"] }
+hitbox-grpc = { path = "../hitbox-grpc" }
 
 reqwest = { version = "0.13", features = ["json"] }
 reqwest-middleware = "0.5"
@@ -56,6 +57,9 @@ chrono = { workspace = true }
 hyper-util = { version = "0.1", features = ["tokio"] }
 async-trait = { workspace = true }
 pin-project = { workspace = true }
+prost = "0.14"
+tonic = "0.14"
+tonic-prost = "0.14"
 
 # Optional dependencies for features
 [dependencies]
@@ -69,6 +73,9 @@ opentelemetry_sdk = { version = "0.31", features = [
 ], optional = true }
 tracing-opentelemetry = { version = "0.32", optional = true }
 metrics-exporter-prometheus = { version = "0.18", optional = true }
+
+[build-dependencies]
+tonic-prost-build = "0.14"
 
 [[example]]
 name = "axum"
@@ -98,3 +105,7 @@ path = "examples/hyper_client.rs"
 [[example]]
 name = "memoization_derive"
 path = "examples/memoization_derive.rs"
+
+[[example]]
+name = "grpc"
+path = "examples/grpc.rs"
