@@ -61,7 +61,7 @@ hyper-util = { version = "0.1", features = [
     "http2",
 ] }
 dashmap = { version = "6.1", features = ["serde"] }
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 pretty_assertions = "1.4"
 assert-json-diff = "2.0"
 jaq-core = "2.1.0"
