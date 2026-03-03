@@ -293,7 +293,10 @@ mod buffered_body_tests {
     #[tokio::test]
     async fn test_complete_yields_bytes_once() {
         let data = Bytes::from("hello world");
-        let mut body: BufferedBody<Full<Bytes>> = BufferedBody::Complete(Some(data.clone()));
+        let mut body: BufferedBody<Full<Bytes>> = BufferedBody::Complete {
+            data: Some(data.clone()),
+            trailers: None,
+        };
 
         // First frame should yield the data
         let frame = body.frame().await.unwrap().unwrap();
@@ -446,7 +449,10 @@ mod buffered_body_tests {
     #[tokio::test]
     async fn test_size_hint_complete() {
         let data = Bytes::from("hello");
-        let body: BufferedBody<Full<Bytes>> = BufferedBody::Complete(Some(data.clone()));
+        let body: BufferedBody<Full<Bytes>> = BufferedBody::Complete {
+            data: Some(data.clone()),
+            trailers: None,
+        };
 
         let hint = body.size_hint();
         assert_eq!(hint.lower(), data.len() as u64);
@@ -455,7 +461,10 @@ mod buffered_body_tests {
 
     #[tokio::test]
     async fn test_size_hint_complete_after_consumed() {
-        let body = BufferedBody::<Full<Bytes>>::Complete(None);
+        let body = BufferedBody::<Full<Bytes>>::Complete {
+            data: None,
+            trailers: None,
+        };
 
         let hint = body.size_hint();
         assert_eq!(hint.lower(), 0);
@@ -476,10 +485,16 @@ mod buffered_body_tests {
     #[tokio::test]
     async fn test_is_end_stream_complete() {
         let data = Bytes::from("hello");
-        let body: BufferedBody<Full<Bytes>> = BufferedBody::Complete(Some(data));
+        let body: BufferedBody<Full<Bytes>> = BufferedBody::Complete {
+            data: Some(data),
+            trailers: None,
+        };
         assert!(!body.is_end_stream());
 
-        let body = BufferedBody::<Full<Bytes>>::Complete(None);
+        let body = BufferedBody::<Full<Bytes>>::Complete {
+            data: None,
+            trailers: None,
+        };
         assert!(body.is_end_stream());
     }
 
@@ -491,5 +506,227 @@ mod buffered_body_tests {
 
         // Full body with data is not at end
         assert!(!body.is_end_stream());
+    }
+
+    // === Trailer-preservation tests (Issue #260) ===
+
+    #[tokio::test]
+    async fn test_complete_yields_data_then_trailers_then_none() {
+        use http::HeaderMap;
+
+        let data = Bytes::from("hello");
+        let mut trailer_map = HeaderMap::new();
+        trailer_map.insert("grpc-status", "0".parse().unwrap());
+        trailer_map.insert("grpc-message", "OK".parse().unwrap());
+
+        let mut body: BufferedBody<Full<Bytes>> = BufferedBody::Complete {
+            data: Some(data.clone()),
+            trailers: Some(trailer_map),
+        };
+
+        // First frame: data
+        let frame = body.frame().await.unwrap().unwrap();
+        let frame_data = frame.into_data().unwrap();
+        assert_eq!(frame_data, data);
+
+        // Second frame: trailers
+        let frame = body.frame().await.unwrap().unwrap();
+        let trailers = frame.into_trailers().unwrap();
+        assert_eq!(trailers.get("grpc-status").unwrap(), "0");
+        assert_eq!(trailers.get("grpc-message").unwrap(), "OK");
+
+        // Third frame: None (end of stream)
+        let frame = body.frame().await;
+        assert!(frame.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_complete_yields_trailers_only_when_no_data() {
+        use http::HeaderMap;
+
+        let mut trailer_map = HeaderMap::new();
+        trailer_map.insert("grpc-status", "0".parse().unwrap());
+
+        let mut body: BufferedBody<Full<Bytes>> = BufferedBody::Complete {
+            data: None,
+            trailers: Some(trailer_map),
+        };
+
+        // First frame: trailers (no data to yield)
+        let frame = body.frame().await.unwrap().unwrap();
+        let trailers = frame.into_trailers().unwrap();
+        assert_eq!(trailers.get("grpc-status").unwrap(), "0");
+
+        // Second frame: None
+        let frame = body.frame().await;
+        assert!(frame.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_is_end_stream_with_pending_trailers() {
+        use http::HeaderMap;
+
+        let mut trailer_map = HeaderMap::new();
+        trailer_map.insert("grpc-status", "0".parse().unwrap());
+
+        // data is None but trailers are pending — NOT end of stream
+        let body: BufferedBody<Full<Bytes>> = BufferedBody::Complete {
+            data: None,
+            trailers: Some(trailer_map),
+        };
+        assert!(!body.is_end_stream());
+
+        // Only truly end when both are None
+        let body: BufferedBody<Full<Bytes>> = BufferedBody::Complete {
+            data: None,
+            trailers: None,
+        };
+        assert!(body.is_end_stream());
+    }
+
+    #[tokio::test]
+    async fn test_collect_on_complete_preserves_trailers() {
+        use http::HeaderMap;
+
+        let data = Bytes::from("response body");
+        let mut trailer_map = HeaderMap::new();
+        trailer_map.insert("grpc-status", "0".parse().unwrap());
+        trailer_map.insert("grpc-message", "OK".parse().unwrap());
+
+        let body: BufferedBody<Full<Bytes>> = BufferedBody::Complete {
+            data: Some(data.clone()),
+            trailers: Some(trailer_map),
+        };
+
+        let collected = body.collect().await.unwrap();
+        assert_eq!(collected.data, data);
+        let trailers = collected.trailers.unwrap();
+        assert_eq!(trailers.get("grpc-status").unwrap(), "0");
+        assert_eq!(trailers.get("grpc-message").unwrap(), "OK");
+    }
+
+    #[tokio::test]
+    async fn test_collect_on_passthrough_preserves_trailers() {
+        use http::HeaderMap;
+        use std::convert::Infallible;
+
+        // Create a streaming body: data chunks + trailer frame
+        let mut trailer_map = HeaderMap::new();
+        trailer_map.insert("grpc-status", "0".parse().unwrap());
+        trailer_map.insert("x-custom-trailer", "value".parse().unwrap());
+
+        let stream = stream::iter(vec![
+            Ok::<_, Infallible>(http_body::Frame::data(Bytes::from("chunk1"))),
+            Ok::<_, Infallible>(http_body::Frame::data(Bytes::from("chunk2"))),
+            Ok::<_, Infallible>(http_body::Frame::trailers(trailer_map)),
+        ]);
+
+        let inner_body = StreamBody::new(stream);
+        let body = BufferedBody::Passthrough(inner_body);
+
+        let collected = body.collect().await.unwrap();
+        assert_eq!(collected.data, Bytes::from("chunk1chunk2"));
+        let trailers = collected.trailers.unwrap();
+        assert_eq!(trailers.get("grpc-status").unwrap(), "0");
+        assert_eq!(trailers.get("x-custom-trailer").unwrap(), "value");
+    }
+
+    #[tokio::test]
+    async fn test_collect_exact_from_stream_captures_trailers_when_body_under_limit() {
+        use http::HeaderMap;
+        use std::convert::Infallible;
+
+        // Body is 11 bytes ("chunk1chunk2" is 12... let's use precise values)
+        // but limit is 1000 — body ends with trailers before reaching limit
+        let mut trailer_map = HeaderMap::new();
+        trailer_map.insert("grpc-status", "0".parse().unwrap());
+
+        let stream = stream::iter(vec![
+            Ok::<_, Infallible>(http_body::Frame::data(Bytes::from("hello"))),
+            Ok::<_, Infallible>(http_body::Frame::trailers(trailer_map)),
+        ]);
+
+        let inner_body = StreamBody::new(stream);
+        let body = BufferedBody::Passthrough(inner_body);
+
+        // Request 1000 bytes but only 5 are available before trailers
+        let result = body.collect_exact(1000).await;
+
+        match result {
+            hitbox_http::CollectExactResult::Incomplete {
+                buffered,
+                error,
+                trailers,
+            } => {
+                assert_eq!(buffered.unwrap(), Bytes::from("hello"));
+                assert!(error.is_none());
+                let trailers = trailers.unwrap();
+                assert_eq!(trailers.get("grpc-status").unwrap(), "0");
+            }
+            other => panic!("Expected Incomplete, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_collect_exact_from_stream_no_trailers_when_limit_reached() {
+        use std::convert::Infallible;
+
+        // Body has plenty of data, limit is reached before stream ends
+        let stream = stream::iter(vec![
+            Ok::<_, Infallible>(http_body::Frame::data(Bytes::from("abcdefghij"))), // 10 bytes
+            Ok::<_, Infallible>(http_body::Frame::data(Bytes::from("klmnopqrst"))), // 10 more
+        ]);
+
+        let inner_body = StreamBody::new(stream);
+        let body = BufferedBody::Passthrough(inner_body);
+
+        // Request only 5 bytes
+        let result = body.collect_exact(5).await;
+
+        match result {
+            hitbox_http::CollectExactResult::AtLeast {
+                buffered,
+                remaining,
+                trailers,
+            } => {
+                // Got at least 5 bytes (may have read more due to frame boundaries)
+                assert!(buffered.len() >= 5);
+                // Stream is still open — trailers haven't been read
+                assert!(remaining.is_some());
+                assert!(trailers.is_none());
+            }
+            other => panic!("Expected AtLeast, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_collect_exact_into_buffered_body_preserves_trailers() {
+        use http::HeaderMap;
+        use std::convert::Infallible;
+
+        // Body under limit, ends with trailers → Incomplete → Complete { data, trailers }
+        let mut trailer_map = HeaderMap::new();
+        trailer_map.insert("grpc-status", "0".parse().unwrap());
+
+        let stream = stream::iter(vec![
+            Ok::<_, Infallible>(http_body::Frame::data(Bytes::from("body data"))),
+            Ok::<_, Infallible>(http_body::Frame::trailers(trailer_map)),
+        ]);
+
+        let inner_body = StreamBody::new(stream);
+        let body = BufferedBody::Passthrough(inner_body);
+
+        let result = body.collect_exact(1000).await;
+        let buffered = result.into_buffered_body();
+
+        // Should be Complete with both data and trailers
+        match buffered {
+            BufferedBody::Complete { data, trailers } => {
+                assert_eq!(data.unwrap(), Bytes::from("body data"));
+                let trailers = trailers.unwrap();
+                assert_eq!(trailers.get("grpc-status").unwrap(), "0");
+            }
+            other => panic!("Expected Complete, got {:?}", other),
+        }
     }
 }

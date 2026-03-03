@@ -27,7 +27,10 @@ async fn test_cacheable_response_serialization_roundtrip() {
         .header("content-type", "application/json")
         .header("cache-control", "public, max-age=3600")
         .header("x-custom-header", "test-value")
-        .body(BufferedBody::<Full<Bytes>>::Complete(Some(body.clone())))
+        .body(BufferedBody::<Full<Bytes>>::Complete {
+            data: Some(body.clone()),
+            trailers: None,
+        })
         .unwrap();
 
     // Create CacheableHttpResponse
@@ -68,7 +71,10 @@ async fn test_cacheable_response_rkyv_roundtrip() {
         .header("cache-control", "public, max-age=3600")
         .header("x-custom-header", "test-value")
         .header("x-request-id", "12345")
-        .body(BufferedBody::<Full<Bytes>>::Complete(Some(body.clone())))
+        .body(BufferedBody::<Full<Bytes>>::Complete {
+            data: Some(body.clone()),
+            trailers: None,
+        })
         .unwrap();
 
     // Create CacheableHttpResponse

@@ -686,8 +686,8 @@ where
         let (parts, body) = subject.into_parts();
 
         // Collect body
-        let payload = match body.collect().await {
-            Ok(bytes) => bytes,
+        let collected = match body.collect().await {
+            Ok(c) => c,
             Err(error_body) => {
                 let request = CacheableHttpRequest::from_request(http::Request::from_parts(
                     parts, error_body,
@@ -697,6 +697,7 @@ where
                 return key_parts;
             }
         };
+        let (payload, payload_trailers) = (collected.data, collected.trailers);
 
         let body_bytes = payload.to_vec();
         let body_str = String::from_utf8_lossy(&body_bytes);
@@ -726,7 +727,10 @@ where
             ),
         };
 
-        let body = crate::BufferedBody::Complete(Some(payload));
+        let body = crate::BufferedBody::Complete {
+            data: Some(payload),
+            trailers: payload_trailers,
+        };
         let request = CacheableHttpRequest::from_request(http::Request::from_parts(parts, body));
 
         let mut key_parts = self.inner.get(request).await;

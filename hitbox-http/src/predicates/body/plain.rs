@@ -25,11 +25,29 @@ where
 
     match body {
         // Already complete - just search
-        BufferedBody::Complete(Some(bytes)) => {
+        BufferedBody::Complete {
+            data: Some(bytes),
+            trailers,
+        } => {
             let found = bytes.windows(pattern.len()).any(|w| w == pattern);
-            (found, BufferedBody::Complete(Some(bytes)))
+            (
+                found,
+                BufferedBody::Complete {
+                    data: Some(bytes),
+                    trailers,
+                },
+            )
         }
-        BufferedBody::Complete(None) => (false, BufferedBody::Complete(None)),
+        BufferedBody::Complete {
+            data: None,
+            trailers,
+        } => (
+            false,
+            BufferedBody::Complete {
+                data: None,
+                trailers,
+            },
+        ),
 
         // Partial - extract parts and search through prefix + remaining
         BufferedBody::Partial(partial) => {
@@ -93,7 +111,13 @@ where
                         .any(|w| w == pattern)
                     {
                         // Found! Return complete body with all buffered data
-                        return (true, BufferedBody::Complete(Some(buffer.freeze())));
+                        return (
+                            true,
+                            BufferedBody::Complete {
+                                data: Some(buffer.freeze()),
+                                trailers: None,
+                            },
+                        );
                     }
                 }
             }
@@ -130,7 +154,13 @@ where
                     .map(|b| b.windows(pattern.len()).any(|w| w == pattern))
                     .unwrap_or(false);
 
-                return (found, BufferedBody::Complete(combined));
+                return (
+                    found,
+                    BufferedBody::Complete {
+                        data: combined,
+                        trailers: None,
+                    },
+                );
             }
         }
     }
@@ -224,9 +254,12 @@ impl PlainOperation {
             PlainOperation::Eq(expected) => body
                 .collect()
                 .await
-                .map(|body_bytes| {
-                    let matches = body_bytes.as_ref() == expected.as_ref();
-                    let result_body = BufferedBody::Complete(Some(body_bytes));
+                .map(|collected| {
+                    let matches = collected.data.as_ref() == expected.as_ref();
+                    let result_body = BufferedBody::Complete {
+                        data: Some(collected.data),
+                        trailers: collected.trailers,
+                    };
                     if matches {
                         PredicateResult::Cacheable(result_body)
                     } else {
@@ -247,9 +280,12 @@ impl PlainOperation {
             PlainOperation::Ends(suffix) => body
                 .collect()
                 .await
-                .map(|body_bytes| {
-                    let matches = body_bytes.ends_with(suffix);
-                    let result_body = BufferedBody::Complete(Some(body_bytes));
+                .map(|collected| {
+                    let matches = collected.data.ends_with(suffix);
+                    let result_body = BufferedBody::Complete {
+                        data: Some(collected.data),
+                        trailers: collected.trailers,
+                    };
                     if matches {
                         PredicateResult::Cacheable(result_body)
                     } else {
@@ -261,9 +297,12 @@ impl PlainOperation {
             PlainOperation::RegExp(regex) => body
                 .collect()
                 .await
-                .map(|body_bytes| {
-                    let matches = regex.is_match(body_bytes.as_ref());
-                    let result_body = BufferedBody::Complete(Some(body_bytes));
+                .map(|collected| {
+                    let matches = regex.is_match(collected.data.as_ref());
+                    let result_body = BufferedBody::Complete {
+                        data: Some(collected.data),
+                        trailers: collected.trailers,
+                    };
                     if matches {
                         PredicateResult::Cacheable(result_body)
                     } else {

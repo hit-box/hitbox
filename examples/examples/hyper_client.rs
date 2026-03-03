@@ -81,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .collect()
         .await
         .expect("Failed to collect body");
-    tracing::info!("Response body length: {} bytes", body1.len());
+    tracing::info!("Response body length: {} bytes", body1.data.len());
 
     // Second request - should be a cache HIT
     tracing::info!("Making second request (expect cache HIT)...");
