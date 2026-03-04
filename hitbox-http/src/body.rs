@@ -57,26 +57,6 @@ use std::task::{Context, Poll};
 /// Returned by [`BufferedBody::collect`]. This preserves HTTP/2 trailers that would
 /// otherwise be lost when converting a streaming body to bytes.
 ///
-/// # Examples
-///
-/// ```no_run
-/// use hitbox_http::{BufferedBody, CollectedBody};
-///
-/// async fn example<B: hyper::body::Body>(body: BufferedBody<B>)
-/// where
-///     B::Data: Send,
-/// {
-///     match body.collect().await {
-///         Ok(collected) => {
-///             println!("Body: {} bytes", collected.data.len());
-///             if let Some(trailers) = &collected.trailers {
-///                 println!("Trailers: {} entries", trailers.len());
-///             }
-///         }
-///         Err(_error_body) => {}
-///     }
-/// }
-/// ```
 #[derive(Debug, Clone)]
 pub struct CollectedBody {
     /// The collected body data.
@@ -103,32 +83,6 @@ pub struct CollectedBody {
 /// - `Error(Some(e))`: An error occurred; will be yielded once then become `None`
 /// - `Error(None)`: Error was already yielded; stream is terminated
 ///
-/// # Examples
-///
-/// ```no_run
-/// use hitbox_http::{BufferedBody, CollectExactResult, Remaining};
-///
-/// async fn example<B: hyper::body::Body + Unpin>(body: BufferedBody<B>) {
-///     // After collecting 100 bytes from a larger body
-///     let result = body.collect_exact(100).await;
-///     match result {
-///         CollectExactResult::AtLeast { buffered, remaining, .. } => {
-///             match remaining {
-///                 Some(Remaining::Body(stream)) => {
-///                     // More data available in stream
-///                 }
-///                 Some(Remaining::Error(err)) => {
-///                     // Error occurred after collecting bytes
-///                 }
-///                 None => {
-///                     // Stream ended exactly at limit
-///                 }
-///             }
-///         }
-///         CollectExactResult::Incomplete { .. } => {}
-///     }
-/// }
-/// ```
 #[pin_project(project = RemainingProj)]
 #[derive(Debug)]
 pub enum Remaining<B>
@@ -166,24 +120,6 @@ where
 /// When polled as an [`HttpBody`]:
 /// 1. Yields the buffered prefix (if any) as a single frame
 /// 2. Delegates to the remaining stream, or yields the stored error
-///
-/// # Examples
-///
-/// ```no_run
-/// use bytes::Bytes;
-/// use hitbox_http::{BufferedBody, PartialBufferedBody, Remaining};
-///
-/// fn example<B: hyper::body::Body>(body: BufferedBody<B>) {
-///     // Decompose a partial body
-///     if let BufferedBody::Partial(partial) = body {
-///         let prefix: Option<&Bytes> = partial.prefix();
-///         println!("Buffered {} bytes", prefix.map(|b| b.len()).unwrap_or(0));
-///
-///         let (prefix, remaining) = partial.into_parts();
-///         // Can now handle prefix and remaining separately
-///     }
-/// }
-/// ```
 ///
 /// # Performance
 ///
@@ -471,27 +407,6 @@ where
 /// - The buffered data may exceed the requested size if a frame boundary
 ///   didn't align exactly
 ///
-/// # Examples
-///
-/// ```no_run
-/// use hitbox_http::{BufferedBody, CollectExactResult};
-///
-/// async fn example<B: hyper::body::Body + Unpin>(body: BufferedBody<B>) {
-///     // Check if body starts with JSON array
-///     let result = body.collect_exact(1).await;
-///     match result {
-///         CollectExactResult::AtLeast { ref buffered, .. } => {
-///             if buffered.starts_with(b"[") {
-///                 // It's a JSON array, reconstruct body for further processing
-///                 let body = result.into_buffered_body();
-///             }
-///         }
-///         CollectExactResult::Incomplete { .. } => {
-///             // Body was empty or error occurred
-///         }
-///     }
-/// }
-/// ```
 #[derive(Debug)]
 pub enum CollectExactResult<B: HttpBody> {
     /// Successfully collected at least the requested number of bytes.
@@ -591,24 +506,6 @@ where
     /// Consumes all remaining bytes and trailers from the stream and returns
     /// them as a [`CollectedBody`] containing both the data and any trailing
     /// headers (e.g., gRPC's `grpc-status`).
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use hitbox_http::BufferedBody;
-    ///
-    /// async fn example<B: hyper::body::Body>(body: BufferedBody<B>)
-    /// where
-    ///     B::Data: Send,
-    /// {
-    ///     match body.collect().await {
-    ///         Ok(collected) => println!("Collected {} bytes", collected.data.len()),
-    ///         Err(error_body) => {
-    ///             // Error occurred, but we still have the body for forwarding
-    ///         }
-    ///     }
-    /// }
-    /// ```
     ///
     /// # Errors
     ///

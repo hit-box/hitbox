@@ -5,6 +5,7 @@
 
 use bytes::{Buf, Bytes, BytesMut};
 use hitbox::predicate::PredicateResult;
+use http::HeaderMap;
 use http_body_util::BodyExt;
 use hyper::body::Body as HttpBody;
 
@@ -88,6 +89,7 @@ where
     B::Data: Send,
 {
     let mut buffer = BytesMut::new();
+    let mut trailers: Option<HeaderMap> = None;
 
     // Initialize with prefix if provided
     if let Some(prefix_bytes) = initial_prefix {
@@ -100,24 +102,33 @@ where
     loop {
         match body.frame().await {
             Some(Ok(frame)) => {
-                if let Ok(mut data) = frame.into_data() {
-                    // Search in: [overlap from previous] + [current chunk]
-                    let search_start = buffer.len().saturating_sub(overlap_size);
-                    buffer.extend_from_slice(&data.copy_to_bytes(data.remaining()));
+                match frame.into_data() {
+                    Ok(mut data) => {
+                        // Search in: [overlap from previous] + [current chunk]
+                        let search_start = buffer.len().saturating_sub(overlap_size);
+                        buffer.extend_from_slice(&data.copy_to_bytes(data.remaining()));
 
-                    // Search in the new region (overlap + new data)
-                    if buffer[search_start..]
-                        .windows(pattern.len())
-                        .any(|w| w == pattern)
-                    {
-                        // Found! Return complete body with all buffered data
-                        return (
-                            true,
-                            BufferedBody::Complete {
-                                data: Some(buffer.freeze()),
-                                trailers: None,
-                            },
-                        );
+                        // Search in the new region (overlap + new data)
+                        if buffer[search_start..]
+                            .windows(pattern.len())
+                            .any(|w| w == pattern)
+                        {
+                            // Found mid-stream — return Partial to preserve remaining body
+                            return (
+                                true,
+                                BufferedBody::Partial(PartialBufferedBody::new(
+                                    Some(buffer.freeze()),
+                                    Remaining::Body(body),
+                                )),
+                            );
+                        }
+                    }
+                    Err(frame) => {
+                        // Not a data frame — capture trailers (terminal frame)
+                        if let Ok(trailer_map) = frame.into_trailers() {
+                            trailers = Some(trailer_map);
+                            break;
+                        }
                     }
                 }
             }
@@ -158,12 +169,32 @@ where
                     found,
                     BufferedBody::Complete {
                         data: combined,
-                        trailers: None,
+                        trailers,
                     },
                 );
             }
         }
     }
+
+    // Exited loop due to trailers — search in collected buffer
+    let combined = if buffer.is_empty() {
+        None
+    } else {
+        Some(buffer.freeze())
+    };
+
+    let found = combined
+        .as_ref()
+        .map(|b| b.windows(pattern.len()).any(|w| w == pattern))
+        .unwrap_or(false);
+
+    (
+        found,
+        BufferedBody::Complete {
+            data: combined,
+            trailers,
+        },
+    )
 }
 
 /// Operations for matching raw body bytes.
