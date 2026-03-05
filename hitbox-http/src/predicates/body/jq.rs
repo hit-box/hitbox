@@ -139,17 +139,21 @@ impl JqOperation {
         B::Data: Send,
     {
         // Collect the full body to parse as JSON
-        let body_bytes = match body.collect().await {
-            Ok(bytes) => bytes,
+        let collected = match body.collect().await {
+            Ok(c) => c,
             Err(error_body) => return PredicateResult::NonCacheable(error_body),
         };
+        let (body_bytes, body_trailers) = (collected.data, collected.trailers);
 
         // Parse body as JSON
         let json_value: Value = match serde_json::from_slice(&body_bytes) {
             Ok(v) => v,
             Err(_) => {
                 // Failed to parse JSON - non-cacheable
-                return PredicateResult::NonCacheable(BufferedBody::Complete(Some(body_bytes)));
+                return PredicateResult::NonCacheable(BufferedBody::Complete {
+                    data: Some(body_bytes),
+                    trailers: body_trailers,
+                });
             }
         };
 
@@ -168,7 +172,10 @@ impl JqOperation {
                 .unwrap_or(false),
         };
 
-        let result_body = BufferedBody::Complete(Some(body_bytes));
+        let result_body = BufferedBody::Complete {
+            data: Some(body_bytes),
+            trailers: body_trailers,
+        };
         if matches {
             PredicateResult::Cacheable(result_body)
         } else {

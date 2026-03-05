@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Updated `buffered_body_to_reqwest` to match new `BufferedBody::Complete` struct variant syntax ([#261](https://github.com/hit-box/hitbox/pull/261))
+
 ## [0.2.0] - 2026-01-27
 ### Added
 - Initial release
