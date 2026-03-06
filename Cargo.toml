@@ -15,6 +15,7 @@ members = [
     "hitbox-fn",
     "hitbox-derive",
     "hitbox-http",
+    "hitbox-protobuf",
     "hitbox-configuration",
     "examples",
 ]
@@ -70,4 +71,9 @@ criterion = "0.8"
 
 # SmallBox for inline trait objects
 smallbox = "0.8"
+
+# Protobuf
+prost = "0.14"
+prost-reflect = { version = "0.16", features = ["serde"] }
+prost-types = "0.14"
 

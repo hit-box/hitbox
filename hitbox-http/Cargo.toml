@@ -38,9 +38,6 @@ serde_json = { workspace = true }
 jaq-core = "2.1.0"
 jaq-std = "2.1.0"
 jaq-json = { version = "1.1.0", features = ["serde_json"] }
-prost = "0.14"
-prost-reflect = { version = "0.16", features = ["serde", "derive"] }
-protox = "0.9"
 regex = { workspace = true }
 tracing = { workspace = true }
 sha2 = "0.10"

@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package test;
+
+service UserService {
+    rpc GetUser (GetUserRequest) returns (GetUserResponse);
+    rpc ListUsers (ListUsersRequest) returns (ListUsersResponse);
+}
+
+message GetUserRequest {
+    string user_id = 1;
+    bool include_details = 2;
+}
+
+message GetUserResponse {
+    User user = 1;
+}
+
+message ListUsersRequest {
+    int32 page = 1;
+    int32 page_size = 2;
+    string role = 3;
+    repeated string tags = 4;
+    map<string, string> metadata = 5;
+}
+
+message ListUsersResponse {
+    repeated User users = 1;
+    int32 total_count = 2;
+}
+
+message User {
+    string id = 1;
+    string name = 2;
+    string email = 3;
+    int32 age = 4;
+    Role role = 5;
+    Address address = 6;
+}
+
+message Address {
+    string city = 1;
+    string country = 2;
+}
+
+enum Role {
+    UNKNOWN = 0;
+    ADMIN = 1;
+    USER = 2;
+}
