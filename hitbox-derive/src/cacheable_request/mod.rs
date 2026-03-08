@@ -13,7 +13,7 @@ use generator::Generator;
 use parser::Source;
 use trait_impl::CacheableRequestImpl;
 
-pub fn expand(input: &DeriveInput) -> Result<TokenStream, Error> {
+pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, Error> {
     let source = Source::from_derive_input(input)?;
     let trait_impl = CacheableRequestImpl::new(&source);
     let generator = Generator::new(&trait_impl);

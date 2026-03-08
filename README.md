@@ -8,7 +8,7 @@ Highly customizable async caching framework for Rust designed for high-performan
 
 Protocol-agnostic async core + first-class HTTP support via hitbox-http. Pluggable backends from in-memory to distributed solutions such as Redis. Built on tower, works with any tokio-based service.
 
-There are two common approaches to caching frameworks. The first is a low-level approach where you work directly with a cache instance, calling `get`, `set`, and `delete` methods and deciding exactly when and where to use them in your code. The second is a higher-level approach where the framework wraps your handlers or clients and automatically decides when to cache or invalidate data. Hitbox follows the second approach - its flexible configuration keeps caching logic out of your business code. 
+There are several common approaches to caching. The first is a low-level approach where you work directly with a cache instance, calling `get`, `set`, and `delete` methods and deciding exactly when and where to use them in your code. The second is a middleware approach where a caching layer wraps your handlers or services transparently, keeping your business logic clean and business-focused. The third is function-level memoization — like Python decorators — where you simply annotate a function and work with it as if no caching exists. Hitbox supports the second and third approaches, keeping caching logic out of your business code in both cases.
 
 While Hitbox is designed for large, high-load projects, it works equally well for small and simple ones. The configuration complexity scales with your project: simple projects need only simple settings.
 
@@ -35,7 +35,9 @@ At the same time, Hitbox is not just an abstract foundation. It already provides
 
 ## Quick Start
 
-### Cargo.toml
+### HTTP Middleware (Axum / Tower)
+
+#### Cargo.toml
 
 ```toml
 [package]
@@ -53,18 +55,18 @@ hitbox-tower = "0.2"
 http = "1"
 ```
 
-### Basic Usage
+#### Basic Usage
 
 ```rust
 use std::time::Duration;
 
 use axum::{Router, extract::Path, routing::get};
 use hitbox::policy::PolicyConfig;
-use hitbox::{Config, Neutral};
-use hitbox_http::extractors::Method as MethodExtractor;
-use hitbox_http::extractors::path::PathExtractor;
-use hitbox_http::predicates::request::Method;
+use hitbox::Config;
+use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
+use hitbox_http::predicates::request::{MethodPredicate, PathPredicate};
 use hitbox_http::predicates::response::{StatusClass, StatusCodePredicate};
+use hitbox_http::{request, response};
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
 
@@ -82,9 +84,9 @@ async fn main() {
 
     // Users list - long TTL (60s)
     let users_config = Config::builder()
-        .request_predicate(Method::new(http::Method::GET).unwrap())
-        .response_predicate(Neutral::new().status_code_class(StatusClass::Success))
-        .extractor(MethodExtractor::new().path("/api/users"))
+        .request_predicate(request::predicate().method(http::Method::GET).path("/api/users"))
+        .response_predicate(response::predicate().status(StatusClass::Success))
+        .extractor(request::extractor().method(MethodConfig::new()).path("/api/users"))
         .policy(
             PolicyConfig::builder()
                 .ttl(Duration::from_secs(60))
@@ -95,10 +97,9 @@ async fn main() {
 
     // Single user - short TTL (10s)
     let user_config = Config::builder()
-        .request_predicate(Method::new(http::Method::GET).unwrap())
-        .response_predicate(Neutral::new().status_code_class(StatusClass::Success))
-
-        .extractor(MethodExtractor::new().path("/api/users/{id}"))
+        .request_predicate(request::predicate().method(http::Method::GET).path("/api/users/{id}"))
+        .response_predicate(response::predicate().status(StatusClass::Success))
+        .extractor(request::extractor().method(MethodConfig::new()).path("/api/users/{id}"))
         .policy(
             PolicyConfig::builder()
                 .ttl(Duration::from_secs(10))
@@ -134,6 +135,12 @@ async fn main() {
 }
 ```
 
+### Function Memoization
+
+The [`hitbox-fn`](./hitbox-fn) crate provides function-level memoization — cache async function results without touching your business logic. Annotate functions with `#[cached]`, derive `KeyExtract` on argument types to control cache key generation, and derive `CacheableResponse` on return types to control what gets stored. Build a reusable `Cache` instance with a backend and policy, then call your function via `.cache(&cache)`. Without cache configuration, `#[cached]` functions can be called directly with `.await` — a transparent passthrough to the underlying function. Enable the `derive` feature flag for macro support.
+
+See the [memoization_derive](./examples/examples/memoization_derive.rs) example for a complete walkthrough including multi-argument functions, skipped fields, and `CacheableResponse` with excluded fields.
+
 ### What's Next
 
 - [Predicates](https://docs.rs/hitbox-http/latest/hitbox_http/#request-predicates) - Control what gets cached
@@ -154,6 +161,7 @@ async fn main() {
 - [Compression](#compression) Reduce storage size with zstd or gzip compression
 - [Observability](#observability) Track cache status, latency, backend I/O, and offload tasks
 - [Predicate and Extractor Traits](#predicate-and-extractor-traits) Protocol-agnostic traits to control caching and generate cache keys
+- [Function Memoization](#function-memoization) Cache async function results with `#[cached]` macro and derive-based cache key extraction
 
 ### HTTP Caching Features
 - [HTTP Predicates](#http-predicates) Control caching with rules based on any part of request or response, including body
@@ -375,18 +383,17 @@ HTTP Extractors build cache keys from request components. They extract values fr
 **Code example**
 
 ```rust
-use hitbox_http::extractors::{
-    Method as MethodExtractor,
-    Path as PathExtractor,
-    query::QueryExtractor,
-    header::HeaderExtractor,
-};
+use hitbox_http::request;
+use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
+use hitbox_http::extractors::query::QueryExtractor;
+use hitbox_http::extractors::header::HeaderExtractor;
 
 // Extract method, path params, query params, and headers for cache key
-MethodExtractor::new()
+request::extractor()
+    .method(MethodConfig::new())
     .path("/v1/authors/{author_id}/books/{book_id}")
-    .query("page".to_string())
-    .header("Accept-Language".to_string())
+    .query("page")
+    .header("Accept-Language")
 ```
 
 A request to `/v1/authors/123/books/456?page=1` with `Accept-Language: en` produces a cache key with `method`, `author_id`, `book_id`, `page`, and `Accept-Language` components.
@@ -458,6 +465,8 @@ Change caching rules at runtime - no recompilation needed.
 | `hitbox` | Main crate with policy configuration, stale cache, and feature flags for backends |
 | `hitbox-core` | Core traits (`Predicate`, `Extractor`) and types for protocol-agnostic caching |
 | `hitbox-backend` | `Backend` trait and utilities for implementing storage backends |
+| `hitbox-fn` | Function memoization with `#[cached]` macro and cache key extraction |
+| `hitbox-derive` | Derive macros (`#[cached]`, `KeyExtract`, `CacheableResponse`, `CacheableRequest`) |
 | `hitbox-http` | HTTP-specific predicates and extractors for request/response caching |
 | `hitbox-tower` | Tower middleware integration (`Cache` layer) for server-side caching |
 | `hitbox-configuration` | YAML/file-based configuration support |

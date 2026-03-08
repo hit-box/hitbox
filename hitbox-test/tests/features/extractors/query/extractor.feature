@@ -190,7 +190,7 @@ Feature: Request Query Cache Key Extractor
       token: secret-token-value
       ```
     Then cache key exists
-      | token | e578add6b8420b29 |
+      | token | e578add6b8420b292631d534db97f1b661de8bcbceb4adf077d6f6ffd707072b |
 
   @extractor @query @transforms
   Scenario: Extract query parameter with transform chain
@@ -211,7 +211,7 @@ Feature: Request Query Cache Key Extractor
       email: User@Example.COM
       ```
     Then cache key exists
-      | email | b4c9a289323b21a0 |
+      | email | b4c9a289323b21a01c3e940f150eb9b8c542587f1abfd8f0e1cc1ffc5e475514 |
 
   @extractor @query @transforms
   Scenario: Extract query parameter with lowercase transform

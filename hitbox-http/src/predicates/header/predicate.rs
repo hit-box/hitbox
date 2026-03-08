@@ -1,7 +1,6 @@
 //! Header predicate implementation.
 
 use async_trait::async_trait;
-use hitbox::Neutral;
 use hitbox::predicate::{Predicate, PredicateResult};
 use http::HeaderMap;
 
@@ -14,45 +13,30 @@ use super::operation::Operation;
 ///
 /// # Type Parameters
 ///
-/// * `P` - The inner predicate to chain with. Use [`Header::new`] to start
-///   a new predicate chain (uses [`Neutral`] internally), or use the
-///   [`HeaderPredicate`] extension trait to chain onto an existing predicate.
+/// * `P` - The inner predicate to chain with. Use the `predicate()` entry point
+///   from [`request`](crate::predicates::request) or [`response`](crate::predicates::response)
+///   to start a new chain, then call `.header(...)`.
 ///
 /// # Examples
 ///
 /// ```
-/// use hitbox_http::predicates::header::{Header, Operation};
+/// use hitbox_http::predicates::header::{HeaderPredicate, Operation};
+/// use hitbox_http::predicates::request;
 /// use http::header::CACHE_CONTROL;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox::Neutral;
-/// # use hitbox_http::CacheableHttpRequest;
-/// # type Subject = CacheableHttpRequest<Empty<Bytes>>;
 /// // Skip caching when Cache-Control contains "no-cache"
-/// let predicate = Header::new(Operation::Contains(
-///     CACHE_CONTROL,
-///     "no-cache".to_string(),
-/// ));
-/// # let _: &Header<Neutral<Subject>> = &predicate;
+/// let predicate = request::predicate::<Empty<Bytes>>()
+///     .header(Operation::Contains(
+///         CACHE_CONTROL,
+///         "no-cache".to_string(),
+///     ));
 /// ```
 #[derive(Debug)]
 pub struct Header<P> {
     pub(crate) operation: Operation,
     pub(crate) inner: P,
-}
-
-impl<S> Header<Neutral<S>> {
-    /// Creates a header predicate that matches headers against the operation.
-    ///
-    /// Returns [`Cacheable`](hitbox::predicate::PredicateResult::Cacheable) when
-    /// the headers satisfy the operation, [`NonCacheable`](hitbox::predicate::PredicateResult::NonCacheable) otherwise.
-    pub fn new(operation: Operation) -> Self {
-        Self {
-            operation,
-            inner: Neutral::new(),
-        }
-    }
 }
 
 /// Extension trait for adding header matching to a predicate chain.
@@ -68,16 +52,19 @@ impl<S> Header<Neutral<S>> {
 /// types. You don't need to implement it manually.
 pub trait HeaderPredicate: Sized {
     /// Adds a header matching operation to this predicate chain.
-    fn header(self, operation: Operation) -> Header<Self>;
+    ///
+    /// Accepts an [`Operation`], a [`HeaderName`](http::HeaderName) (existence check),
+    /// or `(HeaderName, HeaderValue)` (exact match) directly.
+    fn header(self, operation: impl Into<Operation>) -> Header<Self>;
 }
 
 impl<P> HeaderPredicate for P
 where
     P: Predicate,
 {
-    fn header(self, operation: Operation) -> Header<Self> {
+    fn header(self, operation: impl Into<Operation>) -> Header<Self> {
         Header {
-            operation,
+            operation: operation.into(),
             inner: self,
         }
     }

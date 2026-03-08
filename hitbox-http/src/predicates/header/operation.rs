@@ -70,6 +70,58 @@ pub enum Operation {
 }
 
 impl Operation {
+    /// Creates an operation matching an exact header value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` cannot be converted to [`HeaderValue`].
+    pub fn eq<V>(name: HeaderName, value: V) -> Result<Self, V::Error>
+    where
+        V: TryInto<HeaderValue>,
+    {
+        Ok(Operation::Eq(name, value.try_into()?))
+    }
+
+    /// Creates an operation checking header existence.
+    pub fn exist(name: HeaderName) -> Self {
+        Operation::Exist(name)
+    }
+
+    /// Creates an operation matching a header against multiple values.
+    pub fn any(name: HeaderName, values: Vec<HeaderValue>) -> Self {
+        Operation::In(name, values)
+    }
+
+    /// Creates an operation matching a substring within a header value.
+    pub fn contains(name: HeaderName, substring: impl Into<String>) -> Self {
+        Operation::Contains(name, substring.into())
+    }
+
+    /// Creates an operation matching a header value against a regex pattern.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the regex pattern is invalid.
+    pub fn regex(name: HeaderName, pattern: &str) -> Result<Self, regex::Error> {
+        Ok(Operation::Regex(name, Regex::new(pattern)?))
+    }
+}
+
+impl From<HeaderName> for Operation {
+    /// Shorthand for `Operation::exist(name)`.
+    fn from(name: HeaderName) -> Self {
+        Operation::Exist(name)
+    }
+}
+
+impl From<(HeaderName, HeaderValue)> for Operation {
+    /// Shorthand for `Operation::eq(name, value)`.
+    fn from((name, value): (HeaderName, HeaderValue)) -> Self {
+        Operation::Eq(name, value)
+    }
+}
+
+impl Operation {
     /// Check if the operation matches the headers.
     pub fn check(&self, headers: &HeaderMap) -> bool {
         match self {

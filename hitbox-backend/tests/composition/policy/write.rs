@@ -5,24 +5,9 @@ use hitbox_backend::Backend;
 use hitbox_backend::composition::policy::{
     CompositionWritePolicy, OptimisticParallelWritePolicy, SequentialWritePolicy,
 };
-use hitbox_core::{CacheKey, CacheValue, Offload};
-use smol_str::SmolStr;
-use std::future::Future;
+use hitbox_core::{CacheKey, CacheValue};
 
-use crate::common::{ErrorBackend, TestBackend};
-
-/// Test offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct TestOffload;
-
-impl Offload<'static> for TestOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-}
+use crate::common::{ErrorBackend, TestBackend, TestOffloadManager};
 
 // =============================================================================
 // SequentialWritePolicy Tests
@@ -33,7 +18,7 @@ async fn test_sequential_both_succeed() {
     let policy = SequentialWritePolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("test_value"), None, None);
@@ -60,7 +45,7 @@ async fn test_sequential_l1_fails() {
     let policy = SequentialWritePolicy::new();
     let l1 = ErrorBackend;
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("test_value"), None, None);
@@ -87,7 +72,7 @@ async fn test_sequential_l2_fails() {
     let policy = SequentialWritePolicy::new();
     let l1 = TestBackend::new();
     let l2 = ErrorBackend;
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("test_value"), None, None);
@@ -115,7 +100,7 @@ async fn test_sequential_both_fail() {
     let policy = SequentialWritePolicy::new();
     let l1 = ErrorBackend;
     let l2 = ErrorBackend;
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("test_value"), None, None);
@@ -143,7 +128,7 @@ async fn test_optimistic_parallel_both_succeed() {
     let policy = OptimisticParallelWritePolicy::new();
     let l1 = TestBackend::new();
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("test_value"), None, None);
@@ -170,7 +155,7 @@ async fn test_optimistic_parallel_l1_fails_l2_succeeds() {
     let policy = OptimisticParallelWritePolicy::new();
     let l1 = ErrorBackend;
     let l2 = TestBackend::new();
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("test_value"), None, None);
@@ -197,7 +182,7 @@ async fn test_optimistic_parallel_l1_succeeds_l2_fails() {
     let policy = OptimisticParallelWritePolicy::new();
     let l1 = TestBackend::new();
     let l2 = ErrorBackend;
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("test_value"), None, None);
@@ -224,7 +209,7 @@ async fn test_optimistic_parallel_both_fail() {
     let policy = OptimisticParallelWritePolicy::new();
     let l1 = ErrorBackend;
     let l2 = ErrorBackend;
-    let offload = TestOffload;
+    let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
     let value = CacheValue::new(Bytes::from("test_value"), None, None);

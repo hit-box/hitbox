@@ -1,7 +1,8 @@
 use bytes::Bytes;
 use hitbox::Extractor;
 use hitbox_http::extractors::{
-    NeutralExtractor, header::HeaderExtractor, method::MethodExtractor, path::PathExtractor,
+    MethodConfig, NeutralExtractor, header::HeaderExtractor, method::MethodExtractor,
+    path::PathExtractor,
 };
 use hitbox_http::{BufferedBody, CacheableHttpRequest};
 use http::{Method, Request};
@@ -18,7 +19,7 @@ async fn test_request_multiple_extractor_some() {
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new()
         .path("/users/{user_id}/books/{book_id}/")
-        .method()
+        .method(MethodConfig::new())
         .header("x-test".to_owned());
     let parts = extractor.get(request).await;
     dbg!(parts);

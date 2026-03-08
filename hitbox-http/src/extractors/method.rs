@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use hitbox::{Extractor, KeyPart, KeyParts};
 
-use super::NeutralExtractor;
 use crate::CacheableHttpRequest;
 
 /// Extracts the HTTP method as a cache key part.
@@ -11,21 +10,22 @@ use crate::CacheableHttpRequest;
 ///
 /// # Type Parameters
 ///
-/// * `E` - The inner extractor to chain with. Use [`Method::new`] to start
-///   a new extractor chain (uses [`NeutralExtractor`] internally), or use the
-///   [`MethodExtractor`] extension trait to chain onto an existing extractor.
+/// * `E` - The inner extractor to chain with. Use [`extractors::extractor()`](super::extractor)
+///   to start a new chain, then call `.method(MethodConfig::new())`.
 ///
 /// # Examples
 ///
 /// ```
-/// use hitbox_http::extractors::{Method, path::PathExtractor, query::QueryExtractor};
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathExtractor};
+/// use hitbox_http::extractors::query::QueryExtractor;
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox_http::extractors::{NeutralExtractor, Path, query::Query};
-/// let extractor = Method::new()
+/// # use hitbox_http::extractors::{NeutralExtractor, Method, Path, query::Query};
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
 ///     .path("/users/{user_id}")
-///     .query("page".to_string());
+///     .query("page");
 /// # let _: &Query<Path<Method<NeutralExtractor<Empty<Bytes>>>>> = &extractor;
 /// ```
 ///
@@ -38,25 +38,28 @@ pub struct Method<E> {
     inner: E,
 }
 
-impl<S> Method<NeutralExtractor<S>> {
-    /// Creates a method extractor as the starting point for cache key generation.
-    ///
-    /// Adds a key part with name `"method"` and the HTTP method as value
-    /// (e.g., `"GET"`, `"POST"`). Chain additional extractors to build
-    /// a complete cache key.
-    ///
-    /// Chain onto existing extractors using [`MethodExtractor::method`] instead
-    /// if you already have an extractor chain.
-    pub fn new() -> Self {
-        Self {
-            inner: NeutralExtractor::new(),
-        }
-    }
-}
+/// Configuration for the method extractor.
+///
+/// This is a marker type with no configuration options — the HTTP method
+/// is always extracted as-is.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor};
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new());
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct MethodConfig;
 
-impl<S> Default for Method<NeutralExtractor<S>> {
-    fn default() -> Self {
-        Self::new()
+impl MethodConfig {
+    /// Creates a new method extractor configuration.
+    pub fn new() -> Self {
+        MethodConfig
     }
 }
 
@@ -64,7 +67,7 @@ impl<S> Default for Method<NeutralExtractor<S>> {
 ///
 /// # For Callers
 ///
-/// Chain this after [`Method::new()`] or any other extractor to add the HTTP
+/// Chain this after [`extractors::extractor()`](super::extractor) or any other extractor to add the HTTP
 /// method to your cache key. The method is added as a key part with name
 /// `"method"` and value like `"GET"` or `"POST"`.
 ///
@@ -74,14 +77,14 @@ impl<S> Default for Method<NeutralExtractor<S>> {
 /// types. You don't need to implement it manually.
 pub trait MethodExtractor: Sized {
     /// Adds HTTP method extraction to the chain.
-    fn method(self) -> Method<Self>;
+    fn method(self, config: MethodConfig) -> Method<Self>;
 }
 
 impl<E> MethodExtractor for E
 where
     E: Extractor,
 {
-    fn method(self) -> Method<Self> {
+    fn method(self, _config: MethodConfig) -> Method<Self> {
         Method { inner: self }
     }
 }

@@ -120,6 +120,21 @@ impl CachedFn {
         // Convert Ident skip list to String for easier comparison
         let skip: Vec<String> = attrs.skip.0.iter().map(|i| i.to_string()).collect();
 
+        // Validate that all skip names correspond to actual function parameters
+        let arg_names = args.iter().map(|a| a.name.to_string()).collect::<Vec<_>>();
+        for skip_ident in &attrs.skip.0 {
+            if !arg_names.contains(&skip_ident.to_string()) {
+                return Err(Error::new_spanned(
+                    skip_ident,
+                    format!(
+                        "unknown parameter `{}` in skip list; available parameters: {}",
+                        skip_ident,
+                        arg_names.join(", "),
+                    ),
+                ));
+            }
+        }
+
         Ok(Self {
             vis: item.vis,
             name,
@@ -226,9 +241,16 @@ impl CachedFn {
         !self.lifetimes.is_empty()
     }
 
-    /// Returns all generic parameters (lifetimes + type params with bounds) for declarations.
-    /// Example: `'a, 'b, T: Clone, U: Debug` (without angle brackets)
-    pub fn generic_params(&self) -> TokenStream {
+    /// Returns true if the function has 2+ lifetime parameters,
+    /// requiring a synthetic `'__hitbox` lifetime to represent their minimum.
+    pub fn needs_synthetic_lifetime(&self) -> bool {
+        self.lifetimes.len() >= 2
+    }
+
+    /// Returns generic parameters for the internal impl function only.
+    /// These are the original user generics without any synthetic lifetime.
+    /// Example: `'a, 'b, T: Clone` (without angle brackets)
+    pub fn fn_generic_params(&self) -> TokenStream {
         let lifetimes = &self.lifetimes;
         let type_params = &self.type_params;
 
@@ -240,17 +262,127 @@ impl CachedFn {
         }
     }
 
-    /// Returns all generic arguments (lifetimes + type idents without bounds) for type applications.
-    /// Example: `'a, 'b, T, U` (without angle brackets)
+    /// Returns all generic parameters for declarations (impl blocks, struct definitions).
+    ///
+    /// For 2+ lifetimes, prepends a synthetic `'__hitbox` lifetime and bounds all
+    /// user lifetimes to outlive it. The compiler infers `'__hitbox` as the shortest.
+    ///
+    /// - 0 lifetimes: `T: Clone` (type params only)
+    /// - 1 lifetime: `'a, T: Clone` (original)
+    /// - 2+ lifetimes: `'__hitbox, 'a: '__hitbox, 'b: '__hitbox, T: Clone`
+    pub fn generic_params(&self) -> TokenStream {
+        let type_params = &self.type_params;
+
+        if self.needs_synthetic_lifetime() {
+            let bounded: Vec<_> = self
+                .lifetimes
+                .iter()
+                .map(|lt| {
+                    let lifetime = &lt.lifetime;
+                    let bounds = &lt.bounds;
+                    if bounds.is_empty() {
+                        quote::quote! { #lifetime: '__hitbox }
+                    } else {
+                        quote::quote! { #lifetime: #bounds + '__hitbox }
+                    }
+                })
+                .collect();
+            if type_params.is_empty() {
+                quote::quote! { '__hitbox, #(#bounded),* }
+            } else {
+                quote::quote! { '__hitbox, #(#bounded),*, #(#type_params),* }
+            }
+        } else {
+            let lifetimes = &self.lifetimes;
+            match (self.lifetimes.is_empty(), self.type_params.is_empty()) {
+                (true, true) => quote::quote! {},
+                (false, true) => quote::quote! { #(#lifetimes),* },
+                (true, false) => quote::quote! { #(#type_params),* },
+                (false, false) => quote::quote! { #(#lifetimes),*, #(#type_params),* },
+            }
+        }
+    }
+
+    /// Returns all generic arguments for type applications.
+    ///
+    /// - 0 lifetimes: `T` (type idents only)
+    /// - 1 lifetime: `'a, T`
+    /// - 2+ lifetimes: `'__hitbox, 'a, 'b, T`
     pub fn generic_args(&self) -> TokenStream {
-        let lifetimes: Vec<_> = self.lifetimes.iter().map(|lt| &lt.lifetime).collect();
+        let lifetime_idents: Vec<_> = self.lifetimes.iter().map(|lt| &lt.lifetime).collect();
         let type_idents: Vec<_> = self.type_params.iter().map(|tp| &tp.ident).collect();
 
-        match (self.lifetimes.is_empty(), self.type_params.is_empty()) {
-            (true, true) => quote::quote! {},
-            (false, true) => quote::quote! { #(#lifetimes),* },
-            (true, false) => quote::quote! { #(#type_idents),* },
-            (false, false) => quote::quote! { #(#lifetimes),*, #(#type_idents),* },
+        if self.needs_synthetic_lifetime() {
+            if type_idents.is_empty() {
+                quote::quote! { '__hitbox, #(#lifetime_idents),* }
+            } else {
+                quote::quote! { '__hitbox, #(#lifetime_idents),*, #(#type_idents),* }
+            }
+        } else {
+            match (lifetime_idents.is_empty(), type_idents.is_empty()) {
+                (true, true) => quote::quote! {},
+                (false, true) => quote::quote! { #(#lifetime_idents),* },
+                (true, false) => quote::quote! { #(#type_idents),* },
+                (false, false) => quote::quote! { #(#lifetime_idents),*, #(#type_idents),* },
+            }
+        }
+    }
+
+    /// Returns the lifetime declarations part for manual generic construction.
+    ///
+    /// Used by generators that build their own generic params (e.g., adding `'c`, `B`, `CM`, `O`).
+    /// Returns empty for 0 lifetimes.
+    ///
+    /// - 1 lifetime: `'a`
+    /// - 2+ lifetimes: `'__hitbox, 'a: '__hitbox, 'b: '__hitbox`
+    pub fn lifetime_params_decl(&self) -> TokenStream {
+        if self.needs_synthetic_lifetime() {
+            let bounded: Vec<_> = self
+                .lifetimes
+                .iter()
+                .map(|lt| {
+                    let lifetime = &lt.lifetime;
+                    let bounds = &lt.bounds;
+                    if bounds.is_empty() {
+                        quote::quote! { #lifetime: '__hitbox }
+                    } else {
+                        quote::quote! { #lifetime: #bounds + '__hitbox }
+                    }
+                })
+                .collect();
+            quote::quote! { '__hitbox, #(#bounded),* }
+        } else {
+            let lifetimes = &self.lifetimes;
+            quote::quote! { #(#lifetimes),* }
+        }
+    }
+
+    /// Returns the lifetime arguments part for type applications.
+    ///
+    /// Used by generators that build their own generic args (e.g., adding `'c`, `B`, `CM`, `O`).
+    /// Returns empty for 0 lifetimes.
+    ///
+    /// - 1 lifetime: `'a`
+    /// - 2+ lifetimes: `'__hitbox, 'a, 'b`
+    pub fn lifetime_args(&self) -> TokenStream {
+        let lifetime_idents: Vec<_> = self.lifetimes.iter().map(|lt| &lt.lifetime).collect();
+        if self.needs_synthetic_lifetime() {
+            quote::quote! { '__hitbox, #(#lifetime_idents),* }
+        } else {
+            quote::quote! { #(#lifetime_idents),* }
+        }
+    }
+
+    /// Returns the PhantomData type for struct context fields.
+    ///
+    /// When a synthetic lifetime exists, includes it in the phantom to "use" it:
+    /// - No synthetic: `std::marker::PhantomData<C>`
+    /// - With synthetic: `std::marker::PhantomData<(&'__hitbox (), C)>`
+    pub fn phantom_context_type(&self) -> TokenStream {
+        if self.needs_synthetic_lifetime() {
+            quote::quote! { std::marker::PhantomData<(&'__hitbox (), C)> }
+        } else {
+            quote::quote! { std::marker::PhantomData<C> }
         }
     }
 
@@ -283,7 +415,7 @@ impl CachedFn {
     }
 
     /// Returns the tuple expression with each argument wrapped in `Arg::new()` or `Skipped::new()`.
-    /// Example: `(Skipped::new(request_id), Arg::new(value))`
+    /// Example: `(Skipped::new(request_id), Arg::new("value", value))`
     pub fn args_tuple_expr(&self) -> TokenStream {
         let exprs: Vec<_> = self
             .args
@@ -294,7 +426,8 @@ impl CachedFn {
                 if is_skipped {
                     quote::quote! { hitbox_fn::Skipped::new(#name) }
                 } else {
-                    quote::quote! { hitbox_fn::Arg::new(#name) }
+                    let name_str = name.to_string();
+                    quote::quote! { hitbox_fn::Arg::new(#name_str, #name) }
                 }
             })
             .collect();
@@ -350,27 +483,37 @@ impl CachedFn {
 
     /// Returns the expression to instantiate the upstream struct.
     ///
-    /// - For functions with type params: `UpstreamName(std::marker::PhantomData)`
+    /// - For functions with type params: `UpstreamName::<T>(std::marker::PhantomData)`
     /// - For functions with lifetimes: `UpstreamName(std::marker::PhantomData)`
     /// - For functions without generics: `UpstreamName`
     pub fn upstream_instance(&self) -> TokenStream {
         let upstream_name = &self.upstream_name;
-        if !self.type_params.is_empty() || self.has_lifetimes() {
+        if !self.type_params.is_empty() {
+            // Type params need turbofish; lifetimes (including '__hitbox) are inferred.
+            let type_idents: Vec<_> = self.type_params.iter().map(|tp| &tp.ident).collect();
+            quote::quote! { #upstream_name::<#( #type_idents ),*>(std::marker::PhantomData) }
+        } else if self.has_lifetimes() {
+            // Lifetimes only — no turbofish needed, all lifetimes are inferred.
             quote::quote! { #upstream_name(std::marker::PhantomData) }
         } else {
+            // No generics — unit struct.
             quote::quote! { #upstream_name }
         }
     }
 
     /// Returns the offload lifetime for bounds.
     ///
-    /// Uses the first lifetime parameter if present, otherwise `'static`.
+    /// - 0 lifetimes: `'static`
+    /// - 1 lifetime: the user's lifetime directly (e.g., `'a`)
+    /// - 2+ lifetimes: synthetic `'__hitbox` (bounded by all user lifetimes)
     pub fn offload_lifetime(&self) -> TokenStream {
-        if self.has_lifetimes() {
-            let first_lt = &self.lifetimes[0].lifetime;
-            quote::quote! { #first_lt }
-        } else {
-            quote::quote! { 'static }
+        match self.lifetimes.len() {
+            0 => quote::quote! { 'static },
+            1 => {
+                let lt = &self.lifetimes[0].lifetime;
+                quote::quote! { #lt }
+            }
+            _ => quote::quote! { '__hitbox },
         }
     }
 }

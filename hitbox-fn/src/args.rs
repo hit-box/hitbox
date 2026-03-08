@@ -1,5 +1,8 @@
 //! Argument wrapper for function caching.
 
+use std::future::Future;
+use std::pin::Pin;
+
 use hitbox::{
     CachePolicy, CacheableRequest, Extractor, KeyPart, Predicate, RequestCachePolicy,
     predicate::PredicateResult,
@@ -12,37 +15,40 @@ use crate::KeyExtract;
 /// This type wraps arguments that should contribute to the cache key.
 /// The inner type must implement `KeyExtract`.
 ///
-/// # Example
-///
-/// ```
-/// use hitbox_fn::Arg;
-///
-/// // Argument included in cache key
-/// let arg = Arg::new(42);
-/// ```
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Arg<T>(T);
+/// The parameter name is used to disambiguate cache keys:
+/// - Single inner `KeyPart` → key is replaced with the parameter name
+/// - Multiple inner `KeyParts` → each key is prefixed with `"param_name."`
+#[derive(Clone, Debug)]
+pub struct Arg<T> {
+    name: &'static str,
+    value: T,
+}
 
 impl<T> Arg<T> {
-    /// Create a new argument that will be included in the cache key.
-    pub fn new(value: T) -> Self {
-        Self(value)
+    /// Create a new named argument that will be included in the cache key.
+    pub fn new(name: &'static str, value: T) -> Self {
+        Self { name, value }
     }
 
     /// Get a reference to the inner value.
     pub fn value(&self) -> &T {
-        &self.0
+        &self.value
     }
 
     /// Unwrap and return the inner value.
     pub fn into_value(self) -> T {
-        self.0
+        self.value
     }
 }
 
 impl<T: KeyExtract> KeyExtract for Arg<T> {
     fn extract(&self) -> Vec<KeyPart> {
-        self.0.extract()
+        let inner = self.value.extract();
+        if inner.len() == 1 {
+            inner.into_iter().map(|p| p.with_key(self.name)).collect()
+        } else {
+            inner.into_iter().map(|p| p.prefixed(self.name)).collect()
+        }
     }
 }
 
@@ -53,16 +59,7 @@ impl<T: KeyExtract> KeyExtract for Arg<T> {
 ///
 /// Useful for skipping types like database connections, request contexts,
 /// or other non-cacheable dependencies.
-///
-/// # Example
-///
-/// ```
-/// use hitbox_fn::Skipped;
-///
-/// // Argument excluded from cache key (no KeyExtract bound needed)
-/// let skipped = Skipped::new("connection_string");
-/// ```
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct Skipped<T>(T);
 
 impl<T> Skipped<T> {
@@ -93,19 +90,7 @@ impl<T> KeyExtract for Skipped<T> {
 /// This wrapper enables implementing hitbox traits for tuples of function arguments.
 /// Without this wrapper, we couldn't implement foreign traits (`CacheableRequest`, etc.)
 /// for foreign types (tuples).
-///
-/// # Example
-///
-/// ```
-/// use hitbox_fn::Args;
-///
-/// // Wrap function arguments
-/// let args = Args((42u64, "tenant_1"));
-///
-/// // Access inner tuple
-/// let (user_id, tenant_id) = args.0;
-/// ```
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct Args<T>(pub T);
 
 impl<T> Args<T> {
@@ -122,175 +107,81 @@ impl<T> Args<T> {
 
 // CacheableRequest implementations for Args<tuples>
 
-use std::future::Future;
-use std::pin::Pin;
+macro_rules! impl_cacheable_request_for_args {
+    () => {
+        impl CacheableRequest for Args<()> {
+            type CachePolicyFuture<'a, P, E>
+                = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
+            where
+                Self: 'a,
+                P: Predicate<Subject = Self> + Send + Sync + 'a,
+                E: Extractor<Subject = Self> + Send + Sync + 'a;
 
-impl CacheableRequest for Args<()> {
-    type CachePolicyFuture<'a, P, E>
-        = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
-
-    fn cache_policy<'a, P, E>(
-        self,
-        predicates: P,
-        extractors: E,
-    ) -> Self::CachePolicyFuture<'a, P, E>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a,
-    {
-        Box::pin(async move {
-            match predicates.check(self).await {
-                PredicateResult::Cacheable(subject) => {
-                    let (subject, key) = extractors.get(subject).await.into_cache_key();
-                    CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
-                }
-                PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
+            fn cache_policy<'a, P, E>(
+                self,
+                predicates: P,
+                extractors: E,
+            ) -> Self::CachePolicyFuture<'a, P, E>
+            where
+                Self: 'a,
+                P: Predicate<Subject = Self> + Send + Sync + 'a,
+                E: Extractor<Subject = Self> + Send + Sync + 'a,
+            {
+                Box::pin(async move {
+                    match predicates.check(self).await {
+                        PredicateResult::Cacheable(subject) => {
+                            let (subject, key) = extractors.get(subject).await.into_cache_key();
+                            CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                        }
+                        PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
+                    }
+                })
             }
-        })
-    }
+        }
+    };
+    ($($T:ident),+) => {
+        impl<$($T: Send + Sync),+> CacheableRequest for Args<($($T,)+)> {
+            type CachePolicyFuture<'a, P, E>
+                = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
+            where
+                Self: 'a,
+                P: Predicate<Subject = Self> + Send + Sync + 'a,
+                E: Extractor<Subject = Self> + Send + Sync + 'a;
+
+            fn cache_policy<'a, P, E>(
+                self,
+                predicates: P,
+                extractors: E,
+            ) -> Self::CachePolicyFuture<'a, P, E>
+            where
+                Self: 'a,
+                P: Predicate<Subject = Self> + Send + Sync + 'a,
+                E: Extractor<Subject = Self> + Send + Sync + 'a,
+            {
+                Box::pin(async move {
+                    match predicates.check(self).await {
+                        PredicateResult::Cacheable(subject) => {
+                            let (subject, key) = extractors.get(subject).await.into_cache_key();
+                            CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                        }
+                        PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
+                    }
+                })
+            }
+        }
+    };
 }
 
-impl<T0> CacheableRequest for Args<(T0,)>
-where
-    T0: Send + Sync,
-{
-    type CachePolicyFuture<'a, P, E>
-        = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
-
-    fn cache_policy<'a, P, E>(
-        self,
-        predicates: P,
-        extractors: E,
-    ) -> Self::CachePolicyFuture<'a, P, E>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a,
-    {
-        Box::pin(async move {
-            match predicates.check(self).await {
-                PredicateResult::Cacheable(subject) => {
-                    let (subject, key) = extractors.get(subject).await.into_cache_key();
-                    CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
-                }
-                PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-            }
-        })
-    }
-}
-
-impl<T0, T1> CacheableRequest for Args<(T0, T1)>
-where
-    T0: Send + Sync,
-    T1: Send + Sync,
-{
-    type CachePolicyFuture<'a, P, E>
-        = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
-
-    fn cache_policy<'a, P, E>(
-        self,
-        predicates: P,
-        extractors: E,
-    ) -> Self::CachePolicyFuture<'a, P, E>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a,
-    {
-        Box::pin(async move {
-            match predicates.check(self).await {
-                PredicateResult::Cacheable(subject) => {
-                    let (subject, key) = extractors.get(subject).await.into_cache_key();
-                    CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
-                }
-                PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-            }
-        })
-    }
-}
-
-impl<T0, T1, T2> CacheableRequest for Args<(T0, T1, T2)>
-where
-    T0: Send + Sync,
-    T1: Send + Sync,
-    T2: Send + Sync,
-{
-    type CachePolicyFuture<'a, P, E>
-        = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
-
-    fn cache_policy<'a, P, E>(
-        self,
-        predicates: P,
-        extractors: E,
-    ) -> Self::CachePolicyFuture<'a, P, E>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a,
-    {
-        Box::pin(async move {
-            match predicates.check(self).await {
-                PredicateResult::Cacheable(subject) => {
-                    let (subject, key) = extractors.get(subject).await.into_cache_key();
-                    CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
-                }
-                PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-            }
-        })
-    }
-}
-
-impl<T0, T1, T2, T3> CacheableRequest for Args<(T0, T1, T2, T3)>
-where
-    T0: Send + Sync,
-    T1: Send + Sync,
-    T2: Send + Sync,
-    T3: Send + Sync,
-{
-    type CachePolicyFuture<'a, P, E>
-        = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
-
-    fn cache_policy<'a, P, E>(
-        self,
-        predicates: P,
-        extractors: E,
-    ) -> Self::CachePolicyFuture<'a, P, E>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a,
-    {
-        Box::pin(async move {
-            match predicates.check(self).await {
-                PredicateResult::Cacheable(subject) => {
-                    let (subject, key) = extractors.get(subject).await.into_cache_key();
-                    CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
-                }
-                PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-            }
-        })
-    }
-}
-
-// Additional arities can be added via macro if needed
+impl_cacheable_request_for_args!();
+impl_cacheable_request_for_args!(T0);
+impl_cacheable_request_for_args!(T0, T1);
+impl_cacheable_request_for_args!(T0, T1, T2);
+impl_cacheable_request_for_args!(T0, T1, T2, T3);
+impl_cacheable_request_for_args!(T0, T1, T2, T3, T4);
+impl_cacheable_request_for_args!(T0, T1, T2, T3, T4, T5);
+impl_cacheable_request_for_args!(T0, T1, T2, T3, T4, T5, T6);
+impl_cacheable_request_for_args!(T0, T1, T2, T3, T4, T5, T6, T7);
+impl_cacheable_request_for_args!(T0, T1, T2, T3, T4, T5, T6, T7, T8);
+impl_cacheable_request_for_args!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9);
+impl_cacheable_request_for_args!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
+impl_cacheable_request_for_args!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);

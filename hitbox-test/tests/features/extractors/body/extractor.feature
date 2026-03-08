@@ -25,7 +25,7 @@ Feature: Request Body Cache Key Extractor
       {"data":"some content to hash"}
       ```
     Then cache key exists
-      | body | 79dccacb4939ab2f |
+      | body | 79dccacb4939ab2f6ed060148f3eab67b75cb62d4cdc25853b973d29cb755bca |
 
   # Jq extraction - single object
   @extractor @body @jq
@@ -323,7 +323,7 @@ Feature: Request Body Cache Key Extractor
       ```
     Then cache key exists
       | user_id | user-123         |
-      | token   | 930bbdc51b6aed5c |
+      | token   | 930bbdc51b6aed5c2a5678fd6e28dee7a05e8a4b643cfc0b4427c3efb86c0d94 |
 
   @extractor @body @jq @hash
   Scenario: Jq hash with preprocessing (lowercase then hash)
@@ -342,7 +342,7 @@ Feature: Request Body Cache Key Extractor
       {"email":"User@Example.COM"}
       ```
     Then cache key exists
-      | email_hash | b4c9a289323b21a0 |
+      | email_hash | b4c9a289323b21a01c3e940f150eb9b8c542587f1abfd8f0e1cc1ffc5e475514 |
 
   @extractor @body @jq @hash
   Scenario: Jq hash number value
@@ -361,7 +361,7 @@ Feature: Request Body Cache Key Extractor
       {"id":12345}
       ```
     Then cache key exists
-      | id_hash | 5994471abb01112a |
+      | id_hash | 5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5 |
 
   @extractor @body @jq @hash
   Scenario: Jq hash object value
@@ -488,7 +488,7 @@ Feature: Request Body Cache Key Extractor
       ```
     Then cache key exists
       | user  | john             |
-      | token | fcf730b6d95236ec |
+      | token | fcf730b6d95236ecd3c9fc2d92d7b6b2bb061514961aec041d6c7a7192f592e4 |
 
   @extractor @body @regex @hash
   Scenario: Regex with full body hash transform
@@ -509,7 +509,7 @@ Feature: Request Body Cache Key Extractor
       {"session":"mysecrettoken"}
       ```
     Then cache key exists
-      | session | 7afb4c3889fd6086 |
+      | session | 7afb4c3889fd608668a69adf181c4218fb70bee515c2320bbc828839a3989fc2 |
 
   @extractor @body @regex @transforms
   Scenario: Regex with full body transform chain (lowercase then hash)
@@ -530,7 +530,7 @@ Feature: Request Body Cache Key Extractor
       {"email":"User@Example.COM"}
       ```
     Then cache key exists
-      | email | b4c9a289323b21a0 |
+      | email | b4c9a289323b21a01c3e940f150eb9b8c542587f1abfd8f0e1cc1ffc5e475514 |
 
   @extractor @body @regex @transforms
   Scenario: Regex with per-key transform chain
@@ -553,4 +553,4 @@ Feature: Request Body Cache Key Extractor
       ```
     Then cache key exists
       | user  | JOHN             |
-      | email | 855f96e983f1f8e8 |
+      | email | 855f96e983f1f8e8be944692b6f719fd54329826cb62e98015efee8e2e071dd4 |

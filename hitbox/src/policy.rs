@@ -32,13 +32,13 @@ pub struct CacheBehaviorPolicy {
     pub stale: StalePolicy,
 }
 
-/// Enabled cache configuration with TTL, stale window, and behavior settings.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+/// Enabled cache configuration with TTL, staleness, and behavior settings.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Eq, PartialEq)]
 pub struct EnabledCacheConfig {
-    /// Time-to-live before cache entry becomes stale (e.g., "5s", "500ms", "1m").
+    /// Time-to-live before cache entry expires and becomes invalid (e.g., "5s", "500ms", "1m").
     #[serde(default, with = "humantime_serde")]
     pub ttl: Option<Duration>,
-    /// Duration during which stale data can still be served (e.g., "5s", "500ms", "1m").
+    /// Time from cache write until the entry becomes stale (e.g., "5s", "500ms", "1m").
     #[serde(default, with = "humantime_serde")]
     pub stale: Option<Duration>,
     /// Cache behavior policy.
@@ -46,17 +46,6 @@ pub struct EnabledCacheConfig {
     pub policy: CacheBehaviorPolicy,
     /// Concurrency limit for dogpile prevention.
     pub concurrency: Option<ConcurrencyLimit>,
-}
-
-impl Default for EnabledCacheConfig {
-    fn default() -> Self {
-        Self {
-            ttl: Some(Duration::from_secs(5)),
-            stale: None,
-            policy: CacheBehaviorPolicy::default(),
-            concurrency: None,
-        }
-    }
 }
 
 /// Cache policy: enabled with settings or completely disabled.
@@ -103,7 +92,7 @@ impl PolicyConfigBuilder {
         Self::default()
     }
 
-    /// Set the time-to-live before cache entry becomes stale.
+    /// Set the time-to-live before cache entry expires.
     pub fn ttl(self, ttl: Duration) -> Self {
         Self {
             ttl: Some(ttl),
@@ -111,7 +100,7 @@ impl PolicyConfigBuilder {
         }
     }
 
-    /// Set the duration during which stale data can still be served.
+    /// Set the time from cache write until the entry becomes stale.
     pub fn stale(self, stale: Duration) -> Self {
         Self {
             stale: Some(stale),

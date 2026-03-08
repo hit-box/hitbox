@@ -26,7 +26,7 @@ hitbox-moka = { path = "../hitbox-moka", version = "0.2" }
 hitbox-feoxdb = { path = "../hitbox-feoxdb", version = "0.2" }
 hitbox-redis = { path = "../hitbox-redis", version = "0.2" }
 hitbox-tower = { path = "../hitbox-tower", version = "0.2" }
-hitbox-configuration = { path = "../hitbox-configuration", version = "0.1", features = [
+hitbox-configuration = { path = "../hitbox-configuration", version = "0.2", features = [
     "moka",
 ] }
 chrono = { workspace = true }
@@ -45,8 +45,8 @@ serde_yaml = "0.9"
 indexmap = { version = "2", features = ["serde"] }
 serde = { workspace = true, features = ["rc"] }
 anyhow = "1"
-hurl_core = { workspace = true }
-hurl = { workspace = true }
+hurl_core = { version = "7.2.0-SNAPSHOT", git = "https://github.com/hit-box/hurl.git", branch = "master" }
+hurl = { version = "7.2.0-SNAPSHOT", git = "https://github.com/hit-box/hurl.git", branch = "master" }
 http-body-util = { workspace = true }
 http-body = { workspace = true }
 serde_json = { workspace = true }

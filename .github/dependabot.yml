@@ -9,6 +9,9 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+    ignore:
+      - dependency-name: "hurl"
+      - dependency-name: "hurl_core"
 
   - package-ecosystem: "github-actions"
     directory: "/"

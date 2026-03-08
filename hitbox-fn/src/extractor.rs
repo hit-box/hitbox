@@ -61,82 +61,22 @@ pub trait KeyExtract {
 
 // KeyExtract implementations for primitive types
 
-impl KeyExtract for u8 {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("u8", Some(self.to_string()))]
-    }
+macro_rules! impl_key_extract_for_scalar {
+    ($($ty:ty => $name:expr),* $(,)?) => {
+        $(
+            impl KeyExtract for $ty {
+                fn extract(&self) -> Vec<KeyPart> {
+                    vec![KeyPart::new($name, Some(self.to_string()))]
+                }
+            }
+        )*
+    };
 }
 
-impl KeyExtract for u16 {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("u16", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for u32 {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("u32", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for u64 {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("u64", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for u128 {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("u128", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for usize {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("usize", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for i8 {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("i8", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for i16 {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("i16", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for i32 {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("i32", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for i64 {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("i64", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for i128 {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("i128", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for isize {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("isize", Some(self.to_string()))]
-    }
-}
-
-impl KeyExtract for bool {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![KeyPart::new("bool", Some(self.to_string()))]
-    }
+impl_key_extract_for_scalar! {
+    u8 => "u8", u16 => "u16", u32 => "u32", u64 => "u64", u128 => "u128", usize => "usize",
+    i8 => "i8", i16 => "i16", i32 => "i32", i64 => "i64", i128 => "i128", isize => "isize",
+    bool => "bool",
 }
 
 impl KeyExtract for String {
@@ -168,73 +108,39 @@ impl<T: KeyExtract + ?Sized> KeyExtract for &T {
 
 // KeyExtract implementations for Args<tuples>
 
-impl KeyExtract for Args<()> {
-    fn extract(&self) -> Vec<KeyPart> {
-        vec![]
-    }
+macro_rules! impl_key_extract_for_args {
+    () => {
+        impl KeyExtract for Args<()> {
+            fn extract(&self) -> Vec<KeyPart> {
+                vec![]
+            }
+        }
+    };
+    ($first:tt : $T0:ident $(, $idx:tt : $T:ident)*) => {
+        impl<$T0: KeyExtract $(, $T: KeyExtract)*> KeyExtract for Args<($T0, $($T,)*)> {
+            fn extract(&self) -> Vec<KeyPart> {
+                [self.0.$first.extract() $(, self.0.$idx.extract())*]
+                    .into_iter()
+                    .flatten()
+                    .collect()
+            }
+        }
+    };
 }
 
-impl<T0: KeyExtract> KeyExtract for Args<(T0,)> {
-    fn extract(&self) -> Vec<KeyPart> {
-        self.0.0.extract()
-    }
-}
-
-impl<T0: KeyExtract, T1: KeyExtract> KeyExtract for Args<(T0, T1)> {
-    fn extract(&self) -> Vec<KeyPart> {
-        let mut parts = self.0.0.extract();
-        parts.extend(self.0.1.extract());
-        parts
-    }
-}
-
-impl<T0: KeyExtract, T1: KeyExtract, T2: KeyExtract> KeyExtract for Args<(T0, T1, T2)> {
-    fn extract(&self) -> Vec<KeyPart> {
-        let mut parts = self.0.0.extract();
-        parts.extend(self.0.1.extract());
-        parts.extend(self.0.2.extract());
-        parts
-    }
-}
-
-impl<T0: KeyExtract, T1: KeyExtract, T2: KeyExtract, T3: KeyExtract> KeyExtract
-    for Args<(T0, T1, T2, T3)>
-{
-    fn extract(&self) -> Vec<KeyPart> {
-        let mut parts = self.0.0.extract();
-        parts.extend(self.0.1.extract());
-        parts.extend(self.0.2.extract());
-        parts.extend(self.0.3.extract());
-        parts
-    }
-}
-
-impl<T0: KeyExtract, T1: KeyExtract, T2: KeyExtract, T3: KeyExtract, T4: KeyExtract> KeyExtract
-    for Args<(T0, T1, T2, T3, T4)>
-{
-    fn extract(&self) -> Vec<KeyPart> {
-        let mut parts = self.0.0.extract();
-        parts.extend(self.0.1.extract());
-        parts.extend(self.0.2.extract());
-        parts.extend(self.0.3.extract());
-        parts.extend(self.0.4.extract());
-        parts
-    }
-}
-
-impl<T0: KeyExtract, T1: KeyExtract, T2: KeyExtract, T3: KeyExtract, T4: KeyExtract, T5: KeyExtract>
-    KeyExtract for Args<(T0, T1, T2, T3, T4, T5)>
-{
-    fn extract(&self) -> Vec<KeyPart> {
-        let mut parts = self.0.0.extract();
-        parts.extend(self.0.1.extract());
-        parts.extend(self.0.2.extract());
-        parts.extend(self.0.3.extract());
-        parts.extend(self.0.4.extract());
-        parts.extend(self.0.5.extract());
-        parts
-    }
-}
+impl_key_extract_for_args!();
+impl_key_extract_for_args!(0: T0);
+impl_key_extract_for_args!(0: T0, 1: T1);
+impl_key_extract_for_args!(0: T0, 1: T1, 2: T2);
+impl_key_extract_for_args!(0: T0, 1: T1, 2: T2, 3: T3);
+impl_key_extract_for_args!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4);
+impl_key_extract_for_args!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4, 5: T5);
+impl_key_extract_for_args!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4, 5: T5, 6: T6);
+impl_key_extract_for_args!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4, 5: T5, 6: T6, 7: T7);
+impl_key_extract_for_args!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4, 5: T5, 6: T6, 7: T7, 8: T8);
+impl_key_extract_for_args!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4, 5: T5, 6: T6, 7: T7, 8: T8, 9: T9);
+impl_key_extract_for_args!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4, 5: T5, 6: T6, 7: T7, 8: T8, 9: T9, 10: T10);
+impl_key_extract_for_args!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4, 5: T5, 6: T6, 7: T7, 8: T8, 9: T9, 10: T10, 11: T11);
 
 // FnExtractor - bridges KeyExtract to Extractor
 

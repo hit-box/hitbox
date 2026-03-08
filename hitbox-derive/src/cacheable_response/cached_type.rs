@@ -6,11 +6,11 @@ use syn::Ident;
 
 use super::parser::Source;
 
-/// Generated cached type with skipped fields excluded from serialization.
+/// Generated cached type for types with skipped fields.
 ///
-/// Skipped fields are present in the struct but marked with `#[serde(skip)]`
-/// so they are not serialized to cache. This preserves their values on cache
-/// miss while excluding them from storage.
+/// All fields are included. Skipped fields get `#[serde(skip, default)]`
+/// so they are not serialized. A custom `Clone` impl ([`CloneImpl`])
+/// defaults skipped fields instead of cloning them.
 #[derive(Debug)]
 pub struct CachedType<'a> {
     source: &'a Source,
@@ -38,12 +38,9 @@ impl<'a> ToTokens for CachedType<'a> {
                 let ident = f.ident.as_ref().expect("named field");
                 let ty = &f.ty;
                 let vis = &f.vis;
-
                 if f.skip {
-                    // Skipped fields: present in struct but excluded from serialization
                     quote! {
                         #[serde(skip, default)]
-                        #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv::with::Skip))]
                         #vis #ident: #ty
                     }
                 } else {
@@ -54,13 +51,66 @@ impl<'a> ToTokens for CachedType<'a> {
 
         let expanded = quote! {
             /// Auto-generated cached representation.
-            #[derive(Clone, serde::Serialize, serde::Deserialize)]
+            #[derive(hitbox::serde::Serialize, hitbox::serde::Deserialize)]
+            #[serde(crate = "hitbox::serde")]
             #[cfg_attr(
                 feature = "rkyv_format",
                 derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
             )]
             pub struct #cached_name #impl_generics #where_clause {
                 #(#fields,)*
+            }
+        };
+
+        tokens.extend(expanded);
+    }
+}
+
+/// Custom `Clone` impl for the generated cached type.
+///
+/// Non-skipped fields are cloned normally. Skipped fields are reconstructed
+/// via `SkippedFieldDefault::skipped_default()`, preventing sensitive data
+/// from leaking into cache storage when the FSM clones for persistence.
+#[derive(Debug)]
+pub struct CloneImpl<'a> {
+    source: &'a Source,
+    cached_type: &'a CachedType<'a>,
+}
+
+impl<'a> CloneImpl<'a> {
+    pub fn new(source: &'a Source, cached_type: &'a CachedType<'a>) -> Self {
+        Self {
+            source,
+            cached_type,
+        }
+    }
+}
+
+impl<'a> ToTokens for CloneImpl<'a> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let cached_name = self.cached_type.ident();
+        let (impl_generics, ty_generics, where_clause) = self.source.generics.split_for_impl();
+
+        let clone_fields: Vec<_> = self
+            .source
+            .fields()
+            .map(|f| {
+                let ident = f.ident.as_ref().expect("named field");
+                if f.skip {
+                    quote! { #ident: hitbox_fn::SkippedFieldDefault::skipped_default() }
+                } else {
+                    quote! { #ident: hitbox_fn::CachedFieldClone::cached_clone(&self.#ident) }
+                }
+            })
+            .collect();
+
+        let expanded = quote! {
+            impl #impl_generics Clone for #cached_name #ty_generics #where_clause {
+                fn clone(&self) -> Self {
+                    Self {
+                        #(#clone_fields,)*
+                    }
+                }
             }
         };
 

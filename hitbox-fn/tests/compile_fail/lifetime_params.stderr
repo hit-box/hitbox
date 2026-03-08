@@ -1,0 +1,5 @@
+error: #[cached] does not support lifetime parameters; borrowed arguments are planned for 0.3 (see #206)
+ --> tests/compile_fail/lifetime_params.rs:4:22
+  |
+4 | pub async fn example<'a>(value: &'a str) -> String {
+  |                      ^^

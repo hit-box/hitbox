@@ -55,7 +55,7 @@ where
         Self {
             request_predicates: Arc::clone(&self.request_predicates),
             response_predicates: Arc::clone(&self.response_predicates),
-            extractors: Arc::clone(&self.extractors.clone()),
+            extractors: Arc::clone(&self.extractors),
             policy: self.policy.clone(),
         }
     }

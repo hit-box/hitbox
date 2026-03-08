@@ -1,11 +1,4 @@
-//! Derive macros for hitbox caching framework.
-//!
-//! This crate provides procedural macros to reduce boilerplate when using hitbox-fn.
-//!
-//! - `#[derive(KeyExtract)]` - Derive the `KeyExtract` trait for structs
-//! - `#[derive(CacheableRequest)]` - Derive the `CacheableRequest` trait for types
-//! - `#[derive(CacheableResponse)]` - Derive the `CacheableResponse` trait for types
-//! - `#[cached]` - Transform an async function into a cacheable function
+#![doc = include_str!("../README.md")]
 
 use darling::FromDeriveInput;
 use proc_macro2::TokenStream;

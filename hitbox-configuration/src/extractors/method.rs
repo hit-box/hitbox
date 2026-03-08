@@ -1,3 +1,4 @@
+use hitbox_http::extractors::MethodConfig;
 use hitbox_http::extractors::method::MethodExtractor;
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +21,7 @@ impl Method {
         ReqBody::Error: Send,
         ReqBody::Data: Send,
     {
-        Box::new(inner.method())
+        Box::new(inner.method(MethodConfig::new()))
     }
 }
 

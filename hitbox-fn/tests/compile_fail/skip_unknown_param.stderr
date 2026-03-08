@@ -1,0 +1,5 @@
+error: unknown parameter `nonexistent` in skip list; available parameters: value
+ --> tests/compile_fail/skip_unknown_param.rs:3:15
+  |
+3 | #[cached(skip(nonexistent))]
+  |               ^^^^^^^^^^^
