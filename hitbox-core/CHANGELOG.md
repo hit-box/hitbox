@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** `Upstream::call` now takes `self` by value instead of `&mut self` — the FSM calls upstream exactly once, so consuming is semantically correct and simplifies lifetime handling ([#206](https://github.com/hit-box/hitbox/pull/206))
+- **Breaking:** `CacheableRequest::cache_policy` now uses a GAT (`CachePolicyFuture<'a, P, E>`) instead of RPITIT, allowing request types with non-`'static` references (e.g. `&'a str`) ([#206](https://github.com/hit-box/hitbox/pull/206))
+
 ## [0.2.2] - 2026-02-09
 
 ### Added
