@@ -114,8 +114,10 @@ impl<'middleware> Upstream<CacheableHttpRequest<reqwest::Body>> for ReqwestUpstr
 pub fn buffered_body_to_reqwest(buffered: BufferedBody<reqwest::Body>) -> reqwest::Body {
     match buffered {
         BufferedBody::Passthrough(body) => body,
-        BufferedBody::Complete(Some(bytes)) => reqwest::Body::from(bytes),
-        BufferedBody::Complete(None) => reqwest::Body::from(Bytes::new()),
+        BufferedBody::Complete {
+            data: Some(bytes), ..
+        } => reqwest::Body::from(bytes),
+        BufferedBody::Complete { data: None, .. } => reqwest::Body::from(Bytes::new()),
         BufferedBody::Partial(partial) => {
             // PartialBufferedBody implements HttpBody, handling:
             // - prefix bytes (yielded first)

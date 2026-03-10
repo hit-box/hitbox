@@ -45,11 +45,25 @@
 //! - Predicates need to inspect body content without blocking large transfers
 
 use bytes::{Buf, Bytes, BytesMut};
+use http::HeaderMap;
 use http_body::{Body as HttpBody, Frame};
 use pin_project::pin_project;
 use std::fmt;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+/// The result of fully collecting a body: data bytes plus optional HTTP/2 trailers.
+///
+/// Returned by [`BufferedBody::collect`]. This preserves HTTP/2 trailers that would
+/// otherwise be lost when converting a streaming body to bytes.
+///
+#[derive(Debug, Clone)]
+pub struct CollectedBody {
+    /// The collected body data.
+    pub data: Bytes,
+    /// HTTP/2 trailers, if the body stream included a trailing HEADERS frame.
+    pub trailers: Option<HeaderMap>,
+}
 
 /// What remains of a body stream after partial consumption.
 ///
@@ -69,32 +83,6 @@ use std::task::{Context, Poll};
 /// - `Error(Some(e))`: An error occurred; will be yielded once then become `None`
 /// - `Error(None)`: Error was already yielded; stream is terminated
 ///
-/// # Examples
-///
-/// ```no_run
-/// use hitbox_http::{BufferedBody, CollectExactResult, Remaining};
-///
-/// async fn example<B: hyper::body::Body + Unpin>(body: BufferedBody<B>) {
-///     // After collecting 100 bytes from a larger body
-///     let result = body.collect_exact(100).await;
-///     match result {
-///         CollectExactResult::AtLeast { buffered, remaining } => {
-///             match remaining {
-///                 Some(Remaining::Body(stream)) => {
-///                     // More data available in stream
-///                 }
-///                 Some(Remaining::Error(err)) => {
-///                     // Error occurred after collecting bytes
-///                 }
-///                 None => {
-///                     // Stream ended exactly at limit
-///                 }
-///             }
-///         }
-///         CollectExactResult::Incomplete { .. } => {}
-///     }
-/// }
-/// ```
 #[pin_project(project = RemainingProj)]
 #[derive(Debug)]
 pub enum Remaining<B>
@@ -132,24 +120,6 @@ where
 /// When polled as an [`HttpBody`]:
 /// 1. Yields the buffered prefix (if any) as a single frame
 /// 2. Delegates to the remaining stream, or yields the stored error
-///
-/// # Examples
-///
-/// ```no_run
-/// use bytes::Bytes;
-/// use hitbox_http::{BufferedBody, PartialBufferedBody, Remaining};
-///
-/// fn example<B: hyper::body::Body>(body: BufferedBody<B>) {
-///     // Decompose a partial body
-///     if let BufferedBody::Partial(partial) = body {
-///         let prefix: Option<&Bytes> = partial.prefix();
-///         println!("Buffered {} bytes", prefix.map(|b| b.len()).unwrap_or(0));
-///
-///         let (prefix, remaining) = partial.into_parts();
-///         // Can now handle prefix and remaining separately
-///     }
-/// }
-/// ```
 ///
 /// # Performance
 ///
@@ -303,7 +273,10 @@ impl<B: HttpBody> HttpBody for PartialBufferedBody<B> {
 /// use hitbox_http::BufferedBody;
 ///
 /// let cached_data = Bytes::from_static(b"{\"id\": 42}");
-/// let body: BufferedBody<Empty<Bytes>> = BufferedBody::Complete(Some(cached_data));
+/// let body: BufferedBody<Empty<Bytes>> = BufferedBody::Complete {
+///     data: Some(cached_data),
+///     trailers: None,
+/// };
 /// ```
 ///
 /// # State Transitions
@@ -321,8 +294,14 @@ where
 {
     /// Body was fully read and buffered (within size limits).
     ///
-    /// The `Option` is used to yield the data once, then return `None` on subsequent polls.
-    Complete(Option<Bytes>),
+    /// The `Option`s are used as one-shot yields: `data` is yielded first as a
+    /// [`Frame::data`], then `trailers` as a [`Frame::trailers`], then `None`.
+    Complete {
+        /// The buffered body bytes. Taken on first poll.
+        data: Option<Bytes>,
+        /// HTTP/2 trailers captured during body collection. Taken on second poll.
+        trailers: Option<HeaderMap>,
+    },
 
     /// Body was partially read - contains buffered prefix and remaining stream.
     ///
@@ -347,9 +326,11 @@ where
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
         match self.project() {
-            BufferedBodyProj::Complete(data) => {
+            BufferedBodyProj::Complete { data, trailers } => {
                 if let Some(bytes) = data.take() {
                     Poll::Ready(Some(Ok(Frame::data(bytes))))
+                } else if let Some(trailer_map) = trailers.take() {
+                    Poll::Ready(Some(Ok(Frame::trailers(trailer_map))))
                 } else {
                     Poll::Ready(None)
                 }
@@ -377,11 +358,13 @@ where
 
     fn size_hint(&self) -> http_body::SizeHint {
         match self {
-            BufferedBody::Complete(Some(bytes)) => {
+            BufferedBody::Complete {
+                data: Some(bytes), ..
+            } => {
                 let len = bytes.len() as u64;
                 http_body::SizeHint::with_exact(len)
             }
-            BufferedBody::Complete(None) => http_body::SizeHint::with_exact(0),
+            BufferedBody::Complete { data: None, .. } => http_body::SizeHint::with_exact(0),
 
             BufferedBody::Partial(partial) => partial.size_hint(),
 
@@ -391,8 +374,11 @@ where
 
     fn is_end_stream(&self) -> bool {
         match self {
-            BufferedBody::Complete(None) => true,
-            BufferedBody::Complete(Some(_)) => false,
+            BufferedBody::Complete {
+                data: None,
+                trailers: None,
+            } => true,
+            BufferedBody::Complete { .. } => false,
 
             BufferedBody::Partial(partial) => partial.is_end_stream(),
 
@@ -421,27 +407,6 @@ where
 /// - The buffered data may exceed the requested size if a frame boundary
 ///   didn't align exactly
 ///
-/// # Examples
-///
-/// ```no_run
-/// use hitbox_http::{BufferedBody, CollectExactResult};
-///
-/// async fn example<B: hyper::body::Body + Unpin>(body: BufferedBody<B>) {
-///     // Check if body starts with JSON array
-///     let result = body.collect_exact(1).await;
-///     match result {
-///         CollectExactResult::AtLeast { ref buffered, .. } => {
-///             if buffered.starts_with(b"[") {
-///                 // It's a JSON array, reconstruct body for further processing
-///                 let body = result.into_buffered_body();
-///             }
-///         }
-///         CollectExactResult::Incomplete { buffered, error } => {
-///             // Body was empty or error occurred
-///         }
-///     }
-/// }
-/// ```
 #[derive(Debug)]
 pub enum CollectExactResult<B: HttpBody> {
     /// Successfully collected at least the requested number of bytes.
@@ -456,6 +421,9 @@ pub enum CollectExactResult<B: HttpBody> {
         buffered: Bytes,
         /// The remaining stream data, if any.
         remaining: Option<Remaining<B>>,
+        /// HTTP/2 trailers, if captured from an already-complete body.
+        /// When `remaining` is `Some`, trailers are still in the stream.
+        trailers: Option<HeaderMap>,
     },
 
     /// Failed to collect the requested bytes.
@@ -470,6 +438,8 @@ pub enum CollectExactResult<B: HttpBody> {
         buffered: Option<Bytes>,
         /// The error that occurred, if any.
         error: Option<B::Error>,
+        /// HTTP/2 trailers captured from the stream before it ended.
+        trailers: Option<HeaderMap>,
     },
 }
 
@@ -484,16 +454,27 @@ impl<B: HttpBody> CollectExactResult<B> {
             CollectExactResult::AtLeast {
                 buffered,
                 remaining,
+                trailers,
             } => match remaining {
                 Some(rem) => BufferedBody::Partial(PartialBufferedBody::new(Some(buffered), rem)),
-                None => BufferedBody::Complete(Some(buffered)),
+                None => BufferedBody::Complete {
+                    data: Some(buffered),
+                    trailers,
+                },
             },
-            CollectExactResult::Incomplete { buffered, error } => match error {
+            CollectExactResult::Incomplete {
+                buffered,
+                error,
+                trailers,
+            } => match error {
                 Some(err) => BufferedBody::Partial(PartialBufferedBody::new(
                     buffered,
                     Remaining::Error(Some(err)),
                 )),
-                None => BufferedBody::Complete(buffered),
+                None => BufferedBody::Complete {
+                    data: buffered,
+                    trailers,
+                },
             },
         }
     }
@@ -520,28 +501,11 @@ impl<B> BufferedBody<B>
 where
     B: HttpBody,
 {
-    /// Collects the entire body into memory.
+    /// Collects the entire body into memory, preserving HTTP/2 trailers.
     ///
-    /// Consumes all remaining bytes from the stream and returns them as a
-    /// contiguous `Bytes` buffer.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use hitbox_http::BufferedBody;
-    ///
-    /// async fn example<B: hyper::body::Body>(body: BufferedBody<B>)
-    /// where
-    ///     B::Data: Send,
-    /// {
-    ///     match body.collect().await {
-    ///         Ok(bytes) => println!("Collected {} bytes", bytes.len()),
-    ///         Err(error_body) => {
-    ///             // Error occurred, but we still have the body for forwarding
-    ///         }
-    ///     }
-    /// }
-    /// ```
+    /// Consumes all remaining bytes and trailers from the stream and returns
+    /// them as a [`CollectedBody`] containing both the data and any trailing
+    /// headers (e.g., gRPC's `grpc-status`).
     ///
     /// # Errors
     ///
@@ -559,39 +523,49 @@ where
     ///
     /// This method blocks until the entire body is received. For very large
     /// bodies or slow streams, this may take significant time and memory.
-    pub async fn collect(self) -> Result<Bytes, Self>
+    pub async fn collect(self) -> Result<CollectedBody, Self>
     where
         B::Data: Send,
     {
         use http_body_util::BodyExt;
 
         match self {
-            // Already complete, extract bytes
-            BufferedBody::Complete(Some(bytes)) => Ok(bytes),
-            BufferedBody::Complete(None) => Ok(Bytes::new()),
+            // Already complete, extract bytes and trailers
+            BufferedBody::Complete { data, trailers } => Ok(CollectedBody {
+                data: data.unwrap_or_default(),
+                trailers,
+            }),
 
-            // Passthrough - need to collect
+            // Passthrough - need to collect from stream
             BufferedBody::Passthrough(body) => match body.collect().await {
-                Ok(collected) => Ok(collected.to_bytes()),
+                Ok(collected) => {
+                    let trailers = collected.trailers().cloned();
+                    Ok(CollectedBody {
+                        data: collected.to_bytes(),
+                        trailers,
+                    })
+                }
                 Err(err) => Err(BufferedBody::Partial(PartialBufferedBody::new(
                     None,
                     Remaining::Error(Some(err)),
                 ))),
             },
 
-            // Partial - delegate to PartialBody which implements HttpBody
+            // Partial - collect prefix + remaining stream
             BufferedBody::Partial(partial) => {
                 let (prefix, remaining) = partial.into_parts();
                 match remaining {
                     Remaining::Body(body) => match body.collect().await {
                         Ok(collected) => {
-                            if let Some(prefix_bytes) = prefix {
+                            let trailers = collected.trailers().cloned();
+                            let data = if let Some(prefix_bytes) = prefix {
                                 let mut combined = BytesMut::from(prefix_bytes.as_ref());
                                 combined.extend_from_slice(&collected.to_bytes());
-                                Ok(combined.freeze())
+                                combined.freeze()
                             } else {
-                                Ok(collected.to_bytes())
-                            }
+                                collected.to_bytes()
+                            };
+                            Ok(CollectedBody { data, trailers })
                         }
                         Err(err) => Err(BufferedBody::Partial(PartialBufferedBody::new(
                             prefix,
@@ -658,28 +632,32 @@ where
     {
         match self {
             // Already complete - check if we have enough bytes
-            BufferedBody::Complete(Some(data)) => {
+            BufferedBody::Complete {
+                data: Some(data),
+                trailers,
+            } => {
                 if data.len() >= limit_bytes {
-                    // Have at least limit_bytes, stream ended cleanly
                     CollectExactResult::AtLeast {
                         buffered: data,
                         remaining: None,
+                        trailers,
                     }
                 } else {
-                    // Not enough bytes
                     CollectExactResult::Incomplete {
                         buffered: Some(data),
                         error: None,
+                        trailers,
                     }
                 }
             }
-            BufferedBody::Complete(None) => {
-                // Empty body
-                CollectExactResult::Incomplete {
-                    buffered: None,
-                    error: None,
-                }
-            }
+            BufferedBody::Complete {
+                data: None,
+                trailers,
+            } => CollectExactResult::Incomplete {
+                buffered: None,
+                error: None,
+                trailers,
+            },
 
             // Partial - combine prefix with remaining stream
             BufferedBody::Partial(partial) => {
@@ -691,6 +669,7 @@ where
                         CollectExactResult::AtLeast {
                             buffered,
                             remaining: Some(remaining),
+                            trailers: None, // trailers are still in the remaining stream
                         }
                     }
                     prefix => {
@@ -705,16 +684,19 @@ where
                                     CollectExactResult::AtLeast {
                                         buffered: new_bytes,
                                         remaining,
+                                        trailers,
                                     } => {
                                         let combined = combine_bytes(prefix, new_bytes);
                                         CollectExactResult::AtLeast {
                                             buffered: combined,
                                             remaining,
+                                            trailers,
                                         }
                                     }
                                     CollectExactResult::Incomplete {
                                         buffered: new_bytes,
                                         error,
+                                        trailers,
                                     } => {
                                         let combined = if let Some(new) = new_bytes {
                                             Some(combine_bytes(prefix, new))
@@ -724,6 +706,7 @@ where
                                         CollectExactResult::Incomplete {
                                             buffered: combined,
                                             error,
+                                            trailers,
                                         }
                                     }
                                 }
@@ -733,6 +716,7 @@ where
                                 CollectExactResult::Incomplete {
                                     buffered: prefix,
                                     error,
+                                    trailers: None,
                                 }
                             }
                         }
@@ -748,7 +732,7 @@ where
     }
 }
 
-/// Helper function to collect exactly N bytes from a stream.
+/// Helper function to collect exactly N bytes from a stream, preserving trailers.
 async fn collect_exact_from_stream<B>(mut stream: B, limit_bytes: usize) -> CollectExactResult<B>
 where
     B: HttpBody + Unpin,
@@ -756,17 +740,27 @@ where
     use http_body_util::BodyExt;
 
     let mut buffer = BytesMut::new();
+    let mut trailers: Option<HeaderMap> = None;
 
     // Read until we have at least limit_bytes
     while buffer.len() < limit_bytes {
         match stream.frame().await {
             Some(Ok(frame)) => {
-                if let Ok(mut data) = frame.into_data() {
-                    buffer.extend_from_slice(&data.copy_to_bytes(data.remaining()));
+                match frame.into_data() {
+                    Ok(mut data) => {
+                        buffer.extend_from_slice(&data.copy_to_bytes(data.remaining()));
+                    }
+                    Err(frame) => {
+                        // Not a data frame — capture trailers instead of dropping them
+                        if let Ok(trailer_map) = frame.into_trailers() {
+                            trailers = Some(trailer_map);
+                            // Trailers are terminal — the stream is done after this
+                            break;
+                        }
+                    }
                 }
             }
             Some(Err(error)) => {
-                // Error while reading
                 return CollectExactResult::Incomplete {
                     buffered: if buffer.is_empty() {
                         None
@@ -774,10 +768,10 @@ where
                         Some(buffer.freeze())
                     },
                     error: Some(error),
+                    trailers,
                 };
             }
             None => {
-                // Stream ended before we got limit_bytes
                 return CollectExactResult::Incomplete {
                     buffered: if buffer.is_empty() {
                         None
@@ -785,16 +779,31 @@ where
                         Some(buffer.freeze())
                     },
                     error: None,
+                    trailers,
                 };
             }
         }
     }
 
-    // We have at least limit_bytes
-    // Return the buffered data and the remaining stream
-    CollectExactResult::AtLeast {
-        buffered: buffer.freeze(),
-        remaining: Some(Remaining::Body(stream)),
+    // Check if we exited because we reached the limit or because of trailers
+    if buffer.len() >= limit_bytes {
+        // Got enough data — remaining stream (with trailers) is preserved
+        CollectExactResult::AtLeast {
+            buffered: buffer.freeze(),
+            remaining: Some(Remaining::Body(stream)),
+            trailers: None, // trailers are still in the stream
+        }
+    } else {
+        // Broke out of loop due to trailers arriving before reaching limit
+        CollectExactResult::Incomplete {
+            buffered: if buffer.is_empty() {
+                None
+            } else {
+                Some(buffer.freeze())
+            },
+            error: None,
+            trailers,
+        }
     }
 }
 
@@ -804,11 +813,29 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BufferedBody::Complete(Some(bytes)) => f
+            BufferedBody::Complete {
+                data: Some(bytes),
+                trailers,
+            } => {
+                let trailer_info = trailers
+                    .as_ref()
+                    .map(|t| format!(", {} trailers", t.len()))
+                    .unwrap_or_default();
+                f.debug_tuple("Complete")
+                    .field(&format!("{} bytes{}", bytes.len(), trailer_info))
+                    .finish()
+            }
+            BufferedBody::Complete {
+                data: None,
+                trailers: None,
+            } => f.debug_tuple("Complete").field(&"consumed").finish(),
+            BufferedBody::Complete {
+                data: None,
+                trailers: Some(t),
+            } => f
                 .debug_tuple("Complete")
-                .field(&format!("{} bytes", bytes.len()))
+                .field(&format!("consumed, {} trailers pending", t.len()))
                 .finish(),
-            BufferedBody::Complete(None) => f.debug_tuple("Complete").field(&"consumed").finish(),
             BufferedBody::Partial(partial) => {
                 let prefix_len = partial.prefix().map(|b| b.len()).unwrap_or(0);
                 f.debug_struct("Partial")

@@ -23,7 +23,7 @@ pub mod request;
 /// Also re-exports [`response::predicate()`] entry point for building response predicate chains.
 pub mod response;
 
-pub use body::{BufferedBody, CollectExactResult, PartialBufferedBody, Remaining};
+pub use body::{BufferedBody, CollectExactResult, CollectedBody, PartialBufferedBody, Remaining};
 pub use cache_status::DEFAULT_CACHE_STATUS_HEADER;
 pub use cacheable::CacheableSubject;
 pub use request::CacheableHttpRequest;

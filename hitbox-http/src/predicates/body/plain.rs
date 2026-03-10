@@ -5,6 +5,7 @@
 
 use bytes::{Buf, Bytes, BytesMut};
 use hitbox::predicate::PredicateResult;
+use http::HeaderMap;
 use http_body_util::BodyExt;
 use hyper::body::Body as HttpBody;
 
@@ -25,11 +26,29 @@ where
 
     match body {
         // Already complete - just search
-        BufferedBody::Complete(Some(bytes)) => {
+        BufferedBody::Complete {
+            data: Some(bytes),
+            trailers,
+        } => {
             let found = bytes.windows(pattern.len()).any(|w| w == pattern);
-            (found, BufferedBody::Complete(Some(bytes)))
+            (
+                found,
+                BufferedBody::Complete {
+                    data: Some(bytes),
+                    trailers,
+                },
+            )
         }
-        BufferedBody::Complete(None) => (false, BufferedBody::Complete(None)),
+        BufferedBody::Complete {
+            data: None,
+            trailers,
+        } => (
+            false,
+            BufferedBody::Complete {
+                data: None,
+                trailers,
+            },
+        ),
 
         // Partial - extract parts and search through prefix + remaining
         BufferedBody::Partial(partial) => {
@@ -70,6 +89,7 @@ where
     B::Data: Send,
 {
     let mut buffer = BytesMut::new();
+    let mut trailers: Option<HeaderMap> = None;
 
     // Initialize with prefix if provided
     if let Some(prefix_bytes) = initial_prefix {
@@ -82,18 +102,33 @@ where
     loop {
         match body.frame().await {
             Some(Ok(frame)) => {
-                if let Ok(mut data) = frame.into_data() {
-                    // Search in: [overlap from previous] + [current chunk]
-                    let search_start = buffer.len().saturating_sub(overlap_size);
-                    buffer.extend_from_slice(&data.copy_to_bytes(data.remaining()));
+                match frame.into_data() {
+                    Ok(mut data) => {
+                        // Search in: [overlap from previous] + [current chunk]
+                        let search_start = buffer.len().saturating_sub(overlap_size);
+                        buffer.extend_from_slice(&data.copy_to_bytes(data.remaining()));
 
-                    // Search in the new region (overlap + new data)
-                    if buffer[search_start..]
-                        .windows(pattern.len())
-                        .any(|w| w == pattern)
-                    {
-                        // Found! Return complete body with all buffered data
-                        return (true, BufferedBody::Complete(Some(buffer.freeze())));
+                        // Search in the new region (overlap + new data)
+                        if buffer[search_start..]
+                            .windows(pattern.len())
+                            .any(|w| w == pattern)
+                        {
+                            // Found mid-stream — return Partial to preserve remaining body
+                            return (
+                                true,
+                                BufferedBody::Partial(PartialBufferedBody::new(
+                                    Some(buffer.freeze()),
+                                    Remaining::Body(body),
+                                )),
+                            );
+                        }
+                    }
+                    Err(frame) => {
+                        // Not a data frame — capture trailers (terminal frame)
+                        if let Ok(trailer_map) = frame.into_trailers() {
+                            trailers = Some(trailer_map);
+                            break;
+                        }
                     }
                 }
             }
@@ -130,10 +165,36 @@ where
                     .map(|b| b.windows(pattern.len()).any(|w| w == pattern))
                     .unwrap_or(false);
 
-                return (found, BufferedBody::Complete(combined));
+                return (
+                    found,
+                    BufferedBody::Complete {
+                        data: combined,
+                        trailers,
+                    },
+                );
             }
         }
     }
+
+    // Exited loop due to trailers — search in collected buffer
+    let combined = if buffer.is_empty() {
+        None
+    } else {
+        Some(buffer.freeze())
+    };
+
+    let found = combined
+        .as_ref()
+        .map(|b| b.windows(pattern.len()).any(|w| w == pattern))
+        .unwrap_or(false);
+
+    (
+        found,
+        BufferedBody::Complete {
+            data: combined,
+            trailers,
+        },
+    )
 }
 
 /// Operations for matching raw body bytes.
@@ -224,9 +285,12 @@ impl PlainOperation {
             PlainOperation::Eq(expected) => body
                 .collect()
                 .await
-                .map(|body_bytes| {
-                    let matches = body_bytes.as_ref() == expected.as_ref();
-                    let result_body = BufferedBody::Complete(Some(body_bytes));
+                .map(|collected| {
+                    let matches = collected.data.as_ref() == expected.as_ref();
+                    let result_body = BufferedBody::Complete {
+                        data: Some(collected.data),
+                        trailers: collected.trailers,
+                    };
                     if matches {
                         PredicateResult::Cacheable(result_body)
                     } else {
@@ -247,9 +311,12 @@ impl PlainOperation {
             PlainOperation::Ends(suffix) => body
                 .collect()
                 .await
-                .map(|body_bytes| {
-                    let matches = body_bytes.ends_with(suffix);
-                    let result_body = BufferedBody::Complete(Some(body_bytes));
+                .map(|collected| {
+                    let matches = collected.data.ends_with(suffix);
+                    let result_body = BufferedBody::Complete {
+                        data: Some(collected.data),
+                        trailers: collected.trailers,
+                    };
                     if matches {
                         PredicateResult::Cacheable(result_body)
                     } else {
@@ -261,9 +328,12 @@ impl PlainOperation {
             PlainOperation::RegExp(regex) => body
                 .collect()
                 .await
-                .map(|body_bytes| {
-                    let matches = regex.is_match(body_bytes.as_ref());
-                    let result_body = BufferedBody::Complete(Some(body_bytes));
+                .map(|collected| {
+                    let matches = regex.is_match(collected.data.as_ref());
+                    let result_body = BufferedBody::Complete {
+                        data: Some(collected.data),
+                        trailers: collected.trailers,
+                    };
                     if matches {
                         PredicateResult::Cacheable(result_body)
                     } else {

@@ -112,7 +112,7 @@ fn create_reference_request() -> Request<ReqBody> {
         .header("accept", "application/json")
         .header("accept-language", "en-US,en;q=0.9")
         .header("user-agent", "ApiClient/2.0 (Production)")
-        .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+        .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
         .unwrap()
 }
 
@@ -126,7 +126,10 @@ fn create_reference_response() -> Response<ReqBody> {
         .header("x-response-time", "42ms")
         .header("x-ratelimit-limit", "1000")
         .header("x-ratelimit-remaining", "999")
-        .body(BufferedBody::Complete(Some(Bytes::from(RESPONSE_BODY))))
+        .body(BufferedBody::Complete {
+            data: Some(Bytes::from(RESPONSE_BODY)),
+            trailers: None,
+        })
         .unwrap()
 }
 
@@ -977,7 +980,7 @@ fn bench_compare_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;
@@ -1014,7 +1017,7 @@ fn bench_compare_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;
@@ -1359,7 +1362,7 @@ fn bench_compare_body_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;
@@ -1396,7 +1399,7 @@ fn bench_compare_body_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;

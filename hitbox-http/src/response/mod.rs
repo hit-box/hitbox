@@ -396,6 +396,10 @@ pub struct SerializableHttpResponse {
     #[serde(with = "http_serde::header_map")]
     #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_header_map::AsHeaderVec))]
     headers: HeaderMap,
+    /// HTTP/2 trailers (e.g., gRPC's `grpc-status`). Empty for HTTP/1.1 responses.
+    #[serde(with = "http_serde::header_map", default)]
+    #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_header_map::AsHeaderVec))]
+    trailers: HeaderMap,
 }
 
 impl<ResBody> CacheableResponse for CacheableHttpResponse<ResBody>
@@ -432,8 +436,8 @@ where
 
     fn into_cached(self) -> Self::IntoCachedFuture {
         async move {
-            let body_bytes = match self.body.collect().await {
-                Ok(bytes) => bytes,
+            let collected = match self.body.collect().await {
+                Ok(collected) => collected,
                 Err(error_body) => {
                     // If collection fails, return NonCacheable with error body
                     return CachePolicy::NonCacheable(CacheableHttpResponse {
@@ -443,20 +447,27 @@ where
                 }
             };
 
-            // We can store the HeaderMap directly, including pseudo-headers
-            // HeaderMap is designed to handle pseudo-headers and http-serde will serialize them correctly
             CachePolicy::Cacheable(SerializableHttpResponse {
                 status: self.parts.status,
                 version: self.parts.version,
-                body: body_bytes,
+                body: collected.data,
                 headers: self.parts.headers,
+                trailers: collected.trailers.unwrap_or_default(),
             })
         }
         .boxed()
     }
 
     fn from_cached(cached: Self::Cached) -> Self::FromCachedFuture {
-        let body = BufferedBody::Complete(Some(cached.body));
+        let trailers = if cached.trailers.is_empty() {
+            None
+        } else {
+            Some(cached.trailers)
+        };
+        let body = BufferedBody::Complete {
+            data: Some(cached.body),
+            trailers,
+        };
         let mut response = Response::new(body);
         *response.status_mut() = cached.status;
         *response.version_mut() = cached.version;
