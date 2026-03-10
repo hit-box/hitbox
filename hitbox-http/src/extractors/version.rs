@@ -6,7 +6,6 @@
 use async_trait::async_trait;
 use hitbox::{Extractor, KeyPart, KeyParts};
 
-use super::NeutralExtractor;
 use crate::CacheableHttpRequest;
 
 /// Extracts the HTTP protocol version as a cache key part.
@@ -16,13 +15,15 @@ use crate::CacheableHttpRequest;
 /// # Examples
 ///
 /// ```
-/// use hitbox_http::extractors::{Method, version::VersionExtractor};
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, VersionConfig, VersionExtractor};
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox_http::extractors::{NeutralExtractor, Version};
+/// # use hitbox_http::extractors::{NeutralExtractor, Method, Version};
 /// // Include version in cache key
-/// let extractor = Method::new().version();
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .version(VersionConfig::new());
 /// # let _: &Version<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
 /// ```
 #[derive(Debug)]
@@ -30,24 +31,29 @@ pub struct Version<E> {
     inner: E,
 }
 
-impl<S> Version<NeutralExtractor<S>> {
-    /// Creates a version extractor for cache key generation.
-    ///
-    /// Adds a key part with name `"version"` and the HTTP protocol version
-    /// as value (e.g., `"HTTP/1.1"`, `"HTTP/2"`).
-    ///
-    /// Chain onto existing extractors using [`VersionExtractor::version`] instead
-    /// if you already have an extractor chain.
-    pub fn new() -> Self {
-        Self {
-            inner: NeutralExtractor::new(),
-        }
-    }
-}
+/// Configuration for the version extractor.
+///
+/// This is a marker type with no configuration options — the HTTP version
+/// is always extracted as-is.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, VersionConfig, VersionExtractor};
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .version(VersionConfig::new());
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct VersionConfig;
 
-impl<S> Default for Version<NeutralExtractor<S>> {
-    fn default() -> Self {
-        Self::new()
+impl VersionConfig {
+    /// Creates a new version extractor configuration.
+    pub fn new() -> Self {
+        VersionConfig
     }
 }
 
@@ -65,14 +71,14 @@ impl<S> Default for Version<NeutralExtractor<S>> {
 /// types. You don't need to implement it manually.
 pub trait VersionExtractor: Sized {
     /// Adds HTTP version extraction to this extractor chain.
-    fn version(self) -> Version<Self>;
+    fn version(self, config: VersionConfig) -> Version<Self>;
 }
 
 impl<E> VersionExtractor for E
 where
     E: Extractor,
 {
-    fn version(self) -> Version<Self> {
+    fn version(self, _config: VersionConfig) -> Version<Self> {
         Version { inner: self }
     }
 }

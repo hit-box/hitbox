@@ -24,7 +24,7 @@ pub use context::{
 pub use extractor::Extractor;
 pub use key::{CacheKey, KeyPart, KeyParts};
 pub use label::BackendLabel;
-pub use offload::{DisabledOffload, Offload};
+pub use offload::{DisabledOffload, Offload, OffloadKey};
 pub use policy::{
     CacheBehaviorPolicy, CachePolicy, ConcurrencyLimit, EnabledCacheConfig, EntityPolicyConfig,
     PolicyConfig, PolicyConfigBuilder, StalePolicy,
@@ -32,6 +32,8 @@ pub use policy::{
 pub use predicate::{And, Neutral, Not, Or, Predicate, PredicateExt, PredicateResult};
 pub use request::{CacheablePolicyData, CacheableRequest, RequestCachePolicy};
 pub use response::{CacheState, CacheableResponse, ResponseCachePolicy};
+#[doc(hidden)]
+pub use serde;
 #[doc(hidden)]
 pub use smallbox::space::S4;
 #[doc(hidden)]

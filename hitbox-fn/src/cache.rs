@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
+use hitbox::DisabledOffload;
 use hitbox::backend::CacheBackend;
 use hitbox::concurrency::NoopConcurrencyManager;
 use hitbox::policy::PolicyConfig;
-use hitbox_core::DisabledOffload;
 
 /// Marker: no backend configured.
 pub struct NoBackend;
@@ -85,6 +85,85 @@ impl<B, CM, O> Cache<B, CM, O> {
     /// Get a reference to the offload manager.
     pub fn offload(&self) -> &O {
         &self.offload
+    }
+}
+
+/// Trait for accessing cache internals.
+///
+/// This enables the generated `#[cached]` code to work with different
+/// cache ownership patterns: `&Cache`, `Arc<Cache>`, etc.
+pub trait CacheAccess {
+    /// The cache backend type.
+    type Backend;
+    /// The concurrency manager type.
+    type ConcurrencyManager;
+    /// The offload manager type.
+    type Offload;
+
+    /// Get a shared reference to the backend.
+    fn backend(&self) -> Arc<Self::Backend>;
+    /// Get a shared reference to the policy.
+    fn policy(&self) -> Arc<PolicyConfig>;
+    /// Get the concurrency manager.
+    fn concurrency_manager(&self) -> Self::ConcurrencyManager;
+    /// Get the offload manager.
+    fn offload(&self) -> Self::Offload;
+}
+
+impl<B, CM: Clone, O: Clone> CacheAccess for Cache<B, CM, O> {
+    type Backend = B;
+    type ConcurrencyManager = CM;
+    type Offload = O;
+
+    fn backend(&self) -> Arc<B> {
+        Arc::clone(&self.backend)
+    }
+    fn policy(&self) -> Arc<PolicyConfig> {
+        Arc::clone(&self.policy)
+    }
+    fn concurrency_manager(&self) -> CM {
+        self.concurrency_manager.clone()
+    }
+    fn offload(&self) -> O {
+        self.offload.clone()
+    }
+}
+
+impl<T: CacheAccess> CacheAccess for &T {
+    type Backend = T::Backend;
+    type ConcurrencyManager = T::ConcurrencyManager;
+    type Offload = T::Offload;
+
+    fn backend(&self) -> Arc<Self::Backend> {
+        (**self).backend()
+    }
+    fn policy(&self) -> Arc<PolicyConfig> {
+        (**self).policy()
+    }
+    fn concurrency_manager(&self) -> Self::ConcurrencyManager {
+        (**self).concurrency_manager()
+    }
+    fn offload(&self) -> Self::Offload {
+        (**self).offload()
+    }
+}
+
+impl<T: CacheAccess> CacheAccess for Arc<T> {
+    type Backend = T::Backend;
+    type ConcurrencyManager = T::ConcurrencyManager;
+    type Offload = T::Offload;
+
+    fn backend(&self) -> Arc<Self::Backend> {
+        (**self).backend()
+    }
+    fn policy(&self) -> Arc<PolicyConfig> {
+        (**self).policy()
+    }
+    fn concurrency_manager(&self) -> Self::ConcurrencyManager {
+        (**self).concurrency_manager()
+    }
+    fn offload(&self) -> Self::Offload {
+        (**self).offload()
     }
 }
 

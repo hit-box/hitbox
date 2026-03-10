@@ -41,7 +41,7 @@ impl ToTokens for ImplFn<'_> {
         let body = &self.cached_fn.body;
 
         let generics = if self.cached_fn.has_generics() {
-            let generic_params = self.cached_fn.generic_params();
+            let generic_params = self.cached_fn.user_generic_params();
             quote! { <#generic_params> }
         } else {
             quote! {}
@@ -85,6 +85,7 @@ impl ToTokens for CallStruct<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let call_name = &self.cached_fn.call_name;
         let args_tuple = self.cached_fn.args_tuple_type();
+        let phantom_context = self.cached_fn.phantom_context_type();
 
         let generics = if self.cached_fn.has_generics() {
             let generic_params = self.cached_fn.generic_params();
@@ -93,12 +94,13 @@ impl ToTokens for CallStruct<'_> {
             quote! { <B = hitbox_fn::NoBackend, P = hitbox_fn::NoPolicy, C = hitbox_fn::NoContext> }
         };
 
+        let vis = &self.cached_fn.vis;
         tokens.extend(quote! {
-            pub struct #call_name #generics {
+            #vis struct #call_name #generics {
                 args: hitbox_fn::Args<#args_tuple>,
                 backend: B,
                 policy: P,
-                _context: std::marker::PhantomData<C>,
+                _context: #phantom_context,
             }
         });
     }
@@ -312,10 +314,13 @@ impl ToTokens for CallImplWithContext<'_> {
 
 /// Generates the CachedCall struct for use with pre-configured Cache.
 ///
+/// Uses a generic `CC` parameter instead of concrete `&'c Cache<B, CM, O>`,
+/// enabling different cache ownership patterns via `CacheAccess` trait.
+///
 /// ```ignore
-/// pub struct FunctionCallCached<'a, T: Clone, 'c, B, CM, O, C = NoContext> {
+/// pub struct FunctionCallCached<'a, T: Clone, CC, C = NoContext> {
 ///     args: Args<(Arg<&'a T0>, Arg<T>)>,
-///     cache: &'c Cache<B, CM, O>,
+///     cache: CC,
 ///     _context: PhantomData<C>,
 /// }
 /// ```
@@ -333,16 +338,21 @@ impl ToTokens for CachedCallStruct<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let cached_call_name = &self.cached_fn.cached_call_name;
         let args_tuple = self.cached_fn.args_tuple_type();
+        let phantom_context = self.cached_fn.phantom_context_type();
 
-        // Order: fn lifetimes, 'c, fn type params, B, CM, O, C
-        let lifetimes = &self.cached_fn.lifetimes;
-        let type_params = &self.cached_fn.type_params;
+        let generics = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            quote! { <#generic_params, CC, C = hitbox_fn::NoContext> }
+        } else {
+            quote! { <CC, C = hitbox_fn::NoContext> }
+        };
 
+        let vis = &self.cached_fn.vis;
         tokens.extend(quote! {
-            pub struct #cached_call_name <#( #lifetimes, )* 'c, #( #type_params, )* B, CM, O, C = hitbox_fn::NoContext> {
+            #vis struct #cached_call_name #generics {
                 args: hitbox_fn::Args<#args_tuple>,
-                cache: &'c hitbox_fn::Cache<B, CM, O>,
-                _context: std::marker::PhantomData<C>,
+                cache: CC,
+                _context: #phantom_context,
             }
         });
     }
@@ -368,14 +378,25 @@ impl ToTokens for CallImplCache<'_> {
         let call_name = &self.cached_fn.call_name;
         let cached_call_name = &self.cached_fn.cached_call_name;
 
-        let lifetimes = &self.cached_fn.lifetimes;
-        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
-        let type_params = &self.cached_fn.type_params;
-        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
+        let (impl_generics, call_type_args, cached_type_args) = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            let generic_args = self.cached_fn.generic_args();
+            (
+                quote! { <#generic_params, B, P, C> },
+                quote! { <#generic_args, B, P, C> },
+                quote! { <#generic_args, CC, C> },
+            )
+        } else {
+            (
+                quote! { <B, P, C> },
+                quote! { <B, P, C> },
+                quote! { <CC, C> },
+            )
+        };
 
         tokens.extend(quote! {
-            impl <#( #lifetimes, )* #( #type_params, )* B, P, C> #call_name <#( #lifetime_idents, )* #( #type_idents, )* B, P, C> {
-                pub fn cache<CB, CM, O>(self, cache: &hitbox_fn::Cache<CB, CM, O>) -> #cached_call_name <#( #lifetime_idents, )* '_, #( #type_idents, )* CB, CM, O, C> {
+            impl #impl_generics #call_name #call_type_args {
+                pub fn cache<CC>(self, cache: CC) -> #cached_call_name #cached_type_args {
                     #cached_call_name {
                         args: self.args,
                         cache,
@@ -406,19 +427,85 @@ impl ToTokens for CachedCallImplWithContext<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let cached_call_name = &self.cached_fn.cached_call_name;
 
-        let lifetimes = &self.cached_fn.lifetimes;
-        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
-        let type_params = &self.cached_fn.type_params;
-        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
+        let (impl_generics, type_args_no_context, type_args_with_context) =
+            if self.cached_fn.has_generics() {
+                let generic_params = self.cached_fn.generic_params();
+                let generic_args = self.cached_fn.generic_args();
+                (
+                    quote! { <#generic_params, CC> },
+                    quote! { <#generic_args, CC, hitbox_fn::NoContext> },
+                    quote! { <#generic_args, CC, hitbox_fn::WithContext> },
+                )
+            } else {
+                (
+                    quote! { <CC> },
+                    quote! { <CC, hitbox_fn::NoContext> },
+                    quote! { <CC, hitbox_fn::WithContext> },
+                )
+            };
 
         tokens.extend(quote! {
-            impl <#( #lifetimes, )* 'c, #( #type_params, )* B, CM, O> #cached_call_name <#( #lifetime_idents, )* 'c, #( #type_idents, )* B, CM, O, hitbox_fn::NoContext> {
-                pub fn with_context(self) -> #cached_call_name <#( #lifetime_idents, )* 'c, #( #type_idents, )* B, CM, O, hitbox_fn::WithContext> {
+            impl #impl_generics #cached_call_name #type_args_no_context {
+                pub fn with_context(self) -> #cached_call_name #type_args_with_context {
                     #cached_call_name {
                         args: self.args,
                         cache: self.cache,
                         _context: std::marker::PhantomData,
                     }
+                }
+            }
+        });
+    }
+}
+
+// =============================================================================
+// IntoFuture passthrough (no backend, no policy, no context)
+// =============================================================================
+
+/// Generates `IntoFuture` impl for Call without any configuration.
+/// Calls the underlying function directly — no caching.
+pub struct IntoFuturePassthrough<'a> {
+    cached_fn: &'a CachedFn,
+}
+
+impl<'a> IntoFuturePassthrough<'a> {
+    pub fn new(cached_fn: &'a CachedFn) -> Self {
+        Self { cached_fn }
+    }
+}
+
+impl ToTokens for IntoFuturePassthrough<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let call_name = &self.cached_fn.call_name;
+        let impl_name = &self.cached_fn.impl_name;
+        let return_type = &self.cached_fn.return_type;
+
+        let (impl_generics, type_generics) = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            let generic_args = self.cached_fn.generic_args();
+            (
+                quote! { <#generic_params> },
+                quote! { <#generic_args, hitbox_fn::NoBackend, hitbox_fn::NoPolicy, hitbox_fn::NoContext> },
+            )
+        } else {
+            (
+                quote! {},
+                quote! { <hitbox_fn::NoBackend, hitbox_fn::NoPolicy, hitbox_fn::NoContext> },
+            )
+        };
+
+        let offload_lifetime = self.cached_fn.offload_lifetime();
+
+        tokens.extend(quote! {
+            impl #impl_generics std::future::IntoFuture for #call_name #type_generics {
+                type Output = #return_type;
+                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + #offload_lifetime>>;
+
+                fn into_future(self) -> Self::IntoFuture {
+                    let args = self.args;
+                    Box::pin(async move {
+                        #impl_name(args).await
+                    })
                 }
             }
         });
@@ -451,23 +538,41 @@ impl ToTokens for IntoFutureCallNoContext<'_> {
         let return_type = &self.cached_fn.return_type;
         let fn_path = self.cached_fn.fn_path();
 
-        let lifetimes = &self.cached_fn.lifetimes;
-        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
-        let type_params = &self.cached_fn.type_params;
-        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
+        let (impl_generics, type_generics) = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            let generic_args = self.cached_fn.generic_args();
+            (
+                quote! { <#generic_params, B> },
+                quote! { <#generic_args, hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::NoContext> },
+            )
+        } else {
+            (
+                quote! { <B> },
+                quote! { <hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::NoContext> },
+            )
+        };
 
+        let generic_args = self.cached_fn.generic_args();
         let offload_lifetime = self.cached_fn.offload_lifetime();
         let upstream_instance = self.cached_fn.upstream_instance();
 
+        // Use named CallFutureStruct instead of Box::pin(async move { ... }).
+        // The async block approach triggers "not general enough" errors with GAT lifetimes.
+        let into_future_type = if self.cached_fn.has_generics() {
+            quote! { #call_future_name<#generic_args, B, hitbox::concurrency::NoopConcurrencyManager, hitbox::DisabledOffload> }
+        } else {
+            quote! { #call_future_name<B, hitbox::concurrency::NoopConcurrencyManager, hitbox::DisabledOffload> }
+        };
+
         tokens.extend(quote! {
-            impl<#( #lifetimes, )* #( #type_params, )* B> std::future::IntoFuture for #call_name<#( #lifetime_idents, )* #( #type_idents, )* hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::NoContext>
+            impl #impl_generics std::future::IntoFuture for #call_name #type_generics
             where
                 B: hitbox::backend::CacheBackend + Send + Sync + 'static,
                 #return_type: hitbox::CacheableResponse + Send + #offload_lifetime,
-                <#return_type as hitbox::CacheableResponse>::Cached: hitbox_core::Cacheable + Send,
+                <#return_type as hitbox::CacheableResponse>::Cached: hitbox::Cacheable + Send,
             {
                 type Output = #return_type;
-                type IntoFuture = #call_future_name<#( #lifetime_idents, )* #( #type_idents, )* B, hitbox::concurrency::NoopConcurrencyManager, hitbox_core::DisabledOffload>;
+                type IntoFuture = #into_future_type;
 
                 fn into_future(self) -> Self::IntoFuture {
                     let upstream = #upstream_instance;
@@ -481,7 +586,7 @@ impl ToTokens for IntoFutureCallNoContext<'_> {
                         hitbox::predicate::Neutral::new(),
                         extractor,
                         self.policy.0,
-                        hitbox_core::DisabledOffload,
+                        hitbox::DisabledOffload,
                         hitbox::concurrency::NoopConcurrencyManager,
                     );
 
@@ -514,32 +619,22 @@ impl ToTokens for IntoFutureCallWithContext<'_> {
         let return_type = &self.cached_fn.return_type;
         let fn_path = self.cached_fn.fn_path();
 
-        let (impl_generics, type_generics, _future_lifetime) = if self.cached_fn.has_generics() {
+        let (impl_generics, type_generics) = if self.cached_fn.has_generics() {
             let generic_params = self.cached_fn.generic_params();
             let generic_args = self.cached_fn.generic_args();
-            let future_lt = if self.cached_fn.has_lifetimes() {
-                let first_lifetime = &self.cached_fn.lifetimes[0].lifetime;
-                quote! { #first_lifetime }
-            } else {
-                quote! { 'static }
-            };
             (
                 quote! { <#generic_params, B> },
                 quote! { <#generic_args, hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::WithContext> },
-                future_lt,
             )
         } else {
             (
                 quote! { <B> },
                 quote! { <hitbox_fn::WithBackend<B>, hitbox_fn::WithPolicy, hitbox_fn::WithContext> },
-                quote! { 'static },
             )
         };
 
         let offload_lifetime = self.cached_fn.offload_lifetime();
         let upstream_instance = self.cached_fn.upstream_instance();
-
-        let future_lifetime = &_future_lifetime;
 
         // Directly construct and box CacheFuture.
         // Avoids async block which triggers "not general enough" error with GATs.
@@ -548,10 +643,10 @@ impl ToTokens for IntoFutureCallWithContext<'_> {
             where
                 B: hitbox::backend::CacheBackend + Send + Sync + 'static,
                 #return_type: hitbox::CacheableResponse + Send + #offload_lifetime,
-                <#return_type as hitbox::CacheableResponse>::Cached: hitbox_core::Cacheable + Send,
+                <#return_type as hitbox::CacheableResponse>::Cached: hitbox::Cacheable + Send,
             {
                 type Output = (#return_type, hitbox::context::CacheContext);
-                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + #future_lifetime>>;
+                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + #offload_lifetime>>;
 
                 fn into_future(self) -> Self::IntoFuture {
                     let upstream = #upstream_instance;
@@ -565,7 +660,7 @@ impl ToTokens for IntoFutureCallWithContext<'_> {
                         hitbox::predicate::Neutral::new(),
                         extractor,
                         self.policy.0,
-                        hitbox_core::DisabledOffload,
+                        hitbox::DisabledOffload,
                         hitbox::concurrency::NoopConcurrencyManager,
                     );
 
@@ -581,6 +676,7 @@ impl ToTokens for IntoFutureCallWithContext<'_> {
 // =============================================================================
 
 /// Generates `IntoFuture` impl for CachedCall without context.
+/// Uses `CC: CacheAccess` to abstract over cache ownership.
 pub struct IntoFutureCachedNoContext<'a> {
     cached_fn: &'a CachedFn,
 }
@@ -602,40 +698,53 @@ impl ToTokens for IntoFutureCachedNoContext<'_> {
         let return_type = &self.cached_fn.return_type;
         let fn_path = self.cached_fn.fn_path();
 
-        let lifetimes = &self.cached_fn.lifetimes;
-        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
-        let type_params = &self.cached_fn.type_params;
-        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
-
+        let generic_args = self.cached_fn.generic_args();
         let offload_lifetime = self.cached_fn.offload_lifetime();
         let upstream_instance = self.cached_fn.upstream_instance();
 
+        let (impl_generics, type_args) = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            (
+                quote! { <#generic_params, CC> },
+                quote! { <#generic_args, CC, hitbox_fn::NoContext> },
+            )
+        } else {
+            (quote! { <CC> }, quote! { <CC, hitbox_fn::NoContext> })
+        };
+
+        let future_type_args = if self.cached_fn.has_generics() {
+            quote! { #generic_args, CC::Backend, CC::ConcurrencyManager, CC::Offload }
+        } else {
+            quote! { CC::Backend, CC::ConcurrencyManager, CC::Offload }
+        };
+
         tokens.extend(quote! {
-            impl <#( #lifetimes, )* 'c, #( #type_params, )* B, CM, O> std::future::IntoFuture for #cached_call_name <#( #lifetime_idents, )* 'c, #( #type_idents, )* B, CM, O, hitbox_fn::NoContext>
+            impl #impl_generics std::future::IntoFuture for #cached_call_name #type_args
             where
-                B: hitbox::backend::CacheBackend + Send + Sync + 'static,
+                CC: hitbox_fn::CacheAccess,
+                CC::Backend: hitbox::backend::CacheBackend + Send + Sync + 'static,
                 #return_type: hitbox::CacheableResponse + Send + 'static,
-                <#return_type as hitbox::CacheableResponse>::Cached: hitbox_core::Cacheable + Send,
-                CM: hitbox::concurrency::ConcurrencyManager<#return_type> + Clone + 'static,
-                O: hitbox_core::Offload<#offload_lifetime> + Clone + #offload_lifetime,
+                <#return_type as hitbox::CacheableResponse>::Cached: hitbox::Cacheable + Send,
+                CC::ConcurrencyManager: hitbox::concurrency::ConcurrencyManager<#return_type> + Clone + 'static,
+                CC::Offload: hitbox::Offload<#offload_lifetime> + Clone + #offload_lifetime,
             {
                 type Output = #return_type;
-                type IntoFuture = #call_future_name<#( #lifetime_idents, )* #( #type_idents, )* B, CM, O>;
+                type IntoFuture = #call_future_name<#future_type_args>;
 
                 fn into_future(self) -> Self::IntoFuture {
                     let upstream = #upstream_instance;
                     let extractor = hitbox_fn::FnExtractor::<hitbox_fn::Args<#args_tuple>>::new(#fn_path);
 
                     let cache_future = hitbox::fsm::CacheFuture::new(
-                        std::sync::Arc::clone(self.cache.backend()),
+                        self.cache.backend(),
                         self.args,
                         upstream,
                         hitbox::predicate::Neutral::new(),
                         hitbox::predicate::Neutral::new(),
                         extractor,
-                        std::sync::Arc::clone(self.cache.policy()),
-                        self.cache.offload().clone(),
-                        self.cache.concurrency_manager().clone(),
+                        self.cache.policy(),
+                        self.cache.offload(),
+                        self.cache.concurrency_manager(),
                     );
 
                     #call_future_name { inner: cache_future }
@@ -650,6 +759,7 @@ impl ToTokens for IntoFutureCachedNoContext<'_> {
 // =============================================================================
 
 /// Generates `IntoFuture` impl for CachedCall with context.
+/// Uses `CC: CacheAccess` to abstract over cache ownership.
 pub struct IntoFutureCachedWithContext<'a> {
     cached_fn: &'a CachedFn,
 }
@@ -667,49 +777,49 @@ impl ToTokens for IntoFutureCachedWithContext<'_> {
         let return_type = &self.cached_fn.return_type;
         let fn_path = self.cached_fn.fn_path();
 
-        let lifetimes = &self.cached_fn.lifetimes;
-        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
-        let type_params = &self.cached_fn.type_params;
-        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
-
         let offload_lifetime = self.cached_fn.offload_lifetime();
         let upstream_instance = self.cached_fn.upstream_instance();
 
-        let future_lifetime = if self.cached_fn.has_lifetimes() {
-            let first_lifetime = &self.cached_fn.lifetimes[0].lifetime;
-            quote! { #first_lifetime }
+        let (impl_generics, type_args) = if self.cached_fn.has_generics() {
+            let generic_params = self.cached_fn.generic_params();
+            let generic_args = self.cached_fn.generic_args();
+            (
+                quote! { <#generic_params, CC> },
+                quote! { <#generic_args, CC, hitbox_fn::WithContext> },
+            )
         } else {
-            quote! { 'c }
+            (quote! { <CC> }, quote! { <CC, hitbox_fn::WithContext> })
         };
 
         // Directly construct and box CacheFuture.
         // Avoids async block which triggers "not general enough" error with GATs.
         tokens.extend(quote! {
-            impl <#( #lifetimes, )* 'c, #( #type_params, )* B, CM, O> std::future::IntoFuture for #cached_call_name <#( #lifetime_idents, )* 'c, #( #type_idents, )* B, CM, O, hitbox_fn::WithContext>
+            impl #impl_generics std::future::IntoFuture for #cached_call_name #type_args
             where
-                B: hitbox::backend::CacheBackend + Send + Sync + 'static,
+                CC: hitbox_fn::CacheAccess,
+                CC::Backend: hitbox::backend::CacheBackend + Send + Sync + 'static,
                 #return_type: hitbox::CacheableResponse + Send + 'static,
-                <#return_type as hitbox::CacheableResponse>::Cached: hitbox_core::Cacheable + Send,
-                CM: hitbox::concurrency::ConcurrencyManager<#return_type> + Clone + 'static,
-                O: hitbox_core::Offload<#offload_lifetime> + Clone + #offload_lifetime,
+                <#return_type as hitbox::CacheableResponse>::Cached: hitbox::Cacheable + Send,
+                CC::ConcurrencyManager: hitbox::concurrency::ConcurrencyManager<#return_type> + Clone + 'static,
+                CC::Offload: hitbox::Offload<#offload_lifetime> + Clone + #offload_lifetime,
             {
                 type Output = (#return_type, hitbox::context::CacheContext);
-                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + #future_lifetime>>;
+                type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + Send + #offload_lifetime>>;
 
                 fn into_future(self) -> Self::IntoFuture {
                     let upstream = #upstream_instance;
                     let extractor = hitbox_fn::FnExtractor::<hitbox_fn::Args<#args_tuple>>::new(#fn_path);
 
                     let cache_future = hitbox::fsm::CacheFuture::new(
-                        std::sync::Arc::clone(self.cache.backend()),
+                        self.cache.backend(),
                         self.args,
                         upstream,
                         hitbox::predicate::Neutral::new(),
                         hitbox::predicate::Neutral::new(),
                         extractor,
-                        std::sync::Arc::clone(self.cache.policy()),
-                        self.cache.offload().clone(),
-                        self.cache.concurrency_manager().clone(),
+                        self.cache.policy(),
+                        self.cache.offload(),
+                        self.cache.concurrency_manager(),
                     );
 
                     Box::pin(cache_future)
@@ -762,7 +872,7 @@ impl ToTokens for ExecuteFn<'_> {
             where
                 B: hitbox::backend::CacheBackend + Send + Sync + 'static,
                 CM: hitbox::concurrency::ConcurrencyManager<#return_type> + 'static,
-                O: hitbox_core::Offload<#offload_lifetime> + #offload_lifetime,
+                O: hitbox::Offload<#offload_lifetime> + #offload_lifetime,
             {
                 let upstream = #upstream_instance;
                 let extractor = hitbox_fn::FnExtractor::<hitbox_fn::Args<#args_tuple>>::new(#fn_path);
@@ -846,11 +956,11 @@ impl ToTokens for PublicFn<'_> {
 /// ```ignore
 /// struct __FnUpstream;
 ///
-/// impl<'a> hitbox_core::Upstream<Args<...>> for __FnUpstream {
+/// impl<'a> hitbox::Upstream<Args<...>> for __FnUpstream {
 ///     type Response = ReturnType;
 ///     type Future = Pin<Box<dyn Future<Output = Self::Response> + Send + 'a>>;
 ///
-///     fn call(&mut self, args: Args<...>) -> Self::Future {
+///     fn call(self, args: Args<...>) -> Self::Future {
 ///         Box::pin(__fn_impl(args))
 ///     }
 /// }
@@ -872,8 +982,6 @@ impl ToTokens for UpstreamStruct<'_> {
         let args_tuple = self.cached_fn.args_tuple_type();
         let return_type = &self.cached_fn.return_type;
 
-        let lifetimes = &self.cached_fn.lifetimes;
-        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
         let type_params = &self.cached_fn.type_params;
         let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
 
@@ -887,55 +995,56 @@ impl ToTokens for UpstreamStruct<'_> {
             quote! { #impl_name(args) }
         };
 
-        // All patterns generate a struct that implements Upstream with:
-        // - `type Future = Pin<Box<dyn Future + Send + 'lifetime>>` (no GAT)
-        // - `fn call(self, args)` consuming self
-        // The future lifetime comes from offload_lifetime(): first lifetime param or 'static.
-        if self.cached_fn.has_lifetimes() {
-            if !self.cached_fn.type_params.is_empty() {
-                // Lifetimes + type params: use PhantomData struct
-                tokens.extend(quote! {
-                    #[derive(Clone, Copy)]
-                    struct #upstream_name<#( #type_params, )*>(
-                        std::marker::PhantomData<fn() -> (#( #type_idents, )*)>
-                    );
+        // Build struct and impl generics compositionally.
+        //
+        // The struct carries only what it must own:
+        // - `'__hitbox` if synthetic (compiler needs it as a type parameter)
+        // - Type params (for turbofish instantiation)
+        // User lifetimes are NOT on the struct — they're constrained by the
+        // trait type parameter `Upstream<Args<(Arg<&'a str>,)>>` on the impl.
+        let mut struct_params: Vec<TokenStream> = Vec::new();
+        let mut struct_args: Vec<TokenStream> = Vec::new();
+        let mut phantom_parts: Vec<TokenStream> = Vec::new();
 
-                    impl<#( #lifetimes, )* #( #type_params, )*> hitbox_core::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name<#( #type_idents, )*> {
-                        type Response = #return_type;
-                        type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + #future_lifetime>>;
+        if self.cached_fn.needs_synthetic_lifetime() {
+            let synthetic = self.cached_fn.synthetic_lifetime();
+            struct_params.push(quote! { #synthetic });
+            struct_args.push(quote! { #synthetic });
+            phantom_parts.push(quote! { &#synthetic () });
+        }
+        if !type_idents.is_empty() {
+            struct_params.push(quote! { #( #type_params ),* });
+            struct_args.push(quote! { #( #type_idents ),* });
+            phantom_parts.push(quote! { fn() -> (#( #type_idents, )*) });
+        }
 
-                        fn call(self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future {
-                            Box::pin(#fn_call)
-                        }
-                    }
-                });
-            } else {
-                // Lifetimes only: use PhantomData struct to carry the lifetime
-                tokens.extend(quote! {
-                    #[derive(Clone, Copy)]
-                    struct #upstream_name<#( #lifetimes, )*>(
-                        std::marker::PhantomData<(#( &#lifetimes (), )*)>
-                    );
+        if !struct_params.is_empty() {
+            let generic_params = self.cached_fn.generic_params();
 
-                    impl<#( #lifetimes, )*> hitbox_core::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name<#( #lifetime_idents, )*> {
-                        type Response = #return_type;
-                        type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + #future_lifetime>>;
-
-                        fn call(self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future {
-                            Box::pin(#fn_call)
-                        }
-                    }
-                });
-            }
-        } else if !self.cached_fn.type_params.is_empty() {
-            // Type params but no lifetimes
             tokens.extend(quote! {
                 #[derive(Clone, Copy)]
-                struct #upstream_name<#( #type_params, )*>(
-                    std::marker::PhantomData<fn() -> (#( #type_idents, )*)>
+                struct #upstream_name<#( #struct_params ),*>(
+                    std::marker::PhantomData<(#( #phantom_parts, )*)>
                 );
 
-                impl<#( #type_params, )*> hitbox_core::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name<#( #type_idents, )*> {
+                impl<#generic_params> hitbox::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name<#( #struct_args ),*> {
+                    type Response = #return_type;
+                    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + #future_lifetime>>;
+
+                    fn call(self, args: hitbox_fn::Args<#args_tuple>) -> Self::Future {
+                        Box::pin(#fn_call)
+                    }
+                }
+            });
+        } else if self.cached_fn.has_generics() {
+            // Lifetimes only (no synthetic, no types) — unit struct, lifetimes on impl
+            let generic_params = self.cached_fn.generic_params();
+
+            tokens.extend(quote! {
+                #[derive(Clone, Copy)]
+                struct #upstream_name;
+
+                impl<#generic_params> hitbox::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name {
                     type Response = #return_type;
                     type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + #future_lifetime>>;
 
@@ -945,12 +1054,12 @@ impl ToTokens for UpstreamStruct<'_> {
                 }
             });
         } else {
-            // No generics - simple unit struct
+            // No generics at all
             tokens.extend(quote! {
                 #[derive(Clone, Copy)]
                 struct #upstream_name;
 
-                impl hitbox_core::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name {
+                impl hitbox::Upstream<hitbox_fn::Args<#args_tuple>> for #upstream_name {
                     type Response = #return_type;
                     type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Response> + Send + #future_lifetime>>;
 
@@ -991,9 +1100,12 @@ impl ToTokens for CacheFutureTypeAlias<'_> {
         let args_tuple = self.cached_fn.args_tuple_type();
         let return_type = &self.cached_fn.return_type;
 
-        let lifetimes = &self.cached_fn.lifetimes;
-        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
-        // Type alias parameters don't have bounds - just use idents
+        let lifetime_idents: Vec<_> = self
+            .cached_fn
+            .lifetimes
+            .iter()
+            .map(|lt| &lt.lifetime)
+            .collect();
         let type_idents: Vec<_> = self
             .cached_fn
             .type_params
@@ -1004,26 +1116,52 @@ impl ToTokens for CacheFutureTypeAlias<'_> {
         // The CacheFuture lifetime parameter
         let cache_future_lifetime = self.cached_fn.offload_lifetime();
 
-        // The upstream type with generic arguments (lifetimes + type params)
-        let upstream_type =
-            if !self.cached_fn.type_params.is_empty() || self.cached_fn.has_lifetimes() {
-                if self.cached_fn.has_lifetimes() && !self.cached_fn.type_params.is_empty() {
-                    // Both lifetimes and type params - but struct only has type params
-                    quote! { #upstream_name<#( #type_idents, )*> }
-                } else if self.cached_fn.has_lifetimes() {
-                    // Only lifetimes - struct has lifetimes
-                    quote! { #upstream_name<#( #lifetime_idents, )*> }
-                } else {
-                    // Only type params
-                    quote! { #upstream_name<#( #type_idents, )*> }
-                }
-            } else {
+        // The upstream type with generic arguments.
+        // Must match what UpstreamStruct puts on the struct:
+        // - '__hitbox (synthetic) goes on struct
+        // - Type params go on struct
+        // - User lifetimes do NOT go on struct (they're on the impl only)
+        // The upstream type — must match what UpstreamStruct puts on the struct.
+        let upstream_type = {
+            let mut args: Vec<TokenStream> = Vec::new();
+            if self.cached_fn.needs_synthetic_lifetime() {
+                let synthetic = self.cached_fn.synthetic_lifetime();
+                args.push(quote! { #synthetic });
+            }
+            if !type_idents.is_empty() {
+                args.push(quote! { #( #type_idents ),* });
+            }
+            if args.is_empty() {
                 quote! { #upstream_name }
-            };
+            } else {
+                quote! { #upstream_name<#( #args ),*> }
+            }
+        };
+
+        // Type alias params: includes all lifetimes (synthetic + user) and type params.
+        // Type aliases can't have bounds, so we just list them.
+        let type_alias_params = {
+            let mut params: Vec<TokenStream> = Vec::new();
+            if self.cached_fn.needs_synthetic_lifetime() {
+                let synthetic = self.cached_fn.synthetic_lifetime();
+                params.push(quote! { #synthetic });
+            }
+            if !lifetime_idents.is_empty() {
+                params.push(quote! { #( #lifetime_idents ),* });
+            }
+            if !type_idents.is_empty() {
+                params.push(quote! { #( #type_idents ),* });
+            }
+            if params.is_empty() {
+                quote! {}
+            } else {
+                quote! { #( #params, )* }
+            }
+        };
 
         // Make CM and O generic so both Call and CachedCall paths can reuse this
         tokens.extend(quote! {
-            type #cache_future_name<#( #lifetimes, )* #( #type_idents, )* B, CM, O> = hitbox::fsm::CacheFuture<
+            type #cache_future_name<#type_alias_params B, CM, O> = hitbox::fsm::CacheFuture<
                 #cache_future_lifetime,
                 B,
                 hitbox_fn::Args<#args_tuple>,
@@ -1077,34 +1215,43 @@ impl ToTokens for CallFutureStruct<'_> {
         let return_type = &self.cached_fn.return_type;
         let args_tuple = self.cached_fn.args_tuple_type();
 
-        let lifetimes = &self.cached_fn.lifetimes;
-        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
-        let type_params = &self.cached_fn.type_params;
-        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
+        let generic_params = self.cached_fn.generic_params();
+        let generic_args = self.cached_fn.generic_args();
+        let offload_lifetime = self.cached_fn.offload_lifetime();
 
-        // Use first lifetime for Offload bound, or 'static if no lifetimes
-        let offload_lifetime = if self.cached_fn.has_lifetimes() {
-            let first_lt = &self.cached_fn.lifetimes[0].lifetime;
-            quote! { #first_lt }
+        if self.cached_fn.has_generics() {
+            tokens.extend(quote! {
+                #[pin_project::pin_project]
+                pub struct #call_future_name<#generic_params, B, CM, O>
+                where
+                    B: hitbox::backend::CacheBackend + Send + Sync + 'static,
+                    #return_type: hitbox::CacheableResponse + Send + 'static,
+                    <#return_type as hitbox::CacheableResponse>::Cached: hitbox::Cacheable + Send,
+                    hitbox_fn::Args<#args_tuple>: hitbox::CacheableRequest + #offload_lifetime,
+                    CM: hitbox::concurrency::ConcurrencyManager<#return_type> + 'static,
+                    O: hitbox::Offload<#offload_lifetime> + #offload_lifetime,
+                {
+                    #[pin]
+                    inner: #cache_future_name<#generic_args, B, CM, O>,
+                }
+            });
         } else {
-            quote! { 'static }
-        };
-
-        tokens.extend(quote! {
-            #[pin_project::pin_project]
-            pub struct #call_future_name<#( #lifetimes, )* #( #type_params, )* B, CM, O>
-            where
-                B: hitbox::backend::CacheBackend + Send + Sync + 'static,
-                #return_type: hitbox::CacheableResponse + Send + 'static,
-                <#return_type as hitbox::CacheableResponse>::Cached: hitbox_core::Cacheable + Send,
-                hitbox_fn::Args<#args_tuple>: hitbox::CacheableRequest + #offload_lifetime,
-                CM: hitbox::concurrency::ConcurrencyManager<#return_type> + 'static,
-                O: hitbox_core::Offload<#offload_lifetime> + #offload_lifetime,
-            {
-                #[pin]
-                inner: #cache_future_name<#( #lifetime_idents, )* #( #type_idents, )* B, CM, O>,
-            }
-        });
+            tokens.extend(quote! {
+                #[pin_project::pin_project]
+                pub struct #call_future_name<B, CM, O>
+                where
+                    B: hitbox::backend::CacheBackend + Send + Sync + 'static,
+                    #return_type: hitbox::CacheableResponse + Send + 'static,
+                    <#return_type as hitbox::CacheableResponse>::Cached: hitbox::Cacheable + Send,
+                    hitbox_fn::Args<#args_tuple>: hitbox::CacheableRequest + #offload_lifetime,
+                    CM: hitbox::concurrency::ConcurrencyManager<#return_type> + 'static,
+                    O: hitbox::Offload<#offload_lifetime> + #offload_lifetime,
+                {
+                    #[pin]
+                    inner: #cache_future_name<B, CM, O>,
+                }
+            });
+        }
     }
 }
 
@@ -1132,38 +1279,51 @@ impl ToTokens for FutureImplCallNoContext<'_> {
         );
         let return_type = &self.cached_fn.return_type;
 
-        let lifetimes = &self.cached_fn.lifetimes;
-        let lifetime_idents: Vec<_> = lifetimes.iter().map(|lt| &lt.lifetime).collect();
-        let type_params = &self.cached_fn.type_params;
-        let type_idents: Vec<_> = type_params.iter().map(|tp| &tp.ident).collect();
+        let generic_params = self.cached_fn.generic_params();
+        let generic_args = self.cached_fn.generic_args();
+        let offload_lifetime = self.cached_fn.offload_lifetime();
 
-        // Use first lifetime for Offload bound, or 'static if no lifetimes
-        let offload_lifetime = if self.cached_fn.has_lifetimes() {
-            let first_lt = &self.cached_fn.lifetimes[0].lifetime;
-            quote! { #first_lt }
-        } else {
-            quote! { 'static }
-        };
+        if self.cached_fn.has_generics() {
+            tokens.extend(quote! {
+                impl<#generic_params, B, CM, O> std::future::Future for #call_future_name<#generic_args, B, CM, O>
+                where
+                    B: hitbox::backend::CacheBackend + Send + Sync + 'static,
+                    #return_type: hitbox::CacheableResponse + Send + 'static,
+                    <#return_type as hitbox::CacheableResponse>::Cached: hitbox::Cacheable + Send,
+                    CM: hitbox::concurrency::ConcurrencyManager<#return_type> + 'static,
+                    O: hitbox::Offload<#offload_lifetime> + #offload_lifetime,
+                {
+                    type Output = #return_type;
 
-        tokens.extend(quote! {
-            impl<#( #lifetimes, )* #( #type_params, )* B, CM, O> std::future::Future for #call_future_name<#( #lifetime_idents, )* #( #type_idents, )* B, CM, O>
-            where
-                B: hitbox::backend::CacheBackend + Send + Sync + 'static,
-                #return_type: hitbox::CacheableResponse + Send + 'static,
-                <#return_type as hitbox::CacheableResponse>::Cached: hitbox_core::Cacheable + Send,
-                CM: hitbox::concurrency::ConcurrencyManager<#return_type> + 'static,
-                O: hitbox_core::Offload<#offload_lifetime> + #offload_lifetime,
-            {
-                type Output = #return_type;
-
-                fn poll(
-                    self: std::pin::Pin<&mut Self>,
-                    cx: &mut std::task::Context<'_>,
-                ) -> std::task::Poll<Self::Output> {
-                    self.project().inner.poll(cx).map(|(result, _ctx)| result)
+                    fn poll(
+                        self: std::pin::Pin<&mut Self>,
+                        cx: &mut std::task::Context<'_>,
+                    ) -> std::task::Poll<Self::Output> {
+                        self.project().inner.poll(cx).map(|(result, _ctx)| result)
+                    }
                 }
-            }
-        });
+            });
+        } else {
+            tokens.extend(quote! {
+                impl<B, CM, O> std::future::Future for #call_future_name<B, CM, O>
+                where
+                    B: hitbox::backend::CacheBackend + Send + Sync + 'static,
+                    #return_type: hitbox::CacheableResponse + Send + 'static,
+                    <#return_type as hitbox::CacheableResponse>::Cached: hitbox::Cacheable + Send,
+                    CM: hitbox::concurrency::ConcurrencyManager<#return_type> + 'static,
+                    O: hitbox::Offload<#offload_lifetime> + #offload_lifetime,
+                {
+                    type Output = #return_type;
+
+                    fn poll(
+                        self: std::pin::Pin<&mut Self>,
+                        cx: &mut std::task::Context<'_>,
+                    ) -> std::task::Poll<Self::Output> {
+                        self.project().inner.poll(cx).map(|(result, _ctx)| result)
+                    }
+                }
+            });
+        }
     }
 }
 
@@ -1195,6 +1355,7 @@ impl<'a> Generator<'a> {
         let cached_call_struct = CachedCallStruct::new(self.cached_fn);
         let call_impl_cache = CallImplCache::new(self.cached_fn);
         let cached_call_impl_with_context = CachedCallImplWithContext::new(self.cached_fn);
+        let into_future_passthrough = IntoFuturePassthrough::new(self.cached_fn);
         let into_future_call_no_context = IntoFutureCallNoContext::new(self.cached_fn);
         let into_future_call_with_context = IntoFutureCallWithContext::new(self.cached_fn);
         let into_future_cached_no_context = IntoFutureCachedNoContext::new(self.cached_fn);
@@ -1216,6 +1377,7 @@ impl<'a> Generator<'a> {
             #cached_call_struct
             #call_impl_cache
             #cached_call_impl_with_context
+            #into_future_passthrough
             #into_future_call_no_context
             #into_future_call_with_context
             #into_future_cached_no_context

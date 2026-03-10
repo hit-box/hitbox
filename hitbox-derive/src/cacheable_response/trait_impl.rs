@@ -35,37 +35,35 @@ impl<'a> CacheableResponseImpl<'a> {
         let (impl_generics, ty_generics, where_clause) = self.source.generics.split_for_impl();
 
         let expanded = quote! {
-            impl #impl_generics hitbox_core::CacheableResponse for #name #ty_generics #where_clause {
+            impl #impl_generics hitbox::CacheableResponse for #name #ty_generics #where_clause {
                 type Cached = Self;
                 type Subject = Self;
-                type IntoCachedFuture = std::future::Ready<hitbox_core::CachePolicy<Self, Self>>;
+                type IntoCachedFuture = std::future::Ready<hitbox::CachePolicy<Self, Self>>;
                 type FromCachedFuture = std::future::Ready<Self>;
 
                 async fn cache_policy<__P>(
                     self,
                     predicates: __P,
-                    config: &hitbox_core::EntityPolicyConfig,
-                ) -> hitbox_core::ResponseCachePolicy<Self>
+                    config: &hitbox::EntityPolicyConfig,
+                ) -> hitbox::ResponseCachePolicy<Self>
                 where
-                    __P: hitbox_core::predicate::Predicate<Subject = Self::Subject> + Send + Sync,
+                    __P: hitbox::predicate::Predicate<Subject = Self::Subject> + Send + Sync,
                 {
                     match predicates.check(self).await {
-                        hitbox_core::predicate::PredicateResult::Cacheable(data) => {
+                        hitbox::predicate::PredicateResult::Cacheable(data) => {
                             let cached = data.clone();
-                            hitbox_core::CachePolicy::Cacheable(hitbox_core::CacheValue::new(
-                                cached,
-                                config.ttl.map(|d| chrono::Utc::now() + d),
-                                config.stale_ttl.map(|d| chrono::Utc::now() + d),
-                            ))
+                            hitbox::CachePolicy::Cacheable(
+                                hitbox::CacheValue::from_config(cached, config),
+                            )
                         }
-                        hitbox_core::predicate::PredicateResult::NonCacheable(data) => {
-                            hitbox_core::CachePolicy::NonCacheable(data)
+                        hitbox::predicate::PredicateResult::NonCacheable(data) => {
+                            hitbox::CachePolicy::NonCacheable(data)
                         }
                     }
                 }
 
                 fn into_cached(self) -> Self::IntoCachedFuture {
-                    std::future::ready(hitbox_core::CachePolicy::Cacheable(self))
+                    std::future::ready(hitbox::CachePolicy::Cacheable(self))
                 }
 
                 fn from_cached(cached: Self) -> Self::FromCachedFuture {
@@ -82,70 +80,55 @@ impl<'a> CacheableResponseImpl<'a> {
         let cached_name = cached_type.ident();
         let (impl_generics, ty_generics, where_clause) = self.source.generics.split_for_impl();
 
-        // Generate field assignments for all fields (both cached and skipped)
-        let all_fields: Vec<_> = self
+        // All fields are copied through — Cached type has every field.
+        // Skipped fields are handled by custom Clone (defaults on clone)
+        // and serde (skip on serialization).
+        let field_idents: Vec<_> = self
             .source
             .fields()
             .map(|f| f.ident.as_ref().expect("named field"))
             .collect();
 
-        let into_cached_fields: Vec<_> = all_fields
-            .iter()
-            .map(|ident| quote! { #ident: self.#ident })
-            .collect();
-
-        let cache_policy_fields: Vec<_> = all_fields
-            .iter()
-            .map(|ident| quote! { #ident: data.#ident })
-            .collect();
-
-        let from_cached_fields: Vec<_> = all_fields
-            .iter()
-            .map(|ident| quote! { #ident: cached.#ident })
-            .collect();
-
         let expanded = quote! {
-            impl #impl_generics hitbox_core::CacheableResponse for #name #ty_generics #where_clause {
+            impl #impl_generics hitbox::CacheableResponse for #name #ty_generics #where_clause {
                 type Cached = #cached_name #ty_generics;
                 type Subject = Self;
-                type IntoCachedFuture = std::future::Ready<hitbox_core::CachePolicy<Self::Cached, Self>>;
+                type IntoCachedFuture = std::future::Ready<hitbox::CachePolicy<Self::Cached, Self>>;
                 type FromCachedFuture = std::future::Ready<Self>;
 
                 async fn cache_policy<__P>(
                     self,
                     predicates: __P,
-                    config: &hitbox_core::EntityPolicyConfig,
-                ) -> hitbox_core::ResponseCachePolicy<Self>
+                    config: &hitbox::EntityPolicyConfig,
+                ) -> hitbox::ResponseCachePolicy<Self>
                 where
-                    __P: hitbox_core::predicate::Predicate<Subject = Self::Subject> + Send + Sync,
+                    __P: hitbox::predicate::Predicate<Subject = Self::Subject> + Send + Sync,
                 {
                     match predicates.check(self).await {
-                        hitbox_core::predicate::PredicateResult::Cacheable(data) => {
+                        hitbox::predicate::PredicateResult::Cacheable(data) => {
                             let cached = #cached_name {
-                                #(#cache_policy_fields,)*
+                                #(#field_idents: data.#field_idents,)*
                             };
-                            hitbox_core::CachePolicy::Cacheable(hitbox_core::CacheValue::new(
-                                cached,
-                                config.ttl.map(|d| chrono::Utc::now() + d),
-                                config.stale_ttl.map(|d| chrono::Utc::now() + d),
-                            ))
+                            hitbox::CachePolicy::Cacheable(
+                                hitbox::CacheValue::from_config(cached, config),
+                            )
                         }
-                        hitbox_core::predicate::PredicateResult::NonCacheable(data) => {
-                            hitbox_core::CachePolicy::NonCacheable(data)
+                        hitbox::predicate::PredicateResult::NonCacheable(data) => {
+                            hitbox::CachePolicy::NonCacheable(data)
                         }
                     }
                 }
 
                 fn into_cached(self) -> Self::IntoCachedFuture {
                     let cached = #cached_name {
-                        #(#into_cached_fields,)*
+                        #(#field_idents: self.#field_idents,)*
                     };
-                    std::future::ready(hitbox_core::CachePolicy::Cacheable(cached))
+                    std::future::ready(hitbox::CachePolicy::Cacheable(cached))
                 }
 
                 fn from_cached(cached: Self::Cached) -> Self::FromCachedFuture {
                     std::future::ready(#name {
-                        #(#from_cached_fields,)*
+                        #(#field_idents: cached.#field_idents,)*
                     })
                 }
             }

@@ -3,8 +3,6 @@
 //! These tests verify that the correct metrics are recorded with correct labels
 //! when performing cache operations.
 
-#![cfg(feature = "metrics")]
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -18,12 +16,13 @@ use hitbox_backend::{
 };
 use hitbox_core::{
     BackendLabel, BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse,
-    EntityPolicyConfig, Offload, Raw,
+    EntityPolicyConfig, Raw,
 };
 use metrics_util::debugging::{DebugValue, DebuggingRecorder};
 use metrics_util::{CompositeKey, MetricKind};
 use serde::{Deserialize, Serialize};
-use smol_str::SmolStr;
+
+use super::common::TestOffloadManager;
 
 #[cfg(feature = "rkyv_format")]
 use rkyv::{Archive, Serialize as RkyvSerialize};
@@ -35,19 +34,6 @@ type SnapshotEntry = (
     Option<metrics::SharedString>,
     DebugValue,
 );
-
-/// Test offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct TestOffload;
-
-impl Offload<'static> for TestOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-}
 
 /// Simple in-memory backend for testing using DashMap.
 #[derive(Clone)]
@@ -502,7 +488,7 @@ fn test_composition_backend_write_metrics() {
             let l1 = TestBackend::new();
             let l2 = TestBackend::new();
 
-            let composition = CompositionBackend::new(l1, l2, TestOffload).label("comp");
+            let composition = CompositionBackend::new(l1, l2, TestOffloadManager).label("comp");
 
             let key = CacheKey::from_str("test_key", "");
             let data = TestData {
@@ -590,7 +576,7 @@ fn test_composition_backend_read_metrics() {
             let l1 = TestBackend::new();
             let l2 = TestBackend::new();
 
-            let composition = CompositionBackend::new(l1, l2, TestOffload).label("comp");
+            let composition = CompositionBackend::new(l1, l2, TestOffloadManager).label("comp");
 
             let key = CacheKey::from_str("test_key", "");
             let data = TestData {
@@ -691,7 +677,7 @@ fn test_dyn_composition_backend_write_metrics() {
             let l1: Arc<SyncBackend> = Arc::new(TestBackend::new());
             let l2: Arc<SyncBackend> = Arc::new(TestBackend::new());
 
-            let composition = CompositionBackend::new(l1, l2, TestOffload).label("dyncomp");
+            let composition = CompositionBackend::new(l1, l2, TestOffloadManager).label("dyncomp");
 
             let key = CacheKey::from_str("test_key", "");
             let data = TestData {
@@ -778,7 +764,7 @@ fn test_dyn_composition_backend_read_metrics() {
             let l1: Arc<SyncBackend> = Arc::new(TestBackend::new());
             let l2: Arc<SyncBackend> = Arc::new(TestBackend::new());
 
-            let composition = CompositionBackend::new(l1, l2, TestOffload).label("dyncomp");
+            let composition = CompositionBackend::new(l1, l2, TestOffloadManager).label("dyncomp");
 
             let key = CacheKey::from_str("test_key", "");
             let data = TestData {

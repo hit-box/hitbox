@@ -118,6 +118,28 @@ pub enum Operation {
 }
 
 impl Operation {
+    /// Creates an operation that limits cached body size.
+    pub fn limit(bytes: usize) -> Self {
+        Operation::Limit { bytes }
+    }
+
+    /// Creates an operation matching raw body bytes.
+    pub fn plain(op: PlainOperation) -> Self {
+        Operation::Plain(op)
+    }
+
+    /// Creates an operation matching JSON body content using a JQ expression.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the JQ filter expression is invalid.
+    pub fn jq(filter: &str, operation: JqOperation) -> Result<Self, String> {
+        Ok(Operation::Jq {
+            filter: JqExpression::compile(filter)?,
+            operation,
+        })
+    }
+
     /// Check if the operation matches the body.
     /// Returns `PredicateResult::Cacheable` if the operation is satisfied,
     /// `PredicateResult::NonCacheable` otherwise.

@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -8,25 +7,12 @@ use hitbox_backend::{
     Backend, BackendResult, CacheBackend, CacheKeyFormat, CompositionBackend, SyncBackend,
 };
 use hitbox_core::{
-    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig, Offload,
-    Raw,
+    BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig, Raw,
 };
 use serde::{Deserialize, Serialize};
-use smol_str::SmolStr;
 use tokio::sync::RwLock;
 
-/// Test offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct TestOffload;
-
-impl Offload<'static> for TestOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-}
+use super::common::TestOffloadManager;
 
 #[cfg(feature = "rkyv_format")]
 use rkyv::{Archive, Serialize as RkyvSerialize};
@@ -183,7 +169,7 @@ async fn test_composition_with_cloneable_backends() {
     let l2 = MemBackend::new();
 
     // Compose them
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     // Test 1: Write through composition - should populate both layers
     let key_both = CacheKey::from_str("key_both", "");
@@ -223,7 +209,7 @@ async fn test_composition_with_arc_dyn_backends() {
     let l2: Arc<SyncBackend> = Arc::new(MemBackend::new());
 
     // Compose them
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     // Write a value
     let key = CacheKey::from_str("arc_key", "");
@@ -280,7 +266,7 @@ async fn test_composition_l1_l2_different_keys() {
     l2_mem.set::<Value>(&key2, &value2, &mut ctx).await.unwrap();
 
     // Create composition with cloneable backends
-    let composition = CompositionBackend::new(l1_mem, l2_mem, TestOffload);
+    let composition = CompositionBackend::new(l1_mem, l2_mem, TestOffloadManager);
 
     // Test 1: Read key1 - should hit L1
     let result = composition.get::<Value>(&key1, &mut ctx).await.unwrap();
@@ -337,7 +323,7 @@ async fn test_composition_backend_as_trait_object() {
         .unwrap();
 
     // Create composition with cloneable backends
-    let composition = CompositionBackend::new(l1_mem, l2_mem, TestOffload);
+    let composition = CompositionBackend::new(l1_mem, l2_mem, TestOffloadManager);
 
     // Use composition itself as a trait object
     let backend: Box<dyn Backend> = Box::new(composition);
@@ -388,7 +374,7 @@ async fn test_composition_with_cache_wrapper() {
     // Test CompositionBackend with the Cache wrapper struct using cloneable backends
     let l1 = MemBackend::new();
     let l2 = MemBackend::new();
-    let composition = CompositionBackend::new(l1, l2, TestOffload);
+    let composition = CompositionBackend::new(l1, l2, TestOffloadManager);
 
     let cache = Cache::new(composition);
 

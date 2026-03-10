@@ -25,8 +25,9 @@ use tower::{Service, ServiceBuilder, ServiceExt as _};
 
 use hitbox::Config;
 use hitbox::policy::PolicyConfig;
-use hitbox_http::extractors::Method as MethodExtractor;
+use hitbox_http::extractors::{MethodConfig, MethodExtractor};
 use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+use hitbox_http::request;
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
 
@@ -48,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = Config::builder()
         .request_predicate(NeutralRequestPredicate::new())
         .response_predicate(NeutralResponsePredicate::new())
-        .extractor(MethodExtractor::new())
+        .extractor(request::extractor().method(MethodConfig::new()))
         .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
         .build();
 
@@ -80,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .collect()
         .await
         .expect("Failed to collect body");
-    tracing::info!("Response body length: {} bytes", body1.len());
+    tracing::info!("Response body length: {} bytes", body1.data.len());
 
     // Second request - should be a cache HIT
     tracing::info!("Making second request (expect cache HIT)...");

@@ -2,13 +2,14 @@ use std::{fmt::Debug, num::NonZeroU8, sync::Arc, time::Duration};
 
 use hitbox::policy;
 use hitbox_http::{
-    extractors::{NeutralExtractor, method::MethodExtractor, path::PathExtractor},
+    extractors::{MethodConfig, NeutralExtractor, method::MethodExtractor, path::PathExtractor},
     predicates::{
         NeutralRequestPredicate, NeutralResponsePredicate, request::MethodPredicate,
-        response::StatusCodePredicate,
+        request::method::Operation as MethodOp, response::StatusCodePredicate,
+        response::status::Operation as StatusOp,
     },
 };
-use http::{Method, StatusCode};
+use http::Method;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -54,7 +55,7 @@ impl From<CacheBehaviorPolicy> for policy::CacheBehaviorPolicy {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Eq, PartialEq)]
 pub struct EnabledCacheConfig {
     #[serde(default, with = "humantime_serde")]
     ttl: Option<Duration>,
@@ -63,17 +64,6 @@ pub struct EnabledCacheConfig {
     #[serde(default)]
     policy: CacheBehaviorPolicy,
     concurrency: Option<NonZeroU8>,
-}
-
-impl Default for EnabledCacheConfig {
-    fn default() -> Self {
-        Self {
-            ttl: Some(Duration::from_secs(5)),
-            stale: None,
-            policy: CacheBehaviorPolicy::default(),
-            concurrency: None,
-        }
-    }
 }
 
 impl From<EnabledCacheConfig> for policy::EnabledCacheConfig {
@@ -133,7 +123,9 @@ impl ConfigEndpoint {
         match &self.extractors {
             MaybeUndefined::Null => Ok(Box::new(NeutralExtractor::<ReqBody>::new())),
             MaybeUndefined::Undefined => Ok(Box::new(
-                NeutralExtractor::<ReqBody>::new().method().path("{path}*"),
+                NeutralExtractor::<ReqBody>::new()
+                    .method(MethodConfig::new())
+                    .path("{path}*"),
             )),
             MaybeUndefined::Value(extractors) => extractors.iter().cloned().try_rfold(
                 Box::new(NeutralExtractor::<ReqBody>::new()) as RequestExtractor<ReqBody>,
@@ -157,20 +149,19 @@ impl ConfigEndpoint {
             MaybeUndefined::Null => {
                 Box::new(NeutralResponsePredicate::<ResBody>::new()) as ResponsePredicate<ResBody>
             }
-            MaybeUndefined::Undefined => {
-                Box::new(NeutralResponsePredicate::<ResBody>::new().status_code(StatusCode::OK))
-                    as ResponsePredicate<ResBody>
-            }
+            MaybeUndefined::Undefined => Box::new(
+                NeutralResponsePredicate::<ResBody>::new()
+                    .status(StatusOp::eq(http::StatusCode::OK)),
+            ) as ResponsePredicate<ResBody>,
         });
         let request_predicates = Arc::new(match self.request {
             MaybeUndefined::Value(request) => request.into_predicates()?,
             MaybeUndefined::Null => {
                 Box::new(NeutralRequestPredicate::<ReqBody>::new()) as RequestPredicate<ReqBody>
             }
-            MaybeUndefined::Undefined => {
-                Box::new(NeutralRequestPredicate::<ReqBody>::new().method(Method::GET))
-                    as RequestPredicate<ReqBody>
-            }
+            MaybeUndefined::Undefined => Box::new(
+                NeutralRequestPredicate::<ReqBody>::new().method(MethodOp::eq(Method::GET)),
+            ) as RequestPredicate<ReqBody>,
         });
         Ok(Endpoint {
             extractors,

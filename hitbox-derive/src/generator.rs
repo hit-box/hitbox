@@ -34,7 +34,18 @@ impl<'a> ToTokens for Generator<'a> {
                 };
 
                 quote! {
-                    parts.push(hitbox_core::KeyPart::new(#key_name, Some(#field_access.to_string())));
+                    {
+                        let __inner = hitbox_fn::KeyExtract::extract(#field_access);
+                        if __inner.len() == 1 {
+                            for __part in __inner {
+                                parts.push(__part.with_key(#key_name));
+                            }
+                        } else {
+                            for __part in __inner {
+                                parts.push(__part.prefixed(#key_name));
+                            }
+                        }
+                    }
                 }
             })
             .collect();
@@ -42,15 +53,15 @@ impl<'a> ToTokens for Generator<'a> {
         let expanded = if field_extracts.is_empty() {
             quote! {
                 impl hitbox_fn::KeyExtract for #name {
-                    fn extract(&self) -> Vec<hitbox_core::KeyPart> {
-                        vec![hitbox_core::KeyPart::new(stringify!(#name), None::<&str>)]
+                    fn extract(&self) -> Vec<hitbox::KeyPart> {
+                        vec![hitbox::KeyPart::new(stringify!(#name), None::<&str>)]
                     }
                 }
             }
         } else {
             quote! {
                 impl hitbox_fn::KeyExtract for #name {
-                    fn extract(&self) -> Vec<hitbox_core::KeyPart> {
+                    fn extract(&self) -> Vec<hitbox::KeyPart> {
                         let mut parts = Vec::new();
                         #(#field_extracts)*
                         parts

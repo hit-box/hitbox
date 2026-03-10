@@ -1,6 +1,6 @@
 [package]
 name = "hitbox-derive"
-version = "0.1.0"
+version = "0.2.1"
 description = "Derive macros for hitbox caching framework"
 keywords = ["cache", "memoization", "async", "macro", "derive"]
 authors.workspace = true
@@ -16,5 +16,5 @@ proc-macro = true
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full", "parsing", "extra-traits"] }
-darling = "0.20"
-convert_case = "0.6"
+darling = "0.23"
+convert_case = "0.11"

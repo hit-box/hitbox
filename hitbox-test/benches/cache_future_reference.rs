@@ -10,29 +10,16 @@
 //!
 //! Run with: cargo bench -p hitbox-test --bench cache_future_reference
 
-use std::future::{Future, Ready};
+use std::future::Ready;
 use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
-use hitbox_core::{DisabledOffload, Offload, SmolStr};
-
-/// Offload that spawns tasks with tokio::spawn
-#[derive(Clone, Debug)]
-struct BenchOffload;
-
-impl Offload<'static> for BenchOffload {
-    fn spawn<F>(&self, _kind: impl Into<SmolStr>, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(future);
-    }
-}
 use criterion::{Criterion, criterion_group, criterion_main};
 use hitbox::CacheableResponse;
 use hitbox::concurrency::NoopConcurrencyManager;
 use hitbox::fsm::CacheFuture;
+use hitbox::offload::OffloadManager;
 use hitbox::policy::{EnabledCacheConfig, PolicyConfig};
 use hitbox::predicate::Predicate;
 use hitbox_backend::composition::policy::{
@@ -41,7 +28,9 @@ use hitbox_backend::composition::policy::{
 use hitbox_backend::format::BincodeFormat;
 use hitbox_backend::{CacheBackend, CompositionBackend, PassthroughCompressor};
 use hitbox_configuration::{Backend as ConfigBackend, ConfigEndpoint};
+use hitbox_core::DisabledOffload;
 use hitbox_core::Upstream;
+use hitbox_http::extractors::MethodConfig;
 use hitbox_http::extractors::NeutralExtractor;
 use hitbox_http::extractors::body::{BodyExtraction, BodyExtractor, JqExtraction};
 use hitbox_http::extractors::header::{
@@ -60,8 +49,9 @@ use hitbox_http::predicates::header::HeaderPredicate;
 use hitbox_http::predicates::request::header::Operation as HeaderOperation;
 use hitbox_http::predicates::request::method::MethodPredicate;
 use hitbox_http::predicates::request::path::PathPredicate;
+use hitbox_http::predicates::response::StatusCodePredicate as _;
 use hitbox_http::predicates::response::header::Operation as ResponseHeaderOperation;
-use hitbox_http::predicates::response::status::{StatusClass, StatusCodePredicate};
+use hitbox_http::predicates::response::status::StatusClass;
 use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
 use hitbox_http::{BufferedBody, CacheableHttpRequest, CacheableHttpResponse};
 use hitbox_moka::MokaBackend;
@@ -122,7 +112,7 @@ fn create_reference_request() -> Request<ReqBody> {
         .header("accept", "application/json")
         .header("accept-language", "en-US,en;q=0.9")
         .header("user-agent", "ApiClient/2.0 (Production)")
-        .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+        .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
         .unwrap()
 }
 
@@ -136,7 +126,10 @@ fn create_reference_response() -> Response<ReqBody> {
         .header("x-response-time", "42ms")
         .header("x-ratelimit-limit", "1000")
         .header("x-ratelimit-remaining", "999")
-        .body(BufferedBody::Complete(Some(Bytes::from(RESPONSE_BODY))))
+        .body(BufferedBody::Complete {
+            data: Some(Bytes::from(RESPONSE_BODY)),
+            trailers: None,
+        })
         .unwrap()
 }
 
@@ -159,7 +152,7 @@ fn create_response_predicates()
 -> impl Predicate<Subject = <BenchResponse as CacheableResponse>::Subject> + Send + Sync {
     NeutralResponsePredicate::<InnerBody>::new()
         // Only cache 2xx successful responses
-        .status_code_class(StatusClass::Success)
+        .status(StatusClass::Success)
         // Require content-type header
         .header(ResponseHeaderOperation::Exist(
             "content-type".parse().unwrap(),
@@ -175,7 +168,7 @@ fn create_extractors() -> impl hitbox::Extractor<Subject = BenchRequest> + Send 
     let base = NeutralExtractor::<InnerBody>::new();
 
     // Method extractor
-    let with_method = base.method();
+    let with_method = base.method(MethodConfig::new());
 
     // Path extractor (extracts user_id)
     let with_path = with_method.path("/v1/users/{user_id}/orders");
@@ -436,8 +429,8 @@ fn bench_compare_composition_read(c: &mut Criterion) {
         .compressor(PassthroughCompressor)
         .build();
     // Use RaceReadPolicy for read benchmarks
-    let static_composition = CompositionBackend::new(static_l1, static_l2, BenchOffload)
-        .with_policy(
+    let static_composition =
+        CompositionBackend::new(static_l1, static_l2, OffloadManager::default()).with_policy(
             CompositionPolicy::new()
                 .read(RaceReadPolicy::new())
                 .refill(RefillPolicy::Never),
@@ -485,7 +478,7 @@ fn bench_compare_composition_read(c: &mut Criterion) {
     // CompositionBackend with dyn Backend inner layers, wrapped as dyn Backend
     // Use RaceReadPolicy for read benchmarks
     let dyn_composition: Arc<dyn Backend + Send> = Arc::new(
-        CompositionBackend::new(dyn_l1, dyn_l2, BenchOffload).with_policy(
+        CompositionBackend::new(dyn_l1, dyn_l2, OffloadManager::default()).with_policy(
             CompositionPolicy::new()
                 .read(RaceReadPolicy::new())
                 .refill(RefillPolicy::Never),
@@ -553,8 +546,8 @@ fn bench_compare_composition_write(c: &mut Criterion) {
         .compressor(PassthroughCompressor)
         .build();
     // Use OptimisticParallelWritePolicy for write benchmarks
-    let static_composition = CompositionBackend::new(static_l1, static_l2, BenchOffload)
-        .with_policy(
+    let static_composition =
+        CompositionBackend::new(static_l1, static_l2, OffloadManager::default()).with_policy(
             CompositionPolicy::new()
                 .write(OptimisticParallelWritePolicy::new())
                 .refill(RefillPolicy::Never),
@@ -593,7 +586,7 @@ fn bench_compare_composition_write(c: &mut Criterion) {
     // CompositionBackend with dyn Backend inner layers, wrapped as dyn Backend
     // Use OptimisticParallelWritePolicy for write benchmarks
     let dyn_composition: Arc<dyn Backend + Send> = Arc::new(
-        CompositionBackend::new(dyn_l1, dyn_l2, BenchOffload).with_policy(
+        CompositionBackend::new(dyn_l1, dyn_l2, OffloadManager::default()).with_policy(
             CompositionPolicy::new()
                 .write(OptimisticParallelWritePolicy::new())
                 .refill(RefillPolicy::Never),
@@ -987,7 +980,7 @@ fn bench_compare_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;
@@ -1024,7 +1017,7 @@ fn bench_compare_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;
@@ -1369,7 +1362,7 @@ fn bench_compare_body_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;
@@ -1406,7 +1399,7 @@ fn bench_compare_body_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;

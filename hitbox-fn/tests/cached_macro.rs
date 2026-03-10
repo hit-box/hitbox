@@ -4,9 +4,10 @@ use std::time::Duration;
 
 use hitbox::CacheStatus;
 use hitbox::policy::PolicyConfig;
-use hitbox_derive::cached;
+use hitbox_derive::{CacheableResponse, cached};
 use hitbox_fn::Cache;
 use hitbox_moka::MokaBackend;
+use serde::{Deserialize, Serialize};
 
 // =============================================================================
 // Types without KeyExtract (for testing skip)
@@ -23,6 +24,16 @@ impl DbConnection {
     pub fn new(id: u64) -> Self {
         Self { _id: id }
     }
+}
+
+// =============================================================================
+// Zero-argument cached function
+// =============================================================================
+
+/// Function with no arguments at all.
+#[cached]
+pub async fn no_args_function() -> i64 {
+    42
 }
 
 // =============================================================================
@@ -70,7 +81,7 @@ pub async fn with_db_connection(_db: DbConnection, user_id: i64) -> String {
 // Generic type parameter support
 // =============================================================================
 
-use hitbox_core::KeyPart;
+use hitbox::KeyPart;
 use hitbox_fn::KeyExtract;
 
 /// A type that implements KeyExtract for use in generic tests.
@@ -96,7 +107,7 @@ impl KeyExtract for TypedId {
 }
 
 /// Function with a generic type parameter.
-#[cached(prefix = "generic")]
+#[cached]
 pub async fn generic_function<T: KeyExtract + Clone + std::fmt::Debug + Send + Sync + 'static>(
     value: T,
 ) -> String {
@@ -104,7 +115,7 @@ pub async fn generic_function<T: KeyExtract + Clone + std::fmt::Debug + Send + S
 }
 
 /// Function with generic type and skipped parameter.
-#[cached(prefix = "generic_skip", skip(_ctx))]
+#[cached(skip(_ctx))]
 pub async fn generic_with_skip<T: KeyExtract + Clone + std::fmt::Debug + Send + Sync + 'static>(
     _ctx: String,
     value: T,
@@ -117,7 +128,7 @@ pub async fn generic_with_skip<T: KeyExtract + Clone + std::fmt::Debug + Send + 
 // =============================================================================
 
 fn create_cache()
--> Cache<MokaBackend, hitbox::concurrency::NoopConcurrencyManager, hitbox_core::DisabledOffload> {
+-> Cache<MokaBackend, hitbox::concurrency::NoopConcurrencyManager, hitbox::DisabledOffload> {
     Cache::builder()
         .backend(MokaBackend::builder().max_entries(100).build())
         .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
@@ -173,8 +184,11 @@ async fn test_multiple_skipped_params() {
         .cache(&cache)
         .with_context()
         .await;
+
+    // Clone cache and use the clone — exercises Clone for Cache
+    let cache2 = cache.clone();
     let (r2, c2) = multi_params(1, "trace-2".into(), 2, "span-2".into())
-        .cache(&cache)
+        .cache(&cache2)
         .with_context()
         .await;
 
@@ -357,20 +371,6 @@ async fn test_generic_with_skip() {
 // =============================================================================
 // Reference parameter support
 // =============================================================================
-//
-// NOTE: Reference parameter support requires additional work due to complex
-// lifetime interactions between GATs, the Upstream trait, and the CacheFuture.
-// The issue is that Rust requires the Upstream impl to work for any combination
-// of lifetimes, but our impl only works when the struct's lifetime matches the
-// Args' inner lifetime. This is a known limitation with GATs.
-//
-// TODO: Investigate alternative approaches:
-// 1. Using higher-rank trait bounds (HRTB)
-// 2. Different struct design (not carrying lifetime)
-// 3. Boxed dyn Upstream instead of concrete types
-//
-// For now, reference parameters are not supported. Use owned types or
-// clone the data before passing to cached functions.
 
 /// Function with a reference parameter.
 #[cached(prefix = "ref_param")]
@@ -454,4 +454,481 @@ async fn test_skipped_reference() {
     assert_eq!(r2, 42);
     assert_eq!(c1.status, CacheStatus::Miss);
     assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+// =============================================================================
+// Multiple lifetime parameters
+// =============================================================================
+
+#[cached]
+pub async fn with_two_lifetimes<'a, 'b>(prefix: &'a str, suffix: &'b str) -> String {
+    format!("{}-{}", prefix, suffix)
+}
+
+#[tokio::test]
+async fn test_two_lifetimes_passthrough() {
+    let p = String::from("hello");
+    let s = String::from("world");
+    let result = with_two_lifetimes(&p, &s).await;
+    assert_eq!(result, "hello-world");
+}
+
+#[tokio::test]
+async fn test_two_lifetimes_different_scopes() {
+    // The two references have genuinely different lifetimes:
+    // `"long"` is 'static while `&s` borrows a local.
+    // This exercises the synthetic '__hitbox lifetime (inferred as the shorter one).
+    let result = {
+        let s = String::from("short");
+        with_two_lifetimes("long", &s).await
+    };
+    assert_eq!(result, "long-short");
+}
+
+#[tokio::test]
+async fn test_two_lifetimes_cached() {
+    let cache = create_cache();
+
+    let p = String::from("key");
+    let s = String::from("val");
+
+    let (r1, c1) = with_two_lifetimes(&p, &s)
+        .cache(&cache)
+        .with_context()
+        .await;
+    let (r2, c2) = with_two_lifetimes(&p, &s)
+        .cache(&cache)
+        .with_context()
+        .await;
+
+    assert_eq!(r1, "key-val");
+    assert_eq!(r2, "key-val");
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+#[tokio::test]
+async fn test_two_lifetimes_different_values() {
+    let cache = create_cache();
+
+    let (r1, c1) = with_two_lifetimes("a", "b")
+        .cache(&cache)
+        .with_context()
+        .await;
+    let (r2, c2) = with_two_lifetimes("a", "c")
+        .cache(&cache)
+        .with_context()
+        .await;
+
+    assert_eq!(r1, "a-b");
+    assert_eq!(r2, "a-c");
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Miss);
+}
+
+// =============================================================================
+// CacheableResponse skip field tests
+// =============================================================================
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, CacheableResponse)]
+pub struct AuthResult {
+    pub user_id: u64,
+    pub permissions: Vec<String>,
+    #[cacheable_response(skip)]
+    pub access_token: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AuthError;
+
+#[cached]
+pub async fn authenticate(user_id: i64) -> Result<AuthResult, AuthError> {
+    Ok(AuthResult {
+        user_id: user_id as u64,
+        permissions: vec!["read".into(), "write".into()],
+        access_token: Some("secret-token".into()),
+    })
+}
+
+#[tokio::test]
+async fn test_skipped_response_field_preserved_on_miss() {
+    let cache = create_cache();
+
+    let (result, ctx) = authenticate(1).cache(&cache).with_context().await;
+
+    assert_eq!(ctx.status, CacheStatus::Miss);
+    let auth = result.unwrap();
+    assert_eq!(auth.access_token, Some("secret-token".into()));
+    assert_eq!(auth.permissions, vec!["read", "write"]);
+}
+
+#[tokio::test]
+async fn test_skipped_response_field_default_on_hit() {
+    let cache = create_cache();
+
+    // First call — miss, populates cache
+    let (r1, c1) = authenticate(2).cache(&cache).with_context().await;
+    // Second call — hit, from cache
+    let (r2, c2) = authenticate(2).cache(&cache).with_context().await;
+
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+
+    // On miss: skipped field preserved
+    assert_eq!(
+        r1.as_ref().unwrap().access_token,
+        Some("secret-token".into())
+    );
+
+    // On hit: skipped field is Default (None for Option<String>)
+    assert_eq!(r2.as_ref().unwrap().access_token, None);
+
+    // Non-skipped fields are identical
+    assert_eq!(r1.as_ref().unwrap().user_id, r2.as_ref().unwrap().user_id);
+    assert_eq!(
+        r1.as_ref().unwrap().permissions,
+        r2.as_ref().unwrap().permissions
+    );
+}
+
+// =============================================================================
+// Skipped field does NOT require Clone
+// =============================================================================
+
+/// A type that implements Default but NOT Clone.
+#[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "rkyv_format",
+    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+)]
+pub struct NonCloneable {
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, CacheableResponse)]
+pub struct ResponseWithNonCloneable {
+    pub id: u64,
+    #[cacheable_response(skip)]
+    pub ctx: NonCloneable,
+}
+
+#[cached(prefix = "non_clone")]
+pub async fn get_with_non_cloneable(id: i64) -> Result<ResponseWithNonCloneable, AuthError> {
+    Ok(ResponseWithNonCloneable {
+        id: id as u64,
+        ctx: NonCloneable {
+            value: "original".into(),
+        },
+    })
+}
+
+#[tokio::test]
+async fn test_skipped_field_no_clone_bound() {
+    let cache = create_cache();
+
+    // Miss: NonCloneable field preserved despite not implementing Clone
+    let (r1, c1) = get_with_non_cloneable(1).cache(&cache).with_context().await;
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(r1.as_ref().unwrap().ctx.value, "original");
+
+    // Hit: NonCloneable field is Default
+    let (r2, c2) = get_with_non_cloneable(1).cache(&cache).with_context().await;
+    assert_eq!(c2.status, CacheStatus::Hit);
+    assert_eq!(r2.as_ref().unwrap().ctx.value, "");
+
+    // Non-skipped field identical
+    assert_eq!(r1.as_ref().unwrap().id, r2.as_ref().unwrap().id);
+}
+
+// =============================================================================
+// Zero-argument function tests
+// =============================================================================
+
+#[tokio::test]
+async fn test_zero_args_always_same_key() {
+    use std::sync::Arc;
+
+    let cache = Arc::new(create_cache());
+
+    // Using Arc<Cache> exercises CacheAccess for Arc<T>
+    let (r1, c1) = no_args_function().cache(&cache).with_context().await;
+    let (r2, c2) = no_args_function().cache(&cache).with_context().await;
+
+    assert_eq!(r1, r2);
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+#[tokio::test]
+async fn test_zero_args_generated_key() {
+    use hitbox::Extractor;
+    use hitbox_fn::{Arg, Args, FnExtractor, Skipped};
+
+    // Exercise Args::new() and Args::into_inner()
+    let args = Args::new(());
+    assert_eq!(args.into_inner(), ());
+
+    // Exercise Arg::value()
+    let arg = Arg::new("x", 42i64);
+    assert_eq!(*arg.value(), 42);
+
+    // Exercise Skipped::value()
+    let skipped = Skipped::new("ctx");
+    assert_eq!(*skipped.value(), "ctx");
+
+    let extractor = FnExtractor::<Args<()>>::new("no_args_function");
+    let (_, key) = extractor.get(Args(())).await.into_cache_key();
+
+    // Zero-arg function should produce key with only the function name
+    assert_eq!(key.to_string(), "fn=no_args_function");
+}
+
+// =============================================================================
+// Passthrough tests (no backend, no policy — direct function call)
+// =============================================================================
+
+#[tokio::test]
+async fn test_passthrough_no_backend() {
+    let result = compute_with_skip("req-1".into(), 10).await;
+    assert_eq!(result, 20);
+}
+
+#[tokio::test]
+async fn test_passthrough_zero_args() {
+    let result = no_args_function().await;
+    assert_eq!(result, 42);
+}
+
+#[tokio::test]
+async fn test_passthrough_generic() {
+    let id = TypedId::new(42, "user");
+    let result = generic_function(id).await;
+    assert!(result.contains("42"));
+}
+
+// =============================================================================
+// Inline .backend().policy() path tests
+// =============================================================================
+
+#[tokio::test]
+async fn test_inline_backend_policy() {
+    let backend = MokaBackend::builder().max_entries(100).build();
+    let policy = PolicyConfig::builder().ttl(Duration::from_secs(60)).build();
+
+    let result = compute_with_skip("req-1".into(), 10)
+        .backend(backend)
+        .policy(policy)
+        .await;
+
+    assert_eq!(result, 20);
+}
+
+#[tokio::test]
+async fn test_inline_backend_policy_with_context() {
+    let backend = MokaBackend::builder().max_entries(100).build();
+    let policy = PolicyConfig::builder().ttl(Duration::from_secs(60)).build();
+
+    let (result, ctx) = compute_with_skip("req-1".into(), 10)
+        .backend(backend)
+        .policy(policy)
+        .with_context()
+        .await;
+
+    assert_eq!(result, 20);
+    assert_eq!(ctx.status, CacheStatus::Miss);
+}
+
+// =============================================================================
+// Spy backend for key inspection
+// =============================================================================
+
+mod spy_backend {
+    use async_trait::async_trait;
+    use dashmap::DashMap;
+    use hitbox::backend::{Backend, BackendError, CacheBackend, DeleteStatus};
+    use hitbox::{CacheKey, CacheValue, Raw};
+    use hitbox_backend::format::RonFormat;
+
+    /// A backend that always misses but records keys and values.
+    /// Uses RON format for human-readable value inspection.
+    pub struct SpyBackend {
+        store: DashMap<String, CacheValue<Raw>>,
+    }
+
+    impl SpyBackend {
+        pub fn new() -> Self {
+            Self {
+                store: DashMap::new(),
+            }
+        }
+
+        /// Returns all stored keys as Display strings.
+        pub fn keys(&self) -> Vec<String> {
+            self.store.iter().map(|e| e.key().clone()).collect()
+        }
+
+        /// Returns the raw value bytes for a key, deserialized as RON string.
+        pub fn value_as_ron(&self, key: &str) -> Option<String> {
+            self.store.get(key).map(|entry| {
+                let (_, raw) = entry.value().clone().into_parts();
+                String::from_utf8(raw.to_vec()).unwrap()
+            })
+        }
+    }
+
+    #[async_trait]
+    impl Backend for SpyBackend {
+        async fn read(&self, _key: &CacheKey) -> Result<Option<CacheValue<Raw>>, BackendError> {
+            Ok(None)
+        }
+
+        async fn write(&self, key: &CacheKey, value: CacheValue<Raw>) -> Result<(), BackendError> {
+            self.store.insert(key.to_string(), value);
+            Ok(())
+        }
+
+        async fn remove(&self, _key: &CacheKey) -> Result<DeleteStatus, BackendError> {
+            Ok(DeleteStatus::Missing)
+        }
+
+        fn value_format(&self) -> &dyn hitbox_backend::format::Format {
+            &RonFormat
+        }
+    }
+
+    impl CacheBackend for SpyBackend {}
+}
+
+// =============================================================================
+// Key verification tests (using SpyBackend)
+// =============================================================================
+
+use spy_backend::SpyBackend;
+
+#[tokio::test]
+async fn test_key_zero_args() {
+    let cache = Cache::builder()
+        .backend(SpyBackend::new())
+        .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
+        .build();
+
+    no_args_function().cache(&cache).await;
+
+    let keys = cache.backend().keys();
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0], "fn=no_args_function");
+
+    // Reconstruct a second cache from accessors of the first one
+    let cache2 = Cache::builder()
+        .backend(SpyBackend::new())
+        .policy(cache.policy().as_ref().clone())
+        .concurrency_manager(cache.concurrency_manager().clone())
+        .offload(*cache.offload())
+        .build();
+
+    no_args_function().cache(&cache2).await;
+
+    let keys2 = cache2.backend().keys();
+    assert_eq!(keys2.len(), 1);
+    assert_eq!(keys2[0], "fn=no_args_function");
+}
+
+#[tokio::test]
+async fn test_key_with_skip() {
+    let cache = Cache::builder()
+        .backend(SpyBackend::new())
+        .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
+        .build();
+
+    compute_with_skip("req-1".into(), 10).cache(&cache).await;
+
+    let keys = cache.backend().keys();
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0], "fn=compute&value=10");
+}
+
+#[tokio::test]
+async fn test_key_multiple_params_with_skip() {
+    let cache = Cache::builder()
+        .backend(SpyBackend::new())
+        .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
+        .build();
+
+    multi_params(1, "trace-1".into(), 2, "span-1".into())
+        .cache(&cache)
+        .await;
+
+    let keys = cache.backend().keys();
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0], "fn=multi&a=1&b=2");
+}
+
+// =============================================================================
+// Value verification tests (using SpyBackend with RON format)
+// =============================================================================
+
+#[tokio::test]
+async fn test_value_i64() {
+    let cache = Cache::builder()
+        .backend(SpyBackend::new())
+        .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
+        .build();
+
+    no_args_function().cache(&cache).await;
+
+    let ron = cache.backend().value_as_ron("fn=no_args_function").unwrap();
+    assert_eq!(ron, "42");
+}
+
+#[tokio::test]
+async fn test_value_computed() {
+    let cache = Cache::builder()
+        .backend(SpyBackend::new())
+        .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
+        .build();
+
+    compute_with_skip("req-1".into(), 10).cache(&cache).await;
+
+    let ron = cache.backend().value_as_ron("fn=compute&value=10").unwrap();
+    assert_eq!(ron, "20");
+}
+
+#[tokio::test]
+async fn test_value_string() {
+    let cache = Cache::builder()
+        .backend(SpyBackend::new())
+        .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
+        .build();
+
+    with_db_connection(DbConnection::new(1), 42)
+        .cache(&cache)
+        .await;
+
+    let ron = cache
+        .backend()
+        .value_as_ron("fn=with_db&user_id=42")
+        .unwrap();
+    assert_eq!(ron, "\"user_42\"");
+}
+
+#[tokio::test]
+async fn test_value_skipped_response_field() {
+    let cache = Cache::builder()
+        .backend(SpyBackend::new())
+        .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
+        .build();
+
+    let _ = authenticate(1).cache(&cache).await;
+
+    let ron = cache
+        .backend()
+        .value_as_ron("fn=authenticate&user_id=1")
+        .unwrap();
+
+    // The cached value should contain user_id and permissions
+    assert!(ron.contains("user_id:1"));
+    assert!(ron.contains("permissions:[\"read\",\"write\"]"));
+
+    // The skipped field (access_token) is excluded from serialization entirely
+    assert!(!ron.contains("access_token"));
 }

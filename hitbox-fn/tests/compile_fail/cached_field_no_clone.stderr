@@ -1,0 +1,15 @@
+error[E0277]: `NoClone` cannot be used as a cached field in `#[derive(CacheableResponse)]`
+ --> tests/compile_fail/cached_field_no_clone.rs:8:41
+  |
+8 | #[derive(Debug, Serialize, Deserialize, CacheableResponse)]
+  |                                         ^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `NoClone`
+  |
+  = note: non-skipped fields are stored in cache and must implement `Clone` for cache storage
+  = note: either implement `Clone` for `NoClone` or add the `#[cacheable_response(skip)]` attribute
+  = note: required for `NoClone` to implement `CachedFieldClone`
+  = note: this error originates in the derive macro `CacheableResponse` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider annotating `NoClone` with `#[derive(Clone)]`
+  |
+6 + #[derive(Clone)]
+7 | pub struct NoClone(String);
+  |

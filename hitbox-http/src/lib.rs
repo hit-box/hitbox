@@ -7,10 +7,23 @@ mod cacheable;
 pub mod extractors;
 pub mod predicates;
 pub mod query;
-mod request;
-mod response;
+/// HTTP request types and cache policy evaluation.
+///
+/// Contains [`CacheableHttpRequest`] — the core wrapper that pairs request
+/// metadata with a [`BufferedBody`] for predicate/extractor inspection.
+///
+/// Also re-exports [`request::predicate()`] and [`request::extractor()`] entry points for
+/// building request-side predicate and extractor chains.
+pub mod request;
+/// HTTP response types, cache storage, and serialization.
+///
+/// Contains [`CacheableHttpResponse`] for cache policy evaluation and
+/// [`SerializableHttpResponse`] — the serialized form stored in cache backends.
+///
+/// Also re-exports [`response::predicate()`] entry point for building response predicate chains.
+pub mod response;
 
-pub use body::{BufferedBody, CollectExactResult, PartialBufferedBody, Remaining};
+pub use body::{BufferedBody, CollectExactResult, CollectedBody, PartialBufferedBody, Remaining};
 pub use cache_status::DEFAULT_CACHE_STATUS_HEADER;
 pub use cacheable::CacheableSubject;
 pub use request::CacheableHttpRequest;

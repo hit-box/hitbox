@@ -1,0 +1,5 @@
+error: #[cached] can only be applied to async functions
+ --> tests/compile_fail/sync_fn.rs:4:5
+  |
+4 | pub fn not_async(x: i64) -> i64 {
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^

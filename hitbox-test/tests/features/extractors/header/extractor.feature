@@ -112,7 +112,7 @@ Feature: Request Header Cache Key Extractor
       ```
     Then cache key exists
       ```
-      Authorization: "f5603935428bbcd5"
+      Authorization: "f5603935428bbcd5d789830e83553f4b06b5187c3c91145a777920248f20ed47"
       ```
 
   @extractor @header @regex @hash
@@ -135,7 +135,7 @@ Feature: Request Header Cache Key Extractor
       ```
     Then cache key exists
       ```
-      Authorization: "3e5358294ba0321e"
+      Authorization: "3e5358294ba0321e7b4a6acd192104f2e9c9776e8645bc24d4332e266596cc72"
       ```
 
   @extractor @header @starts
@@ -203,7 +203,7 @@ Feature: Request Header Cache Key Extractor
       X-User-Email: User@Example.COM
       ```
     Then cache key exists
-      | X-User-Email | b4c9a289323b21a0 |
+      | X-User-Email | b4c9a289323b21a01c3e940f150eb9b8c542587f1abfd8f0e1cc1ffc5e475514 |
 
   @extractor @header @transforms
   Scenario: Extract header value with lowercase transform
