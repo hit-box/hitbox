@@ -52,7 +52,7 @@ pub struct Config<ReqPred, ResPred, Ext> {
     request_predicate: Arc<ReqPred>,
     response_predicate: Arc<ResPred>,
     extractor: Arc<Ext>,
-    policy: PolicyConfig,
+    policy: Arc<PolicyConfig>,
 }
 
 impl<ReqPred, ResPred, Ext> Clone for Config<ReqPred, ResPred, Ext> {
@@ -61,7 +61,7 @@ impl<ReqPred, ResPred, Ext> Clone for Config<ReqPred, ResPred, Ext> {
             request_predicate: Arc::clone(&self.request_predicate),
             response_predicate: Arc::clone(&self.response_predicate),
             extractor: Arc::clone(&self.extractor),
-            policy: self.policy.clone(),
+            policy: Arc::clone(&self.policy),
         }
     }
 }
@@ -101,8 +101,8 @@ where
         Arc::clone(&self.extractor)
     }
 
-    fn policy(&self) -> &PolicyConfig {
-        &self.policy
+    fn policy(&self) -> Arc<PolicyConfig> {
+        Arc::clone(&self.policy)
     }
 }
 
@@ -257,7 +257,7 @@ where
             request_predicate: Arc::new(self.request_predicate),
             response_predicate: Arc::new(self.response_predicate),
             extractor: Arc::new(self.extractor),
-            policy: self.policy,
+            policy: Arc::new(self.policy),
         }
     }
 }

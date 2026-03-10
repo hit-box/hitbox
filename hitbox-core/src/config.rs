@@ -28,7 +28,7 @@ pub trait CacheConfig<Req, Res> {
     /// Returns extractors that generate cache keys from requests.
     fn extractors(&self) -> Self::Extractor;
     /// Returns TTL and behavior policy for cached entries.
-    fn policy(&self) -> &PolicyConfig;
+    fn policy(&self) -> Arc<PolicyConfig>;
 }
 
 /// Trait for providing one or more cache configurations.
@@ -64,7 +64,7 @@ where
         self.as_ref().extractors()
     }
 
-    fn policy(&self) -> &PolicyConfig {
+    fn policy(&self) -> Arc<PolicyConfig> {
         self.as_ref().policy()
     }
 }

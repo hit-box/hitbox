@@ -167,7 +167,7 @@ impl ConfigEndpoint {
             extractors,
             request_predicates,
             response_predicates,
-            policy: self.policy.into(),
+            policy: Arc::new(self.policy.into()),
         })
     }
 }
