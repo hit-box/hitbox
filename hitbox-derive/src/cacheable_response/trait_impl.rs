@@ -38,6 +38,7 @@ impl<'a> CacheableResponseImpl<'a> {
             impl #impl_generics hitbox::CacheableResponse for #name #ty_generics #where_clause {
                 type Cached = Self;
                 type Subject = Self;
+                type Context = ();
                 type IntoCachedFuture = std::future::Ready<hitbox::CachePolicy<Self, Self>>;
                 type FromCachedFuture = std::future::Ready<Self>;
 
@@ -47,9 +48,9 @@ impl<'a> CacheableResponseImpl<'a> {
                     config: &hitbox::EntityPolicyConfig,
                 ) -> hitbox::ResponseCachePolicy<Self>
                 where
-                    __P: hitbox::predicate::Predicate<Subject = Self::Subject> + Send + Sync,
+                    __P: hitbox::predicate::Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
                 {
-                    match predicates.check(self).await {
+                    match predicates.check(self, &mut Default::default()).await {
                         hitbox::predicate::PredicateResult::Cacheable(data) => {
                             let cached = data.clone();
                             hitbox::CachePolicy::Cacheable(
@@ -93,6 +94,7 @@ impl<'a> CacheableResponseImpl<'a> {
             impl #impl_generics hitbox::CacheableResponse for #name #ty_generics #where_clause {
                 type Cached = #cached_name #ty_generics;
                 type Subject = Self;
+                type Context = ();
                 type IntoCachedFuture = std::future::Ready<hitbox::CachePolicy<Self::Cached, Self>>;
                 type FromCachedFuture = std::future::Ready<Self>;
 
@@ -102,9 +104,9 @@ impl<'a> CacheableResponseImpl<'a> {
                     config: &hitbox::EntityPolicyConfig,
                 ) -> hitbox::ResponseCachePolicy<Self>
                 where
-                    __P: hitbox::predicate::Predicate<Subject = Self::Subject> + Send + Sync,
+                    __P: hitbox::predicate::Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
                 {
-                    match predicates.check(self).await {
+                    match predicates.check(self, &mut Default::default()).await {
                         hitbox::predicate::PredicateResult::Cacheable(data) => {
                             let cached = #cached_name {
                                 #(#field_idents: data.#field_idents,)*

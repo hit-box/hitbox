@@ -18,7 +18,7 @@ async fn test_request_query_predicates_positive() {
     );
     let predicate = NeutralRequestPredicate::new()
         .query(query::Operation::Eq("name".to_owned(), "value".to_owned()));
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -35,7 +35,7 @@ async fn test_request_query_predicates_multiple() {
         "name".to_owned(),
         vec!["value".to_owned(), "second-value".to_owned()],
     ));
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -52,7 +52,7 @@ async fn test_request_query_predicates_negative() {
         "name".to_owned(),
         "wrong-value".to_owned(),
     ));
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }
 
@@ -67,7 +67,7 @@ async fn test_request_query_from_conversions() {
     );
     let op: query::Operation = "name".into();
     let predicate = NeutralRequestPredicate::new().query(op);
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 
     // From<(&str, &str)> creates an Eq operation
@@ -79,7 +79,7 @@ async fn test_request_query_from_conversions() {
     );
     let op: query::Operation = ("format", "json").into();
     let predicate = NeutralRequestPredicate::new().query(op);
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -95,7 +95,7 @@ async fn test_request_query_constructors() {
     let predicate = NeutralRequestPredicate::new()
         .query(query::Operation::eq("page", "3"))
         .query(query::Operation::exist("limit"));
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 
     // any constructor
@@ -109,6 +109,6 @@ async fn test_request_query_constructors() {
         "sort",
         vec!["asc".to_owned(), "desc".to_owned()],
     ));
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }

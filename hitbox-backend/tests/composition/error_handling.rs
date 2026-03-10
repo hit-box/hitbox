@@ -77,10 +77,13 @@ struct TestValue {
 impl CacheableResponse for TestValue {
     type Cached = Self;
     type Subject = Self;
+    type Context = ();
     type IntoCachedFuture = std::future::Ready<hitbox_core::CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = std::future::Ready<Self>;
 
-    async fn cache_policy<P: Predicate<Subject = Self::Subject> + Send + Sync>(
+    async fn cache_policy<
+        P: Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
+    >(
         self,
         _predicate: P,
         _config: &EntityPolicyConfig,

@@ -100,9 +100,14 @@ where
     P::Subject: HasHeaders + Send,
 {
     type Subject = P::Subject;
+    type Context = P::Context;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.inner.check(subject).await {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut Self::Context,
+    ) -> PredicateResult<Self::Subject> {
+        match self.inner.check(subject, ctx).await {
             PredicateResult::Cacheable(subject) => {
                 let is_cacheable = self.operation.check(subject.headers());
                 if is_cacheable {

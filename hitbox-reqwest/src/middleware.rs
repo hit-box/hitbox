@@ -14,7 +14,7 @@ use hitbox::CacheStatusExt;
 use hitbox::backend::CacheBackend;
 use hitbox::concurrency::{ConcurrencyManager, NoopConcurrencyManager};
 use hitbox::fsm::SelectiveCacheFuture;
-use hitbox_core::{CacheConfigs, DisabledOffload};
+use hitbox_core::{CacheConfig, CacheConfigs, DisabledOffload, Extractor, Predicate};
 use hitbox_http::{
     BufferedBody, CacheableHttpRequest, CacheableHttpResponse, DEFAULT_CACHE_STATUS_HEADER,
 };
@@ -107,6 +107,27 @@ where
         + Send
         + Sync
         + 'static,
+    <<C as CacheConfigs<
+        CacheableHttpRequest<reqwest::Body>,
+        CacheableHttpResponse<reqwest::Body>,
+    >>::Config as CacheConfig<
+        CacheableHttpRequest<reqwest::Body>,
+        CacheableHttpResponse<reqwest::Body>,
+    >>::RequestPredicate: Predicate<Context = ()>,
+    <<C as CacheConfigs<
+        CacheableHttpRequest<reqwest::Body>,
+        CacheableHttpResponse<reqwest::Body>,
+    >>::Config as CacheConfig<
+        CacheableHttpRequest<reqwest::Body>,
+        CacheableHttpResponse<reqwest::Body>,
+    >>::Extractor: Extractor<Context = ()>,
+    <<C as CacheConfigs<
+        CacheableHttpRequest<reqwest::Body>,
+        CacheableHttpResponse<reqwest::Body>,
+    >>::Config as CacheConfig<
+        CacheableHttpRequest<reqwest::Body>,
+        CacheableHttpResponse<reqwest::Body>,
+    >>::ResponsePredicate: Predicate<Context = ()>,
 {
     async fn handle(
         &self,

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::task::{self, Poll};
 
 use futures::ready;
-use hitbox_core::{CacheConfigs, Cacheable, Offload, Predicate as _, Upstream};
+use hitbox_core::{CacheConfigs, Cacheable, Offload, Upstream};
 use pin_project::pin_project;
 use tracing::{Level, Span, debug, span, trace};
 
@@ -21,7 +21,7 @@ use crate::backend::CacheBackend;
 use crate::concurrency::ConcurrencyManager;
 use crate::fsm::CacheFuture;
 use crate::policy::PolicyConfig;
-use crate::{CacheConfig, CacheContext, CacheableRequest, CacheableResponse};
+use crate::{CacheConfig, CacheContext, CacheableRequest, CacheableResponse, Extractor, Predicate};
 
 use states::{CheckPredicate, Passthrough, SelectiveState, SelectiveStateProj};
 
@@ -153,7 +153,8 @@ where
         match first_enabled {
             Some(idx) => {
                 let pred = configs.configs()[idx].request_predicates();
-                let predicate_future = Box::pin(async move { pred.check(request).await });
+                let predicate_future =
+                    Box::pin(async move { pred.check(request, &mut Default::default()).await });
                 trace!(parent: &span, config_index = idx, "Checking first enabled config");
                 SelectiveCacheFuture {
                     configs,
@@ -200,6 +201,9 @@ where
     CC: CacheConfigs<Req, ResSubject<Res>>,
     CM: ConcurrencyManager<Res> + 'static,
     O: Offload<'offload>,
+    ReqPredOf<CC, Req, Res>: Predicate<Context = Req::Context>,
+    ExtractorOf<CC, Req, Res>: Extractor<Context = Req::Context>,
+    ResPredOf<CC, Req, Res>: Predicate<Context = Res::Context>,
 {
     type Output = (Res, CacheContext);
 

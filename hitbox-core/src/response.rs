@@ -105,6 +105,7 @@ pub enum CacheState<Cached> {
 /// impl CacheableResponse for MyResponse {
 ///     type Cached = String;
 ///     type Subject = Self;
+///     type Context = ();
 ///     type IntoCachedFuture = std::future::Ready<CachePolicy<String, Self>>;
 ///     type FromCachedFuture = std::future::Ready<Self>;
 ///
@@ -114,9 +115,9 @@ pub enum CacheState<Cached> {
 ///         config: &EntityPolicyConfig,
 ///     ) -> ResponseCachePolicy<Self>
 ///     where
-///         P: Predicate<Subject = Self::Subject> + Send + Sync,
+///         P: Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
 ///     {
-///         match predicates.check(self).await {
+///         match predicates.check(self, &mut Default::default()).await {
 ///             PredicateResult::Cacheable(data) => {
 ///                 let cached = data.body.clone();
 ///                 CachePolicy::Cacheable(CacheValue::new(
@@ -152,6 +153,12 @@ where
     /// this is the inner type `T`.
     type Subject: CacheableResponse;
 
+    /// Shared context type for response predicates.
+    ///
+    /// For HTTP this is `()` (zero-cost). For protocols requiring expensive
+    /// parsing (e.g., protobuf), this carries the deserialized message.
+    type Context: Default + Send;
+
     /// Future type for `into_cached` method.
     type IntoCachedFuture: Future<Output = CachePolicy<Self::Cached, Self>> + Send;
 
@@ -173,7 +180,7 @@ where
         config: &EntityPolicyConfig,
     ) -> impl Future<Output = ResponseCachePolicy<Self>> + Send
     where
-        P: Predicate<Subject = Self::Subject> + Send + Sync;
+        P: Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync;
 
     /// Convert this response to its cached representation.
     ///
@@ -197,6 +204,7 @@ macro_rules! impl_cacheable_response_for_scalar {
             impl CacheableResponse for $ty {
                 type Cached = Self;
                 type Subject = Self;
+                type Context = ();
                 type IntoCachedFuture = std::future::Ready<CachePolicy<Self, Self>>;
                 type FromCachedFuture = std::future::Ready<Self>;
 
@@ -206,9 +214,9 @@ macro_rules! impl_cacheable_response_for_scalar {
                     config: &EntityPolicyConfig,
                 ) -> ResponseCachePolicy<Self>
                 where
-                    P: Predicate<Subject = Self::Subject> + Send + Sync,
+                    P: Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
                 {
-                    match predicates.check(self).await {
+                    match predicates.check(self, &mut Default::default()).await {
                         PredicateResult::Cacheable(data) => {
                             let cached = data.clone();
                             CachePolicy::Cacheable(CacheValue::new(
@@ -254,6 +262,7 @@ where
 {
     type Cached = Self;
     type Subject = Self;
+    type Context = ();
     type IntoCachedFuture = std::future::Ready<CachePolicy<Self, Self>>;
     type FromCachedFuture = std::future::Ready<Self>;
 
@@ -263,9 +272,9 @@ where
         config: &EntityPolicyConfig,
     ) -> ResponseCachePolicy<Self>
     where
-        P: Predicate<Subject = Self::Subject> + Send + Sync,
+        P: Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
     {
-        match predicates.check(self).await {
+        match predicates.check(self, &mut Default::default()).await {
             PredicateResult::Cacheable(data) => {
                 let cached = data.clone();
                 CachePolicy::Cacheable(CacheValue::new(
@@ -356,6 +365,7 @@ where
 {
     type Cached = <T as CacheableResponse>::Cached;
     type Subject = T;
+    type Context = T::Context;
     type IntoCachedFuture = ResultIntoCachedFuture<T, E>;
     type FromCachedFuture = ResultFromCachedFuture<T, E>;
 
@@ -365,10 +375,10 @@ where
         config: &EntityPolicyConfig,
     ) -> ResponseCachePolicy<Self>
     where
-        P: Predicate<Subject = Self::Subject> + Send + Sync,
+        P: Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
     {
         match self {
-            Ok(response) => match predicates.check(response).await {
+            Ok(response) => match predicates.check(response, &mut Default::default()).await {
                 PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                     CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
                         res,

@@ -13,7 +13,7 @@ async fn test_request_path_extractor_some() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().path("/users/{user_id}/books/{book_id}/");
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let user_part = key_parts.iter().find(|p| p.key() == "user_id").unwrap();
@@ -31,7 +31,7 @@ async fn test_request_path_extractor_from_owned_string_ref() {
     let request = CacheableHttpRequest::from_request(request);
     let pattern = String::from("/api/{version}/items");
     let extractor = NeutralExtractor::new().path(&pattern);
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let version_part = key_parts.iter().find(|p| p.key() == "version").unwrap();

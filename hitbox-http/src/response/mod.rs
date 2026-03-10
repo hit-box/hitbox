@@ -410,6 +410,7 @@ where
 {
     type Cached = SerializableHttpResponse;
     type Subject = Self;
+    type Context = ();
     type IntoCachedFuture = BoxFuture<'static, CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = Ready<Self>;
 
@@ -419,9 +420,9 @@ where
         config: &EntityPolicyConfig,
     ) -> hitbox::ResponseCachePolicy<Self>
     where
-        P: hitbox::Predicate<Subject = Self::Subject> + Send + Sync,
+        P: hitbox::Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
     {
-        match predicates.check(self).await {
+        match predicates.check(self, &mut Default::default()).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                 CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
                     res,

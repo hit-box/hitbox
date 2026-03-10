@@ -50,17 +50,17 @@ impl<S> PredicateResult<S> {
     /// This enables predicate chaining where `NonCacheable` is "sticky":
     ///
     /// ```ignore
-    /// predicate1.check(request).await
-    ///     .and_then(|req| predicate2.check(req)).await
-    ///     .and_then(|req| predicate3.check(req)).await
+    /// predicate1.check(request, &mut ctx).await
+    ///     .and_then(&mut ctx, |req, ctx| predicate2.check(req, ctx)).await
+    ///     .and_then(&mut ctx, |req, ctx| predicate3.check(req, ctx)).await
     /// ```
-    pub async fn and_then<F, Fut>(self, f: F) -> PredicateResult<S>
+    pub async fn and_then<F, Fut, Ctx>(self, ctx: &mut Ctx, f: F) -> PredicateResult<S>
     where
-        F: FnOnce(S) -> Fut,
+        F: FnOnce(S, &mut Ctx) -> Fut,
         Fut: std::future::Future<Output = PredicateResult<S>>,
     {
         match self {
-            PredicateResult::Cacheable(value) => f(value).await,
+            PredicateResult::Cacheable(value) => f(value, ctx).await,
             PredicateResult::NonCacheable(value) => PredicateResult::NonCacheable(value),
         }
     }
@@ -78,6 +78,12 @@ impl<S> PredicateResult<S> {
 /// For request predicates, this is typically a request type. For response
 /// predicates, this is typically a response type.
 ///
+/// The `Context` associated type provides shared, pre-computed data that
+/// predicates can access during evaluation. For HTTP predicates this is
+/// typically `()` (zero-cost). For protocols requiring expensive parsing
+/// (e.g., protobuf), the context carries the deserialized message so that
+/// multiple predicates can share it without redundant work.
+///
 /// # Ownership
 ///
 /// The `check` method takes ownership of the subject and returns it wrapped
@@ -89,11 +95,26 @@ pub trait Predicate {
     /// The type being evaluated by this predicate.
     type Subject;
 
+    /// Shared context available to all predicates in a chain.
+    ///
+    /// Use `()` when no context is needed (zero-cost for HTTP).
+    /// Use `Option<DynamicMessage>` or similar for protocols that require
+    /// expensive parsing shared across predicates.
+    type Context: Default + Send;
+
     /// Evaluate whether the subject should be cached.
     ///
     /// Returns [`PredicateResult::Cacheable`] if the subject should be cached,
     /// or [`PredicateResult::NonCacheable`] if it should bypass the cache.
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject>;
+    ///
+    /// The `ctx` parameter provides mutable access to a shared context that
+    /// persists across the predicate chain. Combinators pass the same context
+    /// to each predicate sequentially.
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut Self::Context,
+    ) -> PredicateResult<Self::Subject>;
 }
 
 #[async_trait]
@@ -101,11 +122,17 @@ impl<T> Predicate for Box<T>
 where
     T: Predicate + ?Sized + Sync,
     T::Subject: Send,
+    T::Context: Send,
 {
     type Subject = T::Subject;
+    type Context = T::Context;
 
-    async fn check(&self, subject: T::Subject) -> PredicateResult<T::Subject> {
-        self.as_ref().check(subject).await
+    async fn check(
+        &self,
+        subject: T::Subject,
+        ctx: &mut T::Context,
+    ) -> PredicateResult<T::Subject> {
+        self.as_ref().check(subject, ctx).await
     }
 }
 
@@ -114,11 +141,17 @@ impl<T> Predicate for &T
 where
     T: Predicate + ?Sized + Sync,
     T::Subject: Send,
+    T::Context: Send,
 {
     type Subject = T::Subject;
+    type Context = T::Context;
 
-    async fn check(&self, subject: T::Subject) -> PredicateResult<T::Subject> {
-        (*self).check(subject).await
+    async fn check(
+        &self,
+        subject: T::Subject,
+        ctx: &mut T::Context,
+    ) -> PredicateResult<T::Subject> {
+        (*self).check(subject, ctx).await
     }
 }
 
@@ -127,11 +160,17 @@ impl<T> Predicate for Arc<T>
 where
     T: Predicate + Send + Sync + ?Sized,
     T::Subject: Send,
+    T::Context: Send,
 {
     type Subject = T::Subject;
+    type Context = T::Context;
 
-    async fn check(&self, subject: T::Subject) -> PredicateResult<T::Subject> {
-        self.as_ref().check(subject).await
+    async fn check(
+        &self,
+        subject: T::Subject,
+        ctx: &mut T::Context,
+    ) -> PredicateResult<T::Subject> {
+        self.as_ref().check(subject, ctx).await
     }
 }
 
@@ -141,26 +180,31 @@ mod tests {
 
     #[tokio::test]
     async fn test_predicate_ext_with_box_dyn() {
-        let p1: Box<dyn Predicate<Subject = i32> + Send + Sync> = Box::new(Neutral::<i32>::new());
-        let p2: Box<dyn Predicate<Subject = i32> + Send + Sync> = Box::new(Neutral::<i32>::new());
+        let p1: Box<dyn Predicate<Subject = i32, Context = ()> + Send + Sync> =
+            Box::new(Neutral::<i32>::new());
+        let p2: Box<dyn Predicate<Subject = i32, Context = ()> + Send + Sync> =
+            Box::new(Neutral::<i32>::new());
 
         // PredicateExt works on Box<dyn Predicate> because Box<T> is Sized
         let combined = p1.or(p2);
 
-        let result = combined.check(42).await;
+        let result = combined.check(42, &mut Default::default()).await;
         assert!(matches!(result, PredicateResult::Cacheable(42)));
     }
 
     #[tokio::test]
     async fn test_predicate_ext_chaining_with_box_dyn() {
-        let p1: Box<dyn Predicate<Subject = i32> + Send + Sync> = Box::new(Neutral::<i32>::new());
-        let p2: Box<dyn Predicate<Subject = i32> + Send + Sync> = Box::new(Neutral::<i32>::new());
-        let p3: Box<dyn Predicate<Subject = i32> + Send + Sync> = Box::new(Neutral::<i32>::new());
+        let p1: Box<dyn Predicate<Subject = i32, Context = ()> + Send + Sync> =
+            Box::new(Neutral::<i32>::new());
+        let p2: Box<dyn Predicate<Subject = i32, Context = ()> + Send + Sync> =
+            Box::new(Neutral::<i32>::new());
+        let p3: Box<dyn Predicate<Subject = i32, Context = ()> + Send + Sync> =
+            Box::new(Neutral::<i32>::new());
 
         // Chain: p1.and(p2).or(p3).not()
         let combined = p1.and(p2).or(p3).not();
 
-        let result = combined.check(42).await;
+        let result = combined.check(42, &mut Default::default()).await;
         // Neutral returns Cacheable, so: Cacheable AND Cacheable = Cacheable, OR Cacheable = Cacheable, NOT = NonCacheable
         assert!(matches!(result, PredicateResult::NonCacheable(42)));
     }
@@ -174,20 +218,20 @@ mod tests {
         // Can chain after boxing
         let combined = p1.or(p2);
 
-        let result = combined.check(42).await;
+        let result = combined.check(42, &mut Default::default()).await;
         assert!(matches!(result, PredicateResult::Cacheable(42)));
     }
 
     #[tokio::test]
     async fn test_predicate_ext_boxed_in_vec() {
         // Store heterogeneous predicates in a Vec
-        let predicates: Vec<Box<dyn Predicate<Subject = i32> + Send + Sync>> = vec![
+        let predicates: Vec<Box<dyn Predicate<Subject = i32, Context = ()> + Send + Sync>> = vec![
             Neutral::<i32>::new().boxed(),
             Neutral::<i32>::new().not().boxed(),
         ];
 
-        let result1 = predicates[0].check(1).await;
-        let result2 = predicates[1].check(2).await;
+        let result1 = predicates[0].check(1, &mut Default::default()).await;
+        let result2 = predicates[1].check(2, &mut Default::default()).await;
 
         assert!(matches!(result1, PredicateResult::Cacheable(1)));
         assert!(matches!(result2, PredicateResult::NonCacheable(2)));

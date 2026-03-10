@@ -27,12 +27,15 @@ pub struct State {
     pub responses: Vec<TestResponse>,
 }
 
-pub type BoxRequestPredicate =
-    Box<dyn Predicate<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>;
-pub type BoxResponsePredicate =
-    Box<dyn Predicate<Subject = CacheableHttpResponse<axum::body::Body>> + Send + Sync>;
-pub type BoxExtractor =
-    Box<dyn Extractor<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>;
+pub type BoxRequestPredicate = Box<
+    dyn Predicate<Subject = CacheableHttpRequest<axum::body::Body>, Context = ()> + Send + Sync,
+>;
+pub type BoxResponsePredicate = Box<
+    dyn Predicate<Subject = CacheableHttpResponse<axum::body::Body>, Context = ()> + Send + Sync,
+>;
+pub type BoxExtractor = Box<
+    dyn Extractor<Subject = CacheableHttpRequest<axum::body::Body>, Context = ()> + Send + Sync,
+>;
 
 /// Holds cache configuration components that can be modified by test steps.
 pub struct TestConfig {

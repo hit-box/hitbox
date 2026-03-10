@@ -126,8 +126,13 @@ where
     ResBody::Error: Send,
 {
     type Subject = CacheableHttpRequest<ResBody>;
+    type Context = ();
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut Self::Context,
+    ) -> KeyParts<Self::Subject> {
         KeyParts::new(subject)
     }
 }

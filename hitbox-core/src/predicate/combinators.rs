@@ -41,11 +41,17 @@ impl<P> Predicate for Not<P>
 where
     P: Predicate + Send + Sync,
     P::Subject: Send,
+    P::Context: Send,
 {
     type Subject = P::Subject;
+    type Context = P::Context;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.predicate.check(subject).await {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut Self::Context,
+    ) -> PredicateResult<Self::Subject> {
+        match self.predicate.check(subject, ctx).await {
             PredicateResult::Cacheable(s) => PredicateResult::NonCacheable(s),
             PredicateResult::NonCacheable(s) => PredicateResult::Cacheable(s),
         }
@@ -73,14 +79,20 @@ impl<L, R> And<L, R> {
 impl<L, R> Predicate for And<L, R>
 where
     L: Predicate + Send + Sync,
-    R: Predicate<Subject = L::Subject> + Send + Sync,
+    R: Predicate<Subject = L::Subject, Context = L::Context> + Send + Sync,
     L::Subject: Send,
+    L::Context: Send,
 {
     type Subject = L::Subject;
+    type Context = L::Context;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.left.check(subject).await {
-            PredicateResult::Cacheable(s) => self.right.check(s).await,
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut Self::Context,
+    ) -> PredicateResult<Self::Subject> {
+        match self.left.check(subject, ctx).await {
+            PredicateResult::Cacheable(s) => self.right.check(s, ctx).await,
             non_cacheable => non_cacheable,
         }
     }
@@ -107,14 +119,20 @@ impl<L, R> Or<L, R> {
 impl<L, R> Predicate for Or<L, R>
 where
     L: Predicate + Send + Sync,
-    R: Predicate<Subject = L::Subject> + Send + Sync,
+    R: Predicate<Subject = L::Subject, Context = L::Context> + Send + Sync,
     L::Subject: Send,
+    L::Context: Send,
 {
     type Subject = L::Subject;
+    type Context = L::Context;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.left.check(subject).await {
-            PredicateResult::NonCacheable(s) => self.right.check(s).await,
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut Self::Context,
+    ) -> PredicateResult<Self::Subject> {
+        match self.left.check(subject, ctx).await {
+            PredicateResult::NonCacheable(s) => self.right.check(s, ctx).await,
             cacheable => cacheable,
         }
     }
@@ -127,7 +145,7 @@ pub trait PredicateExt: Predicate + Sized {
     /// Returns `Cacheable` only if both predicates return `Cacheable`.
     fn and<R>(self, right: R) -> And<Self, R>
     where
-        R: Predicate<Subject = Self::Subject>,
+        R: Predicate<Subject = Self::Subject, Context = Self::Context>,
     {
         And::new(self, right)
     }
@@ -137,7 +155,7 @@ pub trait PredicateExt: Predicate + Sized {
     /// Returns `Cacheable` if either predicate returns `Cacheable`.
     fn or<R>(self, right: R) -> Or<Self, R>
     where
-        R: Predicate<Subject = Self::Subject>,
+        R: Predicate<Subject = Self::Subject, Context = Self::Context>,
     {
         Or::new(self, right)
     }
@@ -153,7 +171,9 @@ pub trait PredicateExt: Predicate + Sized {
     ///
     /// Useful for type erasure when storing predicates in collections
     /// or returning them from functions.
-    fn boxed(self) -> Box<dyn Predicate<Subject = Self::Subject> + Send + Sync>
+    fn boxed(
+        self,
+    ) -> Box<dyn Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync>
     where
         Self: Send + Sync + 'static,
     {

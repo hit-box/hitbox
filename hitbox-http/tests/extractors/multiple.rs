@@ -21,6 +21,6 @@ async fn test_request_multiple_extractor_some() {
         .path("/users/{user_id}/books/{book_id}/")
         .method(MethodConfig::new())
         .header("x-test".to_owned());
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     dbg!(parts);
 }

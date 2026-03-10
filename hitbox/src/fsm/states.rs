@@ -231,8 +231,8 @@ impl<Req, ReqP, E, U> Initial<Req, ReqP, E, U> {
 impl<Req, ReqP, E, U> Initial<Req, ReqP, E, U>
 where
     Req: CacheableRequest + Send,
-    ReqP: Predicate<Subject = Req> + Send + Sync,
-    E: Extractor<Subject = Req> + Send + Sync,
+    ReqP: Predicate<Subject = Req, Context = Req::Context> + Send + Sync,
+    E: Extractor<Subject = Req, Context = Req::Context> + Send + Sync,
     U: Upstream<Req>,
 {
     /// Transition from Initial state.
@@ -374,7 +374,7 @@ impl PollUpstream {
     ) -> PollUpstreamTransition<Res>
     where
         Res: CacheableResponse + Send + 'static,
-        ResP: Predicate<Subject = Res::Subject> + Send + Sync + 'static,
+        ResP: Predicate<Subject = Res::Subject, Context = Res::Context> + Send + Sync + 'static,
     {
         // Record upstream duration metric
         crate::metrics::record_upstream_duration(self.upstream_start.elapsed());

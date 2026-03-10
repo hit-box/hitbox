@@ -681,8 +681,13 @@ where
     E: Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
 {
     type Subject = E::Subject;
+    type Context = E::Context;
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut Self::Context,
+    ) -> KeyParts<Self::Subject> {
         let (parts, body) = subject.into_parts();
 
         // Collect body
@@ -692,7 +697,7 @@ where
                 let request = CacheableHttpRequest::from_request(http::Request::from_parts(
                     parts, error_body,
                 ));
-                let mut key_parts = self.inner.get(request).await;
+                let mut key_parts = self.inner.get(request, ctx).await;
                 key_parts.push(KeyPart::new("body", None::<String>));
                 return key_parts;
             }
@@ -733,7 +738,7 @@ where
         };
         let request = CacheableHttpRequest::from_request(http::Request::from_parts(parts, body));
 
-        let mut key_parts = self.inner.get(request).await;
+        let mut key_parts = self.inner.get(request, ctx).await;
         for part in extracted_parts {
             key_parts.push(part);
         }

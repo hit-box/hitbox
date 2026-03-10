@@ -5,7 +5,7 @@
 //! this directly — it's created by the [`Cache`](crate::Cache) layer.
 
 use hitbox::concurrency::ConcurrencyManager;
-use hitbox_core::{CacheConfigs, DisabledOffload, Offload};
+use hitbox_core::{CacheConfig, CacheConfigs, DisabledOffload, Extractor, Offload, Predicate};
 use std::sync::Arc;
 
 use hitbox::{backend::CacheBackend, fsm::SelectiveCacheFuture};
@@ -112,6 +112,9 @@ where
     ResBody::Error: Send,
     ResBody::Data: Send,
     S::Error: Send,
+    <<C as CacheConfigs<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>>::Config as CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>>::RequestPredicate: Predicate<Context = ()>,
+    <<C as CacheConfigs<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>>::Config as CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>>::Extractor: Extractor<Context = ()>,
+    <<C as CacheConfigs<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>>::Config as CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>>::ResponsePredicate: Predicate<Context = ()>,
 {
     type Response = Response<BufferedBody<ResBody>>;
     type Error = S::Error;

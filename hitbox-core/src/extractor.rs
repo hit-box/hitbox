@@ -26,8 +26,9 @@
 //! #[async_trait::async_trait]
 //! impl Extractor for MethodExtractor {
 //!     type Subject = HttpRequest;
+//!     type Context = ();
 //!
-//!     async fn get(&self, request: Self::Subject) -> KeyParts<Self::Subject> {
+//!     async fn get(&self, request: Self::Subject, _ctx: &mut Self::Context) -> KeyParts<Self::Subject> {
 //!         let mut parts = KeyParts::new(request);
 //!         parts.push(KeyPart::new("method", Some(request.method().as_str())));
 //!         parts
@@ -53,6 +54,9 @@ use crate::KeyParts;
 /// Typically this is a request type from which cache key components
 /// are extracted.
 ///
+/// The `Context` associated type provides shared, pre-computed data.
+/// See [`Predicate::Context`](crate::predicate::Predicate::Context) for details.
+///
 /// # Ownership
 ///
 /// The `get` method takes ownership of the subject and returns it wrapped
@@ -70,10 +74,17 @@ pub trait Extractor {
     /// The type from which cache key components are extracted.
     type Subject;
 
+    /// Shared context available to all extractors in a chain.
+    ///
+    /// Use `()` when no context is needed (zero-cost for HTTP).
+    type Context: Default + Send;
+
     /// Extract cache key components from the subject.
     ///
     /// Returns a [`KeyParts`] containing the subject and accumulated key parts.
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject>;
+    /// The `ctx` parameter provides mutable access to a shared context.
+    async fn get(&self, subject: Self::Subject, ctx: &mut Self::Context)
+    -> KeyParts<Self::Subject>;
 }
 
 #[async_trait]
@@ -81,11 +92,13 @@ impl<T> Extractor for &T
 where
     T: Extractor + ?Sized + Sync,
     T::Subject: Send,
+    T::Context: Send,
 {
     type Subject = T::Subject;
+    type Context = T::Context;
 
-    async fn get(&self, subject: T::Subject) -> KeyParts<T::Subject> {
-        self.get(subject).await
+    async fn get(&self, subject: T::Subject, ctx: &mut T::Context) -> KeyParts<T::Subject> {
+        (**self).get(subject, ctx).await
     }
 }
 
@@ -94,11 +107,13 @@ impl<T> Extractor for Box<T>
 where
     T: Extractor + ?Sized + Sync,
     T::Subject: Send,
+    T::Context: Send,
 {
     type Subject = T::Subject;
+    type Context = T::Context;
 
-    async fn get(&self, subject: T::Subject) -> KeyParts<T::Subject> {
-        self.as_ref().get(subject).await
+    async fn get(&self, subject: T::Subject, ctx: &mut T::Context) -> KeyParts<T::Subject> {
+        self.as_ref().get(subject, ctx).await
     }
 }
 
@@ -107,10 +122,12 @@ impl<T> Extractor for Arc<T>
 where
     T: Extractor + Send + Sync + ?Sized,
     T::Subject: Send,
+    T::Context: Send,
 {
     type Subject = T::Subject;
+    type Context = T::Context;
 
-    async fn get(&self, subject: T::Subject) -> KeyParts<T::Subject> {
-        self.as_ref().get(subject).await
+    async fn get(&self, subject: T::Subject, ctx: &mut T::Context) -> KeyParts<T::Subject> {
+        self.as_ref().get(subject, ctx).await
     }
 }

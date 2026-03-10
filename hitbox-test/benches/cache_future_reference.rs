@@ -138,7 +138,8 @@ fn create_reference_response() -> Response<ReqBody> {
 // ============================================================================
 
 /// Create reference request predicates (method + path pattern + required headers) - static dispatch
-fn create_request_predicates() -> impl Predicate<Subject = BenchRequest> + Send + Sync {
+fn create_request_predicates() -> impl Predicate<Subject = BenchRequest, Context = ()> + Send + Sync
+{
     NeutralRequestPredicate::new()
         .method(Method::POST)
         .path("/v1/users/{user_id}/orders".to_string())
@@ -149,7 +150,8 @@ fn create_request_predicates() -> impl Predicate<Subject = BenchRequest> + Send 
 
 /// Create reference response predicates (cache successful 2xx responses) - static dispatch
 fn create_response_predicates()
--> impl Predicate<Subject = <BenchResponse as CacheableResponse>::Subject> + Send + Sync {
+-> impl Predicate<Subject = <BenchResponse as CacheableResponse>::Subject, Context = ()> + Send + Sync
+{
     NeutralResponsePredicate::<InnerBody>::new()
         // Only cache 2xx successful responses
         .status(StatusClass::Success)
@@ -164,7 +166,8 @@ fn create_response_predicates()
 }
 
 /// Create reference extractors (method + path + query + headers with transforms) - static dispatch
-fn create_extractors() -> impl hitbox::Extractor<Subject = BenchRequest> + Send + Sync {
+fn create_extractors() -> impl hitbox::Extractor<Subject = BenchRequest, Context = ()> + Send + Sync
+{
     let base = NeutralExtractor::<InnerBody>::new();
 
     // Method extractor
@@ -223,7 +226,8 @@ fn create_policy() -> Arc<PolicyConfig> {
 }
 
 /// Extend request predicates with body jq predicate
-fn create_request_predicates_with_body() -> impl Predicate<Subject = BenchRequest> + Send + Sync {
+fn create_request_predicates_with_body()
+-> impl Predicate<Subject = BenchRequest, Context = ()> + Send + Sync {
     let jq_filter = JqExpression::compile(".order.customer_id").unwrap();
     create_request_predicates().body(BodyOperation::Jq {
         filter: jq_filter,
@@ -233,7 +237,8 @@ fn create_request_predicates_with_body() -> impl Predicate<Subject = BenchReques
 
 /// Extend response predicates with body jq predicate
 fn create_response_predicates_with_body()
--> impl Predicate<Subject = <BenchResponse as CacheableResponse>::Subject> + Send + Sync {
+-> impl Predicate<Subject = <BenchResponse as CacheableResponse>::Subject, Context = ()> + Send + Sync
+{
     let jq_filter = JqExpression::compile(".data | type").unwrap();
     create_response_predicates().body(BodyOperation::Jq {
         filter: jq_filter,
@@ -242,7 +247,8 @@ fn create_response_predicates_with_body()
 }
 
 /// Extend extractors with body jq extractor
-fn create_extractors_with_body() -> impl hitbox::Extractor<Subject = BenchRequest> + Send + Sync {
+fn create_extractors_with_body()
+-> impl hitbox::Extractor<Subject = BenchRequest, Context = ()> + Send + Sync {
     let jq_extraction = JqExtraction::compile(
         "{customer_id: .order.customer_id, shipping: .order.shipping_method}",
     )
@@ -272,7 +278,12 @@ fn bench_compare_cache_write(c: &mut Criterion) {
     // Generate cache key using extractors
     let extractors = create_extractors();
     let request = CacheableHttpRequest::from_request(create_reference_request());
-    let (_, cache_key) = rt.block_on(async { extractors.get(request).await.into_cache_key() });
+    let (_, cache_key) = rt.block_on(async {
+        extractors
+            .get(request, &mut Default::default())
+            .await
+            .into_cache_key()
+    });
 
     // Generate cacheable response
     let response = CacheableHttpResponse::from_response(create_reference_response());
@@ -339,7 +350,12 @@ fn bench_compare_cache_read(c: &mut Criterion) {
     // Generate cache key using extractors
     let extractors = create_extractors();
     let request = CacheableHttpRequest::from_request(create_reference_request());
-    let (_, cache_key) = rt.block_on(async { extractors.get(request).await.into_cache_key() });
+    let (_, cache_key) = rt.block_on(async {
+        extractors
+            .get(request, &mut Default::default())
+            .await
+            .into_cache_key()
+    });
 
     // Generate cacheable response
     let response = CacheableHttpResponse::from_response(create_reference_response());
@@ -439,7 +455,12 @@ fn bench_compare_composition_read(c: &mut Criterion) {
     // Generate cache key using extractors
     let extractors = create_extractors();
     let request = CacheableHttpRequest::from_request(create_reference_request());
-    let (_, cache_key) = rt.block_on(async { extractors.get(request).await.into_cache_key() });
+    let (_, cache_key) = rt.block_on(async {
+        extractors
+            .get(request, &mut Default::default())
+            .await
+            .into_cache_key()
+    });
 
     // Generate cacheable response
     let response = CacheableHttpResponse::from_response(create_reference_response());
@@ -556,7 +577,12 @@ fn bench_compare_composition_write(c: &mut Criterion) {
     // Generate cache key using extractors
     let extractors = create_extractors();
     let request = CacheableHttpRequest::from_request(create_reference_request());
-    let (_, cache_key) = rt.block_on(async { extractors.get(request).await.into_cache_key() });
+    let (_, cache_key) = rt.block_on(async {
+        extractors
+            .get(request, &mut Default::default())
+            .await
+            .into_cache_key()
+    });
 
     // Generate cacheable response
     let response = CacheableHttpResponse::from_response(create_reference_response());
@@ -671,7 +697,11 @@ fn bench_compare_request_predicates(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(static_predicates.check(request).await)
+            std::hint::black_box(
+                static_predicates
+                    .check(request, &mut Default::default())
+                    .await,
+            )
         });
     });
 
@@ -679,7 +709,7 @@ fn bench_compare_request_predicates(c: &mut Criterion) {
         let predicates = dynamic_predicates.clone();
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(predicates.check(request).await)
+            std::hint::black_box(predicates.check(request, &mut Default::default()).await)
         });
     });
 
@@ -705,7 +735,11 @@ fn bench_compare_response_predicates(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let response = CacheableHttpResponse::from_response(create_reference_response());
-            std::hint::black_box(static_predicates.check(response).await)
+            std::hint::black_box(
+                static_predicates
+                    .check(response, &mut Default::default())
+                    .await,
+            )
         });
     });
 
@@ -713,7 +747,7 @@ fn bench_compare_response_predicates(c: &mut Criterion) {
         let predicates = dynamic_predicates.clone();
         b.to_async(&rt).iter(|| async {
             let response = CacheableHttpResponse::from_response(create_reference_response());
-            std::hint::black_box(predicates.check(response).await)
+            std::hint::black_box(predicates.check(response, &mut Default::default()).await)
         });
     });
 
@@ -741,7 +775,11 @@ fn bench_compare_extractors(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(static_extractors.get(request).await)
+            std::hint::black_box(
+                static_extractors
+                    .get(request, &mut Default::default())
+                    .await,
+            )
         });
     });
 
@@ -749,7 +787,7 @@ fn bench_compare_extractors(c: &mut Criterion) {
         let extractors = dynamic_extractors.clone();
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(extractors.get(request).await)
+            std::hint::black_box(extractors.get(request, &mut Default::default()).await)
         });
     });
 
@@ -773,19 +811,27 @@ fn bench_compare_cache_future_hit(c: &mut Criterion) {
             .build(),
     );
 
-    let static_request_predicates: Arc<dyn Predicate<Subject = BenchRequest> + Send + Sync> =
-        Arc::new(create_request_predicates());
+    let static_request_predicates: Arc<
+        dyn Predicate<Subject = BenchRequest, Context = ()> + Send + Sync,
+    > = Arc::new(create_request_predicates());
     let static_response_predicates: Arc<
-        dyn Predicate<Subject = <BenchResponse as CacheableResponse>::Subject> + Send + Sync,
+        dyn Predicate<Subject = <BenchResponse as CacheableResponse>::Subject, Context = ()>
+            + Send
+            + Sync,
     > = Arc::new(create_response_predicates());
-    let static_extractors: Arc<dyn hitbox::Extractor<Subject = BenchRequest> + Send + Sync> =
-        Arc::new(create_extractors());
+    let static_extractors: Arc<
+        dyn hitbox::Extractor<Subject = BenchRequest, Context = ()> + Send + Sync,
+    > = Arc::new(create_extractors());
     let static_policy = create_policy();
 
     // Pre-populate static cache
     let request = CacheableHttpRequest::from_request(create_reference_request());
-    let (_, static_cache_key) =
-        rt.block_on(async { static_extractors.get(request).await.into_cache_key() });
+    let (_, static_cache_key) = rt.block_on(async {
+        static_extractors
+            .get(request, &mut Default::default())
+            .await
+            .into_cache_key()
+    });
 
     let response = CacheableHttpResponse::from_response(create_reference_response());
     let cached_response = rt.block_on(async {
@@ -818,8 +864,13 @@ fn bench_compare_cache_future_hit(c: &mut Criterion) {
 
     // Pre-populate dynamic cache
     let request = CacheableHttpRequest::from_request(create_reference_request());
-    let (_, dyn_cache_key) =
-        rt.block_on(async { endpoint.extractors.get(request).await.into_cache_key() });
+    let (_, dyn_cache_key) = rt.block_on(async {
+        endpoint
+            .extractors
+            .get(request, &mut Default::default())
+            .await
+            .into_cache_key()
+    });
 
     let response = CacheableHttpResponse::from_response(create_reference_response());
     let cached_response = rt.block_on(async {
@@ -927,13 +978,17 @@ fn bench_compare_cache_future_miss(c: &mut Criterion) {
             .build(),
     );
 
-    let static_request_predicates: Arc<dyn Predicate<Subject = BenchRequest> + Send + Sync> =
-        Arc::new(create_request_predicates());
+    let static_request_predicates: Arc<
+        dyn Predicate<Subject = BenchRequest, Context = ()> + Send + Sync,
+    > = Arc::new(create_request_predicates());
     let static_response_predicates: Arc<
-        dyn Predicate<Subject = <BenchResponse as CacheableResponse>::Subject> + Send + Sync,
+        dyn Predicate<Subject = <BenchResponse as CacheableResponse>::Subject, Context = ()>
+            + Send
+            + Sync,
     > = Arc::new(create_response_predicates());
-    let static_extractors: Arc<dyn hitbox::Extractor<Subject = BenchRequest> + Send + Sync> =
-        Arc::new(create_extractors());
+    let static_extractors: Arc<
+        dyn hitbox::Extractor<Subject = BenchRequest, Context = ()> + Send + Sync,
+    > = Arc::new(create_extractors());
     let static_policy = create_policy();
 
     // ===== Dynamic dispatch setup =====
@@ -1054,7 +1109,11 @@ fn bench_compare_body_request_predicates(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(static_predicates.check(request).await)
+            std::hint::black_box(
+                static_predicates
+                    .check(request, &mut Default::default())
+                    .await,
+            )
         });
     });
 
@@ -1062,7 +1121,7 @@ fn bench_compare_body_request_predicates(c: &mut Criterion) {
         let predicates = dynamic_predicates.clone();
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(predicates.check(request).await)
+            std::hint::black_box(predicates.check(request, &mut Default::default()).await)
         });
     });
 
@@ -1088,7 +1147,11 @@ fn bench_compare_body_response_predicates(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let response = CacheableHttpResponse::from_response(create_reference_response());
-            std::hint::black_box(static_predicates.check(response).await)
+            std::hint::black_box(
+                static_predicates
+                    .check(response, &mut Default::default())
+                    .await,
+            )
         });
     });
 
@@ -1096,7 +1159,7 @@ fn bench_compare_body_response_predicates(c: &mut Criterion) {
         let predicates = dynamic_predicates.clone();
         b.to_async(&rt).iter(|| async {
             let response = CacheableHttpResponse::from_response(create_reference_response());
-            std::hint::black_box(predicates.check(response).await)
+            std::hint::black_box(predicates.check(response, &mut Default::default()).await)
         });
     });
 
@@ -1124,7 +1187,11 @@ fn bench_compare_body_extractors(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(static_extractors.get(request).await)
+            std::hint::black_box(
+                static_extractors
+                    .get(request, &mut Default::default())
+                    .await,
+            )
         });
     });
 
@@ -1132,7 +1199,7 @@ fn bench_compare_body_extractors(c: &mut Criterion) {
         let extractors = dynamic_extractors.clone();
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(extractors.get(request).await)
+            std::hint::black_box(extractors.get(request, &mut Default::default()).await)
         });
     });
 
@@ -1156,19 +1223,27 @@ fn bench_compare_body_cache_future_hit(c: &mut Criterion) {
             .build(),
     );
 
-    let static_request_predicates: Arc<dyn Predicate<Subject = BenchRequest> + Send + Sync> =
-        Arc::new(create_request_predicates_with_body());
+    let static_request_predicates: Arc<
+        dyn Predicate<Subject = BenchRequest, Context = ()> + Send + Sync,
+    > = Arc::new(create_request_predicates_with_body());
     let static_response_predicates: Arc<
-        dyn Predicate<Subject = <BenchResponse as CacheableResponse>::Subject> + Send + Sync,
+        dyn Predicate<Subject = <BenchResponse as CacheableResponse>::Subject, Context = ()>
+            + Send
+            + Sync,
     > = Arc::new(create_response_predicates_with_body());
-    let static_extractors: Arc<dyn hitbox::Extractor<Subject = BenchRequest> + Send + Sync> =
-        Arc::new(create_extractors_with_body());
+    let static_extractors: Arc<
+        dyn hitbox::Extractor<Subject = BenchRequest, Context = ()> + Send + Sync,
+    > = Arc::new(create_extractors_with_body());
     let static_policy = create_policy();
 
     // Pre-populate static cache
     let request = CacheableHttpRequest::from_request(create_reference_request());
-    let (_, static_cache_key) =
-        rt.block_on(async { static_extractors.get(request).await.into_cache_key() });
+    let (_, static_cache_key) = rt.block_on(async {
+        static_extractors
+            .get(request, &mut Default::default())
+            .await
+            .into_cache_key()
+    });
 
     let response = CacheableHttpResponse::from_response(create_reference_response());
     let cached_response = rt.block_on(async {
@@ -1201,8 +1276,13 @@ fn bench_compare_body_cache_future_hit(c: &mut Criterion) {
 
     // Pre-populate dynamic cache
     let request = CacheableHttpRequest::from_request(create_reference_request());
-    let (_, dyn_cache_key) =
-        rt.block_on(async { endpoint.extractors.get(request).await.into_cache_key() });
+    let (_, dyn_cache_key) = rt.block_on(async {
+        endpoint
+            .extractors
+            .get(request, &mut Default::default())
+            .await
+            .into_cache_key()
+    });
 
     let response = CacheableHttpResponse::from_response(create_reference_response());
     let cached_response = rt.block_on(async {
@@ -1309,13 +1389,17 @@ fn bench_compare_body_cache_future_miss(c: &mut Criterion) {
             .build(),
     );
 
-    let static_request_predicates: Arc<dyn Predicate<Subject = BenchRequest> + Send + Sync> =
-        Arc::new(create_request_predicates_with_body());
+    let static_request_predicates: Arc<
+        dyn Predicate<Subject = BenchRequest, Context = ()> + Send + Sync,
+    > = Arc::new(create_request_predicates_with_body());
     let static_response_predicates: Arc<
-        dyn Predicate<Subject = <BenchResponse as CacheableResponse>::Subject> + Send + Sync,
+        dyn Predicate<Subject = <BenchResponse as CacheableResponse>::Subject, Context = ()>
+            + Send
+            + Sync,
     > = Arc::new(create_response_predicates_with_body());
-    let static_extractors: Arc<dyn hitbox::Extractor<Subject = BenchRequest> + Send + Sync> =
-        Arc::new(create_extractors_with_body());
+    let static_extractors: Arc<
+        dyn hitbox::Extractor<Subject = BenchRequest, Context = ()> + Send + Sync,
+    > = Arc::new(create_extractors_with_body());
     let static_policy = create_policy();
 
     // ===== Dynamic dispatch setup with body =====

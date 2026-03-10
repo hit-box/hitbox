@@ -62,6 +62,12 @@ pub type RequestCachePolicy<T> = CachePolicy<CacheablePolicyData<T>, T>;
 /// 2. If cacheable, extracts a cache key using the provided extractors
 /// 3. Returns either `Cacheable` with the key or `NonCacheable`
 pub trait CacheableRequest: Sized {
+    /// Shared context type for predicates and extractors.
+    ///
+    /// For HTTP this is `()` (zero-cost). For protocols requiring expensive
+    /// parsing (e.g., protobuf), this carries the deserialized message.
+    type Context: Default + Send + Sync;
+
     /// The future type returned by `cache_policy`.
     ///
     /// Uses GAT to properly capture the lifetime of `Self`, allowing
@@ -69,8 +75,8 @@ pub trait CacheableRequest: Sized {
     type CachePolicyFuture<'a, P, E>: Future<Output = RequestCachePolicy<Self>> + Send + 'a
     where
         Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
+        P: Predicate<Subject = Self, Context = Self::Context> + Send + Sync + 'a,
+        E: Extractor<Subject = Self, Context = Self::Context> + Send + Sync + 'a;
 
     /// Determine if this request should be cached and extract its key.
     ///
@@ -85,6 +91,6 @@ pub trait CacheableRequest: Sized {
     ) -> Self::CachePolicyFuture<'a, P, E>
     where
         Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
+        P: Predicate<Subject = Self, Context = Self::Context> + Send + Sync + 'a,
+        E: Extractor<Subject = Self, Context = Self::Context> + Send + Sync + 'a;
 }

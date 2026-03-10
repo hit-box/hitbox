@@ -22,7 +22,10 @@ async fn test_conditions_or_cacheable() {
         NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::GET));
     let wrong_predicate =
         NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::POST));
-    let prediction = correct_predicate.or(wrong_predicate).check(request).await;
+    let prediction = correct_predicate
+        .or(wrong_predicate)
+        .check(request, &mut Default::default())
+        .await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -39,7 +42,10 @@ async fn test_conditions_or_right_branch() {
         NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::POST));
     let correct_predicate =
         NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::GET));
-    let prediction = wrong_predicate.or(correct_predicate).check(request).await;
+    let prediction = wrong_predicate
+        .or(correct_predicate)
+        .check(request, &mut Default::default())
+        .await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -57,7 +63,7 @@ async fn test_conditions_or_noncacheable() {
         NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::POST));
     let prediction = wrong_predicate_one
         .or(wrong_predicate_two)
-        .check(request)
+        .check(request, &mut Default::default())
         .await;
     assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }
@@ -85,7 +91,7 @@ async fn test_conditions_not() {
     let prediction = correct_query_predicate
         .and(wrong_path_predicate.not())
         .and(wrong_header_predicate.not())
-        .check(request)
+        .check(request, &mut Default::default())
         .await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }

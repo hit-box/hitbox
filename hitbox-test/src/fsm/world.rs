@@ -29,12 +29,13 @@ use crate::tracing::{SpanCollector, create_span_collector};
 pub struct SimpleRequest(pub u32);
 
 impl CacheableRequest for SimpleRequest {
+    type Context = ();
     type CachePolicyFuture<'a, P, E>
         = std::pin::Pin<Box<dyn std::future::Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
         Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
+        P: Predicate<Subject = Self, Context = Self::Context> + Send + Sync + 'a,
+        E: Extractor<Subject = Self, Context = Self::Context> + Send + Sync + 'a;
 
     fn cache_policy<'a, P, E>(
         self,
@@ -43,13 +44,13 @@ impl CacheableRequest for SimpleRequest {
     ) -> Self::CachePolicyFuture<'a, P, E>
     where
         Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a,
+        P: Predicate<Subject = Self, Context = Self::Context> + Send + Sync + 'a,
+        E: Extractor<Subject = Self, Context = Self::Context> + Send + Sync + 'a,
     {
         Box::pin(async move {
-            match predicates.check(self).await {
+            match predicates.check(self, &mut Default::default()).await {
                 PredicateResult::Cacheable(request) => {
-                    let key_parts = extractors.get(request).await;
+                    let key_parts = extractors.get(request, &mut Default::default()).await;
                     let (request, cache_key) = key_parts.into_cache_key();
                     RequestCachePolicy::Cacheable(CacheablePolicyData {
                         key: cache_key,
@@ -68,6 +69,7 @@ pub struct SimpleResponse(pub u32);
 impl CacheableResponse for SimpleResponse {
     type Cached = u32;
     type Subject = SimpleResponse;
+    type Context = ();
     type IntoCachedFuture = Ready<CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = Ready<Self>;
 
@@ -77,9 +79,9 @@ impl CacheableResponse for SimpleResponse {
         _config: &EntityPolicyConfig,
     ) -> ResponseCachePolicy<Self>
     where
-        P: Predicate<Subject = Self::Subject> + Send + Sync,
+        P: Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
     {
-        match predicates.check(self).await {
+        match predicates.check(self, &mut Default::default()).await {
             PredicateResult::Cacheable(response) => {
                 CachePolicy::Cacheable(CacheValue::new(response.0, None, None))
             }
@@ -108,8 +110,13 @@ pub struct ConfigurableRequestPredicate {
 #[async_trait::async_trait]
 impl Predicate for ConfigurableRequestPredicate {
     type Subject = SimpleRequest;
+    type Context = ();
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut Self::Context,
+    ) -> PredicateResult<Self::Subject> {
         if self.cacheable {
             PredicateResult::Cacheable(subject)
         } else {
@@ -126,8 +133,13 @@ pub struct ConfigurableResponsePredicate {
 #[async_trait::async_trait]
 impl Predicate for ConfigurableResponsePredicate {
     type Subject = SimpleResponse;
+    type Context = ();
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut Self::Context,
+    ) -> PredicateResult<Self::Subject> {
         if self.cacheable {
             PredicateResult::Cacheable(subject)
         } else {
@@ -146,8 +158,13 @@ pub struct FixedKeyExtractor;
 #[async_trait::async_trait]
 impl Extractor for FixedKeyExtractor {
     type Subject = SimpleRequest;
+    type Context = ();
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut Self::Context,
+    ) -> KeyParts<Self::Subject> {
         let mut key_parts = KeyParts::new(subject);
         key_parts.push(KeyPart::new("fixed_key", Some("value")));
         key_parts

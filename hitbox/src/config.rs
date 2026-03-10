@@ -12,10 +12,11 @@ use hitbox_core::predicate::Predicate;
 use crate::policy::PolicyConfig;
 
 /// Boxed predicate for dynamic dispatch.
-pub type BoxPredicate<R> = Box<dyn Predicate<Subject = R> + Send + Sync>;
+pub type BoxPredicate<R, Ctx = ()> = Box<dyn Predicate<Subject = R, Context = Ctx> + Send + Sync>;
 
 /// Boxed extractor for dynamic dispatch.
-pub type BoxExtractor<Req> = Box<dyn Extractor<Subject = Req> + Send + Sync>;
+pub type BoxExtractor<Req, Ctx = ()> =
+    Box<dyn Extractor<Subject = Req, Context = Ctx> + Send + Sync>;
 
 /// Generic cache configuration.
 ///
@@ -35,7 +36,8 @@ pub type BoxExtractor<Req> = Box<dyn Extractor<Subject = Req> + Send + Sync>;
 /// # #[async_trait::async_trait]
 /// # impl Extractor for FixedKeyExtractor {
 /// #     type Subject = String;
-/// #     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+/// #     type Context = ();
+/// #     async fn get(&self, subject: Self::Subject, _ctx: &mut Self::Context) -> KeyParts<Self::Subject> {
 /// #         KeyParts::new(subject)
 /// #     }
 /// # }

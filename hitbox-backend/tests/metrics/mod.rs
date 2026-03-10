@@ -101,6 +101,7 @@ struct TestData {
 impl CacheableResponse for TestData {
     type Cached = Self;
     type Subject = Self;
+    type Context = ();
     type IntoCachedFuture = std::future::Ready<hitbox_core::CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = std::future::Ready<Self>;
 
@@ -110,7 +111,7 @@ impl CacheableResponse for TestData {
         _: &EntityPolicyConfig,
     ) -> hitbox_core::ResponseCachePolicy<Self>
     where
-        P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
+        P: hitbox_core::Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
     {
         todo!()
     }

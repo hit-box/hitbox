@@ -115,7 +115,8 @@ impl CheckPredicate {
                     "Config matched, extracting cache key"
                 );
                 let ext = configs.configs()[self.config_index].extractors();
-                let extract_future = Box::pin(async move { ext.get(request).await });
+                let extract_future =
+                    Box::pin(async move { ext.get(request, &mut Default::default()).await });
                 CheckPredicateTransition::ExtractKey {
                     extract_future,
                     config_index: self.config_index,
@@ -139,7 +140,10 @@ impl CheckPredicate {
                 match next {
                     Some(next_idx) => {
                         let pred = configs.configs()[next_idx].request_predicates();
-                        let predicate_future = Box::pin(async move { pred.check(request).await });
+                        let predicate_future =
+                            Box::pin(
+                                async move { pred.check(request, &mut Default::default()).await },
+                            );
                         CheckPredicateTransition::NextConfig {
                             predicate_future,
                             config_index: next_idx,

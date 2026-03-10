@@ -677,7 +677,10 @@ async fn test_zero_args_generated_key() {
     assert_eq!(*skipped.value(), "ctx");
 
     let extractor = FnExtractor::<Args<()>>::new("no_args_function");
-    let (_, key) = extractor.get(Args(())).await.into_cache_key();
+    let (_, key) = extractor
+        .get(Args(()), &mut Default::default())
+        .await
+        .into_cache_key();
 
     // Zero-arg function should produce key with only the function name
     assert_eq!(key.to_string(), "fn=no_args_function");

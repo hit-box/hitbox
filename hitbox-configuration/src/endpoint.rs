@@ -14,11 +14,11 @@ pub type ResponsePredicate<ResBody> = BoxPredicate<CacheableHttpResponse<ResBody
 pub type RequestExtractor<ReqBody> = BoxExtractor<CacheableHttpRequest<ReqBody>>;
 
 pub type ArcRequestPredicate<ReqBody> =
-    Arc<dyn Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>;
+    Arc<dyn Predicate<Subject = CacheableHttpRequest<ReqBody>, Context = ()> + Send + Sync>;
 pub type ArcResponsePredicate<ResBody> =
-    Arc<dyn Predicate<Subject = CacheableHttpResponse<ResBody>> + Send + Sync>;
+    Arc<dyn Predicate<Subject = CacheableHttpResponse<ResBody>, Context = ()> + Send + Sync>;
 pub type ArcRequestExtractor<ReqBody> =
-    Arc<dyn Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>;
+    Arc<dyn Extractor<Subject = CacheableHttpRequest<ReqBody>, Context = ()> + Send + Sync>;
 
 pub struct Endpoint<ReqBody, ResBody>
 where
@@ -166,7 +166,7 @@ where
     /// Set the request predicates.
     pub fn request_predicate<P>(self, predicate: P) -> Self
     where
-        P: Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync + 'static,
+        P: Predicate<Subject = CacheableHttpRequest<ReqBody>, Context = ()> + Send + Sync + 'static,
     {
         Self {
             request_predicates: Some(Arc::new(predicate)),
@@ -177,7 +177,10 @@ where
     /// Set the response predicates.
     pub fn response_predicate<P>(self, predicate: P) -> Self
     where
-        P: Predicate<Subject = CacheableHttpResponse<ResBody>> + Send + Sync + 'static,
+        P: Predicate<Subject = CacheableHttpResponse<ResBody>, Context = ()>
+            + Send
+            + Sync
+            + 'static,
     {
         Self {
             response_predicates: Some(Arc::new(predicate)),
@@ -188,7 +191,7 @@ where
     /// Set the key extractors.
     pub fn extractor<E>(self, extractor: E) -> Self
     where
-        E: Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync + 'static,
+        E: Extractor<Subject = CacheableHttpRequest<ReqBody>, Context = ()> + Send + Sync + 'static,
     {
         Self {
             extractors: Some(Arc::new(extractor)),

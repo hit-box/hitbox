@@ -115,9 +115,14 @@ where
     ReqBody::Error: Send,
 {
     type Subject = P::Subject;
+    type Context = P::Context;
 
-    async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.inner.check(request).await {
+    async fn check(
+        &self,
+        request: Self::Subject,
+        ctx: &mut Self::Context,
+    ) -> PredicateResult<Self::Subject> {
+        match self.inner.check(request, ctx).await {
             PredicateResult::Cacheable(request) => {
                 let is_match = match &self.operation {
                     Operation::Pattern(resource) => resource.is_match(request.parts().uri.path()),

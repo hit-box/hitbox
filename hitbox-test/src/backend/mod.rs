@@ -34,6 +34,7 @@ impl TestResponse {
 impl CacheableResponse for TestResponse {
     type Cached = Self;
     type Subject = Self;
+    type Context = ();
     type IntoCachedFuture = Ready<CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = Ready<Self>;
 
@@ -43,7 +44,7 @@ impl CacheableResponse for TestResponse {
         _config: &EntityPolicyConfig,
     ) -> ResponseCachePolicy<Self>
     where
-        P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
+        P: hitbox_core::Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
     {
         // Always cacheable for testing
         CachePolicy::Cacheable(CacheValue::new(self.clone(), None, None))

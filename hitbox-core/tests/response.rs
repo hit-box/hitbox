@@ -24,6 +24,7 @@ impl TestResponse {
 impl CacheableResponse for TestResponse {
     type Cached = Self;
     type Subject = Self;
+    type Context = ();
     type IntoCachedFuture = std::future::Ready<CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = std::future::Ready<Self>;
 
@@ -33,9 +34,9 @@ impl CacheableResponse for TestResponse {
         _config: &EntityPolicyConfig,
     ) -> hitbox_core::ResponseCachePolicy<Self>
     where
-        P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
+        P: hitbox_core::Predicate<Subject = Self::Subject, Context = Self::Context> + Send + Sync,
     {
-        match predicates.check(self).await {
+        match predicates.check(self, &mut Default::default()).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                 CachePolicy::Cacheable(res) => {
                     CachePolicy::Cacheable(CacheValue::new(res, Some(Utc::now()), Some(Utc::now())))
@@ -67,8 +68,13 @@ impl NeuralPredicate {
 #[async_trait]
 impl Predicate for NeuralPredicate {
     type Subject = TestResponse;
+    type Context = ();
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut Self::Context,
+    ) -> PredicateResult<Self::Subject> {
         PredicateResult::Cacheable(subject)
     }
 }

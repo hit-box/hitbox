@@ -19,7 +19,7 @@ async fn test_request_query_extractor_some() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().query("key");
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let query_part = key_parts.iter().find(|p| p.key() == "key").unwrap();
@@ -38,7 +38,7 @@ async fn test_request_query_extractor_none() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().query("non-existent-key");
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     assert!(key_parts.is_empty());
@@ -56,7 +56,7 @@ async fn test_request_query_extractor_multiple() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().query("cars");
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let car_parts: Vec<_> = key_parts.iter().filter(|p| p.key() == "cars").collect();
@@ -75,7 +75,7 @@ async fn test_request_query_extractor_from_string() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().query(String::from("page"));
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let page_part = key_parts.iter().find(|p| p.key() == "page").unwrap();
@@ -95,7 +95,7 @@ async fn test_request_query_extractor_starts_with() {
     let request = CacheableHttpRequest::from_request(request);
     let extractor =
         NeutralExtractor::new().query(QueryConfig::name(NameSelector::starts("filter_")));
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     // Should match filter_name and filter_role, not page
@@ -119,7 +119,7 @@ async fn test_request_query_extractor_with_regex_value() {
         QueryConfig::name(NameSelector::exact("version"))
             .value(ValueExtractor::Regex(regex::Regex::new(r"v(\d+)").unwrap())),
     );
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let version_part = key_parts.iter().find(|p| p.key() == "version").unwrap();
@@ -139,7 +139,7 @@ async fn test_request_query_extractor_with_transform() {
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new()
         .query(QueryConfig::name(NameSelector::exact("search")).transform(Transform::Lowercase));
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let search_part = key_parts.iter().find(|p| p.key() == "search").unwrap();

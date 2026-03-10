@@ -268,9 +268,9 @@ where
     Res: CacheableResponse + Send + 'static,
     Res::Cached: Cacheable + Send,
     Req: CacheableRequest + Send + 'offload,
-    ReqP: Predicate<Subject = Req> + Send + Sync + 'offload,
-    ResP: Predicate<Subject = Res::Subject> + Send + Sync + 'static,
-    E: Extractor<Subject = Req> + Send + Sync + 'offload,
+    ReqP: Predicate<Subject = Req, Context = Req::Context> + Send + Sync + 'offload,
+    ResP: Predicate<Subject = Res::Subject, Context = Res::Context> + Send + Sync + 'static,
+    E: Extractor<Subject = Req, Context = Req::Context> + Send + Sync + 'offload,
     C: ConcurrencyManager<Res> + 'static,
     O: Offload<'offload>,
 {

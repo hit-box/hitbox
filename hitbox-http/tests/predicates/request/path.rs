@@ -17,7 +17,7 @@ async fn test_request_path_predicates_full_match() {
             .unwrap(),
     );
     let predicate = NeutralRequestPredicate::new().path(path::Operation::pattern(expression));
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -32,7 +32,7 @@ async fn test_request_path_predicates_use_expression() {
             .unwrap(),
     );
     let predicate = NeutralRequestPredicate::new().path(path::Operation::pattern(expression));
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -47,7 +47,7 @@ async fn test_request_path_predicates_non_match() {
             .unwrap(),
     );
     let predicate = NeutralRequestPredicate::new().path(path::Operation::pattern(expression));
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }
 
@@ -62,7 +62,7 @@ async fn test_request_path_from_conversions() {
     );
     let op: path::Operation = "/api/users/{id}".into();
     let predicate = NeutralRequestPredicate::new().path(op);
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 
     // From<String>
@@ -74,6 +74,6 @@ async fn test_request_path_from_conversions() {
     );
     let op: path::Operation = String::from("/api/users/{id}").into();
     let predicate = NeutralRequestPredicate::new().path(op);
-    let prediction = predicate.check(request).await;
+    let prediction = predicate.check(request, &mut Default::default()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }

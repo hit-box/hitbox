@@ -97,10 +97,15 @@ where
     E: Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync,
 {
     type Subject = E::Subject;
+    type Context = E::Context;
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut Self::Context,
+    ) -> KeyParts<Self::Subject> {
         let method = subject.parts().method.to_string();
-        let mut parts = self.inner.get(subject).await;
+        let mut parts = self.inner.get(subject, ctx).await;
         parts.push(KeyPart::new("method", Some(method)));
         parts
     }

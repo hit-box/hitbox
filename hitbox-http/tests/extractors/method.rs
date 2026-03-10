@@ -14,6 +14,6 @@ async fn test_request_method_extractor_some() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().method(MethodConfig::new());
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut Default::default()).await;
     dbg!(parts);
 }

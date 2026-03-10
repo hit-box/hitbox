@@ -87,9 +87,14 @@ where
     <<P::Subject as CacheableSubject>::Body as HttpBody>::Data: Send,
 {
     type Subject = P::Subject;
+    type Context = P::Context;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        let inner_result = self.inner.check(subject).await;
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut Self::Context,
+    ) -> PredicateResult<Self::Subject> {
+        let inner_result = self.inner.check(subject, ctx).await;
 
         let (was_cacheable, subject) = match inner_result {
             PredicateResult::Cacheable(s) => (true, s),

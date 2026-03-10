@@ -63,7 +63,7 @@ use crate::predicates::version::HasVersion;
 ///         .method(MethodConfig::new())
 ///         .path("/users/{user_id}");
 ///     # let _: &Path<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
-///     let key_parts = extractor.get(cacheable).await;
+///     let key_parts = extractor.get(cacheable, &mut Default::default()).await;
 /// }
 /// ```
 #[derive(Debug)]
@@ -149,12 +149,13 @@ where
     ReqBody: HttpBody + Send + 'static,
     ReqBody::Error: Send,
 {
+    type Context = ();
     type CachePolicyFuture<'a, P, E>
         = std::pin::Pin<Box<dyn std::future::Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
         Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
+        P: Predicate<Subject = Self, Context = Self::Context> + Send + Sync + 'a,
+        E: Extractor<Subject = Self, Context = Self::Context> + Send + Sync + 'a;
 
     fn cache_policy<'a, P, E>(
         self,
@@ -163,13 +164,16 @@ where
     ) -> Self::CachePolicyFuture<'a, P, E>
     where
         Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a,
+        P: Predicate<Subject = Self, Context = Self::Context> + Send + Sync + 'a,
+        E: Extractor<Subject = Self, Context = Self::Context> + Send + Sync + 'a,
     {
         Box::pin(async move {
-            let (request, key) = extractors.get(self).await.into_cache_key();
+            let (request, key) = extractors
+                .get(self, &mut Default::default())
+                .await
+                .into_cache_key();
 
-            match predicates.check(request).await {
+            match predicates.check(request, &mut Default::default()).await {
                 PredicateResult::Cacheable(request) => {
                     CachePolicy::Cacheable(CacheablePolicyData { key, request })
                 }

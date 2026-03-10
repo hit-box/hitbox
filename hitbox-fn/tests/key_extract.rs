@@ -126,7 +126,7 @@ async fn test_extractor_with_derived_type() {
     let extractor = FnExtractor::new("test::get_user");
     let args = Args((UserId(42),));
 
-    let key_parts = extractor.get(args).await;
+    let key_parts = extractor.get(args, &mut Default::default()).await;
     let (_, key) = key_parts.into_cache_key();
 
     let key_str = key.to_string();
@@ -139,7 +139,7 @@ async fn test_extractor_with_multiple_derived_types() {
     let extractor = FnExtractor::new("test::get_user_for_tenant");
     let args = Args((UserId(1), TenantId("acme".into())));
 
-    let key_parts = extractor.get(args).await;
+    let key_parts = extractor.get(args, &mut Default::default()).await;
     let (_, key) = key_parts.into_cache_key();
 
     let key_str = key.to_string();
@@ -163,8 +163,14 @@ async fn test_extractor_skip_not_affect_key() {
         request_id: "req-222".into(),
     },));
 
-    let (_, key1) = extractor.get(args1).await.into_cache_key();
-    let (_, key2) = extractor.get(args2).await.into_cache_key();
+    let (_, key1) = extractor
+        .get(args1, &mut Default::default())
+        .await
+        .into_cache_key();
+    let (_, key2) = extractor
+        .get(args2, &mut Default::default())
+        .await
+        .into_cache_key();
 
     // Keys should be equal despite different request_id
     assert_eq!(key1.to_string(), key2.to_string());
@@ -174,8 +180,14 @@ async fn test_extractor_skip_not_affect_key() {
 async fn test_extractor_different_values_different_keys() {
     let extractor = FnExtractor::new("test::get_user");
 
-    let (_, key1) = extractor.get(Args((UserId(1),))).await.into_cache_key();
-    let (_, key2) = extractor.get(Args((UserId(2),))).await.into_cache_key();
+    let (_, key1) = extractor
+        .get(Args((UserId(1),)), &mut Default::default())
+        .await
+        .into_cache_key();
+    let (_, key2) = extractor
+        .get(Args((UserId(2),)), &mut Default::default())
+        .await
+        .into_cache_key();
 
     assert_ne!(key1.to_string(), key2.to_string());
 }
@@ -300,7 +312,7 @@ async fn test_extractor_with_scalars() {
     let extractor = FnExtractor::new("test::compute");
     let args = Args((42u64, "key".to_string()));
 
-    let key_parts = extractor.get(args).await;
+    let key_parts = extractor.get(args, &mut Default::default()).await;
     let (_, key) = key_parts.into_cache_key();
 
     let key_str = key.to_string();
@@ -313,9 +325,18 @@ async fn test_extractor_with_scalars() {
 async fn test_extractor_scalar_different_values() {
     let extractor = FnExtractor::new("test::add");
 
-    let (_, key1) = extractor.get(Args((1i64, 2i64))).await.into_cache_key();
-    let (_, key2) = extractor.get(Args((1i64, 3i64))).await.into_cache_key();
-    let (_, key3) = extractor.get(Args((1i64, 2i64))).await.into_cache_key();
+    let (_, key1) = extractor
+        .get(Args((1i64, 2i64)), &mut Default::default())
+        .await
+        .into_cache_key();
+    let (_, key2) = extractor
+        .get(Args((1i64, 3i64)), &mut Default::default())
+        .await
+        .into_cache_key();
+    let (_, key3) = extractor
+        .get(Args((1i64, 2i64)), &mut Default::default())
+        .await
+        .into_cache_key();
 
     // Different args = different keys
     assert_ne!(key1.to_string(), key2.to_string());

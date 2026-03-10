@@ -182,8 +182,13 @@ where
     T: KeyExtract + Send + Sync,
 {
     type Subject = T;
+    type Context = ();
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut Self::Context,
+    ) -> KeyParts<Self::Subject> {
         let extracted = subject.extract();
         let mut parts = KeyParts::new(subject);
         parts.push(KeyPart::new("fn", Some(self.fn_path)));
