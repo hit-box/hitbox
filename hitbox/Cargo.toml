@@ -26,8 +26,6 @@ futures = { workspace = true, features = ["alloc"] }
 tokio = { workspace = true, features = ["rt", "sync", "time"] }
 dashmap = { workspace = true }
 smol_str = { workspace = true }
-humantime-serde = "1"
-bounded-integer = { version = "0.6", features = ["macro", "serde1"] }
 
 [features]
 default = []

@@ -2,7 +2,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{
     Extractor, Predicate,
-    config::{BoxExtractor, BoxPredicate, CacheConfig},
+    config::{BoxExtractor, BoxPredicate, CacheConfig, CacheConfigs},
     policy::PolicyConfig,
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
@@ -28,7 +28,7 @@ where
     pub request_predicates: ArcRequestPredicate<ReqBody>,
     pub response_predicates: ArcResponsePredicate<ResBody>,
     pub extractors: ArcRequestExtractor<ReqBody>,
-    pub policy: PolicyConfig,
+    pub policy: Arc<PolicyConfig>,
 }
 
 impl<ReqBody, ResBody> Debug for Endpoint<ReqBody, ResBody>
@@ -56,7 +56,7 @@ where
             request_predicates: Arc::clone(&self.request_predicates),
             response_predicates: Arc::clone(&self.response_predicates),
             extractors: Arc::clone(&self.extractors),
-            policy: self.policy.clone(),
+            policy: Arc::clone(&self.policy),
         }
     }
 }
@@ -103,8 +103,25 @@ where
         Arc::clone(&self.extractors)
     }
 
-    fn policy(&self) -> &PolicyConfig {
-        &self.policy
+    fn policy(&self) -> Arc<PolicyConfig> {
+        Arc::clone(&self.policy)
+    }
+}
+
+impl<ReqBody, ResBody> CacheConfigs<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>
+    for Endpoint<ReqBody, ResBody>
+where
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
+    ReqBody::Data: Send,
+    ResBody: hyper::body::Body + Send + 'static,
+    ResBody::Error: Send,
+    ResBody::Data: Send,
+{
+    type Config = Self;
+
+    fn configs(&self) -> &[Self::Config] {
+        std::slice::from_ref(self)
     }
 }
 
@@ -128,7 +145,7 @@ where
     request_predicates: Option<ArcRequestPredicate<ReqBody>>,
     response_predicates: Option<ArcResponsePredicate<ResBody>>,
     extractors: Option<ArcRequestExtractor<ReqBody>>,
-    policy: PolicyConfig,
+    policy: Arc<PolicyConfig>,
 }
 
 impl<ReqBody, ResBody> EndpointBuilder<ReqBody, ResBody>
@@ -142,7 +159,7 @@ where
             request_predicates: None,
             response_predicates: None,
             extractors: None,
-            policy: PolicyConfig::default(),
+            policy: Arc::new(PolicyConfig::default()),
         }
     }
 
@@ -181,7 +198,10 @@ where
 
     /// Set the cache policy.
     pub fn policy(self, policy: PolicyConfig) -> Self {
-        Self { policy, ..self }
+        Self {
+            policy: Arc::new(policy),
+            ..self
+        }
     }
 
     /// Build the Endpoint, using defaults for any unset fields.

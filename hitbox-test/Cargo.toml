@@ -44,6 +44,7 @@ serde-saphyr = { workspace = true }
 serde_yaml = "0.9"
 indexmap = { version = "2", features = ["serde"] }
 serde = { workspace = true, features = ["rc"] }
+humantime-serde = "1"
 anyhow = "1"
 hurl_core = { version = "7.2.0-SNAPSHOT", git = "https://github.com/hit-box/hurl.git", branch = "master" }
 hurl = { version = "7.2.0-SNAPSHOT", git = "https://github.com/hit-box/hurl.git", branch = "master" }

@@ -73,8 +73,9 @@ pub mod context;
 /// the [`OffloadManager`](offload::OffloadManager) for handling these background tasks.
 pub mod offload;
 
-pub use config::{CacheConfig, Config, ConfigBuilder, NotSet};
+pub use config::{Config, ConfigBuilder, NotSet, SelectiveConfig};
 pub use context::{BoxContext, CacheContext, CacheStatus, CacheStatusExt, Context, ResponseSource};
+pub use hitbox_core::{CacheConfig, CacheConfigs};
 
 /// Policy configuration for cache behavior.
 ///

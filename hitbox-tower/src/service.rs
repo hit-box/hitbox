@@ -5,11 +5,10 @@
 //! this directly — it's created by the [`Cache`](crate::Cache) layer.
 
 use hitbox::concurrency::ConcurrencyManager;
-use hitbox::config::CacheConfig;
-use hitbox_core::{DisabledOffload, Offload};
+use hitbox_core::{CacheConfigs, DisabledOffload, Offload};
 use std::sync::Arc;
 
-use hitbox::{backend::CacheBackend, fsm::CacheFuture};
+use hitbox::{backend::CacheBackend, fsm::SelectiveCacheFuture};
 use hitbox_http::{BufferedBody, CacheableHttpRequest, CacheableHttpResponse};
 use http::header::HeaderName;
 use http::{Request, Response};
@@ -104,7 +103,7 @@ where
         + 'static,
     B: CacheBackend + Clone + Send + Sync + 'static,
     S::Future: Send,
-    C: CacheConfig<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>,
+    C: CacheConfigs<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>> + Clone,
     CM: ConcurrencyManager<Result<CacheableHttpResponse<ResBody>, S::Error>> + Clone + 'static,
     O: Offload<'static> + Clone,
     ReqBody: HttpBody + Send + 'static,
@@ -117,15 +116,13 @@ where
     type Response = Response<BufferedBody<ResBody>>;
     type Error = S::Error;
     type Future = CacheServiceFuture<
-        CacheFuture<
+        SelectiveCacheFuture<
             'static,
             B,
             CacheableHttpRequest<ReqBody>,
             Result<CacheableHttpResponse<ResBody>, S::Error>,
             TowerUpstream<S, ReqBody, ResBody>,
-            C::RequestPredicate,
-            C::ResponsePredicate,
-            C::Extractor,
+            C,
             CM,
             O,
         >,
@@ -141,8 +138,6 @@ where
     }
 
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        let configuration = &self.configuration;
-
         // Convert incoming Request<ReqBody> to CacheableHttpRequest<ReqBody>
         let (parts, body) = req.into_parts();
         let buffered_request = Request::from_parts(parts, BufferedBody::Passthrough(body));
@@ -151,15 +146,12 @@ where
         // Create upstream adapter that handles Tower service calls
         let upstream = TowerUpstream::new(self.upstream.clone());
 
-        // Create CacheFuture with cacheable types only
-        let cache_future = CacheFuture::new(
+        // Delegate to SelectiveCacheFuture which handles single and multi-config
+        let cache_future = SelectiveCacheFuture::new(
+            self.configuration.clone(),
             self.backend.clone(),
             cacheable_req,
             upstream,
-            configuration.request_predicates(),
-            configuration.response_predicates(),
-            configuration.extractors(),
-            Arc::new(configuration.policy().clone()),
             self.offload.clone(),
             self.concurrency_manager.clone(),
         );

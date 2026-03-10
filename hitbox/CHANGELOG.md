@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `SelectiveCacheFuture` for multi-config routing with first-match-wins strategy ([#253](https://github.com/hit-box/hitbox/pull/253))
+- `SelectiveConfig` container for multiple `CacheConfig` instances ([#253](https://github.com/hit-box/hitbox/pull/253))
+
+### Changed
+- `Config` now implements `CacheConfigs` via `slice::from_ref` ([#253](https://github.com/hit-box/hitbox/pull/253))
+- `Config` now stores `policy` as `Arc<PolicyConfig>` ([#253](https://github.com/hit-box/hitbox/pull/253))
 
 ### Changed
 - **Breaking:** Relaxed FSM lifetime bounds from `'static` to `'offload` for `Req`, `ReqP`, and `E` — enables caching of request types containing references ([#206](https://github.com/hit-box/hitbox/pull/206))

@@ -1,24 +1,117 @@
+use std::num::NonZeroU8;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::core::{BoxExtractor, HitboxWorld, StepExt};
 use crate::handler_state::HandlerName;
 use hitbox::offload::OffloadManager;
+use hitbox::policy;
 use hitbox_configuration::{Request, Response, extractors::Extractor};
 use hitbox_http::extractors::NeutralExtractor;
 
 use anyhow::{Error, anyhow};
 use cucumber::gherkin::Step;
 use cucumber::given;
-use hitbox::policy::PolicyConfig;
 use serde::{Deserialize, Serialize};
+
+// =============================================================================
+// Serde-enabled policy types for YAML deserialization in BDD tests
+// =============================================================================
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+enum StalePolicy {
+    #[default]
+    Return,
+    Revalidate,
+    OffloadRevalidate,
+}
+
+impl From<StalePolicy> for policy::StalePolicy {
+    fn from(s: StalePolicy) -> Self {
+        match s {
+            StalePolicy::Return => policy::StalePolicy::Return,
+            StalePolicy::Revalidate => policy::StalePolicy::Revalidate,
+            StalePolicy::OffloadRevalidate => policy::StalePolicy::OffloadRevalidate,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct CacheBehaviorPolicy {
+    #[serde(default)]
+    stale: StalePolicy,
+}
+
+impl From<CacheBehaviorPolicy> for policy::CacheBehaviorPolicy {
+    fn from(s: CacheBehaviorPolicy) -> Self {
+        policy::CacheBehaviorPolicy {
+            stale: s.stale.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct EnabledCacheConfig {
+    #[serde(default, with = "humantime_serde")]
+    ttl: Option<Duration>,
+    #[serde(default, with = "humantime_serde")]
+    stale: Option<Duration>,
+    #[serde(default)]
+    policy: CacheBehaviorPolicy,
+    concurrency: Option<NonZeroU8>,
+}
+
+impl Default for EnabledCacheConfig {
+    fn default() -> Self {
+        Self {
+            ttl: Some(Duration::from_secs(5)),
+            stale: None,
+            policy: CacheBehaviorPolicy::default(),
+            concurrency: None,
+        }
+    }
+}
+
+impl From<EnabledCacheConfig> for policy::EnabledCacheConfig {
+    fn from(s: EnabledCacheConfig) -> Self {
+        policy::EnabledCacheConfig {
+            ttl: s.ttl,
+            stale: s.stale,
+            policy: s.policy.into(),
+            concurrency: s.concurrency,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum PolicyConfig {
+    Enabled(EnabledCacheConfig),
+    Disabled,
+}
+
+impl Default for PolicyConfig {
+    fn default() -> Self {
+        PolicyConfig::Enabled(EnabledCacheConfig::default())
+    }
+}
+
+impl From<PolicyConfig> for policy::PolicyConfig {
+    fn from(s: PolicyConfig) -> Self {
+        match s {
+            PolicyConfig::Enabled(config) => policy::PolicyConfig::Enabled(config.into()),
+            PolicyConfig::Disabled => policy::PolicyConfig::Disabled,
+        }
+    }
+}
 
 #[given(regex = r"hitbox with policy")]
 fn hitbox_with_policy(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
-    let policy = step
+    let policy: policy::PolicyConfig = step
         .docstring_content()
         .as_deref()
         .map(serde_saphyr::from_str::<PolicyConfig>)
         .transpose()?
+        .map(Into::into)
         .unwrap_or_default();
     world.config.policy = policy;
     Ok(())

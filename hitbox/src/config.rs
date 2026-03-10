@@ -1,41 +1,21 @@
-//! Cache configuration trait and type aliases.
+//! Cache configuration types and implementations.
 //!
-//! `CacheConfig` unifies request filtering, response filtering, key extraction,
-//! and TTL policy into a single configuration object per endpoint.
+//! Provides [`Config`] (single configuration) and [`SelectiveConfig`] (multi-config routing),
+//! both implementing [`CacheConfigs`] for use with cache services.
 
 use std::sync::Arc;
 
-use crate::Extractor;
+use hitbox_core::Extractor;
+pub use hitbox_core::config::{CacheConfig, CacheConfigs};
+use hitbox_core::predicate::Predicate;
+
 use crate::policy::PolicyConfig;
-use crate::predicate::Predicate;
 
 /// Boxed predicate for dynamic dispatch.
 pub type BoxPredicate<R> = Box<dyn Predicate<Subject = R> + Send + Sync>;
 
 /// Boxed extractor for dynamic dispatch.
 pub type BoxExtractor<Req> = Box<dyn Extractor<Subject = Req> + Send + Sync>;
-
-/// Trait for cache configuration.
-///
-/// Provides predicates for determining cacheability, extractors for generating
-/// cache keys, and policy for TTL/staleness behavior.
-pub trait CacheConfig<Req, Res> {
-    /// Predicate type for filtering requests.
-    type RequestPredicate: Predicate<Subject = Req> + Send + Sync + 'static;
-    /// Predicate type for filtering responses.
-    type ResponsePredicate: Predicate<Subject = Res> + Send + Sync + 'static;
-    /// Extractor type for generating cache keys.
-    type Extractor: Extractor<Subject = Req> + Send + Sync + 'static;
-
-    /// Returns predicates that decide if a request should be cached.
-    fn request_predicates(&self) -> Self::RequestPredicate;
-    /// Returns predicates that decide if a response should be cached.
-    fn response_predicates(&self) -> Self::ResponsePredicate;
-    /// Returns extractors that generate cache keys from requests.
-    fn extractors(&self) -> Self::Extractor;
-    /// Returns TTL and behavior policy for cached entries.
-    fn policy(&self) -> &PolicyConfig;
-}
 
 /// Generic cache configuration.
 ///
@@ -72,7 +52,7 @@ pub struct Config<ReqPred, ResPred, Ext> {
     request_predicate: Arc<ReqPred>,
     response_predicate: Arc<ResPred>,
     extractor: Arc<Ext>,
-    policy: PolicyConfig,
+    policy: Arc<PolicyConfig>,
 }
 
 impl<ReqPred, ResPred, Ext> Clone for Config<ReqPred, ResPred, Ext> {
@@ -81,7 +61,7 @@ impl<ReqPred, ResPred, Ext> Clone for Config<ReqPred, ResPred, Ext> {
             request_predicate: Arc::clone(&self.request_predicate),
             response_predicate: Arc::clone(&self.response_predicate),
             extractor: Arc::clone(&self.extractor),
-            policy: self.policy.clone(),
+            policy: Arc::clone(&self.policy),
         }
     }
 }
@@ -121,10 +101,61 @@ where
         Arc::clone(&self.extractor)
     }
 
-    fn policy(&self) -> &PolicyConfig {
-        &self.policy
+    fn policy(&self) -> Arc<PolicyConfig> {
+        Arc::clone(&self.policy)
     }
 }
+
+impl<Req, Res, ReqPred, ResPred, Ext> CacheConfigs<Req, Res> for Config<ReqPred, ResPred, Ext>
+where
+    Req: Send,
+    Res: Send,
+    ReqPred: Predicate<Subject = Req> + Send + Sync + 'static,
+    ResPred: Predicate<Subject = Res> + Send + Sync + 'static,
+    Ext: Extractor<Subject = Req> + Send + Sync + 'static,
+{
+    type Config = Self;
+
+    fn configs(&self) -> &[Self::Config] {
+        std::slice::from_ref(self)
+    }
+}
+
+// =============================================================================
+// SelectiveConfig
+// =============================================================================
+
+/// Multi-config container for selective caching.
+///
+/// Holds multiple [`CacheConfig`] instances evaluated in order by
+/// [`SelectiveCacheFuture`](crate::fsm::SelectiveCacheFuture).
+/// First matching configuration wins.
+#[derive(Debug, Clone)]
+pub struct SelectiveConfig<C> {
+    configs: Vec<C>,
+}
+
+impl<C> SelectiveConfig<C> {
+    /// Create a new selective config from a vector of configurations.
+    pub fn new(configs: Vec<C>) -> Self {
+        Self { configs }
+    }
+}
+
+impl<Req, Res, C> CacheConfigs<Req, Res> for SelectiveConfig<C>
+where
+    C: CacheConfig<Req, Res>,
+{
+    type Config = C;
+
+    fn configs(&self) -> &[C] {
+        &self.configs
+    }
+}
+
+// =============================================================================
+// Builder
+// =============================================================================
 
 /// Builder for [`Config`].
 ///
@@ -226,32 +257,7 @@ where
             request_predicate: Arc::new(self.request_predicate),
             response_predicate: Arc::new(self.response_predicate),
             extractor: Arc::new(self.extractor),
-            policy: self.policy,
+            policy: Arc::new(self.policy),
         }
-    }
-}
-
-impl<T, Req, Res> CacheConfig<Req, Res> for Arc<T>
-where
-    T: CacheConfig<Req, Res>,
-{
-    type RequestPredicate = T::RequestPredicate;
-    type ResponsePredicate = T::ResponsePredicate;
-    type Extractor = T::Extractor;
-
-    fn request_predicates(&self) -> Self::RequestPredicate {
-        self.as_ref().request_predicates()
-    }
-
-    fn response_predicates(&self) -> Self::ResponsePredicate {
-        self.as_ref().response_predicates()
-    }
-
-    fn extractors(&self) -> Self::Extractor {
-        self.as_ref().extractors()
-    }
-
-    fn policy(&self) -> &PolicyConfig {
-        self.as_ref().policy()
     }
 }

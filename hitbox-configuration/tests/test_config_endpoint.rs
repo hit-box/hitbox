@@ -1,15 +1,9 @@
 use bytes::Bytes;
-use hitbox::policy::PolicyConfig;
 use hitbox_configuration::{ConfigEndpoint, types::MaybeUndefined};
 use http_body_util::Empty;
-use std::time::Duration;
 
 type ReqBody = Empty<Bytes>;
 type ResBody = Empty<Bytes>;
-
-fn default_policy() -> PolicyConfig {
-    PolicyConfig::builder().ttl(Duration::from_secs(60)).build()
-}
 
 #[test]
 fn test_extractors_variants() {
@@ -20,9 +14,7 @@ fn test_extractors_variants() {
     ] {
         let endpoint = ConfigEndpoint {
             extractors,
-            request: MaybeUndefined::Undefined,
-            response: MaybeUndefined::Undefined,
-            policy: default_policy(),
+            ..Default::default()
         };
         assert!(endpoint.extractors::<ReqBody>().is_ok());
     }
@@ -31,12 +23,7 @@ fn test_extractors_variants() {
 #[test]
 fn test_into_endpoint_variants() {
     // all undefined
-    let endpoint = ConfigEndpoint {
-        extractors: MaybeUndefined::Undefined,
-        request: MaybeUndefined::Undefined,
-        response: MaybeUndefined::Undefined,
-        policy: default_policy(),
-    };
+    let endpoint = ConfigEndpoint::default();
     assert!(endpoint.into_endpoint::<ReqBody, ResBody>().is_ok());
 
     // all null
@@ -44,12 +31,8 @@ fn test_into_endpoint_variants() {
         extractors: MaybeUndefined::Null,
         request: MaybeUndefined::Null,
         response: MaybeUndefined::Null,
-        policy: default_policy(),
+        ..Default::default()
     };
-    assert!(endpoint.into_endpoint::<ReqBody, ResBody>().is_ok());
-
-    // default
-    let endpoint = ConfigEndpoint::default();
     assert!(endpoint.into_endpoint::<ReqBody, ResBody>().is_ok());
 }
 
