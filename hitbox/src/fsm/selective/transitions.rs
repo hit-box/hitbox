@@ -58,22 +58,6 @@ impl<'a, Req, UF> CheckPredicateTransition<'a, Req, UF> {
     }
 }
 
-impl<Req, UF> std::fmt::Debug for CheckPredicateTransition<'_, Req, UF> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::ExtractKey { config_index, .. } => f
-                .debug_struct("CheckPredicateTransition::ExtractKey")
-                .field("config_index", config_index)
-                .finish(),
-            Self::NextConfig { config_index, .. } => f
-                .debug_struct("CheckPredicateTransition::NextConfig")
-                .field("config_index", config_index)
-                .finish(),
-            Self::Passthrough { .. } => f.write_str("CheckPredicateTransition::Passthrough"),
-        }
-    }
-}
-
 // =============================================================================
 // ExtractKeyTransition
 // =============================================================================
@@ -90,14 +74,6 @@ impl<Inner> ExtractKeyTransition<Inner> {
             ExtractKeyTransition::RunCacheFuture { inner } => {
                 SelectiveState::RunCacheFuture { inner }
             }
-        }
-    }
-}
-
-impl<Inner> std::fmt::Debug for ExtractKeyTransition<Inner> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::RunCacheFuture { .. } => f.write_str("ExtractKeyTransition::RunCacheFuture"),
         }
     }
 }

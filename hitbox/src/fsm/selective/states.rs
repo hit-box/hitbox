@@ -58,17 +58,6 @@ pub enum SelectiveState<'a, Inner, Req, UF> {
     },
 }
 
-impl<Inner, Req, UF> std::fmt::Debug for SelectiveState<'_, Inner, Req, UF> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::CheckPredicate { .. } => f.write_str("SelectiveState::CheckPredicate"),
-            Self::ExtractKey { .. } => f.write_str("SelectiveState::ExtractKey"),
-            Self::RunCacheFuture { .. } => f.write_str("SelectiveState::RunCacheFuture"),
-            Self::Passthrough { .. } => f.write_str("SelectiveState::Passthrough"),
-        }
-    }
-}
-
 // =============================================================================
 // CheckPredicate
 // =============================================================================
@@ -171,14 +160,6 @@ impl CheckPredicate {
     }
 }
 
-impl std::fmt::Debug for CheckPredicate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CheckPredicate")
-            .field("config_index", &self.config_index)
-            .finish_non_exhaustive()
-    }
-}
-
 // =============================================================================
 // ExtractKey
 // =============================================================================
@@ -264,14 +245,6 @@ impl ExtractKey {
     }
 }
 
-impl std::fmt::Debug for ExtractKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ExtractKey")
-            .field("config_index", &self.config_index)
-            .finish_non_exhaustive()
-    }
-}
-
 // =============================================================================
 // Passthrough
 // =============================================================================
@@ -291,11 +264,5 @@ impl Passthrough {
         Self {
             span: span!(parent: parent, Level::TRACE, "fsm.Passthrough"),
         }
-    }
-}
-
-impl std::fmt::Debug for Passthrough {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Passthrough").finish_non_exhaustive()
     }
 }
