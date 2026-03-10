@@ -236,21 +236,25 @@ impl CachedFn {
         !self.lifetimes.is_empty() || !self.type_params.is_empty()
     }
 
-    /// Returns true if the function has any lifetime parameters.
-    pub fn has_lifetimes(&self) -> bool {
-        !self.lifetimes.is_empty()
-    }
-
     /// Returns true if the function has 2+ lifetime parameters,
     /// requiring a synthetic `'__hitbox` lifetime to represent their minimum.
     pub fn needs_synthetic_lifetime(&self) -> bool {
         self.lifetimes.len() >= 2
     }
 
-    /// Returns generic parameters for the internal impl function only.
-    /// These are the original user generics without any synthetic lifetime.
+    /// Returns the synthetic `'__hitbox` lifetime token.
+    ///
+    /// Used as a single "minimum" lifetime when a function has 2+ lifetime
+    /// parameters. All user lifetimes are bounded by it (`'a: '__hitbox`),
+    /// so the compiler infers it as the shortest.
+    pub fn synthetic_lifetime(&self) -> syn::Lifetime {
+        syn::Lifetime::new("'__hitbox", proc_macro2::Span::call_site())
+    }
+
+    /// Returns the user's original generic parameters without synthetic lifetime.
+    /// Used only for the internal impl function (the actual async fn body).
     /// Example: `'a, 'b, T: Clone` (without angle brackets)
-    pub fn fn_generic_params(&self) -> TokenStream {
+    pub fn user_generic_params(&self) -> TokenStream {
         let lifetimes = &self.lifetimes;
         let type_params = &self.type_params;
 
@@ -274,6 +278,7 @@ impl CachedFn {
         let type_params = &self.type_params;
 
         if self.needs_synthetic_lifetime() {
+            let synthetic = self.synthetic_lifetime();
             let bounded: Vec<_> = self
                 .lifetimes
                 .iter()
@@ -281,16 +286,16 @@ impl CachedFn {
                     let lifetime = &lt.lifetime;
                     let bounds = &lt.bounds;
                     if bounds.is_empty() {
-                        quote::quote! { #lifetime: '__hitbox }
+                        quote::quote! { #lifetime: #synthetic }
                     } else {
-                        quote::quote! { #lifetime: #bounds + '__hitbox }
+                        quote::quote! { #lifetime: #bounds + #synthetic }
                     }
                 })
                 .collect();
             if type_params.is_empty() {
-                quote::quote! { '__hitbox, #(#bounded),* }
+                quote::quote! { #synthetic, #(#bounded),* }
             } else {
-                quote::quote! { '__hitbox, #(#bounded),*, #(#type_params),* }
+                quote::quote! { #synthetic, #(#bounded),*, #(#type_params),* }
             }
         } else {
             let lifetimes = &self.lifetimes;
@@ -313,10 +318,11 @@ impl CachedFn {
         let type_idents: Vec<_> = self.type_params.iter().map(|tp| &tp.ident).collect();
 
         if self.needs_synthetic_lifetime() {
+            let synthetic = self.synthetic_lifetime();
             if type_idents.is_empty() {
-                quote::quote! { '__hitbox, #(#lifetime_idents),* }
+                quote::quote! { #synthetic, #(#lifetime_idents),* }
             } else {
-                quote::quote! { '__hitbox, #(#lifetime_idents),*, #(#type_idents),* }
+                quote::quote! { #synthetic, #(#lifetime_idents),*, #(#type_idents),* }
             }
         } else {
             match (lifetime_idents.is_empty(), type_idents.is_empty()) {
@@ -328,51 +334,6 @@ impl CachedFn {
         }
     }
 
-    /// Returns the lifetime declarations part for manual generic construction.
-    ///
-    /// Used by generators that build their own generic params (e.g., adding `'c`, `B`, `CM`, `O`).
-    /// Returns empty for 0 lifetimes.
-    ///
-    /// - 1 lifetime: `'a`
-    /// - 2+ lifetimes: `'__hitbox, 'a: '__hitbox, 'b: '__hitbox`
-    pub fn lifetime_params_decl(&self) -> TokenStream {
-        if self.needs_synthetic_lifetime() {
-            let bounded: Vec<_> = self
-                .lifetimes
-                .iter()
-                .map(|lt| {
-                    let lifetime = &lt.lifetime;
-                    let bounds = &lt.bounds;
-                    if bounds.is_empty() {
-                        quote::quote! { #lifetime: '__hitbox }
-                    } else {
-                        quote::quote! { #lifetime: #bounds + '__hitbox }
-                    }
-                })
-                .collect();
-            quote::quote! { '__hitbox, #(#bounded),* }
-        } else {
-            let lifetimes = &self.lifetimes;
-            quote::quote! { #(#lifetimes),* }
-        }
-    }
-
-    /// Returns the lifetime arguments part for type applications.
-    ///
-    /// Used by generators that build their own generic args (e.g., adding `'c`, `B`, `CM`, `O`).
-    /// Returns empty for 0 lifetimes.
-    ///
-    /// - 1 lifetime: `'a`
-    /// - 2+ lifetimes: `'__hitbox, 'a, 'b`
-    pub fn lifetime_args(&self) -> TokenStream {
-        let lifetime_idents: Vec<_> = self.lifetimes.iter().map(|lt| &lt.lifetime).collect();
-        if self.needs_synthetic_lifetime() {
-            quote::quote! { '__hitbox, #(#lifetime_idents),* }
-        } else {
-            quote::quote! { #(#lifetime_idents),* }
-        }
-    }
-
     /// Returns the PhantomData type for struct context fields.
     ///
     /// When a synthetic lifetime exists, includes it in the phantom to "use" it:
@@ -380,7 +341,8 @@ impl CachedFn {
     /// - With synthetic: `std::marker::PhantomData<(&'__hitbox (), C)>`
     pub fn phantom_context_type(&self) -> TokenStream {
         if self.needs_synthetic_lifetime() {
-            quote::quote! { std::marker::PhantomData<(&'__hitbox (), C)> }
+            let synthetic = self.synthetic_lifetime();
+            quote::quote! { std::marker::PhantomData<(&#synthetic (), C)> }
         } else {
             quote::quote! { std::marker::PhantomData<C> }
         }
@@ -484,19 +446,19 @@ impl CachedFn {
     /// Returns the expression to instantiate the upstream struct.
     ///
     /// - For functions with type params: `UpstreamName::<T>(std::marker::PhantomData)`
-    /// - For functions with lifetimes: `UpstreamName(std::marker::PhantomData)`
-    /// - For functions without generics: `UpstreamName`
+    /// - For synthetic lifetime (no types): `UpstreamName(std::marker::PhantomData)`
+    /// - Otherwise (unit struct): `UpstreamName`
     pub fn upstream_instance(&self) -> TokenStream {
         let upstream_name = &self.upstream_name;
         if !self.type_params.is_empty() {
             // Type params need turbofish; lifetimes (including '__hitbox) are inferred.
             let type_idents: Vec<_> = self.type_params.iter().map(|tp| &tp.ident).collect();
             quote::quote! { #upstream_name::<#( #type_idents ),*>(std::marker::PhantomData) }
-        } else if self.has_lifetimes() {
-            // Lifetimes only — no turbofish needed, all lifetimes are inferred.
+        } else if self.needs_synthetic_lifetime() {
+            // Synthetic lifetime on struct — no turbofish, lifetime is inferred.
             quote::quote! { #upstream_name(std::marker::PhantomData) }
         } else {
-            // No generics — unit struct.
+            // Unit struct (lifetimes, if any, are only on the impl block).
             quote::quote! { #upstream_name }
         }
     }
@@ -513,7 +475,10 @@ impl CachedFn {
                 let lt = &self.lifetimes[0].lifetime;
                 quote::quote! { #lt }
             }
-            _ => quote::quote! { '__hitbox },
+            _ => {
+                let synthetic = self.synthetic_lifetime();
+                quote::quote! { #synthetic }
+            }
         }
     }
 }

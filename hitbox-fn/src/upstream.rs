@@ -2,7 +2,7 @@
 
 use std::future::Future;
 
-use hitbox_core::Upstream;
+use hitbox::Upstream;
 
 /// Wrapper that adapts an async function to the [`Upstream`] trait.
 ///

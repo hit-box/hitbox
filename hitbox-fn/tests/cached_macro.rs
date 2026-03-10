@@ -81,7 +81,7 @@ pub async fn with_db_connection(_db: DbConnection, user_id: i64) -> String {
 // Generic type parameter support
 // =============================================================================
 
-use hitbox_core::KeyPart;
+use hitbox::KeyPart;
 use hitbox_fn::KeyExtract;
 
 /// A type that implements KeyExtract for use in generic tests.
@@ -128,7 +128,7 @@ pub async fn generic_with_skip<T: KeyExtract + Clone + std::fmt::Debug + Send + 
 // =============================================================================
 
 fn create_cache()
--> Cache<MokaBackend, hitbox::concurrency::NoopConcurrencyManager, hitbox_core::DisabledOffload> {
+-> Cache<MokaBackend, hitbox::concurrency::NoopConcurrencyManager, hitbox::DisabledOffload> {
     Cache::builder()
         .backend(MokaBackend::builder().max_entries(100).build())
         .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
@@ -371,20 +371,6 @@ async fn test_generic_with_skip() {
 // =============================================================================
 // Reference parameter support
 // =============================================================================
-//
-// NOTE: Reference parameter support requires additional work due to complex
-// lifetime interactions between GATs, the Upstream trait, and the CacheFuture.
-// The issue is that Rust requires the Upstream impl to work for any combination
-// of lifetimes, but our impl only works when the struct's lifetime matches the
-// Args' inner lifetime. This is a known limitation with GATs.
-//
-// TODO: Investigate alternative approaches:
-// 1. Using higher-rank trait bounds (HRTB)
-// 2. Different struct design (not carrying lifetime)
-// 3. Boxed dyn Upstream instead of concrete types
-//
-// For now, reference parameters are not supported. Use owned types or
-// clone the data before passing to cached functions.
 
 /// Function with a reference parameter.
 #[cached(prefix = "ref_param")]
@@ -485,6 +471,18 @@ async fn test_two_lifetimes_passthrough() {
     let s = String::from("world");
     let result = with_two_lifetimes(&p, &s).await;
     assert_eq!(result, "hello-world");
+}
+
+#[tokio::test]
+async fn test_two_lifetimes_different_scopes() {
+    // The two references have genuinely different lifetimes:
+    // `"long"` is 'static while `&s` borrows a local.
+    // This exercises the synthetic '__hitbox lifetime (inferred as the shorter one).
+    let result = {
+        let s = String::from("short");
+        with_two_lifetimes("long", &s).await
+    };
+    assert_eq!(result, "long-short");
 }
 
 #[tokio::test]
@@ -748,8 +746,8 @@ mod spy_backend {
     use async_trait::async_trait;
     use dashmap::DashMap;
     use hitbox::backend::{Backend, BackendError, CacheBackend, DeleteStatus};
+    use hitbox::{CacheKey, CacheValue, Raw};
     use hitbox_backend::format::RonFormat;
-    use hitbox_core::{CacheKey, CacheValue, Raw};
 
     /// A backend that always misses but records keys and values.
     /// Uses RON format for human-readable value inspection.

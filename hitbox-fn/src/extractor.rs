@@ -16,7 +16,7 @@ use crate::Args;
 ///
 /// ```
 /// use hitbox_fn::KeyExtract;
-/// use hitbox_core::KeyPart;
+/// use hitbox::KeyPart;
 ///
 /// struct UserId(u64);
 ///
@@ -34,7 +34,7 @@ use crate::Args;
 ///
 /// ```
 /// use hitbox_fn::{Args, KeyExtract};
-/// use hitbox_core::KeyPart;
+/// use hitbox::KeyPart;
 ///
 /// struct UserId(u64);
 /// impl KeyExtract for UserId {
