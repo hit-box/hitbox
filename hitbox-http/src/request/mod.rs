@@ -149,18 +149,32 @@ where
     ReqBody: HttpBody + Send + 'static,
     ReqBody::Error: Send,
 {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    type CachePolicyFuture<'a, P, E>
+        = std::pin::Pin<Box<dyn std::future::Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-        E: Extractor<Subject = Self> + Send + Sync,
-    {
-        let (request, key) = extractors.get(self).await.into_cache_key();
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a;
 
-        match predicates.check(request).await {
-            PredicateResult::Cacheable(request) => {
-                CachePolicy::Cacheable(CacheablePolicyData { key, request })
+    fn cache_policy<'a, P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Self::CachePolicyFuture<'a, P, E>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
+    {
+        Box::pin(async move {
+            let (request, key) = extractors.get(self).await.into_cache_key();
+
+            match predicates.check(request).await {
+                PredicateResult::Cacheable(request) => {
+                    CachePolicy::Cacheable(CacheablePolicyData { key, request })
+                }
+                PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),
             }
-            PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),
-        }
+        })
     }
 }

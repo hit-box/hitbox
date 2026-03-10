@@ -42,10 +42,10 @@ pub mod metrics;
 pub use error::CacheError;
 
 pub use hitbox_core::{
-    And, BackendLabel, CacheKey, CachePolicy, CacheState, CacheValue, CacheablePolicyData,
-    CacheableRequest, CacheableResponse, DisabledOffload, EntityPolicyConfig, Extractor, KeyPart,
-    KeyParts, Neutral, Not, Offload, Or, Predicate, PredicateExt, Raw, RequestCachePolicy,
-    ResponseCachePolicy,
+    And, BackendLabel, CacheKey, CachePolicy, CacheState, CacheValue, Cacheable,
+    CacheablePolicyData, CacheableRequest, CacheableResponse, DisabledOffload, EntityPolicyConfig,
+    Extractor, KeyPart, KeyParts, Neutral, Not, Offload, OffloadKey, Or, Predicate, PredicateExt,
+    Raw, RequestCachePolicy, ResponseCachePolicy, Upstream,
 };
 
 /// Hidden re-export of serde for derive macro generated code.

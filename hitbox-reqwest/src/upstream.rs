@@ -33,21 +33,21 @@ use reqwest_middleware::{Next, Result};
 ///
 /// # Type Parameter
 ///
-/// The lifetime `'a` comes from [`Next<'a>`], representing the middleware
+/// The lifetime `'middleware` comes from [`Next`], representing the middleware
 /// chain's lifetime. This is why [`DisabledOffload`] is used in the middleware -
 /// we cannot spawn background tasks with non-`'static` lifetimes.
 ///
 /// [`Next`]: reqwest_middleware::Next
 /// [`DisabledOffload`]: hitbox_core::DisabledOffload
-pub struct ReqwestUpstream<'a> {
-    next: Next<'a>,
+pub struct ReqwestUpstream<'middleware> {
+    next: Next<'middleware>,
     extensions: Extensions,
 }
 
-impl<'a> ReqwestUpstream<'a> {
+impl<'middleware> ReqwestUpstream<'middleware> {
     /// Creates a new upstream wrapper. Typically called internally by
     /// [`CacheMiddleware`](crate::CacheMiddleware).
-    pub fn new(next: Next<'a>, extensions: Extensions) -> Self {
+    pub fn new(next: Next<'middleware>, extensions: Extensions) -> Self {
         Self { next, extensions }
     }
 }
@@ -57,14 +57,18 @@ impl<'a> ReqwestUpstream<'a> {
 /// This allows the hitbox cache FSM to treat the remaining middleware chain
 /// as an upstream service that can be called on cache misses.
 ///
+/// The implementation clones `Next` and takes `Extensions` so the returned
+/// future owns all data it needs, allowing the FSM to move the future
+/// independently of the upstream.
+///
 /// [`Upstream`]: hitbox_core::Upstream
-impl<'a> Upstream<CacheableHttpRequest<reqwest::Body>> for ReqwestUpstream<'a> {
+impl<'middleware> Upstream<CacheableHttpRequest<reqwest::Body>> for ReqwestUpstream<'middleware> {
     type Response = Result<CacheableHttpResponse<reqwest::Body>>;
-    type Future = Pin<Box<dyn Future<Output = Self::Response> + Send + 'a>>;
+    type Future = Pin<Box<dyn Future<Output = Self::Response> + Send + 'middleware>>;
 
-    fn call(&mut self, req: CacheableHttpRequest<reqwest::Body>) -> Self::Future {
-        let next = self.next.clone();
-        let mut extensions = std::mem::take(&mut self.extensions);
+    fn call(self, req: CacheableHttpRequest<reqwest::Body>) -> Self::Future {
+        let next = self.next;
+        let mut extensions = self.extensions;
 
         Box::pin(async move {
             // Convert CacheableHttpRequest back to reqwest::Request

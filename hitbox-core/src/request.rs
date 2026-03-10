@@ -62,18 +62,29 @@ pub type RequestCachePolicy<T> = CachePolicy<CacheablePolicyData<T>, T>;
 /// 2. If cacheable, extracts a cache key using the provided extractors
 /// 3. Returns either `Cacheable` with the key or `NonCacheable`
 pub trait CacheableRequest: Sized {
+    /// The future type returned by `cache_policy`.
+    ///
+    /// Uses GAT to properly capture the lifetime of `Self`, allowing
+    /// request types with non-`'static` references.
+    type CachePolicyFuture<'a, P, E>: Future<Output = RequestCachePolicy<Self>> + Send + 'a
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a;
+
     /// Determine if this request should be cached and extract its key.
     ///
     /// # Arguments
     ///
     /// * `predicates` - Predicates to evaluate whether the request is cacheable
     /// * `extractors` - Extractors to generate the cache key
-    fn cache_policy<P, E>(
+    fn cache_policy<'a, P, E>(
         self,
         predicates: P,
         extractors: E,
-    ) -> impl Future<Output = RequestCachePolicy<Self>> + Send
+    ) -> Self::CachePolicyFuture<'a, P, E>
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-        E: Extractor<Subject = Self> + Send + Sync;
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a;
 }

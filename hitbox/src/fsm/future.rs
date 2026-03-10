@@ -46,7 +46,7 @@ where
     backend: Arc<B>,
     cache_key: Option<CacheKey>,
     #[pin]
-    state: State<Res, Req, U, ReqP, E>,
+    state: State<'offload, Res, Req, U, ReqP, E>,
     response_predicates: Option<ResP>,
     policy: Arc<crate::policy::PolicyConfig>,
     /// Offload for background revalidation (SWR).
@@ -156,7 +156,7 @@ where
         backend: Arc<B>,
         cache_key: CacheKey,
         request: Req,
-        mut upstream: U,
+        upstream: U,
         response_predicates: ResP,
         policy: Arc<crate::policy::PolicyConfig>,
     ) -> Self {
@@ -199,10 +199,10 @@ where
     B: CacheBackend + Send + Sync + 'static,
     Res: CacheableResponse + Send + 'static,
     Res::Cached: Cacheable + Send,
-    Req: CacheableRequest + Send + 'static,
-    ReqP: Predicate<Subject = Req> + Send + Sync + 'static,
+    Req: CacheableRequest + Send + 'offload,
+    ReqP: Predicate<Subject = Req> + Send + Sync + 'offload,
     ResP: Predicate<Subject = Res::Subject> + Send + Sync + 'static,
-    E: Extractor<Subject = Req> + Send + Sync + 'static,
+    E: Extractor<Subject = Req> + Send + Sync + 'offload,
     C: ConcurrencyManager<Res> + 'static,
     O: Offload<'offload>,
 {

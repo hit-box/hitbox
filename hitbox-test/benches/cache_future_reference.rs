@@ -87,7 +87,7 @@ impl Upstream<BenchRequest> for MockUpstream {
     type Response = BenchResponse;
     type Future = Ready<Self::Response>;
 
-    fn call(&mut self, _req: BenchRequest) -> Self::Future {
+    fn call(self, _req: BenchRequest) -> Self::Future {
         // Create a fresh response each time (no Clone needed)
         std::future::ready(CacheableHttpResponse::from_response(
             create_reference_response(),

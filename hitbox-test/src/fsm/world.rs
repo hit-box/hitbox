@@ -29,22 +29,36 @@ use crate::tracing::{SpanCollector, create_span_collector};
 pub struct SimpleRequest(pub u32);
 
 impl CacheableRequest for SimpleRequest {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    type CachePolicyFuture<'a, P, E>
+        = std::pin::Pin<Box<dyn std::future::Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-        E: Extractor<Subject = Self> + Send + Sync,
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a;
+
+    fn cache_policy<'a, P, E>(
+        self,
+        predicates: P,
+        extractors: E,
+    ) -> Self::CachePolicyFuture<'a, P, E>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
     {
-        match predicates.check(self).await {
-            PredicateResult::Cacheable(request) => {
-                let key_parts = extractors.get(request).await;
-                let (request, cache_key) = key_parts.into_cache_key();
-                RequestCachePolicy::Cacheable(CacheablePolicyData {
-                    key: cache_key,
-                    request,
-                })
+        Box::pin(async move {
+            match predicates.check(self).await {
+                PredicateResult::Cacheable(request) => {
+                    let key_parts = extractors.get(request).await;
+                    let (request, cache_key) = key_parts.into_cache_key();
+                    RequestCachePolicy::Cacheable(CacheablePolicyData {
+                        key: cache_key,
+                        request,
+                    })
+                }
+                PredicateResult::NonCacheable(request) => RequestCachePolicy::NonCacheable(request),
             }
-            PredicateResult::NonCacheable(request) => RequestCachePolicy::NonCacheable(request),
-        }
+        })
     }
 }
 
@@ -162,8 +176,8 @@ impl Upstream<SimpleRequest> for ConfigurableUpstream {
     type Response = SimpleResponse;
     type Future = std::pin::Pin<Box<dyn std::future::Future<Output = SimpleResponse> + Send>>;
 
-    fn call(&mut self, request: SimpleRequest) -> Self::Future {
-        let call_count = self.call_count.clone();
+    fn call(self, request: SimpleRequest) -> Self::Future {
+        let call_count = self.call_count;
         let delay_ms = self.delay_ms;
         let response_value = request.0;
         Box::pin(async move {

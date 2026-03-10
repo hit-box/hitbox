@@ -5,7 +5,6 @@ fn compile_fail() {
     // Feature-independent tests
     t.compile_fail("tests/compile_fail/sync_fn.rs");
     t.compile_fail("tests/compile_fail/self_method.rs");
-    t.compile_fail("tests/compile_fail/lifetime_params.rs");
     t.compile_fail("tests/compile_fail/skip_unknown_param.rs");
 
     // CacheableResponse tests produce different errors with rkyv_format

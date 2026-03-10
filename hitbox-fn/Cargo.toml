@@ -12,15 +12,15 @@ rust-version.workspace = true
 [features]
 default = []
 derive = ["hitbox-derive"]
-rkyv_format = ["hitbox/rkyv_format", "hitbox-core/rkyv_format", "dep:rkyv"]
+rkyv_format = ["hitbox/rkyv_format", "dep:rkyv"]
 
 [dependencies]
 hitbox = { path = "../hitbox", version = "0.2" }
-hitbox-core = { path = "../hitbox-core", version = "0.2" }
 hitbox-derive = { path = "../hitbox-derive", version = "0.2", optional = true }
 rkyv = { workspace = true, optional = true }
 
 async-trait = { workspace = true }
+pin-project = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }

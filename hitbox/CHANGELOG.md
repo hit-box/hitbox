@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** Relaxed FSM lifetime bounds from `'static` to `'offload` for `Req`, `ReqP`, and `E` — enables caching of request types containing references ([#206](https://github.com/hit-box/hitbox/pull/206))
+
+### Added
+- Re-export `Upstream`, `Cacheable`, and `OffloadKey` from `hitbox-core` ([#206](https://github.com/hit-box/hitbox/pull/206))
+
 ## [0.2.4] - 2026-02-17
 
 ### Added

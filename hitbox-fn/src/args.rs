@@ -1,5 +1,8 @@
 //! Argument wrapper for function caching.
 
+use std::future::Future;
+use std::pin::Pin;
+
 use hitbox::{
     CachePolicy, CacheableRequest, Extractor, KeyPart, Predicate, RequestCachePolicy,
     predicate::PredicateResult,
@@ -107,35 +110,63 @@ impl<T> Args<T> {
 macro_rules! impl_cacheable_request_for_args {
     () => {
         impl CacheableRequest for Args<()> {
-            async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+            type CachePolicyFuture<'a, P, E>
+                = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
             where
-                P: Predicate<Subject = Self> + Send + Sync,
-                E: Extractor<Subject = Self> + Send + Sync,
+                Self: 'a,
+                P: Predicate<Subject = Self> + Send + Sync + 'a,
+                E: Extractor<Subject = Self> + Send + Sync + 'a;
+
+            fn cache_policy<'a, P, E>(
+                self,
+                predicates: P,
+                extractors: E,
+            ) -> Self::CachePolicyFuture<'a, P, E>
+            where
+                Self: 'a,
+                P: Predicate<Subject = Self> + Send + Sync + 'a,
+                E: Extractor<Subject = Self> + Send + Sync + 'a,
             {
-                match predicates.check(self).await {
-                    PredicateResult::Cacheable(subject) => {
-                        let (subject, key) = extractors.get(subject).await.into_cache_key();
-                        CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                Box::pin(async move {
+                    match predicates.check(self).await {
+                        PredicateResult::Cacheable(subject) => {
+                            let (subject, key) = extractors.get(subject).await.into_cache_key();
+                            CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                        }
+                        PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
                     }
-                    PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-                }
+                })
             }
         }
     };
     ($($T:ident),+) => {
-        impl<$($T: Send + Sync + 'static),+> CacheableRequest for Args<($($T,)+)> {
-            async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+        impl<$($T: Send + Sync),+> CacheableRequest for Args<($($T,)+)> {
+            type CachePolicyFuture<'a, P, E>
+                = Pin<Box<dyn Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
             where
-                P: Predicate<Subject = Self> + Send + Sync,
-                E: Extractor<Subject = Self> + Send + Sync,
+                Self: 'a,
+                P: Predicate<Subject = Self> + Send + Sync + 'a,
+                E: Extractor<Subject = Self> + Send + Sync + 'a;
+
+            fn cache_policy<'a, P, E>(
+                self,
+                predicates: P,
+                extractors: E,
+            ) -> Self::CachePolicyFuture<'a, P, E>
+            where
+                Self: 'a,
+                P: Predicate<Subject = Self> + Send + Sync + 'a,
+                E: Extractor<Subject = Self> + Send + Sync + 'a,
             {
-                match predicates.check(self).await {
-                    PredicateResult::Cacheable(subject) => {
-                        let (subject, key) = extractors.get(subject).await.into_cache_key();
-                        CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                Box::pin(async move {
+                    match predicates.check(self).await {
+                        PredicateResult::Cacheable(subject) => {
+                            let (subject, key) = extractors.get(subject).await.into_cache_key();
+                            CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
+                        }
+                        PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
                     }
-                    PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
-                }
+                })
             }
         }
     };

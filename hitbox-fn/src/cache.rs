@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
+use hitbox::DisabledOffload;
 use hitbox::backend::CacheBackend;
 use hitbox::concurrency::NoopConcurrencyManager;
 use hitbox::policy::PolicyConfig;
-use hitbox_core::DisabledOffload;
 
 /// Marker: no backend configured.
 pub struct NoBackend;

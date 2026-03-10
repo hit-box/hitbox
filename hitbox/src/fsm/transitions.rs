@@ -24,14 +24,14 @@ use crate::{CacheKey, CacheableRequest, CacheableResponse, Extractor, Predicate}
 // =============================================================================
 
 /// Transitions from Initial state.
-pub enum InitialTransition<Req, U>
+pub enum InitialTransition<'req, Req, U>
 where
-    Req: CacheableRequest,
-    U: Upstream<Req>,
+    Req: CacheableRequest + 'req,
+    U: Upstream<Req> + 'req,
 {
     /// Cache is enabled - check request cache policy
     CheckRequestCachePolicy {
-        cache_policy_future: RequestCachePolicyFuture<Req>,
+        cache_policy_future: RequestCachePolicyFuture<'req, Req>,
         ctx: BoxContext,
         upstream: U,
     },
@@ -42,12 +42,12 @@ where
     },
 }
 
-impl<Req, U> InitialTransition<Req, U>
+impl<'req, Req, U> InitialTransition<'req, Req, U>
 where
-    Req: CacheableRequest,
-    U: Upstream<Req>,
+    Req: CacheableRequest + 'req,
+    U: Upstream<Req> + 'req,
 {
-    pub fn into_state<Res, ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<Res, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
     where
         Res: CacheableResponse,
         U: Upstream<Req, Response = Res>,
@@ -78,7 +78,7 @@ where
     }
 }
 
-impl<Req, U> std::fmt::Debug for InitialTransition<Req, U>
+impl<Req, U> std::fmt::Debug for InitialTransition<'_, Req, U>
 where
     Req: CacheableRequest,
     U: Upstream<Req>,
@@ -122,9 +122,10 @@ where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -216,9 +217,10 @@ where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -305,11 +307,14 @@ pub enum ConvertResponseTransition<Res> {
 }
 
 impl<Res> ConvertResponseTransition<Res> {
-    pub fn into_state<Req, U, ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E>
     where
         Res: CacheableResponse,
-        Req: CacheableRequest,
-        U: Upstream<Req, Response = Res>,
+        Req: CacheableRequest + 'req,
+        U: Upstream<Req, Response = Res> + 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -356,9 +361,10 @@ where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -416,9 +422,10 @@ where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E>(self, parent: &Span) -> State<'req, Res, Req, U, ReqP, E>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -478,10 +485,13 @@ impl<Res> PollUpstreamTransition<Res>
 where
     Res: CacheableResponse,
 {
-    pub fn into_state<Req, U, ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E>
     where
-        Req: CacheableRequest,
-        U: Upstream<Req, Response = Res>,
+        Req: CacheableRequest + 'req,
+        U: Upstream<Req, Response = Res> + 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -539,10 +549,13 @@ impl<Res> CheckResponseCachePolicyTransition<Res>
 where
     Res: CacheableResponse,
 {
-    pub fn into_state<Req, U, ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E>
     where
-        Req: CacheableRequest,
-        U: Upstream<Req, Response = Res>,
+        Req: CacheableRequest + 'req,
+        U: Upstream<Req, Response = Res> + 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
@@ -584,11 +597,14 @@ pub enum UpdateCacheTransition<Res> {
 }
 
 impl<Res> UpdateCacheTransition<Res> {
-    pub fn into_state<Req, U, ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E>
     where
         Res: CacheableResponse,
-        Req: CacheableRequest,
-        U: Upstream<Req, Response = Res>,
+        Req: CacheableRequest + 'req,
+        U: Upstream<Req, Response = Res> + 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
     {
