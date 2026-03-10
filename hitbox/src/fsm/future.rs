@@ -208,7 +208,7 @@ where
     /// Create a CacheFuture starting at `PollCache` state, skipping predicate
     /// evaluation and key extraction.
     ///
-    /// Used by [`MultiCacheFuture`] after the routing FSM has already evaluated
+    /// Used by [`SelectiveCacheFuture`](super::SelectiveCacheFuture) after the routing FSM has already evaluated
     /// request predicates and extracted the cache key.
     ///
     /// Note: `ReqP` and `E` are phantom types in this path — the FSM starts
