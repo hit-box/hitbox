@@ -7,6 +7,7 @@ use hitbox_configuration::{
     },
     types::MaybeUndefined,
 };
+use hitbox_core::EvalContext;
 use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::{BufferedBody, CacheableHttpRequest};
 use http::Request as HttpRequest;
@@ -57,7 +58,7 @@ async fn test_expression_into_predicates() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let cacheable = predicate_or.check(request).await;
+    let cacheable = predicate_or.check(request, &mut EvalContext::new()).await;
     assert!(matches!(cacheable, PredicateResult::NonCacheable(_)));
 }
 
@@ -132,7 +133,7 @@ async fn test_or_with_matching_first_predicate() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let cacheable = predicate_or.check(request).await;
+    let cacheable = predicate_or.check(request, &mut EvalContext::new()).await;
     assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
 }
 
@@ -154,7 +155,7 @@ async fn test_or_with_matching_middle_predicate() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let cacheable = predicate_or.check(request).await;
+    let cacheable = predicate_or.check(request, &mut EvalContext::new()).await;
     assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
 }
 
@@ -176,7 +177,7 @@ async fn test_or_with_matching_last_predicate() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let cacheable = predicate_or.check(request).await;
+    let cacheable = predicate_or.check(request, &mut EvalContext::new()).await;
     assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
 }
 
@@ -198,7 +199,7 @@ async fn test_or_with_no_matching_predicates() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let cacheable = predicate_or.check(request).await;
+    let cacheable = predicate_or.check(request, &mut EvalContext::new()).await;
     assert!(matches!(cacheable, PredicateResult::NonCacheable(_)));
 }
 
@@ -216,7 +217,7 @@ async fn test_or_with_single_predicate_matching() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let cacheable = predicate_or.check(request).await;
+    let cacheable = predicate_or.check(request, &mut EvalContext::new()).await;
     assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
 }
 
@@ -234,7 +235,7 @@ async fn test_or_with_single_predicate_not_matching() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let cacheable = predicate_or.check(request).await;
+    let cacheable = predicate_or.check(request, &mut EvalContext::new()).await;
     assert!(matches!(cacheable, PredicateResult::NonCacheable(_)));
 }
 
@@ -256,7 +257,7 @@ async fn test_or_with_mixed_predicate_types() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let cacheable = predicate_or.check(request).await;
+    let cacheable = predicate_or.check(request, &mut EvalContext::new()).await;
     assert!(matches!(cacheable, PredicateResult::Cacheable(_)));
 }
 

@@ -4,6 +4,7 @@
 //! in cache keys.
 
 use async_trait::async_trait;
+use hitbox::EvalContext;
 use hitbox::{Extractor, KeyPart, KeyParts};
 
 use crate::CacheableHttpRequest;
@@ -92,9 +93,9 @@ where
 {
     type Subject = E::Subject;
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
         let version = format!("{:?}", subject.parts().version);
-        let mut parts = self.inner.get(subject).await;
+        let mut parts = self.inner.get(subject, ctx).await;
         parts.push(KeyPart::new("version", Some(version)));
         parts
     }

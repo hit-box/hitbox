@@ -49,7 +49,8 @@ impl<'a> CacheableResponseImpl<'a> {
                 where
                     __P: hitbox::predicate::Predicate<Subject = Self::Subject> + Send + Sync,
                 {
-                    match predicates.check(self).await {
+                    let mut ctx = hitbox::EvalContext::new();
+                    match predicates.check(self, &mut ctx).await {
                         hitbox::predicate::PredicateResult::Cacheable(data) => {
                             let cached = data.clone();
                             hitbox::CachePolicy::Cacheable(
@@ -104,7 +105,8 @@ impl<'a> CacheableResponseImpl<'a> {
                 where
                     __P: hitbox::predicate::Predicate<Subject = Self::Subject> + Send + Sync,
                 {
-                    match predicates.check(self).await {
+                    let mut ctx = hitbox::EvalContext::new();
+                    match predicates.check(self, &mut ctx).await {
                         hitbox::predicate::PredicateResult::Cacheable(data) => {
                             let cached = #cached_name {
                                 #(#field_idents: data.#field_idents,)*

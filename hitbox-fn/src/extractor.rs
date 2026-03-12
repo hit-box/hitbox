@@ -183,7 +183,11 @@ where
 {
     type Subject = T;
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut hitbox::EvalContext,
+    ) -> KeyParts<Self::Subject> {
         let extracted = subject.extract();
         let mut parts = KeyParts::new(subject);
         parts.push(KeyPart::new("fn", Some(self.fn_path)));

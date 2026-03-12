@@ -35,7 +35,7 @@ pub type BoxExtractor<Req> = Box<dyn Extractor<Subject = Req> + Send + Sync>;
 /// # #[async_trait::async_trait]
 /// # impl Extractor for FixedKeyExtractor {
 /// #     type Subject = String;
-/// #     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+/// #     async fn get(&self, subject: Self::Subject, _ctx: &mut hitbox::EvalContext) -> KeyParts<Self::Subject> {
 /// #         KeyParts::new(subject)
 /// #     }
 /// # }

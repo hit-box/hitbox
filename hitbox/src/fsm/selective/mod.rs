@@ -153,7 +153,11 @@ where
         match first_enabled {
             Some(idx) => {
                 let pred = configs.configs()[idx].request_predicates();
-                let predicate_future = Box::pin(async move { pred.check(request).await });
+                let predicate_future = Box::pin(async move {
+                    let mut ctx = hitbox_core::EvalContext::new();
+                    let result = pred.check(request, &mut ctx).await;
+                    (result, ctx)
+                });
                 trace!(parent: &span, config_index = idx, "Checking first enabled config");
                 SelectiveCacheFuture {
                     configs,
@@ -214,10 +218,15 @@ where
                 } => {
                     let check = state.as_ref().expect(POLL_AFTER_READY);
                     trace!(parent: &check.span, "FSM state: CheckPredicate");
-                    let result = ready!(predicate_future.poll(cx));
+                    let (result, ctx) = ready!(predicate_future.poll(cx));
                     let check = state.take().expect(POLL_AFTER_READY);
                     check
-                        .transition::<_, Res, _, _>(result, &*this.configs, &mut *this.upstream)
+                        .transition::<_, Res, _, _>(
+                            result,
+                            ctx,
+                            &*this.configs,
+                            &mut *this.upstream,
+                        )
                         .into_state(&*this.span)
                 }
                 SelectiveStateProj::ExtractKey {

@@ -1,5 +1,6 @@
 use crate::CacheableHttpResponse;
 use async_trait::async_trait;
+use hitbox::EvalContext;
 use hitbox::predicate::{Predicate, PredicateResult};
 
 /// HTTP status code classes for broad matching.
@@ -191,8 +192,12 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, response: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.inner.check(response).await {
+    async fn check(
+        &self,
+        response: Self::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
+        match self.inner.check(response, ctx).await {
             PredicateResult::Cacheable(response) => {
                 if self.operation.matches(response.parts.status) {
                     PredicateResult::Cacheable(response)

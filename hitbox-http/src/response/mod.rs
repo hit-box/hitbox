@@ -7,6 +7,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::FutureExt;
 use futures::future::BoxFuture;
+use hitbox::EvalContext;
 use hitbox::{
     CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, predicate::PredicateResult,
 };
@@ -421,7 +422,8 @@ where
     where
         P: hitbox::Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        match predicates.check(self).await {
+        let mut ctx = EvalContext::new();
+        match predicates.check(self, &mut ctx).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                 CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
                     res,

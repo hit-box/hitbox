@@ -1,6 +1,7 @@
 pub use crate::extractors::extractor;
 pub use crate::predicates::request::predicate;
 
+use hitbox::EvalContext;
 use hitbox::{
     CacheablePolicyData, RequestCachePolicy,
     predicate::{Predicate, PredicateResult},
@@ -63,7 +64,7 @@ use crate::predicates::version::HasVersion;
 ///         .method(MethodConfig::new())
 ///         .path("/users/{user_id}");
 ///     # let _: &Path<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
-///     let key_parts = extractor.get(cacheable).await;
+///     let key_parts = extractor.get(cacheable, &mut hitbox::EvalContext::new()).await;
 /// }
 /// ```
 #[derive(Debug)]
@@ -167,9 +168,10 @@ where
         E: Extractor<Subject = Self> + Send + Sync + 'a,
     {
         Box::pin(async move {
-            let (request, key) = extractors.get(self).await.into_cache_key();
+            let mut ctx = EvalContext::new();
+            let (request, key) = extractors.get(self, &mut ctx).await.into_cache_key();
 
-            match predicates.check(request).await {
+            match predicates.check(request, &mut ctx).await {
                 PredicateResult::Cacheable(request) => {
                     CachePolicy::Cacheable(CacheablePolicyData { key, request })
                 }

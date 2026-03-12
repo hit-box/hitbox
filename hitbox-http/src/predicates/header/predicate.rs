@@ -1,6 +1,7 @@
 //! Header predicate implementation.
 
 use async_trait::async_trait;
+use hitbox::EvalContext;
 use hitbox::predicate::{Predicate, PredicateResult};
 use http::HeaderMap;
 
@@ -101,8 +102,12 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.inner.check(subject).await {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
+        match self.inner.check(subject, ctx).await {
             PredicateResult::Cacheable(subject) => {
                 let is_cacheable = self.operation.check(subject.headers());
                 if is_cacheable {
