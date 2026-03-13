@@ -169,10 +169,9 @@ where
     {
         Box::pin(async move {
             let mut ctx = EvalContext::new();
-            let (request, key) = extractors.get(self, &mut ctx).await.into_cache_key();
-
-            match predicates.check(request, &mut ctx).await {
+            match predicates.check(self, &mut ctx).await {
                 PredicateResult::Cacheable(request) => {
+                    let (request, key) = extractors.get(request, &mut ctx).await.into_cache_key();
                     CachePolicy::Cacheable(CacheablePolicyData { key, request })
                 }
                 PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),
