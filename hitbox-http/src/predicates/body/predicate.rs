@@ -92,7 +92,7 @@ where
     async fn check(
         &self,
         subject: Self::Subject,
-        ctx: &mut EvalContext,
+        ctx: &EvalContext,
     ) -> PredicateResult<Self::Subject> {
         let inner_result = self.inner.check(subject, ctx).await;
 

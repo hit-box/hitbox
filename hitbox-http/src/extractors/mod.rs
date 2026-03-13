@@ -128,7 +128,7 @@ where
 {
     type Subject = CacheableHttpRequest<ResBody>;
 
-    async fn get(&self, subject: Self::Subject, _ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, _ctx: &EvalContext) -> KeyParts<Self::Subject> {
         KeyParts::new(subject)
     }
 }

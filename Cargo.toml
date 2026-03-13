@@ -71,3 +71,6 @@ criterion = "0.8"
 # SmallBox for inline trait objects
 smallbox = "0.8"
 
+# Synchronization
+parking_lot = "0.12"
+

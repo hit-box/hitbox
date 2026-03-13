@@ -47,7 +47,7 @@ where
     async fn check(
         &self,
         subject: Self::Subject,
-        _ctx: &mut EvalContext,
+        _ctx: &EvalContext,
     ) -> PredicateResult<Self::Subject> {
         PredicateResult::Cacheable(subject)
     }

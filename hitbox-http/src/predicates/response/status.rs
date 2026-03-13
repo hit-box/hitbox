@@ -195,7 +195,7 @@ where
     async fn check(
         &self,
         response: Self::Subject,
-        ctx: &mut EvalContext,
+        ctx: &EvalContext,
     ) -> PredicateResult<Self::Subject> {
         match self.inner.check(response, ctx).await {
             PredicateResult::Cacheable(response) => {

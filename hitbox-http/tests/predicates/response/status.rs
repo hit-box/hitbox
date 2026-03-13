@@ -23,9 +23,7 @@ fn response(status: u16) -> CacheableHttpResponse<Empty<Bytes>> {
 async fn test_response_predicates_match() {
     let predicate =
         NeutralResponsePredicate::new().status(StatusOp::eq(StatusCode::from_u16(200).unwrap()));
-    let prediction = predicate
-        .check(response(200), &mut EvalContext::new())
-        .await;
+    let prediction = predicate.check(response(200), &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -33,9 +31,7 @@ async fn test_response_predicates_match() {
 async fn test_response_predicates_not_match() {
     let predicate =
         NeutralResponsePredicate::new().status(StatusOp::eq(StatusCode::from_u16(200).unwrap()));
-    let prediction = predicate
-        .check(response(500), &mut EvalContext::new())
-        .await;
+    let prediction = predicate.check(response(500), &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }
 
@@ -48,9 +44,7 @@ async fn test_status_class_matching() {
         (503, StatusClass::ServerError),
     ] {
         let predicate = NeutralResponsePredicate::new().status(class);
-        let prediction = predicate
-            .check(response(status), &mut EvalContext::new())
-            .await;
+        let prediction = predicate.check(response(status), &EvalContext::new()).await;
         assert!(
             matches!(prediction, PredicateResult::Cacheable(_)),
             "expected Cacheable for status {status}"
@@ -61,9 +55,7 @@ async fn test_status_class_matching() {
 #[tokio::test]
 async fn test_status_class_mismatch() {
     let predicate = NeutralResponsePredicate::new().status(StatusClass::ClientError);
-    let prediction = predicate
-        .check(response(200), &mut EvalContext::new())
-        .await;
+    let prediction = predicate.check(response(200), &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
 }
 
@@ -72,17 +64,13 @@ async fn test_status_from_conversions() {
     // From StatusCode
     let op: StatusOp = StatusCode::OK.into();
     let predicate = NeutralResponsePredicate::new().status(op);
-    let prediction = predicate
-        .check(response(200), &mut EvalContext::new())
-        .await;
+    let prediction = predicate.check(response(200), &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 
     // From StatusClass
     let op: StatusOp = StatusClass::Success.into();
     let predicate = NeutralResponsePredicate::new().status(op);
-    let prediction = predicate
-        .check(response(201), &mut EvalContext::new())
-        .await;
+    let prediction = predicate.check(response(201), &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -92,9 +80,7 @@ async fn test_status_range() {
         StatusCode::OK,
         StatusCode::from_u16(299).unwrap(),
     ));
-    let prediction = predicate
-        .check(response(204), &mut EvalContext::new())
-        .await;
+    let prediction = predicate.check(response(204), &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -102,8 +88,6 @@ async fn test_status_range() {
 async fn test_status_any() {
     let predicate = NeutralResponsePredicate::new()
         .status(StatusOp::any(vec![StatusCode::OK, StatusCode::CREATED]));
-    let prediction = predicate
-        .check(response(201), &mut EvalContext::new())
-        .await;
+    let prediction = predicate.check(response(201), &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }

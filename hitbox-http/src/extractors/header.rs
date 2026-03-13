@@ -222,7 +222,7 @@ where
 {
     type Subject = E::Subject;
 
-    async fn get(&self, subject: Self::Subject, ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, ctx: &EvalContext) -> KeyParts<Self::Subject> {
         let headers = &subject.parts().headers;
         let mut extracted_parts = Vec::new();
 

@@ -28,7 +28,7 @@ mod jq_eq_tests {
             operation: JqOperation::Eq(json!("test-value")),
         });
 
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -47,7 +47,7 @@ mod jq_eq_tests {
             operation: JqOperation::Eq(json!("wrong-value")),
         });
 
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 
@@ -66,7 +66,7 @@ mod jq_eq_tests {
             operation: JqOperation::Eq(json!("test-value")),
         });
 
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -91,7 +91,7 @@ mod jq_exist_tests {
             operation: JqOperation::Exist,
         });
 
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -110,7 +110,7 @@ mod jq_exist_tests {
             operation: JqOperation::Exist,
         });
 
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -136,7 +136,7 @@ mod jq_in_tests {
             operation: JqOperation::In(values),
         });
 
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -156,7 +156,7 @@ mod jq_in_tests {
             operation: JqOperation::In(values),
         });
 
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -177,7 +177,7 @@ async fn test_response_body_jq_nested_field() {
         operation: JqOperation::Eq(json!("value_one")),
     });
 
-    let prediction = predicate.check(response, &mut EvalContext::new()).await;
+    let prediction = predicate.check(response, &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -201,7 +201,7 @@ async fn test_response_body_jq_array_index() {
         operation: JqOperation::Eq(json!("my-key-01")),
     });
 
-    let prediction = predicate.check(response, &mut EvalContext::new()).await;
+    let prediction = predicate.check(response, &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -226,7 +226,7 @@ async fn test_response_body_jq_array_map() {
         operation: JqOperation::Eq(json!(["my-key-00", "my-key-01", "my-key-02"])),
     });
 
-    let prediction = predicate.check(response, &mut EvalContext::new()).await;
+    let prediction = predicate.check(response, &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -245,7 +245,7 @@ mod constructor_tests {
                 .unwrap(),
         );
         let predicate = NeutralResponsePredicate::new().body(Operation::limit(1024));
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 
         // non-cacheable (exceeds limit)
@@ -256,7 +256,7 @@ mod constructor_tests {
                 .unwrap(),
         );
         let predicate = NeutralResponsePredicate::new().body(Operation::limit(10));
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 
@@ -271,7 +271,7 @@ mod constructor_tests {
         );
         let predicate = NeutralResponsePredicate::new()
             .body(Operation::plain(PlainOperation::Contains("success".into())));
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 
         // jq constructor
@@ -283,7 +283,7 @@ mod constructor_tests {
         );
         let predicate = NeutralResponsePredicate::new()
             .body(Operation::jq(".status", JqOperation::Eq(json!("ok"))).unwrap());
-        let prediction = predicate.check(response, &mut EvalContext::new()).await;
+        let prediction = predicate.check(response, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 }

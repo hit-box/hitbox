@@ -45,10 +45,10 @@ impl<'a> ToTokens for CacheableRequestImpl<'a> {
                     __E: hitbox::Extractor<Subject = Self> + Send + Sync + '__a,
                 {
                     ::std::boxed::Box::pin(async move {
-                        let mut ctx = hitbox::EvalContext::new();
-                        match predicates.check(self, &mut ctx).await {
+                        let ctx = hitbox::EvalContext::new();
+                        match predicates.check(self, &ctx).await {
                             hitbox::predicate::PredicateResult::Cacheable(subject) => {
-                                let (subject, key) = extractors.get(subject, &mut ctx).await.into_cache_key();
+                                let (subject, key) = extractors.get(subject, &ctx).await.into_cache_key();
                                 hitbox::CachePolicy::Cacheable(
                                     hitbox::CacheablePolicyData::new(key, subject)
                                 )

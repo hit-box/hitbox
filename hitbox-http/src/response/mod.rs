@@ -422,8 +422,8 @@ where
     where
         P: hitbox::Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        let mut ctx = EvalContext::new();
-        match predicates.check(self, &mut ctx).await {
+        let ctx = EvalContext::new();
+        match predicates.check(self, &ctx).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                 CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
                     res,

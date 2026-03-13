@@ -29,7 +29,7 @@ mod eq_tests {
             operation: JqOperation::Eq("test-value".into()),
         });
 
-        let prediction = predicate.check(request, &mut EvalContext::new()).await;
+        let prediction = predicate.check(request, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -48,7 +48,7 @@ mod eq_tests {
             operation: JqOperation::Eq("wrong-value".into()),
         });
 
-        let prediction = predicate.check(request, &mut EvalContext::new()).await;
+        let prediction = predicate.check(request, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 
@@ -66,7 +66,7 @@ mod eq_tests {
             operation: JqOperation::Eq("test-value".into()),
         });
 
-        let prediction = predicate.check(request, &mut EvalContext::new()).await;
+        let prediction = predicate.check(request, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -90,7 +90,7 @@ mod exist_tests {
             operation: JqOperation::Exist,
         });
 
-        let prediction = predicate.check(request, &mut EvalContext::new()).await;
+        let prediction = predicate.check(request, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -108,7 +108,7 @@ mod exist_tests {
             operation: JqOperation::Exist,
         });
 
-        let prediction = predicate.check(request, &mut EvalContext::new()).await;
+        let prediction = predicate.check(request, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -133,7 +133,7 @@ mod in_tests {
             operation: JqOperation::In(values.into_iter().map(|v| v.into()).collect()),
         });
 
-        let prediction = predicate.check(request, &mut EvalContext::new()).await;
+        let prediction = predicate.check(request, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -152,7 +152,7 @@ mod in_tests {
             operation: JqOperation::In(values.into_iter().map(|v| v.into()).collect()),
         });
 
-        let prediction = predicate.check(request, &mut EvalContext::new()).await;
+        let prediction = predicate.check(request, &EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -172,7 +172,7 @@ async fn test_request_body_predicates_positive_basic() {
         operation: JqOperation::Eq("value_one".into()),
     });
 
-    let prediction = predicate.check(request, &mut EvalContext::new()).await;
+    let prediction = predicate.check(request, &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -195,7 +195,7 @@ async fn test_request_body_predicates_positive_array() {
         operation: JqOperation::Eq("my-key-01".into()),
     });
 
-    let prediction = predicate.check(request, &mut EvalContext::new()).await;
+    let prediction = predicate.check(request, &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
 
@@ -219,6 +219,6 @@ async fn test_request_body_predicates_positive_multiple_value() {
         operation: JqOperation::Eq(json!(["my-key-00", "my-key-01", "my-key-02"])),
     });
 
-    let prediction = predicate.check(request, &mut EvalContext::new()).await;
+    let prediction = predicate.check(request, &EvalContext::new()).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }

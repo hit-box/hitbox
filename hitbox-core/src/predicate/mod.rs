@@ -98,7 +98,7 @@ pub trait Predicate {
     async fn check(
         &self,
         subject: Self::Subject,
-        ctx: &mut EvalContext,
+        ctx: &EvalContext,
     ) -> PredicateResult<Self::Subject>;
 }
 
@@ -110,11 +110,7 @@ where
 {
     type Subject = T::Subject;
 
-    async fn check(
-        &self,
-        subject: T::Subject,
-        ctx: &mut EvalContext,
-    ) -> PredicateResult<T::Subject> {
+    async fn check(&self, subject: T::Subject, ctx: &EvalContext) -> PredicateResult<T::Subject> {
         self.as_ref().check(subject, ctx).await
     }
 }
@@ -127,11 +123,7 @@ where
 {
     type Subject = T::Subject;
 
-    async fn check(
-        &self,
-        subject: T::Subject,
-        ctx: &mut EvalContext,
-    ) -> PredicateResult<T::Subject> {
+    async fn check(&self, subject: T::Subject, ctx: &EvalContext) -> PredicateResult<T::Subject> {
         (*self).check(subject, ctx).await
     }
 }
@@ -144,11 +136,7 @@ where
 {
     type Subject = T::Subject;
 
-    async fn check(
-        &self,
-        subject: T::Subject,
-        ctx: &mut EvalContext,
-    ) -> PredicateResult<T::Subject> {
+    async fn check(&self, subject: T::Subject, ctx: &EvalContext) -> PredicateResult<T::Subject> {
         self.as_ref().check(subject, ctx).await
     }
 }
@@ -165,8 +153,8 @@ mod tests {
         // PredicateExt works on Box<dyn Predicate> because Box<T> is Sized
         let combined = p1.or(p2);
 
-        let mut ctx = EvalContext::new();
-        let result = combined.check(42, &mut ctx).await;
+        let ctx = EvalContext::new();
+        let result = combined.check(42, &ctx).await;
         assert!(matches!(result, PredicateResult::Cacheable(42)));
     }
 
@@ -179,8 +167,8 @@ mod tests {
         // Chain: p1.and(p2).or(p3).not()
         let combined = p1.and(p2).or(p3).not();
 
-        let mut ctx = EvalContext::new();
-        let result = combined.check(42, &mut ctx).await;
+        let ctx = EvalContext::new();
+        let result = combined.check(42, &ctx).await;
         // Neutral returns Cacheable, so: Cacheable AND Cacheable = Cacheable, OR Cacheable = Cacheable, NOT = NonCacheable
         assert!(matches!(result, PredicateResult::NonCacheable(42)));
     }
@@ -194,8 +182,8 @@ mod tests {
         // Can chain after boxing
         let combined = p1.or(p2);
 
-        let mut ctx = EvalContext::new();
-        let result = combined.check(42, &mut ctx).await;
+        let ctx = EvalContext::new();
+        let result = combined.check(42, &ctx).await;
         assert!(matches!(result, PredicateResult::Cacheable(42)));
     }
 
@@ -207,9 +195,9 @@ mod tests {
             Neutral::<i32>::new().not().boxed(),
         ];
 
-        let mut ctx = EvalContext::new();
-        let result1 = predicates[0].check(1, &mut ctx).await;
-        let result2 = predicates[1].check(2, &mut ctx).await;
+        let ctx = EvalContext::new();
+        let result1 = predicates[0].check(1, &ctx).await;
+        let result2 = predicates[1].check(2, &ctx).await;
 
         assert!(matches!(result1, PredicateResult::Cacheable(1)));
         assert!(matches!(result2, PredicateResult::NonCacheable(2)));

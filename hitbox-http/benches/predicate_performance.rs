@@ -57,11 +57,7 @@ fn bench_single_predicates(c: &mut Criterion) {
         let predicate = NeutralRequestPredicate::new().method(Method::GET);
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -69,11 +65,7 @@ fn bench_single_predicates(c: &mut Criterion) {
         let predicate = NeutralRequestPredicate::new().path("/api/users/{user_id}".to_string());
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -84,11 +76,7 @@ fn bench_single_predicates(c: &mut Criterion) {
         ));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -97,11 +85,7 @@ fn bench_single_predicates(c: &mut Criterion) {
             .header(HeaderOperation::Exist("authorization".parse().unwrap()));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -112,11 +96,7 @@ fn bench_single_predicates(c: &mut Criterion) {
         ));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_complex_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -137,11 +117,7 @@ fn bench_small_chains(c: &mut Criterion) {
             .path("/api/users/{user_id}".to_string());
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -155,11 +131,7 @@ fn bench_small_chains(c: &mut Criterion) {
             ));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -177,11 +149,7 @@ fn bench_small_chains(c: &mut Criterion) {
             ));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_complex_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -191,11 +159,7 @@ fn bench_small_chains(c: &mut Criterion) {
         let predicate = left.or(right);
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -203,11 +167,7 @@ fn bench_small_chains(c: &mut Criterion) {
         let predicate = NeutralRequestPredicate::new().method(Method::POST).not();
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -243,11 +203,7 @@ fn bench_medium_chains(c: &mut Criterion) {
             ));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_complex_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -273,11 +229,7 @@ fn bench_medium_chains(c: &mut Criterion) {
             ));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_complex_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -304,11 +256,7 @@ fn bench_medium_chains(c: &mut Criterion) {
             .query(QueryOperation::Eq("sort".to_string(), "date".to_string()));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_complex_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -334,11 +282,7 @@ fn bench_early_exit(c: &mut Criterion) {
             ));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -353,11 +297,7 @@ fn bench_early_exit(c: &mut Criterion) {
             )); // Will fail
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -376,11 +316,7 @@ fn bench_early_exit(c: &mut Criterion) {
             ));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -399,11 +335,7 @@ fn bench_predicate_type_comparison(c: &mut Criterion) {
         let predicate = NeutralRequestPredicate::new().method(Method::GET);
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -411,11 +343,7 @@ fn bench_predicate_type_comparison(c: &mut Criterion) {
         let predicate = NeutralRequestPredicate::new().path("/api/users/{user_id}".to_string());
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -426,11 +354,7 @@ fn bench_predicate_type_comparison(c: &mut Criterion) {
         ));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -439,11 +363,7 @@ fn bench_predicate_type_comparison(c: &mut Criterion) {
             .header(HeaderOperation::Exist("authorization".parse().unwrap()));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_simple_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 
@@ -454,11 +374,7 @@ fn bench_predicate_type_comparison(c: &mut Criterion) {
         ));
         b.to_async(&rt).iter(|| async {
             let req = CacheableHttpRequest::from_request(create_complex_request());
-            black_box(
-                predicate
-                    .check(black_box(req), &mut EvalContext::new())
-                    .await,
-            )
+            black_box(predicate.check(black_box(req), &EvalContext::new()).await)
         });
     });
 

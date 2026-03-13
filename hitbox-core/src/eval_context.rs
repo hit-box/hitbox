@@ -12,7 +12,7 @@
 //!
 //! struct ParsedProto(String);
 //!
-//! let mut ctx = EvalContext::new();
+//! let ctx = EvalContext::new();
 //! ctx.insert(ParsedProto("hello".into()));
 //!
 //! assert!(ctx.contains::<ParsedProto>());
@@ -24,9 +24,19 @@
 //! An `EvalContext` is created inside each `cache_policy` implementation:
 //! one for the request phase (shared by request predicates and extractors)
 //! and another for the response phase (used by response predicates).
+//!
+//! ## Interior Mutability
+//!
+//! All methods take `&self`, using a [`parking_lot::RwLock`] internally.
+//! This allows `EvalContext` to be shared by reference (`&EvalContext`)
+//! across concurrent predicate evaluations.
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+
+use parking_lot::{
+    MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
+};
 
 /// A type-map for sharing computed values across predicates and extractors.
 ///
@@ -37,17 +47,18 @@ use std::collections::HashMap;
 /// # Thread Safety
 ///
 /// `EvalContext` is `Send + Sync` because all stored values must be
-/// `Send + Sync + 'static`. It is passed as `&mut EvalContext` through
-/// the evaluation chain, which is always sequential.
+/// `Send + Sync + 'static`. It uses interior mutability via
+/// [`parking_lot::RwLock`], so all methods take `&self` and it can be
+/// shared across threads via `&EvalContext`.
 pub struct EvalContext {
-    map: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    map: RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>,
 }
 
 impl EvalContext {
     /// Creates an empty evaluation context.
     pub fn new() -> Self {
         Self {
-            map: HashMap::new(),
+            map: RwLock::new(HashMap::new()),
         }
     }
 
@@ -55,24 +66,33 @@ impl EvalContext {
     ///
     /// If a value of this type already exists, it is replaced and the old
     /// value is returned.
-    pub fn insert<T: Send + Sync + 'static>(&mut self, val: T) -> Option<T> {
+    pub fn insert<T: Send + Sync + 'static>(&self, val: T) -> Option<T> {
         self.map
+            .write()
             .insert(TypeId::of::<T>(), Box::new(val))
             .and_then(|boxed| boxed.downcast().ok().map(|b| *b))
     }
 
     /// Returns a reference to a value of the given type, if present.
-    pub fn get<T: Send + Sync + 'static>(&self) -> Option<&T> {
-        self.map
-            .get(&TypeId::of::<T>())
-            .and_then(|boxed| boxed.downcast_ref())
+    ///
+    /// The returned guard holds a read lock and dereferences to `&T`.
+    pub fn get<T: Send + Sync + 'static>(&self) -> Option<MappedRwLockReadGuard<'_, T>> {
+        RwLockReadGuard::try_map(self.map.read(), |map| {
+            map.get(&TypeId::of::<T>())
+                .and_then(|boxed| boxed.downcast_ref())
+        })
+        .ok()
     }
 
     /// Returns a mutable reference to a value of the given type, if present.
-    pub fn get_mut<T: Send + Sync + 'static>(&mut self) -> Option<&mut T> {
-        self.map
-            .get_mut(&TypeId::of::<T>())
-            .and_then(|boxed| boxed.downcast_mut())
+    ///
+    /// The returned guard holds a write lock and dereferences to `&mut T`.
+    pub fn get_mut<T: Send + Sync + 'static>(&self) -> Option<MappedRwLockWriteGuard<'_, T>> {
+        RwLockWriteGuard::try_map(self.map.write(), |map| {
+            map.get_mut(&TypeId::of::<T>())
+                .and_then(|boxed| boxed.downcast_mut())
+        })
+        .ok()
     }
 
     /// Returns a mutable reference to a value of the given type, inserting
@@ -86,24 +106,28 @@ impl EvalContext {
     /// });
     /// ```
     pub fn get_or_insert_with<T: Send + Sync + 'static>(
-        &mut self,
+        &self,
         f: impl FnOnce() -> T,
-    ) -> &mut T {
-        self.map
-            .entry(TypeId::of::<T>())
-            .or_insert_with(|| Box::new(f()))
-            .downcast_mut()
-            .expect("type mismatch in EvalContext (this is a bug)")
+    ) -> MappedRwLockWriteGuard<'_, T> {
+        let mut map = self.map.write();
+        map.entry(TypeId::of::<T>())
+            .or_insert_with(|| Box::new(f()));
+        RwLockWriteGuard::map(map, |map| {
+            map.get_mut(&TypeId::of::<T>())
+                .and_then(|boxed| boxed.downcast_mut())
+                .expect("type mismatch in EvalContext (this is a bug)")
+        })
     }
 
     /// Returns `true` if the context contains a value of the given type.
     pub fn contains<T: Send + Sync + 'static>(&self) -> bool {
-        self.map.contains_key(&TypeId::of::<T>())
+        self.map.read().contains_key(&TypeId::of::<T>())
     }
 
     /// Removes and returns a value of the given type, if present.
-    pub fn remove<T: Send + Sync + 'static>(&mut self) -> Option<T> {
+    pub fn remove<T: Send + Sync + 'static>(&self) -> Option<T> {
         self.map
+            .write()
             .remove(&TypeId::of::<T>())
             .and_then(|boxed| boxed.downcast().ok().map(|b| *b))
     }
@@ -118,7 +142,7 @@ impl Default for EvalContext {
 impl std::fmt::Debug for EvalContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EvalContext")
-            .field("entries", &self.map.len())
+            .field("entries", &self.map.read().len())
             .finish()
     }
 }
@@ -132,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_insert_and_get() {
-        let mut ctx = EvalContext::new();
+        let ctx = EvalContext::new();
         ctx.insert(StringValue("hello".into()));
 
         assert!(ctx.contains::<StringValue>());
@@ -141,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_insert_replaces_and_returns_old() {
-        let mut ctx = EvalContext::new();
+        let ctx = EvalContext::new();
         assert!(ctx.insert(Counter(1)).is_none());
         let old = ctx.insert(Counter(2));
         assert_eq!(old.unwrap().0, 1);
@@ -150,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_get_mut() {
-        let mut ctx = EvalContext::new();
+        let ctx = EvalContext::new();
         ctx.insert(Counter(0));
         ctx.get_mut::<Counter>().unwrap().0 += 1;
         assert_eq!(ctx.get::<Counter>().unwrap().0, 1);
@@ -158,11 +182,12 @@ mod tests {
 
     #[test]
     fn test_get_or_insert_with() {
-        let mut ctx = EvalContext::new();
+        let ctx = EvalContext::new();
 
         // First call inserts
         let val = ctx.get_or_insert_with(|| Counter(42));
         assert_eq!(val.0, 42);
+        drop(val);
 
         // Second call returns existing
         let val = ctx.get_or_insert_with(|| Counter(99));
@@ -171,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_remove() {
-        let mut ctx = EvalContext::new();
+        let ctx = EvalContext::new();
         ctx.insert(Counter(10));
         let removed = ctx.remove::<Counter>();
         assert_eq!(removed.unwrap().0, 10);
@@ -186,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_multiple_types() {
-        let mut ctx = EvalContext::new();
+        let ctx = EvalContext::new();
         ctx.insert(StringValue("a".into()));
         ctx.insert(Counter(1));
 
