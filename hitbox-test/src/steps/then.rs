@@ -170,6 +170,39 @@ fn response_header_is_correct(
     Ok(())
 }
 
+#[then(expr = "response header {string} starts with {string}")]
+fn response_header_starts_with(
+    world: &mut HitboxWorld,
+    header_name: String,
+    expected_prefix: String,
+) -> Result<(), Error> {
+    let response = world
+        .state
+        .response
+        .as_ref()
+        .ok_or_else(|| anyhow!("No response available"))?;
+
+    let header_value = response
+        .headers()
+        .get(&header_name)
+        .ok_or_else(|| anyhow!("Header '{}' not found", header_name))?;
+
+    let actual_value = header_value
+        .to_str()
+        .map_err(|_| anyhow!("Header '{}' contains invalid UTF-8", header_name))?;
+
+    if !actual_value.starts_with(&expected_prefix) {
+        return Err(anyhow!(
+            "Expected header '{}' to start with '{}', but found '{}'",
+            header_name,
+            expected_prefix,
+            actual_value
+        ));
+    }
+
+    Ok(())
+}
+
 #[then(expr = "backend read was called {int} times with all miss")]
 fn backend_read_all_miss(world: &mut HitboxWorld, expected: usize) -> Result<(), Error> {
     let read_count = world.backend.read_count();
@@ -278,6 +311,54 @@ fn response_headers_table(world: &mut HitboxWorld, step: &Step) -> Result<(), Er
                 i,
                 header_name,
                 expected_value,
+                actual_value
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+#[then(expr = "response headers start with")]
+fn response_headers_start_with_table(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+    let table = step
+        .table
+        .as_ref()
+        .ok_or_else(|| anyhow!("Expected a table"))?;
+
+    if table.rows.len() != world.state.responses.len() {
+        return Err(anyhow!(
+            "Expected {} rows but got {}",
+            world.state.responses.len(),
+            table.rows.len()
+        ));
+    }
+
+    for (i, (row, response)) in table
+        .rows
+        .iter()
+        .zip(world.state.responses.iter())
+        .enumerate()
+    {
+        let header_name = row
+            .first()
+            .ok_or_else(|| anyhow!("Row {} missing header name", i))?;
+        let expected_prefix = row
+            .get(1)
+            .ok_or_else(|| anyhow!("Row {} missing value", i))?;
+
+        let actual_value = response
+            .headers()
+            .get(header_name)
+            .map(|v| v.to_str().unwrap_or(""))
+            .unwrap_or("");
+
+        if !actual_value.starts_with(expected_prefix.as_str()) {
+            return Err(anyhow!(
+                "Response {}: header '{}' expected to start with '{}', got '{}'",
+                i,
+                header_name,
+                expected_prefix,
                 actual_value
             ));
         }

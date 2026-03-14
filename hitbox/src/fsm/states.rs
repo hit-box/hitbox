@@ -263,6 +263,8 @@ where
                 }
             }
             PolicyConfig::Disabled => {
+                self.ctx
+                    .set_status(CacheStatus::Forward(ForwardReason::Bypass));
                 let upstream_future = self.upstream.call(self.request);
                 InitialTransition::PollUpstream {
                     upstream_future,
