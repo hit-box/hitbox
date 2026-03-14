@@ -337,8 +337,12 @@ fn test_basic_backend_write_metrics() {
                 id: 42,
                 name: "test".to_string(),
             };
-            let value =
-                CacheValue::new(data, Some(Utc::now() + chrono::Duration::seconds(60)), None);
+            let value = CacheValue::new(
+                data,
+                Some(Utc::now() + chrono::Duration::seconds(60)),
+                None,
+                None,
+            );
 
             // Perform a cache write
             let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -410,6 +414,7 @@ fn test_basic_backend_read_metrics() {
             let value = CacheValue::new(
                 data.clone(),
                 Some(Utc::now() + chrono::Duration::seconds(60)),
+                None,
                 None,
             );
 
@@ -495,8 +500,12 @@ fn test_composition_backend_write_metrics() {
                 id: 42,
                 name: "test".to_string(),
             };
-            let value =
-                CacheValue::new(data, Some(Utc::now() + chrono::Duration::seconds(60)), None);
+            let value = CacheValue::new(
+                data,
+                Some(Utc::now() + chrono::Duration::seconds(60)),
+                None,
+                None,
+            );
 
             // Perform a cache write
             let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -586,6 +595,7 @@ fn test_composition_backend_read_metrics() {
             let value = CacheValue::new(
                 data.clone(),
                 Some(Utc::now() + chrono::Duration::seconds(60)),
+                None,
                 None,
             );
 
@@ -684,8 +694,12 @@ fn test_dyn_composition_backend_write_metrics() {
                 id: 42,
                 name: "test".to_string(),
             };
-            let value =
-                CacheValue::new(data, Some(Utc::now() + chrono::Duration::seconds(60)), None);
+            let value = CacheValue::new(
+                data,
+                Some(Utc::now() + chrono::Duration::seconds(60)),
+                None,
+                None,
+            );
 
             // Perform a cache write via trait object
             let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -774,6 +788,7 @@ fn test_dyn_composition_backend_read_metrics() {
             let value = CacheValue::new(
                 data.clone(),
                 Some(Utc::now() + chrono::Duration::seconds(60)),
+                None,
                 None,
             );
 

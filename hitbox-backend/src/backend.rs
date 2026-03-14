@@ -297,7 +297,8 @@ pub trait CacheBackend: Backend {
                         )))
                     })?;
 
-                    let cached_value = CacheValue::new(deserialized, meta.expire, meta.stale);
+                    let cached_value =
+                        CacheValue::new(deserialized, meta.expire, meta.stale, meta.created_at);
 
                     // Refill L1 if read mode is Refill (data came from L2).
                     // CompositionFormat will create L1-only envelope, so only L1 gets populated.
@@ -357,7 +358,12 @@ pub trait CacheBackend: Backend {
             let result = self
                 .write(
                     key,
-                    CacheValue::new(Bytes::from(compressed_value), value.expire(), value.stale()),
+                    CacheValue::new(
+                        Bytes::from(compressed_value),
+                        value.expire(),
+                        value.stale(),
+                        value.created_at(),
+                    ),
                 )
                 .await;
             crate::metrics::record_write(backend_label.as_str(), write_timer.elapsed());

@@ -31,7 +31,11 @@ use crate::fsm::transitions::{
     PollUpstreamTransition, UpdateCacheTransition,
 };
 use crate::policy::{EnabledCacheConfig, PolicyConfig, StalePolicy};
-use crate::{CacheKey, CacheState, CacheStatus, CacheableRequest, CacheableResponse, Extractor};
+use crate::{
+    CacheKey, CacheState, CacheStatus, CacheTiming, CacheableRequest, CacheableResponse, Extractor,
+    ForwardReason,
+};
+use chrono::Utc;
 
 // =============================================================================
 // Helper Types
@@ -485,6 +489,7 @@ impl CheckResponseCachePolicy {
                 }
                 let cache_key = self.cache_key;
                 let mut ctx = self.ctx;
+                ctx.set_stored(true);
                 let update_cache_future = Box::pin(async move {
                     let update_cache_result =
                         backend.set::<Res>(&cache_key, &cache_value, &mut ctx).await;
@@ -586,10 +591,12 @@ impl<U> CheckRequestCachePolicy<U> {
                 }
             }
             CachePolicy::NonCacheable(request) => {
+                let mut ctx = self.ctx;
+                ctx.set_status(CacheStatus::Forward(ForwardReason::Bypass));
                 let upstream_future = self.upstream.call(request);
                 CheckRequestCachePolicyTransition::PollUpstream {
                     upstream_future,
-                    ctx: self.ctx,
+                    ctx,
                 }
             }
         }
@@ -660,6 +667,11 @@ impl<Req, U> PollCache<Req, U> {
 
                 match cache_state {
                     CacheState::Actual(value) => {
+                        let timing = CacheTiming {
+                            created_at: value.created_at().unwrap_or_else(Utc::now),
+                            expire: value.expire(),
+                        };
+                        ctx.set_timing(Some(timing));
                         if ctx.read_mode() == ReadMode::Refill {
                             let cache_key = self.cache_key;
                             let update_cache_future = Box::pin(async move {
@@ -683,6 +695,11 @@ impl<Req, U> PollCache<Req, U> {
                         }
                     }
                     CacheState::Stale(value) => {
+                        let timing = CacheTiming {
+                            created_at: value.created_at().unwrap_or_else(Utc::now),
+                            expire: value.expire(),
+                        };
+                        ctx.set_timing(Some(timing));
                         let cache_key = self.cache_key;
                         let request = self.request;
                         let upstream = self.upstream;
@@ -696,7 +713,7 @@ impl<Req, U> PollCache<Req, U> {
                         }
                     }
                     CacheState::Expired(_value) => {
-                        ctx.set_status(CacheStatus::Miss);
+                        ctx.set_status(CacheStatus::Forward(ForwardReason::Expired));
                         self.transition_to_upstream(ctx, policy, concurrency_manager)
                     }
                 }
@@ -899,7 +916,7 @@ impl<Req, U> HandleStale<Req, U> {
             }
             StalePolicy::Revalidate => {
                 self.span.record("stale.policy", "revalidate");
-                ctx.set_status(CacheStatus::Miss);
+                ctx.set_status(CacheStatus::Forward(ForwardReason::Expired));
                 let upstream_future = self.upstream.call(self.request);
                 HandleStaleResult {
                     transition: HandleStaleTransition::Revalidate {
@@ -987,14 +1004,17 @@ impl<Req, U> AwaitResponse<Req, U> {
         U: Upstream<Req, Response = Res>,
         C: ConcurrencyManager<Res>,
     {
-        let ctx = self.ctx;
+        let mut ctx = self.ctx;
 
         match result {
-            Ok(response) => AwaitResponseTransition::Response(Response {
-                response,
-                ctx,
-                span: Span::none(),
-            }),
+            Ok(response) => {
+                ctx.set_status(CacheStatus::Collapsed);
+                AwaitResponseTransition::Response(Response {
+                    response,
+                    ctx,
+                    span: Span::none(),
+                })
+            }
             Err(ref concurrency_error) => {
                 match concurrency_error {
                     ConcurrencyError::Lagged(n) => {

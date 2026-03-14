@@ -192,6 +192,7 @@ async fn test_backend_with_policy_functional() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     let mut ctx: BoxContext = CacheContext::default().boxed();

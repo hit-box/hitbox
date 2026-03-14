@@ -173,8 +173,9 @@ pub fn record_context_metrics(ctx: &CacheContext, duration: Duration, revalidate
     // Record cache status counter
     let counter = match ctx.status {
         crate::context::CacheStatus::Hit => *CACHE_HIT_COUNTER,
-        crate::context::CacheStatus::Miss => *CACHE_MISS_COUNTER,
+        crate::context::CacheStatus::Forward(_) => *CACHE_MISS_COUNTER,
         crate::context::CacheStatus::Stale => *CACHE_STALE_COUNTER,
+        crate::context::CacheStatus::Collapsed => *CACHE_HIT_COUNTER,
     };
     metrics::counter!(counter, "backend" => backend.to_string()).increment(1);
 

@@ -5,7 +5,9 @@
 
 use std::any::Any;
 
-use hitbox_core::{BoxContext, CacheContext, CacheStatus, Context, ReadMode, ResponseSource};
+use hitbox_core::{
+    BoxContext, CacheContext, CacheStatus, CacheTiming, Context, ReadMode, ResponseSource,
+};
 use smallbox::smallbox;
 
 use super::CompositionFormat;
@@ -88,6 +90,30 @@ impl Context for CompositionContext {
 
     fn set_read_mode(&mut self, mode: ReadMode) {
         self.inner.set_read_mode(mode);
+    }
+
+    fn timing(&self) -> Option<&CacheTiming> {
+        self.inner.timing()
+    }
+
+    fn set_timing(&mut self, timing: Option<CacheTiming>) {
+        self.inner.set_timing(timing);
+    }
+
+    fn stored(&self) -> bool {
+        self.inner.stored()
+    }
+
+    fn set_stored(&mut self, stored: bool) {
+        self.inner.set_stored(stored);
+    }
+
+    fn extensions(&self) -> Option<&(dyn Any + Send + Sync)> {
+        self.inner.extensions()
+    }
+
+    fn set_extensions(&mut self, ext: Option<Box<dyn Any + Send + Sync>>) {
+        self.inner.set_extensions(ext);
     }
 
     fn as_any(&self) -> &dyn Any {

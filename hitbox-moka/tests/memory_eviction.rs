@@ -15,7 +15,7 @@ fn make_key(id: u32) -> CacheKey {
 fn make_value(size: usize) -> CacheValue<Bytes> {
     let data = Bytes::from(vec![0u8; size]);
     let expire = Some(Utc::now() + chrono::Duration::hours(1));
-    CacheValue::new(data, expire, None)
+    CacheValue::new(data, expire, None, None)
 }
 
 /// Calculate total entry size (key + value).

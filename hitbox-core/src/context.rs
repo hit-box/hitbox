@@ -2,20 +2,59 @@
 
 use std::any::Any;
 
+use chrono::{DateTime, Utc};
 use smallbox::{SmallBox, smallbox, space::S4};
 
 use crate::label::BackendLabel;
 
-/// Whether the request resulted in a cache hit, miss, or stale data.
+/// Why a request was forwarded to upstream instead of served from cache.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum CacheStatus {
-    /// Cache hit - valid cached data was found and returned.
-    Hit,
-    /// Cache miss - no cached data was found.
+pub enum ForwardReason {
+    /// No matching cache entry found.
     #[default]
     Miss,
-    /// Stale data - cached data was found but has exceeded its freshness window.
+    /// Cache entry was expired/stale and policy required a fresh response.
+    Expired,
+    /// Cache was intentionally bypassed (predicate rejected the request).
+    /// Covers all predicate rejections including uncacheable methods.
+    Bypass,
+}
+
+impl ForwardReason {
+    /// Returns the reason as a string slice.
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            ForwardReason::Miss => "miss",
+            ForwardReason::Expired => "expired",
+            ForwardReason::Bypass => "bypass",
+        }
+    }
+}
+
+/// What the cache did with this request.
+///
+/// Variants split into two groups matching RFC 9211 semantics:
+/// - Served from cache: `Hit`, `Stale`, `Collapsed` → RFC 9211 `; hit`
+/// - Forwarded upstream: `Forward(reason)` → RFC 9211 `; fwd=<reason>`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CacheStatus {
+    /// Cache hit — fresh cached data was found and returned.
+    Hit,
+    /// Stale hit — cached data was served despite being past freshness window
+    /// (stale-while-revalidate). Background refresh may be in progress.
     Stale,
+    /// Collapsed hit — request was coalesced with another in-flight request
+    /// (dog-pile prevention). Served from the other request's result.
+    Collapsed,
+    /// Forwarded to upstream with a specific reason.
+    Forward(ForwardReason),
+}
+
+impl Default for CacheStatus {
+    fn default() -> Self {
+        CacheStatus::Forward(ForwardReason::default())
+    }
 }
 
 impl CacheStatus {
@@ -24,10 +63,33 @@ impl CacheStatus {
     pub const fn as_str(&self) -> &'static str {
         match self {
             CacheStatus::Hit => "hit",
-            CacheStatus::Miss => "miss",
             CacheStatus::Stale => "stale",
+            CacheStatus::Collapsed => "collapsed",
+            CacheStatus::Forward(reason) => reason.as_str(),
         }
     }
+
+    /// Returns true if the response was served from cache (hit, stale, or collapsed).
+    #[inline]
+    pub const fn is_served_from_cache(&self) -> bool {
+        matches!(
+            self,
+            CacheStatus::Hit | CacheStatus::Stale | CacheStatus::Collapsed
+        )
+    }
+}
+
+/// Timing information from a cache operation.
+///
+/// Used to compute `Age` and `ttl` for cache status headers.
+/// Present when response was served from cache (Hit, Stale, Collapsed).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CacheTiming {
+    /// When the cache entry was originally created/stored.
+    pub created_at: DateTime<Utc>,
+    /// When the entry's freshness expires (for ttl computation).
+    /// Can be in the past for stale responses → negative ttl.
+    pub expire: Option<DateTime<Utc>>,
 }
 
 /// Source of the response - either from upstream or from a cache backend.
@@ -106,6 +168,42 @@ pub trait Context: Send + Sync {
         // Default implementation does nothing - simple contexts ignore read mode
     }
 
+    // Cache timing
+
+    /// Returns the cache timing information, if available.
+    fn timing(&self) -> Option<&CacheTiming> {
+        None
+    }
+
+    /// Sets the cache timing information.
+    fn set_timing(&mut self, _timing: Option<CacheTiming>) {
+        // Default implementation does nothing
+    }
+
+    // Stored flag
+
+    /// Returns whether the response was stored in cache during this operation.
+    fn stored(&self) -> bool {
+        false
+    }
+
+    /// Sets whether the response was stored in cache.
+    fn set_stored(&mut self, _stored: bool) {
+        // Default implementation does nothing
+    }
+
+    // Protocol extensions
+
+    /// Returns a reference to the protocol-specific extension data, if any.
+    fn extensions(&self) -> Option<&(dyn Any + Send + Sync)> {
+        None
+    }
+
+    /// Sets protocol-specific extension data.
+    fn set_extensions(&mut self, _ext: Option<Box<dyn Any + Send + Sync>>) {
+        // Default implementation does nothing
+    }
+
     // Type identity and conversion
 
     /// Returns a reference to self as `Any` for downcasting.
@@ -143,6 +241,16 @@ pub trait Context: Send + Sync {
                 // No backend hit, keep as upstream
             }
         }
+
+        // Merge timing - take from inner if it has timing (cache hit)
+        if let Some(timing) = other.timing() {
+            self.set_timing(Some(*timing));
+        }
+
+        // Merge stored flag
+        if other.stored() {
+            self.set_stored(true);
+        }
     }
 }
 
@@ -167,14 +275,46 @@ pub fn finalize_context(ctx: BoxContext) -> CacheContext {
 }
 
 /// Context information about a cache operation.
-#[derive(Debug, Clone, Default)]
+///
+/// This is the single source of truth for all cache operation metadata.
+/// Protocol-specific data (e.g., HTTP status codes) is stored in [`extensions`](Self::extensions).
+#[derive(Debug, Default)]
 pub struct CacheContext {
-    /// Whether the request resulted in a cache hit, miss, or stale data.
+    /// What the cache did with this request (hit, stale, collapsed, or forwarded).
     pub status: CacheStatus,
     /// Read mode for this operation.
     pub read_mode: ReadMode,
     /// Source of the response.
     pub source: ResponseSource,
+    /// Timing data for computing Age and ttl headers.
+    /// Present when response was served from cache (Hit, Stale, Collapsed).
+    pub timing: Option<CacheTiming>,
+    /// Whether the response was stored in cache during this operation.
+    pub stored: bool,
+    /// Protocol-specific extension data.
+    ///
+    /// Each protocol crate defines its own struct and stores it here.
+    /// Costs 8 bytes (null pointer) when unused, one small heap allocation when used.
+    ///
+    /// Examples:
+    /// - HTTP: `HttpCacheData { upstream_status: u16 }`
+    /// - gRPC: `GrpcCacheData { grpc_status: i32 }`
+    pub extensions: Option<Box<dyn Any + Send + Sync>>,
+}
+
+impl Clone for CacheContext {
+    fn clone(&self) -> Self {
+        Self {
+            status: self.status,
+            read_mode: self.read_mode,
+            source: self.source.clone(),
+            timing: self.timing,
+            stored: self.stored,
+            // Extensions are protocol-specific and not cloned.
+            // They are only needed at the header-generation point.
+            extensions: None,
+        }
+    }
 }
 
 impl CacheContext {
@@ -212,6 +352,30 @@ impl Context for CacheContext {
         self.read_mode = mode;
     }
 
+    fn timing(&self) -> Option<&CacheTiming> {
+        self.timing.as_ref()
+    }
+
+    fn set_timing(&mut self, timing: Option<CacheTiming>) {
+        self.timing = timing;
+    }
+
+    fn stored(&self) -> bool {
+        self.stored
+    }
+
+    fn set_stored(&mut self, stored: bool) {
+        self.stored = stored;
+    }
+
+    fn extensions(&self) -> Option<&(dyn Any + Send + Sync)> {
+        self.extensions.as_deref()
+    }
+
+    fn set_extensions(&mut self, ext: Option<Box<dyn Any + Send + Sync>>) {
+        self.extensions = ext;
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -231,20 +395,23 @@ impl Context for CacheContext {
 /// metadata to responses. Each protocol (HTTP, gRPC, etc.) implements
 /// this trait with its own configuration type.
 ///
+/// The full [`CacheContext`] is passed, giving implementations access to
+/// status, timing, stored flag, and protocol-specific extensions.
+///
 /// # Example
 ///
 /// ```ignore
-/// use hitbox_core::{CacheStatus, CacheStatusExt};
+/// use hitbox_core::{CacheContext, CacheStatusExt};
 ///
 /// // For HTTP responses (implemented in hitbox-http)
-/// response.cache_status(CacheStatus::Hit, &header_name);
+/// response.cache_status(&cache_context, &config);
 /// ```
 pub trait CacheStatusExt {
     /// Configuration type for applying cache status (e.g., header name for HTTP).
     type Config;
 
     /// Applies cache status information to the response.
-    fn cache_status(&mut self, status: CacheStatus, config: &Self::Config);
+    fn cache_status(&mut self, context: &CacheContext, config: &Self::Config);
 }
 
 #[cfg(test)]
@@ -260,16 +427,38 @@ mod tests {
 
         println!("CacheContext size: {} bytes", cache_ctx_size);
         println!("  - CacheStatus: {} bytes", size_of::<CacheStatus>());
+        println!("  - ForwardReason: {} bytes", size_of::<ForwardReason>());
+        println!("  - CacheTiming: {} bytes", size_of::<CacheTiming>());
         println!("  - ResponseSource: {} bytes", size_of::<ResponseSource>());
         println!("BoxContext size: {} bytes", box_ctx_size);
         println!("S4 inline space: {} bytes", s4_space);
 
-        // CacheContext should fit in S4 inline storage (32 bytes on 64-bit)
-        assert!(
-            cache_ctx_size <= s4_space,
-            "CacheContext ({} bytes) should fit in S4 ({} bytes)",
-            cache_ctx_size,
-            s4_space
+        // CacheContext now exceeds S4 due to timing + stored + extensions fields.
+        // SmallBox automatically falls back to heap allocation, which is fine
+        // since context is created once per request.
+        println!(
+            "CacheContext {} S4 inline storage (heap fallback is OK)",
+            if cache_ctx_size <= s4_space {
+                "fits in"
+            } else {
+                "exceeds"
+            }
         );
+    }
+
+    #[test]
+    fn test_cache_status_default() {
+        let status = CacheStatus::default();
+        assert_eq!(status, CacheStatus::Forward(ForwardReason::Miss));
+    }
+
+    #[test]
+    fn test_cache_status_is_served_from_cache() {
+        assert!(CacheStatus::Hit.is_served_from_cache());
+        assert!(CacheStatus::Stale.is_served_from_cache());
+        assert!(CacheStatus::Collapsed.is_served_from_cache());
+        assert!(!CacheStatus::Forward(ForwardReason::Miss).is_served_from_cache());
+        assert!(!CacheStatus::Forward(ForwardReason::Expired).is_served_from_cache());
+        assert!(!CacheStatus::Forward(ForwardReason::Bypass).is_served_from_cache());
     }
 }

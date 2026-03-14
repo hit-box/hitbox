@@ -35,8 +35,8 @@ Feature: Concurrency Control (Dogpile Prevention)
     And backend write was called 1 times
     And response headers are
       | X-Cache-Status | MISS |
-      | X-Cache-Status | MISS |
-      | X-Cache-Status | MISS |
+      | X-Cache-Status | HIT  |
+      | X-Cache-Status | HIT  |
 
   Scenario: Concurrent requests with concurrency limit of 3 - all requests go to upstream
     Given hitbox with policy
@@ -76,7 +76,7 @@ Feature: Concurrency Control (Dogpile Prevention)
     And backend write was called 1 times
     And response headers are
       | X-Cache-Status | MISS |
-      | X-Cache-Status | MISS |
+      | X-Cache-Status | HIT  |
       | X-Cache-Status | HIT  |
 
   Scenario: Non-cacheable response (status 201) - no coalescing, all go to upstream

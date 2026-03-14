@@ -29,6 +29,7 @@ async fn test_compose_trait_basic_usage() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Write through composition
@@ -75,6 +76,7 @@ async fn test_compose_with_custom_policy() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Populate only L2
@@ -115,6 +117,7 @@ async fn test_compose_nested_3_levels() {
             data: "nested_value".to_string(),
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 
@@ -159,6 +162,7 @@ async fn test_compose_with_builder_chaining() {
             data: "chained_value".to_string(),
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 

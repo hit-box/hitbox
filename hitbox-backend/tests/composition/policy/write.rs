@@ -21,7 +21,7 @@ async fn test_sequential_both_succeed() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("test_value"), None, None);
+    let value = CacheValue::new(Bytes::from("test_value"), None, None, None);
 
     let l1_clone = l1.clone();
     let l2_clone = l2.clone();
@@ -48,7 +48,7 @@ async fn test_sequential_l1_fails() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("test_value"), None, None);
+    let value = CacheValue::new(Bytes::from("test_value"), None, None, None);
 
     let l1_clone = l1.clone();
     let l2_clone = l2.clone();
@@ -75,7 +75,7 @@ async fn test_sequential_l2_fails() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("test_value"), None, None);
+    let value = CacheValue::new(Bytes::from("test_value"), None, None, None);
 
     let l1_clone = l1.clone();
     let l2_clone = l2.clone();
@@ -103,7 +103,7 @@ async fn test_sequential_both_fail() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("test_value"), None, None);
+    let value = CacheValue::new(Bytes::from("test_value"), None, None, None);
 
     let l1_clone = l1.clone();
     let l2_clone = l2.clone();
@@ -131,7 +131,7 @@ async fn test_optimistic_parallel_both_succeed() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("test_value"), None, None);
+    let value = CacheValue::new(Bytes::from("test_value"), None, None, None);
 
     let l1_clone = l1.clone();
     let l2_clone = l2.clone();
@@ -158,7 +158,7 @@ async fn test_optimistic_parallel_l1_fails_l2_succeeds() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("test_value"), None, None);
+    let value = CacheValue::new(Bytes::from("test_value"), None, None, None);
 
     let l1_clone = l1.clone();
     let l2_clone = l2.clone();
@@ -185,7 +185,7 @@ async fn test_optimistic_parallel_l1_succeeds_l2_fails() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("test_value"), None, None);
+    let value = CacheValue::new(Bytes::from("test_value"), None, None, None);
 
     let l1_clone = l1.clone();
     let l2_clone = l2.clone();
@@ -212,7 +212,7 @@ async fn test_optimistic_parallel_both_fail() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("test_value"), None, None);
+    let value = CacheValue::new(Bytes::from("test_value"), None, None, None);
 
     let l1_clone = l1.clone();
     let l2_clone = l2.clone();

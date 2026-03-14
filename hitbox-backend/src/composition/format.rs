@@ -218,8 +218,12 @@ impl Format for CompositionFormat {
                 .map_err(|e| FormatError::Serialize(Box::new(e)))?;
             crate::metrics::record_compress(&self.l1_label, compress_timer.elapsed());
 
-            let composition =
-                CompositionEnvelope::L1(CacheValue::new(Bytes::from(l1_compressed), None, None));
+            let composition = CompositionEnvelope::L1(CacheValue::new(
+                Bytes::from(l1_compressed),
+                None,
+                None,
+                None,
+            ));
 
             return composition
                 .serialize()
@@ -259,8 +263,8 @@ impl Format for CompositionFormat {
 
         // Pack both compressed values into CompositionEnvelope
         let composition = CompositionEnvelope::Both {
-            l1: CacheValue::new(Bytes::from(l1_compressed), None, None),
-            l2: CacheValue::new(Bytes::from(l2_compressed), None, None),
+            l1: CacheValue::new(Bytes::from(l1_compressed), None, None, None),
+            l2: CacheValue::new(Bytes::from(l2_compressed), None, None, None),
         };
 
         // Serialize the CompositionEnvelope using zero-copy repr(C) format

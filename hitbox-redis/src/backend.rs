@@ -808,14 +808,18 @@ where
         let mut con = self.get_connection().await?.clone();
         let cache_key = self.key_format.serialize(key)?;
 
-        // Pipeline: HMGET (data, stale) + PTTL with typed decoding
-        let ((data, stale_ms), pttl): ((Option<Vec<u8>>, Option<i64>), i64) = con
+        // Pipeline: HMGET (data, stale, created_at) + PTTL with typed decoding
+        let ((data, stale_ms, created_at_ms), pttl): (
+            (Option<Vec<u8>>, Option<i64>, Option<i64>),
+            i64,
+        ) = con
             .query_pipeline(
                 redis::pipe()
                     .cmd("HMGET")
                     .arg(&cache_key)
                     .arg("d")
                     .arg("s")
+                    .arg("c")
                     .cmd("PTTL")
                     .arg(&cache_key),
             )
@@ -831,22 +835,28 @@ where
         // Convert stale millis to DateTime
         let stale = stale_ms.and_then(DateTime::from_timestamp_millis);
 
+        // Convert created_at millis to DateTime
+        let created_at = created_at_ms.and_then(DateTime::from_timestamp_millis);
+
         // Calculate expire from PTTL (milliseconds remaining)
         // PTTL returns: -2 if key doesn't exist, -1 if no TTL, else milliseconds
         let expire = (pttl > 0).then(|| Utc::now() + chrono::Duration::milliseconds(pttl));
 
-        Ok(Some(CacheValue::new(data, expire, stale)))
+        Ok(Some(CacheValue::new(data, expire, stale, created_at)))
     }
 
     async fn write(&self, key: &CacheKey, value: CacheValue<Raw>) -> BackendResult<()> {
         let mut con = self.get_connection().await?.clone();
         let cache_key = self.key_format.serialize(key)?;
 
-        // Build HSET command with data field, optionally add stale field
+        // Build HSET command with data field, optionally add stale and created_at fields
         let mut cmd = redis::cmd("HSET");
         cmd.arg(&cache_key).arg("d").arg(value.data().as_ref());
         if let Some(stale) = value.stale() {
             cmd.arg("s").arg(stale.timestamp_millis());
+        }
+        if let Some(created_at) = value.created_at() {
+            cmd.arg("c").arg(created_at.timestamp_millis());
         }
 
         // Pipeline: HSET + optional PEXPIRE (computed from value.ttl())

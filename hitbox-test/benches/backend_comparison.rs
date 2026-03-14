@@ -50,7 +50,7 @@ async fn bench_write_single<B>(
     B: Backend + CacheBackend,
 {
     let key = CacheKey::from_str("bench", &format!("key-{}", key_num));
-    let value = CacheValue::new(serialized.clone(), None, None);
+    let value = CacheValue::new(serialized.clone(), None, None, None);
     let mut ctx = CacheContext::default().boxed();
     backend
         .set::<BenchResponse>(&key, &value, &mut ctx)
@@ -78,7 +78,7 @@ async fn bench_mixed_single<B>(
     B: Backend + CacheBackend,
 {
     let key = CacheKey::from_str("bench", &format!("key-{}", key_num));
-    let value = CacheValue::new(serialized.clone(), None, None);
+    let value = CacheValue::new(serialized.clone(), None, None, None);
     let mut ctx = CacheContext::default().boxed();
 
     // Write
@@ -142,7 +142,7 @@ fn moka_backend_benchmarks(c: &mut Criterion) {
         runtime.block_on(async {
             for i in 0..1000 {
                 let key = CacheKey::from_str("bench", &format!("key-{}", i));
-                let value = CacheValue::new(response.clone(), None, None);
+                let value = CacheValue::new(response.clone(), None, None, None);
                 let mut ctx = CacheContext::default().boxed();
                 backend
                     .set::<BenchResponse>(&key, &value, &mut ctx)
@@ -256,7 +256,7 @@ fn feoxdb_backend_benchmarks(c: &mut Criterion) {
         runtime.block_on(async {
             for i in 0..1000 {
                 let key = CacheKey::from_str("bench", &format!("key-{}", i));
-                let value = CacheValue::new(response.clone(), None, None);
+                let value = CacheValue::new(response.clone(), None, None, None);
                 let mut ctx = CacheContext::default().boxed();
                 backend
                     .set::<BenchResponse>(&key, &value, &mut ctx)
@@ -390,7 +390,7 @@ fn redis_backend_benchmarks(c: &mut Criterion) {
         runtime.block_on(async {
             for i in 0..1000 {
                 let key = CacheKey::from_str("bench", &format!("key-{}", i));
-                let value = CacheValue::new(response.clone(), None, None);
+                let value = CacheValue::new(response.clone(), None, None, None);
                 let mut ctx = CacheContext::default().boxed();
                 backend
                     .set::<BenchResponse>(&key, &value, &mut ctx)

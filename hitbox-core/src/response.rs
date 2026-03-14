@@ -123,6 +123,7 @@ pub enum CacheState<Cached> {
 ///                     cached,
 ///                     config.ttl.map(|d| Utc::now() + d),
 ///                     config.stale_ttl.map(|d| Utc::now() + d),
+///                     Some(Utc::now()),
 ///                 ))
 ///             }
 ///             PredicateResult::NonCacheable(data) => CachePolicy::NonCacheable(data),
@@ -215,6 +216,7 @@ macro_rules! impl_cacheable_response_for_scalar {
                                 cached,
                                 config.ttl.map(|d| Utc::now() + d),
                                 config.stale_ttl.map(|d| Utc::now() + d),
+                                Some(Utc::now()),
                             ))
                         }
                         PredicateResult::NonCacheable(data) => CachePolicy::NonCacheable(data),
@@ -272,6 +274,7 @@ where
                     cached,
                     config.ttl.map(|d| Utc::now() + d),
                     config.stale_ttl.map(|d| Utc::now() + d),
+                    Some(Utc::now()),
                 ))
             }
             PredicateResult::NonCacheable(data) => CachePolicy::NonCacheable(data),
@@ -374,6 +377,7 @@ where
                         res,
                         config.ttl.map(|duration| Utc::now() + duration),
                         config.stale_ttl.map(|duration| Utc::now() + duration),
+                        Some(Utc::now()),
                     )),
                     CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
                 },

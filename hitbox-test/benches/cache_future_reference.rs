@@ -282,7 +282,7 @@ fn bench_compare_cache_write(c: &mut Criterion) {
             hitbox::CachePolicy::NonCacheable(_) => panic!("Response should be cacheable"),
         }
     });
-    let cache_value = CacheValue::new(cached_response, None, None);
+    let cache_value = CacheValue::new(cached_response, None, None, None);
 
     // ===== Dynamic backend setup =====
     let config = load_config();
@@ -349,7 +349,7 @@ fn bench_compare_cache_read(c: &mut Criterion) {
             hitbox::CachePolicy::NonCacheable(_) => panic!("Response should be cacheable"),
         }
     });
-    let cache_value = CacheValue::new(cached_response, None, None);
+    let cache_value = CacheValue::new(cached_response, None, None, None);
 
     // Pre-populate static cache
     rt.block_on(async {
@@ -449,7 +449,7 @@ fn bench_compare_composition_read(c: &mut Criterion) {
             hitbox::CachePolicy::NonCacheable(_) => panic!("Response should be cacheable"),
         }
     });
-    let cache_value = CacheValue::new(cached_response, None, None);
+    let cache_value = CacheValue::new(cached_response, None, None, None);
 
     // Pre-populate static composition cache
     rt.block_on(async {
@@ -566,7 +566,7 @@ fn bench_compare_composition_write(c: &mut Criterion) {
             hitbox::CachePolicy::NonCacheable(_) => panic!("Response should be cacheable"),
         }
     });
-    let cache_value = CacheValue::new(cached_response, None, None);
+    let cache_value = CacheValue::new(cached_response, None, None, None);
 
     // ===== Dynamic CompositionBackend setup (all levels are dyn Backend) =====
     let dyn_l1: Arc<dyn Backend + Send> = Arc::new(
@@ -794,7 +794,7 @@ fn bench_compare_cache_future_hit(c: &mut Criterion) {
             hitbox::CachePolicy::NonCacheable(_) => panic!("Response should be cacheable"),
         }
     });
-    let cache_value = CacheValue::new(cached_response, None, None);
+    let cache_value = CacheValue::new(cached_response, None, None, None);
 
     rt.block_on(async {
         let mut ctx = CacheContext::default().boxed();
@@ -828,7 +828,7 @@ fn bench_compare_cache_future_hit(c: &mut Criterion) {
             hitbox::CachePolicy::NonCacheable(_) => panic!("Response should be cacheable"),
         }
     });
-    let cache_value = CacheValue::new(cached_response, None, None);
+    let cache_value = CacheValue::new(cached_response, None, None, None);
 
     rt.block_on(async {
         let mut ctx = CacheContext::default().boxed();
@@ -1177,7 +1177,7 @@ fn bench_compare_body_cache_future_hit(c: &mut Criterion) {
             hitbox::CachePolicy::NonCacheable(_) => panic!("Response should be cacheable"),
         }
     });
-    let cache_value = CacheValue::new(cached_response, None, None);
+    let cache_value = CacheValue::new(cached_response, None, None, None);
 
     rt.block_on(async {
         let mut ctx = CacheContext::default().boxed();
@@ -1211,7 +1211,7 @@ fn bench_compare_body_cache_future_hit(c: &mut Criterion) {
             hitbox::CachePolicy::NonCacheable(_) => panic!("Response should be cacheable"),
         }
     });
-    let cache_value = CacheValue::new(cached_response, None, None);
+    let cache_value = CacheValue::new(cached_response, None, None, None);
 
     rt.block_on(async {
         let mut ctx = CacheContext::default().boxed();

@@ -24,7 +24,10 @@ pub mod request;
 pub mod response;
 
 pub use body::{BufferedBody, CollectExactResult, CollectedBody, PartialBufferedBody, Remaining};
-pub use cache_status::DEFAULT_CACHE_STATUS_HEADER;
+pub use cache_status::{
+    CACHE_STATUS_HEADER, DEFAULT_CACHE_NAME, DEFAULT_CACHE_STATUS_HEADER, HttpCacheData,
+    HttpCacheStatusConfig,
+};
 pub use cacheable::CacheableSubject;
 pub use request::CacheableHttpRequest;
 pub use response::{CacheableHttpResponse, SerializableHttpResponse};

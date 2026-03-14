@@ -69,6 +69,7 @@ async fn test_direct_write_through_trait_object() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Create composition as trait object

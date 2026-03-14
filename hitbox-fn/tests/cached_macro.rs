@@ -2,8 +2,8 @@
 
 use std::time::Duration;
 
-use hitbox::CacheStatus;
 use hitbox::policy::PolicyConfig;
+use hitbox::{CacheStatus, ForwardReason};
 use hitbox_derive::{CacheableResponse, cached};
 use hitbox_fn::Cache;
 use hitbox_moka::MokaBackend;
@@ -152,7 +152,7 @@ async fn test_skipped_param_not_in_cache_key() {
     // Both should return same result
     assert_eq!(r1, r2);
     // First should be miss, second should be hit (same cache key)
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -171,8 +171,8 @@ async fn test_included_param_affects_cache_key() {
         .await;
 
     // Both should be misses (different cache keys due to different value)
-    assert_eq!(c1.status, CacheStatus::Miss);
-    assert_eq!(c2.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
+    assert_eq!(c2.status, CacheStatus::Forward(ForwardReason::Miss));
 }
 
 #[tokio::test]
@@ -193,7 +193,7 @@ async fn test_multiple_skipped_params() {
         .await;
 
     assert_eq!(r1, r2);
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -212,8 +212,8 @@ async fn test_multiple_params_different_values() {
         .await;
 
     // Different cache keys
-    assert_eq!(c1.status, CacheStatus::Miss);
-    assert_eq!(c2.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
+    assert_eq!(c2.status, CacheStatus::Forward(ForwardReason::Miss));
 }
 
 #[tokio::test]
@@ -231,7 +231,7 @@ async fn test_all_params_skipped_same_key() {
         .await;
 
     assert_eq!(r1, r2);
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -249,7 +249,7 @@ async fn test_first_param_skipped() {
         .await;
 
     // Different first param (skipped) - should hit
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -267,7 +267,7 @@ async fn test_last_param_skipped() {
         .await;
 
     // Different last param (skipped) - should hit
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -290,7 +290,7 @@ async fn test_skipped_type_without_key_extract() {
 
     // Same user_id = cache hit, despite different DbConnection
     assert_eq!(r1, r2);
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -310,7 +310,7 @@ async fn test_generic_function_same_value() {
 
     // Same value = cache hit
     assert_eq!(r1, r2);
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -325,8 +325,8 @@ async fn test_generic_function_different_value() {
     let (_, c2) = generic_function(id2).cache(&cache).with_context().await;
 
     // Different value = cache miss
-    assert_eq!(c1.status, CacheStatus::Miss);
-    assert_eq!(c2.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
+    assert_eq!(c2.status, CacheStatus::Forward(ForwardReason::Miss));
 }
 
 #[tokio::test]
@@ -341,8 +341,8 @@ async fn test_generic_function_different_label() {
     let (_, c2) = generic_function(id2).cache(&cache).with_context().await;
 
     // Different label = cache miss
-    assert_eq!(c1.status, CacheStatus::Miss);
-    assert_eq!(c2.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
+    assert_eq!(c2.status, CacheStatus::Forward(ForwardReason::Miss));
 }
 
 #[tokio::test]
@@ -364,7 +364,7 @@ async fn test_generic_with_skip() {
 
     // Same value, different ctx (skipped) = cache hit
     assert_eq!(r1, r2);
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -400,7 +400,7 @@ async fn test_reference_param() {
 
     assert_eq!(r1, "HELLO");
     assert_eq!(r2, "HELLO");
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -412,8 +412,8 @@ async fn test_reference_different_values() {
     let (_, c2) = with_reference("world").cache(&cache).with_context().await;
 
     // Different values = different cache keys
-    assert_eq!(c1.status, CacheStatus::Miss);
-    assert_eq!(c2.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
+    assert_eq!(c2.status, CacheStatus::Forward(ForwardReason::Miss));
 }
 
 #[tokio::test]
@@ -432,7 +432,7 @@ async fn test_mixed_ref_and_owned() {
 
     assert_eq!(r1, "user_42");
     assert_eq!(r2, "user_42");
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -452,7 +452,7 @@ async fn test_skipped_reference() {
 
     assert_eq!(r1, 42);
     assert_eq!(r2, 42);
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -503,7 +503,7 @@ async fn test_two_lifetimes_cached() {
 
     assert_eq!(r1, "key-val");
     assert_eq!(r2, "key-val");
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -522,8 +522,8 @@ async fn test_two_lifetimes_different_values() {
 
     assert_eq!(r1, "a-b");
     assert_eq!(r2, "a-c");
-    assert_eq!(c1.status, CacheStatus::Miss);
-    assert_eq!(c2.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
+    assert_eq!(c2.status, CacheStatus::Forward(ForwardReason::Miss));
 }
 
 // =============================================================================
@@ -556,7 +556,7 @@ async fn test_skipped_response_field_preserved_on_miss() {
 
     let (result, ctx) = authenticate(1).cache(&cache).with_context().await;
 
-    assert_eq!(ctx.status, CacheStatus::Miss);
+    assert_eq!(ctx.status, CacheStatus::Forward(ForwardReason::Miss));
     let auth = result.unwrap();
     assert_eq!(auth.access_token, Some("secret-token".into()));
     assert_eq!(auth.permissions, vec!["read", "write"]);
@@ -571,7 +571,7 @@ async fn test_skipped_response_field_default_on_hit() {
     // Second call — hit, from cache
     let (r2, c2) = authenticate(2).cache(&cache).with_context().await;
 
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 
     // On miss: skipped field preserved
@@ -628,7 +628,7 @@ async fn test_skipped_field_no_clone_bound() {
 
     // Miss: NonCloneable field preserved despite not implementing Clone
     let (r1, c1) = get_with_non_cloneable(1).cache(&cache).with_context().await;
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(r1.as_ref().unwrap().ctx.value, "original");
 
     // Hit: NonCloneable field is Default
@@ -655,7 +655,7 @@ async fn test_zero_args_always_same_key() {
     let (r2, c2) = no_args_function().cache(&cache).with_context().await;
 
     assert_eq!(r1, r2);
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }
 
@@ -735,7 +735,7 @@ async fn test_inline_backend_policy_with_context() {
         .await;
 
     assert_eq!(result, 20);
-    assert_eq!(ctx.status, CacheStatus::Miss);
+    assert_eq!(ctx.status, CacheStatus::Forward(ForwardReason::Miss));
 }
 
 // =============================================================================

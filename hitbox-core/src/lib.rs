@@ -18,8 +18,8 @@ pub mod value;
 pub use cacheable::Cacheable;
 pub use config::{CacheConfig, CacheConfigs};
 pub use context::{
-    BoxContext, CacheContext, CacheStatus, CacheStatusExt, Context, ReadMode, ResponseSource,
-    finalize_context,
+    BoxContext, CacheContext, CacheStatus, CacheStatusExt, CacheTiming, Context, ForwardReason,
+    ReadMode, ResponseSource, finalize_context,
 };
 pub use extractor::Extractor;
 pub use key::{CacheKey, KeyPart, KeyParts};

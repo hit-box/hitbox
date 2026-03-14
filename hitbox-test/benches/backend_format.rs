@@ -48,7 +48,7 @@ async fn bench_write_single<B>(
     B: Backend + CacheBackend,
 {
     let key = CacheKey::from_str("bench", &format!("key-{}", key_num));
-    let value = CacheValue::new(serialized.clone(), None, None);
+    let value = CacheValue::new(serialized.clone(), None, None, None);
     let mut ctx = CacheContext::default().boxed();
     backend
         .set::<BenchResponse>(&key, &value, &mut ctx)
@@ -183,7 +183,7 @@ fn format_read_benchmark(c: &mut Criterion) {
         runtime.block_on(async {
             for i in 0..100 {
                 let key = CacheKey::from_str("bench", &format!("key-{}", i));
-                let value = CacheValue::new(response.clone(), None, None);
+                let value = CacheValue::new(response.clone(), None, None, None);
                 let mut ctx = CacheContext::default().boxed();
                 backend
                     .set::<BenchResponse>(&key, &value, &mut ctx)
@@ -211,7 +211,7 @@ fn format_read_benchmark(c: &mut Criterion) {
         runtime.block_on(async {
             for i in 0..100 {
                 let key = CacheKey::from_str("bench", &format!("key-{}", i));
-                let value = CacheValue::new(response.clone(), None, None);
+                let value = CacheValue::new(response.clone(), None, None, None);
                 let mut ctx = CacheContext::default().boxed();
                 backend
                     .set::<BenchResponse>(&key, &value, &mut ctx)
@@ -243,7 +243,7 @@ fn format_read_benchmark(c: &mut Criterion) {
         runtime.block_on(async {
             for i in 0..100 {
                 let key = CacheKey::from_str("bench", &format!("key-{}", i));
-                let value = CacheValue::new(response.clone(), None, None);
+                let value = CacheValue::new(response.clone(), None, None, None);
                 let mut ctx = CacheContext::default().boxed();
                 backend
                     .set::<BenchResponse>(&key, &value, &mut ctx)
@@ -273,7 +273,7 @@ fn format_read_benchmark(c: &mut Criterion) {
             runtime.block_on(async {
                 for i in 0..100 {
                     let key = CacheKey::from_str("bench", &format!("key-{}", i));
-                    let value = CacheValue::new(response.clone(), None, None);
+                    let value = CacheValue::new(response.clone(), None, None, None);
                     let mut ctx = CacheContext::default().boxed();
                     backend
                         .set::<BenchResponse>(&key, &value, &mut ctx)

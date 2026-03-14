@@ -37,7 +37,7 @@ use std::sync::Arc;
 use hitbox::backend::CacheBackend;
 use hitbox::concurrency::NoopConcurrencyManager;
 use hitbox_core::DisabledOffload;
-use hitbox_http::DEFAULT_CACHE_STATUS_HEADER;
+use hitbox_http::HttpCacheStatusConfig;
 use http::header::HeaderName;
 use tower::Layer;
 
@@ -106,8 +106,8 @@ pub struct Cache<B, C, CM, O = DisabledOffload> {
     pub offload: O,
     /// Concurrency manager for dogpile prevention.
     pub concurrency_manager: CM,
-    /// Header name for cache status (HIT/MISS/STALE).
-    pub cache_status_header: HeaderName,
+    /// Configuration for cache status headers (RFC 9211 + legacy).
+    pub cache_status_config: HttpCacheStatusConfig,
 }
 
 impl<S, B, C, CM, O> Layer<S> for Cache<B, C, CM, O>
@@ -125,7 +125,7 @@ where
             self.configuration.clone(),
             self.offload.clone(),
             self.concurrency_manager.clone(),
-            self.cache_status_header.clone(),
+            self.cache_status_config.clone(),
         )
     }
 }
@@ -211,7 +211,7 @@ pub struct CacheBuilder<B, C, CM, O = DisabledOffload> {
     configuration: C,
     offload: O,
     concurrency_manager: CM,
-    cache_status_header: Option<HeaderName>,
+    cache_status_config: Option<HttpCacheStatusConfig>,
 }
 
 impl CacheBuilder<NotSet, NotSet, NoopConcurrencyManager, DisabledOffload> {
@@ -224,7 +224,7 @@ impl CacheBuilder<NotSet, NotSet, NoopConcurrencyManager, DisabledOffload> {
             configuration: NotSet,
             offload: DisabledOffload,
             concurrency_manager: NoopConcurrencyManager,
-            cache_status_header: None,
+            cache_status_config: None,
         }
     }
 }
@@ -258,7 +258,7 @@ impl<B, C, CM, O> CacheBuilder<B, C, CM, O> {
             configuration: self.configuration,
             offload: self.offload,
             concurrency_manager: self.concurrency_manager,
-            cache_status_header: self.cache_status_header,
+            cache_status_config: self.cache_status_config,
         }
     }
 
@@ -302,7 +302,7 @@ impl<B, C, CM, O> CacheBuilder<B, C, CM, O> {
             configuration,
             offload: self.offload,
             concurrency_manager: self.concurrency_manager,
-            cache_status_header: self.cache_status_header,
+            cache_status_config: self.cache_status_config,
         }
     }
 
@@ -324,7 +324,7 @@ impl<B, C, CM, O> CacheBuilder<B, C, CM, O> {
             configuration: self.configuration,
             offload: self.offload,
             concurrency_manager,
-            cache_status_header: self.cache_status_header,
+            cache_status_config: self.cache_status_config,
         }
     }
 
@@ -342,14 +342,14 @@ impl<B, C, CM, O> CacheBuilder<B, C, CM, O> {
             configuration: self.configuration,
             offload,
             concurrency_manager: self.concurrency_manager,
-            cache_status_header: self.cache_status_header,
+            cache_status_config: self.cache_status_config,
         }
     }
 
-    /// Sets the header name for cache status.
+    /// Sets the legacy header name for cache status.
     ///
-    /// The cache status header indicates whether a response was served from cache.
-    /// Possible values are `HIT`, `MISS`, or `STALE`.
+    /// Controls the legacy `x-cache-status` header name. The RFC 9211
+    /// `Cache-Status` header is always included.
     ///
     /// Defaults to [`DEFAULT_CACHE_STATUS_HEADER`] (`x-cache-status`).
     ///
@@ -365,8 +365,22 @@ impl<B, C, CM, O> CacheBuilder<B, C, CM, O> {
     ///     .cache_status_header(HeaderName::from_static("x-custom-cache"));
     /// ```
     pub fn cache_status_header(self, header_name: HeaderName) -> Self {
+        let mut config = self.cache_status_config.unwrap_or_default();
+        config.legacy_header = Some(header_name);
         CacheBuilder {
-            cache_status_header: Some(header_name),
+            cache_status_config: Some(config),
+            ..self
+        }
+    }
+
+    /// Sets the cache name used in the RFC 9211 `Cache-Status` header.
+    ///
+    /// Defaults to `"hitbox"`.
+    pub fn cache_name(self, name: impl Into<String>) -> Self {
+        let mut config = self.cache_status_config.unwrap_or_default();
+        config.cache_name = name.into();
+        CacheBuilder {
+            cache_status_config: Some(config),
             ..self
         }
     }
@@ -386,9 +400,7 @@ where
             configuration: self.configuration,
             offload: self.offload,
             concurrency_manager: self.concurrency_manager,
-            cache_status_header: self
-                .cache_status_header
-                .unwrap_or(DEFAULT_CACHE_STATUS_HEADER),
+            cache_status_config: self.cache_status_config.unwrap_or_default(),
         }
     }
 }

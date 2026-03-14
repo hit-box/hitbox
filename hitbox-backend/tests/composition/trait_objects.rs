@@ -115,6 +115,7 @@ async fn test_boxed_composition_backend() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Should work through Box
@@ -145,6 +146,7 @@ async fn test_arc_composition_backend() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Should work through Arc
@@ -173,6 +175,7 @@ async fn test_ref_composition_backend() {
             data: "test_value".to_string(),
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 
@@ -204,6 +207,7 @@ async fn test_composition_as_dyn_backend() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Should work through trait object
@@ -234,6 +238,7 @@ async fn test_arc_composition_as_dyn_backend() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Should work through Arc trait object
@@ -263,6 +268,7 @@ async fn test_arc_sync_composition_as_dyn_backend() {
             data: "test_value".to_string(),
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 
