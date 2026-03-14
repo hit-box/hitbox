@@ -27,16 +27,15 @@
 //!
 //! ## Interior Mutability
 //!
-//! All methods take `&self`, using a [`parking_lot::RwLock`] internally.
-//! This allows `EvalContext` to be shared by reference (`&EvalContext`)
-//! across concurrent predicate evaluations.
+//! All methods take `&self`, using a [`std::sync::RwLock`] internally.
+//! Values are stored as [`Arc`], so `get` returns `Arc<T>` — the lock is
+//! held only for the duration of a HashMap lookup and an `Arc::clone`,
+//! never across `.await` points. This makes `EvalContext` safe to share
+//! via `&EvalContext` across concurrent `tokio::spawn` tasks.
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
-
-use parking_lot::{
-    MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
-};
+use std::sync::{Arc, RwLock};
 
 /// A type-map for sharing computed values across predicates and extractors.
 ///
@@ -48,10 +47,11 @@ use parking_lot::{
 ///
 /// `EvalContext` is `Send + Sync` because all stored values must be
 /// `Send + Sync + 'static`. It uses interior mutability via
-/// [`parking_lot::RwLock`], so all methods take `&self` and it can be
-/// shared across threads via `&EvalContext`.
+/// [`std::sync::RwLock`] and stores values as [`Arc`], so all methods
+/// take `&self` and return owned `Arc<T>` handles — no lock guards
+/// escape the API.
 pub struct EvalContext {
-    map: RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>,
+    map: RwLock<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
 }
 
 impl EvalContext {
@@ -64,72 +64,71 @@ impl EvalContext {
 
     /// Inserts a value into the context.
     ///
-    /// If a value of this type already exists, it is replaced and the old
-    /// value is returned.
-    pub fn insert<T: Send + Sync + 'static>(&self, val: T) -> Option<T> {
+    /// If a value of this type already exists, it is replaced.
+    pub fn insert<T: Send + Sync + 'static>(&self, val: T) {
         self.map
             .write()
-            .insert(TypeId::of::<T>(), Box::new(val))
-            .and_then(|boxed| boxed.downcast().ok().map(|b| *b))
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(TypeId::of::<T>(), Arc::new(val));
     }
 
-    /// Returns a reference to a value of the given type, if present.
+    /// Returns an `Arc` to a value of the given type, if present.
     ///
-    /// The returned guard holds a read lock and dereferences to `&T`.
-    pub fn get<T: Send + Sync + 'static>(&self) -> Option<MappedRwLockReadGuard<'_, T>> {
-        RwLockReadGuard::try_map(self.map.read(), |map| {
-            map.get(&TypeId::of::<T>())
-                .and_then(|boxed| boxed.downcast_ref())
-        })
-        .ok()
+    /// The internal lock is held only for the HashMap lookup and `Arc::clone`,
+    /// then released immediately.
+    pub fn get<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        self.map
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&TypeId::of::<T>())
+            .and_then(|arc| arc.clone().downcast().ok())
     }
 
-    /// Returns a mutable reference to a value of the given type, if present.
+    /// Returns an `Arc` to a value of the given type, inserting a default
+    /// computed by `f` if not present.
     ///
-    /// The returned guard holds a write lock and dereferences to `&mut T`.
-    pub fn get_mut<T: Send + Sync + 'static>(&self) -> Option<MappedRwLockWriteGuard<'_, T>> {
-        RwLockWriteGuard::try_map(self.map.write(), |map| {
-            map.get_mut(&TypeId::of::<T>())
-                .and_then(|boxed| boxed.downcast_mut())
-        })
-        .ok()
-    }
-
-    /// Returns a mutable reference to a value of the given type, inserting
-    /// a default computed by `f` if not present.
-    ///
-    /// This is the primary method for expensive lazy initialization:
+    /// Uses double-checked locking: the read lock fast-path avoids write
+    /// contention when the value already exists.
     ///
     /// ```ignore
     /// let msg = ctx.get_or_insert_with(|| {
     ///     ParsedProto(DynamicMessage::decode(descriptor, body_bytes).unwrap())
     /// });
     /// ```
-    pub fn get_or_insert_with<T: Send + Sync + 'static>(
-        &self,
-        f: impl FnOnce() -> T,
-    ) -> MappedRwLockWriteGuard<'_, T> {
-        let mut map = self.map.write();
-        map.entry(TypeId::of::<T>())
-            .or_insert_with(|| Box::new(f()));
-        RwLockWriteGuard::map(map, |map| {
-            map.get_mut(&TypeId::of::<T>())
-                .and_then(|boxed| boxed.downcast_mut())
-                .expect("type mismatch in EvalContext (this is a bug)")
-        })
+    pub fn get_or_insert_with<T: Send + Sync + 'static>(&self, f: impl FnOnce() -> T) -> Arc<T> {
+        // Fast path: read lock only
+        if let Some(val) = self.get::<T>() {
+            return val;
+        }
+        // Compute outside any lock
+        let val = Arc::new(f());
+        // Write lock only for insertion
+        let mut map = self.map.write().unwrap_or_else(|e| e.into_inner());
+        // Double-check: another thread may have inserted while we computed
+        if let Some(arc) = map.get(&TypeId::of::<T>())
+            && let Ok(typed) = arc.clone().downcast::<T>()
+        {
+            return typed;
+        }
+        map.insert(TypeId::of::<T>(), val.clone());
+        val
     }
 
     /// Returns `true` if the context contains a value of the given type.
     pub fn contains<T: Send + Sync + 'static>(&self) -> bool {
-        self.map.read().contains_key(&TypeId::of::<T>())
+        self.map
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains_key(&TypeId::of::<T>())
     }
 
-    /// Removes and returns a value of the given type, if present.
-    pub fn remove<T: Send + Sync + 'static>(&self) -> Option<T> {
+    /// Removes a value of the given type, returning the `Arc` if present.
+    pub fn remove<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
         self.map
             .write()
+            .unwrap_or_else(|e| e.into_inner())
             .remove(&TypeId::of::<T>())
-            .and_then(|boxed| boxed.downcast().ok().map(|b| *b))
+            .and_then(|arc| arc.downcast().ok())
     }
 }
 
@@ -141,8 +140,9 @@ impl Default for EvalContext {
 
 impl std::fmt::Debug for EvalContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let len = self.map.read().map(|m| m.len()).unwrap_or(0);
         f.debug_struct("EvalContext")
-            .field("entries", &self.map.read().len())
+            .field("entries", &len)
             .finish()
     }
 }
@@ -164,20 +164,11 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_replaces_and_returns_old() {
+    fn test_insert_replaces() {
         let ctx = EvalContext::new();
-        assert!(ctx.insert(Counter(1)).is_none());
-        let old = ctx.insert(Counter(2));
-        assert_eq!(old.unwrap().0, 1);
+        ctx.insert(Counter(1));
+        ctx.insert(Counter(2));
         assert_eq!(ctx.get::<Counter>().unwrap().0, 2);
-    }
-
-    #[test]
-    fn test_get_mut() {
-        let ctx = EvalContext::new();
-        ctx.insert(Counter(0));
-        ctx.get_mut::<Counter>().unwrap().0 += 1;
-        assert_eq!(ctx.get::<Counter>().unwrap().0, 1);
     }
 
     #[test]
@@ -187,7 +178,6 @@ mod tests {
         // First call inserts
         let val = ctx.get_or_insert_with(|| Counter(42));
         assert_eq!(val.0, 42);
-        drop(val);
 
         // Second call returns existing
         let val = ctx.get_or_insert_with(|| Counter(99));
@@ -223,5 +213,18 @@ mod tests {
     fn test_default() {
         let ctx = EvalContext::default();
         assert!(!ctx.contains::<Counter>());
+    }
+
+    #[test]
+    fn test_arc_is_send_across_threads() {
+        let ctx = Arc::new(EvalContext::new());
+        ctx.insert(Counter(42));
+
+        let ctx2 = ctx.clone();
+        let handle = std::thread::spawn(move || {
+            let val = ctx2.get::<Counter>().unwrap();
+            assert_eq!(val.0, 42);
+        });
+        handle.join().unwrap();
     }
 }
