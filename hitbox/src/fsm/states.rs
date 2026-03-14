@@ -244,7 +244,7 @@ where
     /// Based on policy configuration:
     /// - Enabled: create CheckRequestCachePolicy future
     /// - Disabled: call upstream directly
-    pub fn transition<'req>(self, policy: &PolicyConfig) -> InitialTransition<'req, Req, U>
+    pub fn transition<'req>(mut self, policy: &PolicyConfig) -> InitialTransition<'req, Req, U>
     where
         Req: 'req,
         ReqP: 'req,
