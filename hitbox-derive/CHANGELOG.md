@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `#[cached]` codegen uses `CacheAccess` trait instead of concrete `Cache<B, CM, O>` type ([#206](https://github.com/hit-box/hitbox/pull/206))
 - `#[derive(CacheableRequest)]` generates GAT-based impl to support non-`'static` request types ([#206](https://github.com/hit-box/hitbox/pull/206))
+- Generated `CacheableRequest` and `CacheableResponse` impls now pass `&EvalContext`
 
 ## [0.2.1] - 2026-02-17
 
