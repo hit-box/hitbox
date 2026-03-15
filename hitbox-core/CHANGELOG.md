@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - `CacheConfig` and `CacheConfigs` traits for cache configuration abstraction ([#253](https://github.com/hit-box/hitbox/pull/253))
+- `ForwardReason`, `CacheTiming`, and protocol extensions in `CacheContext` for richer cache operation metadata ([#269](https://github.com/hit-box/hitbox/pull/269))
+
+### Changed
+- **Breaking:** `CacheStatus` extended with `Collapsed` and `Forward(ForwardReason)` variants ([#269](https://github.com/hit-box/hitbox/pull/269))
+- **Breaking:** `CacheStatusExt::cache_status()` takes `&CacheContext` instead of `CacheStatus` ([#269](https://github.com/hit-box/hitbox/pull/269))
+- **Breaking:** `CacheValue::new()` and `CacheMeta::new()` take additional `created_at` argument for tracking entry creation time ([#269](https://github.com/hit-box/hitbox/pull/269))
 
 ### Changed
 - `PolicyConfig` and related policy types moved from `hitbox` crate ([#253](https://github.com/hit-box/hitbox/pull/253))

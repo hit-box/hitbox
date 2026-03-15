@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - `SelectiveCacheFuture` for multi-config routing with first-match-wins strategy ([#253](https://github.com/hit-box/hitbox/pull/253))
+- FSM wiring for `CacheTiming`, `stored`, `Collapsed`, and `Forward(Bypass)` statuses ([#269](https://github.com/hit-box/hitbox/pull/269))
 - `SelectiveConfig` container for multiple `CacheConfig` instances ([#253](https://github.com/hit-box/hitbox/pull/253))
 
 ### Changed
