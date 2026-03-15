@@ -249,8 +249,10 @@ where
                     let passthrough = state.as_ref().expect(POLL_AFTER_READY);
                     trace!(parent: &passthrough.span, "FSM state: Passthrough");
                     let response = ready!(upstream_future.poll(cx));
-                    let mut ctx = CacheContext::default();
-                    ctx.status = CacheStatus::Forward(hitbox_core::ForwardReason::Bypass);
+                    let ctx = CacheContext {
+                        status: CacheStatus::Forward(hitbox_core::ForwardReason::Bypass),
+                        ..Default::default()
+                    };
                     let ctx = hitbox_core::finalize_context(ctx.boxed());
                     return Poll::Ready((response, ctx));
                 }

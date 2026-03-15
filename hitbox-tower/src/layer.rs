@@ -351,7 +351,7 @@ impl<B, C, CM, O> CacheBuilder<B, C, CM, O> {
     /// Controls the legacy `x-cache-status` header name. The RFC 9211
     /// `Cache-Status` header is always included.
     ///
-    /// Defaults to [`DEFAULT_CACHE_STATUS_HEADER`] (`x-cache-status`).
+    /// Defaults to [`hitbox_http::DEFAULT_CACHE_STATUS_HEADER`] (`x-cache-status`).
     ///
     /// # Examples
     ///
