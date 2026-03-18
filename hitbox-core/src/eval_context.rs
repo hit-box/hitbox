@@ -2,21 +2,23 @@
 //!
 //! [`EvalContext`] is a type-map that allows predicates and extractors to share
 //! computed values during a single evaluation phase. This avoids redundant
-//! expensive operations (e.g., deserializing a protobuf body into a
-//! `DynamicMessage`) when multiple predicates or extractors need the same data.
+//! expensive operations (e.g., collecting a chunked body and deserializing it
+//! into JSON) when multiple predicates or extractors need the same data.
 //!
 //! ## Usage
 //!
-//! ```rust
+//! ```ignore
 //! use hitbox_core::EvalContext;
 //!
-//! struct ParsedProto(String);
+//! struct ParsedBody(serde_json::Value);
 //!
 //! let ctx = EvalContext::new();
-//! ctx.insert(ParsedProto("hello".into()));
 //!
-//! assert!(ctx.contains::<ParsedProto>());
-//! assert_eq!(ctx.get::<ParsedProto>().unwrap().0, "hello");
+//! // Async lazy initialization — body is collected once
+//! let body = ctx.get_or_insert_with(|| async {
+//!     let collected = body.collect().await.unwrap();
+//!     ParsedBody(serde_json::from_slice(&collected.data).unwrap())
+//! }).await;
 //! ```
 //!
 //! ## Lifecycle
@@ -27,15 +29,18 @@
 //!
 //! ## Interior Mutability
 //!
-//! All methods take `&self`, using a [`std::sync::RwLock`] internally.
-//! Values are stored as [`Arc`], so `get` returns `Arc<T>` — the lock is
-//! held only for the duration of a HashMap lookup and an `Arc::clone`,
-//! never across `.await` points. This makes `EvalContext` safe to share
-//! via `&EvalContext` across concurrent `tokio::spawn` tasks.
+//! All methods take `&self` and are async, using [`tokio::sync::RwLock`]
+//! internally. Values are stored as [`Arc`], so `get` returns `Arc<T>` —
+//! no lock guards escape the API. `get_or_insert_with` accepts an async
+//! closure, enabling lazy computation of values that require `.await`
+//! (like body collection or deserialization).
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::future::Future;
+use std::sync::Arc;
+
+use tokio::sync::RwLock;
 
 /// A type-map for sharing computed values across predicates and extractors.
 ///
@@ -47,7 +52,7 @@ use std::sync::{Arc, RwLock};
 ///
 /// `EvalContext` is `Send + Sync` because all stored values must be
 /// `Send + Sync + 'static`. It uses interior mutability via
-/// [`std::sync::RwLock`] and stores values as [`Arc`], so all methods
+/// [`tokio::sync::RwLock`] and stores values as [`Arc`], so all methods
 /// take `&self` and return owned `Arc<T>` handles — no lock guards
 /// escape the API.
 pub struct EvalContext {
@@ -65,46 +70,50 @@ impl EvalContext {
     /// Inserts a value into the context.
     ///
     /// If a value of this type already exists, it is replaced.
-    pub fn insert<T: Send + Sync + 'static>(&self, val: T) {
+    pub async fn insert<T: Send + Sync + 'static>(&self, val: T) {
         self.map
             .write()
-            .unwrap_or_else(|e| e.into_inner())
+            .await
             .insert(TypeId::of::<T>(), Arc::new(val));
     }
 
     /// Returns an `Arc` to a value of the given type, if present.
-    ///
-    /// The internal lock is held only for the HashMap lookup and `Arc::clone`,
-    /// then released immediately.
-    pub fn get<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+    pub async fn get<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
         self.map
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .await
             .get(&TypeId::of::<T>())
             .and_then(|arc| arc.clone().downcast().ok())
     }
 
     /// Returns an `Arc` to a value of the given type, inserting a default
-    /// computed by `f` if not present.
+    /// computed by the async closure `f` if not present.
     ///
     /// Uses double-checked locking: the read lock fast-path avoids write
-    /// contention when the value already exists.
+    /// contention when the value already exists. The computation runs
+    /// outside any lock, so it can freely `.await`.
     ///
     /// ```ignore
-    /// let msg = ctx.get_or_insert_with(|| {
-    ///     ParsedProto(DynamicMessage::decode(descriptor, body_bytes).unwrap())
-    /// });
+    /// let body = ctx.get_or_insert_with(|| async {
+    ///     let collected = body.collect().await.unwrap();
+    ///     ParsedBody(serde_json::from_slice(&collected.data).unwrap())
+    /// }).await;
     /// ```
-    pub fn get_or_insert_with<T: Send + Sync + 'static>(&self, f: impl FnOnce() -> T) -> Arc<T> {
+    pub async fn get_or_insert_with<T, F, Fut>(&self, f: F) -> Arc<T>
+    where
+        T: Send + Sync + 'static,
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = T>,
+    {
         // Fast path: read lock only
-        if let Some(val) = self.get::<T>() {
+        if let Some(val) = self.get::<T>().await {
             return val;
         }
-        // Compute outside any lock
-        let val = Arc::new(f());
+        // Compute outside any lock — can .await freely
+        let val = Arc::new(f().await);
         // Write lock only for insertion
-        let mut map = self.map.write().unwrap_or_else(|e| e.into_inner());
-        // Double-check: another thread may have inserted while we computed
+        let mut map = self.map.write().await;
+        // Double-check: another task may have inserted while we computed
         if let Some(arc) = map.get(&TypeId::of::<T>())
             && let Ok(typed) = arc.clone().downcast::<T>()
         {
@@ -115,18 +124,15 @@ impl EvalContext {
     }
 
     /// Returns `true` if the context contains a value of the given type.
-    pub fn contains<T: Send + Sync + 'static>(&self) -> bool {
-        self.map
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
-            .contains_key(&TypeId::of::<T>())
+    pub async fn contains<T: Send + Sync + 'static>(&self) -> bool {
+        self.map.read().await.contains_key(&TypeId::of::<T>())
     }
 
     /// Removes a value of the given type, returning the `Arc` if present.
-    pub fn remove<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+    pub async fn remove<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
         self.map
             .write()
-            .unwrap_or_else(|e| e.into_inner())
+            .await
             .remove(&TypeId::of::<T>())
             .and_then(|arc| arc.downcast().ok())
     }
@@ -140,7 +146,7 @@ impl Default for EvalContext {
 
 impl std::fmt::Debug for EvalContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let len = self.map.read().map(|m| m.len()).unwrap_or(0);
+        let len = self.map.try_read().map(|m| m.len()).unwrap_or(0);
         f.debug_struct("EvalContext")
             .field("entries", &len)
             .finish()
@@ -154,77 +160,97 @@ mod tests {
     struct StringValue(String);
     struct Counter(u32);
 
-    #[test]
-    fn test_insert_and_get() {
+    #[tokio::test]
+    async fn test_insert_and_get() {
         let ctx = EvalContext::new();
-        ctx.insert(StringValue("hello".into()));
+        ctx.insert(StringValue("hello".into())).await;
 
-        assert!(ctx.contains::<StringValue>());
-        assert_eq!(ctx.get::<StringValue>().unwrap().0, "hello");
+        assert!(ctx.contains::<StringValue>().await);
+        assert_eq!(ctx.get::<StringValue>().await.unwrap().0, "hello");
     }
 
-    #[test]
-    fn test_insert_replaces() {
+    #[tokio::test]
+    async fn test_insert_replaces() {
         let ctx = EvalContext::new();
-        ctx.insert(Counter(1));
-        ctx.insert(Counter(2));
-        assert_eq!(ctx.get::<Counter>().unwrap().0, 2);
+        ctx.insert(Counter(1)).await;
+        ctx.insert(Counter(2)).await;
+        assert_eq!(ctx.get::<Counter>().await.unwrap().0, 2);
     }
 
-    #[test]
-    fn test_get_or_insert_with() {
+    #[tokio::test]
+    async fn test_get_or_insert_with_sync() {
         let ctx = EvalContext::new();
 
-        // First call inserts
-        let val = ctx.get_or_insert_with(|| Counter(42));
+        // First call inserts (sync computation wrapped in async)
+        let val = ctx.get_or_insert_with(|| async { Counter(42) }).await;
         assert_eq!(val.0, 42);
 
         // Second call returns existing
-        let val = ctx.get_or_insert_with(|| Counter(99));
+        let val = ctx.get_or_insert_with(|| async { Counter(99) }).await;
         assert_eq!(val.0, 42);
     }
 
-    #[test]
-    fn test_remove() {
+    #[tokio::test]
+    async fn test_get_or_insert_with_async() {
         let ctx = EvalContext::new();
-        ctx.insert(Counter(10));
-        let removed = ctx.remove::<Counter>();
+
+        // Simulate async computation (like body collection)
+        let val = ctx
+            .get_or_insert_with(|| async {
+                tokio::task::yield_now().await;
+                Counter(42)
+            })
+            .await;
+        assert_eq!(val.0, 42);
+
+        // Second call returns cached value, does not compute
+        let val = ctx
+            .get_or_insert_with(|| async { panic!("should not be called") as Counter })
+            .await;
+        assert_eq!(val.0, 42);
+    }
+
+    #[tokio::test]
+    async fn test_remove() {
+        let ctx = EvalContext::new();
+        ctx.insert(Counter(10)).await;
+        let removed = ctx.remove::<Counter>().await;
         assert_eq!(removed.unwrap().0, 10);
-        assert!(!ctx.contains::<Counter>());
+        assert!(!ctx.contains::<Counter>().await);
     }
 
-    #[test]
-    fn test_missing_type_returns_none() {
+    #[tokio::test]
+    async fn test_missing_type_returns_none() {
         let ctx = EvalContext::new();
-        assert!(ctx.get::<Counter>().is_none());
+        assert!(ctx.get::<Counter>().await.is_none());
     }
 
-    #[test]
-    fn test_multiple_types() {
+    #[tokio::test]
+    async fn test_multiple_types() {
         let ctx = EvalContext::new();
-        ctx.insert(StringValue("a".into()));
-        ctx.insert(Counter(1));
+        ctx.insert(StringValue("a".into())).await;
+        ctx.insert(Counter(1)).await;
 
-        assert_eq!(ctx.get::<StringValue>().unwrap().0, "a");
-        assert_eq!(ctx.get::<Counter>().unwrap().0, 1);
+        assert_eq!(ctx.get::<StringValue>().await.unwrap().0, "a");
+        assert_eq!(ctx.get::<Counter>().await.unwrap().0, 1);
     }
 
-    #[test]
-    fn test_default() {
+    #[tokio::test]
+    async fn test_default() {
         let ctx = EvalContext::default();
-        assert!(!ctx.contains::<Counter>());
+        assert!(!ctx.contains::<Counter>().await);
     }
 
-    #[test]
-    fn test_arc_is_send_across_threads() {
+    #[tokio::test]
+    async fn test_arc_is_send_across_tasks() {
         let ctx = Arc::new(EvalContext::new());
-        ctx.insert(Counter(42));
+        ctx.insert(Counter(42)).await;
 
         let ctx2 = ctx.clone();
-        let handle = std::thread::spawn(move || {
-            let val = ctx2.get::<Counter>().unwrap();
+        let handle = tokio::spawn(async move {
+            let val = ctx2.get::<Counter>().await.unwrap();
             assert_eq!(val.0, 42);
         });
-        handle.join().unwrap();
+        handle.await.unwrap();
     }
 }
