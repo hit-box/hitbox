@@ -140,21 +140,23 @@ where
             ));
 
         // Execute cache future
-        let (response, mut cache_context) = cache_future.await;
+        let (response, cache_context) = cache_future.await;
 
         // Convert CacheableHttpResponse back to reqwest::Response
         let mut cacheable_response = response?;
 
         // Set HTTP-specific extension data (upstream status code)
-        if matches!(cache_context.status, CacheStatus::Forward(_)) {
-            let status_code = cacheable_response.parts.status.as_u16();
-            cache_context.extensions = Some(Box::new(HttpCacheData {
-                upstream_status: status_code,
-            }));
-        }
+        let http_ext = if matches!(cache_context.status, CacheStatus::Forward(_)) {
+            Some(HttpCacheData {
+                upstream_status: cacheable_response.parts.status.as_u16(),
+            })
+        } else {
+            None
+        };
+        let http_ctx = cache_context.with_extensions(http_ext);
 
         // Add cache status headers (RFC 9211 Cache-Status, Age, legacy x-cache-status)
-        cacheable_response.cache_status(&cache_context, &self.cache_status_config);
+        cacheable_response.cache_status(&http_ctx, &self.cache_status_config);
 
         let http_response = cacheable_response.into_response();
         let (parts, buffered_body) = http_response.into_parts();

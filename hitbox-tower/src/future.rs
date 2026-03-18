@@ -72,20 +72,22 @@ where
         let this = self.project();
 
         // Poll the inner CacheFuture
-        let (result, mut cache_context) = ready!(this.inner.poll(cx));
+        let (result, cache_context) = ready!(this.inner.poll(cx));
 
         // Transform the response and add cache headers
         let response = result.map(|mut cacheable_response| {
             // Set HTTP-specific extension data (upstream status code)
-            if matches!(cache_context.status, CacheStatus::Forward(_)) {
-                let status_code = cacheable_response.parts.status.as_u16();
-                cache_context.extensions = Some(Box::new(HttpCacheData {
-                    upstream_status: status_code,
-                }));
-            }
+            let http_ext = if matches!(cache_context.status, CacheStatus::Forward(_)) {
+                Some(HttpCacheData {
+                    upstream_status: cacheable_response.parts.status.as_u16(),
+                })
+            } else {
+                None
+            };
+            let http_ctx = cache_context.with_extensions(http_ext);
 
             // Add cache status headers (RFC 9211 Cache-Status, Age, legacy x-cache-status)
-            cacheable_response.cache_status(&cache_context, this.cache_status_config);
+            cacheable_response.cache_status(&http_ctx, this.cache_status_config);
 
             cacheable_response.into_response()
         });

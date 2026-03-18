@@ -108,14 +108,6 @@ impl Context for CompositionContext {
         self.inner.set_stored(stored);
     }
 
-    fn extensions(&self) -> Option<&(dyn Any + Send + Sync)> {
-        self.inner.extensions()
-    }
-
-    fn set_extensions(&mut self, ext: Option<Box<dyn Any + Send + Sync>>) {
-        self.inner.set_extensions(ext);
-    }
-
     fn as_any(&self) -> &dyn Any {
         self
     }

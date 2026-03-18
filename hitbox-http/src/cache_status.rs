@@ -83,7 +83,10 @@ impl HttpCacheStatusConfig {
 /// Formats the RFC 9211 `Cache-Status` header value.
 ///
 /// See: <https://www.rfc-editor.org/rfc/rfc9211>
-fn format_cache_status(ctx: &CacheContext, cache_name: &str) -> String {
+/// Type alias for the HTTP-specific cache context.
+pub type HttpCacheContext = CacheContext<Option<HttpCacheData>>;
+
+fn format_cache_status(ctx: &HttpCacheContext, cache_name: &str) -> String {
     let mut buf = String::with_capacity(64);
     buf.push_str(cache_name);
 
@@ -114,9 +117,7 @@ fn format_cache_status(ctx: &CacheContext, cache_name: &str) -> String {
             let _ = write!(buf, "; fwd={fwd_value}");
 
             // Add fwd-status from protocol extensions
-            if let Some(ext) = &ctx.extensions
-                && let Some(http_data) = ext.downcast_ref::<HttpCacheData>()
-            {
+            if let Some(http_data) = &ctx.extensions {
                 let _ = write!(buf, "; fwd-status={}", http_data.upstream_status);
             }
         }
@@ -134,7 +135,7 @@ fn format_cache_status(ctx: &CacheContext, cache_name: &str) -> String {
 ///
 /// Returns `None` if the response wasn't served from cache.
 /// Per RFC 9111 §5.1, caches MUST generate an Age header in responses served from cache.
-fn compute_age(ctx: &CacheContext) -> Option<u64> {
+fn compute_age(ctx: &HttpCacheContext) -> Option<u64> {
     if !ctx.status.is_served_from_cache() {
         return None;
     }
@@ -150,8 +151,9 @@ where
     ResBody: HttpBody,
 {
     type Config = HttpCacheStatusConfig;
+    type Extensions = Option<HttpCacheData>;
 
-    fn cache_status(&mut self, context: &CacheContext, config: &Self::Config) {
+    fn cache_status(&mut self, context: &HttpCacheContext, config: &Self::Config) {
         // RFC 9211: Cache-Status structured header
         let cache_status_value = format_cache_status(context, &config.cache_name);
         if let Ok(value) = HeaderValue::from_str(&cache_status_value) {
@@ -191,7 +193,7 @@ mod tests {
         let created = Utc::now() - Duration::seconds(900);
         let expire = Utc::now() + Duration::seconds(2700);
 
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Hit,
             timing: Some(CacheTiming {
                 created_at: created,
@@ -210,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_format_cache_miss() {
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Forward(ForwardReason::Miss),
             stored: true,
             ..Default::default()
@@ -222,12 +224,12 @@ mod tests {
 
     #[test]
     fn test_format_cache_miss_with_fwd_status() {
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Forward(ForwardReason::Miss),
             stored: true,
-            extensions: Some(Box::new(HttpCacheData {
+            extensions: Some(HttpCacheData {
                 upstream_status: 200,
-            })),
+            }),
             ..Default::default()
         };
 
@@ -237,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_format_cache_bypass() {
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Forward(ForwardReason::Bypass),
             ..Default::default()
         };
@@ -251,7 +253,7 @@ mod tests {
         let created = Utc::now() - Duration::seconds(3720);
         let expire = Utc::now() - Duration::seconds(120);
 
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Stale,
             timing: Some(CacheTiming {
                 created_at: created,
@@ -269,7 +271,7 @@ mod tests {
 
     #[test]
     fn test_format_collapsed() {
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Collapsed,
             timing: Some(CacheTiming {
                 created_at: Utc::now(),
@@ -284,12 +286,12 @@ mod tests {
 
     #[test]
     fn test_format_expired_forward() {
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Forward(ForwardReason::Expired),
             stored: true,
-            extensions: Some(Box::new(HttpCacheData {
+            extensions: Some(HttpCacheData {
                 upstream_status: 200,
-            })),
+            }),
             ..Default::default()
         };
 
@@ -299,7 +301,7 @@ mod tests {
 
     #[test]
     fn test_format_custom_cache_name() {
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Hit,
             ..Default::default()
         };
@@ -310,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_compute_age_cache_hit() {
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Hit,
             timing: Some(CacheTiming {
                 created_at: Utc::now() - Duration::seconds(900),
@@ -325,7 +327,7 @@ mod tests {
 
     #[test]
     fn test_compute_age_cache_miss_returns_none() {
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Forward(ForwardReason::Miss),
             ..Default::default()
         };
@@ -335,7 +337,7 @@ mod tests {
 
     #[test]
     fn test_compute_age_no_timing_returns_none() {
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Hit,
             timing: None,
             ..Default::default()
@@ -346,12 +348,12 @@ mod tests {
 
     #[test]
     fn test_format_upstream_error_not_stored() {
-        let ctx = CacheContext {
+        let ctx: HttpCacheContext = CacheContext {
             status: CacheStatus::Forward(ForwardReason::Miss),
             stored: false,
-            extensions: Some(Box::new(HttpCacheData {
+            extensions: Some(HttpCacheData {
                 upstream_status: 500,
-            })),
+            }),
             ..Default::default()
         };
 

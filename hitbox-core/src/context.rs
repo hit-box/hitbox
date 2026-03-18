@@ -192,18 +192,6 @@ pub trait Context: Send + Sync {
         // Default implementation does nothing
     }
 
-    // Protocol extensions
-
-    /// Returns a reference to the protocol-specific extension data, if any.
-    fn extensions(&self) -> Option<&(dyn Any + Send + Sync)> {
-        None
-    }
-
-    /// Sets protocol-specific extension data.
-    fn set_extensions(&mut self, _ext: Option<Box<dyn Any + Send + Sync>>) {
-        // Default implementation does nothing
-    }
-
     // Type identity and conversion
 
     /// Returns a reference to self as `Any` for downcasting.
@@ -277,9 +265,14 @@ pub fn finalize_context(ctx: BoxContext) -> CacheContext {
 /// Context information about a cache operation.
 ///
 /// This is the single source of truth for all cache operation metadata.
-/// Protocol-specific data (e.g., HTTP status codes) is stored in [`extensions`](Self::extensions).
-#[derive(Debug, Default)]
-pub struct CacheContext {
+/// The `Ext` type parameter carries protocol-specific data (e.g., HTTP status codes).
+///
+/// - Inside the FSM: `CacheContext` (= `CacheContext<()>`) — protocol-agnostic
+/// - At the integration boundary: `CacheContext<Option<HttpCacheData>>` — protocol-specific
+///
+/// Use [`with_extensions`](Self::with_extensions) to transform between extension types.
+#[derive(Debug, Clone, Default)]
+pub struct CacheContext<Ext = ()> {
     /// What the cache did with this request (hit, stale, collapsed, or forwarded).
     pub status: CacheStatus,
     /// Read mode for this operation.
@@ -293,28 +286,10 @@ pub struct CacheContext {
     pub stored: bool,
     /// Protocol-specific extension data.
     ///
-    /// Each protocol crate defines its own struct and stores it here.
-    /// Costs 8 bytes (null pointer) when unused, one small heap allocation when used.
-    ///
-    /// Examples:
-    /// - HTTP: `HttpCacheData { upstream_status: u16 }`
-    /// - gRPC: `GrpcCacheData { grpc_status: i32 }`
-    pub extensions: Option<Box<dyn Any + Send + Sync>>,
-}
-
-impl Clone for CacheContext {
-    fn clone(&self) -> Self {
-        Self {
-            status: self.status,
-            read_mode: self.read_mode,
-            source: self.source.clone(),
-            timing: self.timing,
-            stored: self.stored,
-            // Extensions are protocol-specific and not cloned.
-            // They are only needed at the header-generation point.
-            extensions: None,
-        }
-    }
+    /// Defaults to `()` inside the FSM. Protocol crates use their own type:
+    /// - HTTP: `Option<HttpCacheData>`
+    /// - gRPC: `Option<GrpcCacheData>`
+    pub extensions: Ext,
 }
 
 impl CacheContext {
@@ -324,6 +299,31 @@ impl CacheContext {
     /// Uses SmallBox for inline storage, avoiding heap allocation for small contexts.
     pub fn boxed(self) -> BoxContext {
         smallbox!(self)
+    }
+}
+
+impl<Ext> CacheContext<Ext> {
+    /// Transform this context's extension type.
+    ///
+    /// Copies all protocol-agnostic fields and replaces extensions with the new value.
+    /// Used at the integration boundary to add protocol-specific data.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let ctx: CacheContext = finalize_context(box_ctx); // CacheContext<()>
+    /// let http_ctx = ctx.with_extensions(Some(HttpCacheData { upstream_status: 200 }));
+    /// // http_ctx: CacheContext<Option<HttpCacheData>>
+    /// ```
+    pub fn with_extensions<NewExt>(self, extensions: NewExt) -> CacheContext<NewExt> {
+        CacheContext {
+            status: self.status,
+            read_mode: self.read_mode,
+            source: self.source,
+            timing: self.timing,
+            stored: self.stored,
+            extensions,
+        }
     }
 }
 
@@ -368,14 +368,6 @@ impl Context for CacheContext {
         self.stored = stored;
     }
 
-    fn extensions(&self) -> Option<&(dyn Any + Send + Sync)> {
-        self.extensions.as_deref()
-    }
-
-    fn set_extensions(&mut self, ext: Option<Box<dyn Any + Send + Sync>>) {
-        self.extensions = ext;
-    }
-
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -393,10 +385,7 @@ impl Context for CacheContext {
 ///
 /// This trait provides a protocol-agnostic way to attach cache status
 /// metadata to responses. Each protocol (HTTP, gRPC, etc.) implements
-/// this trait with its own configuration type.
-///
-/// The full [`CacheContext`] is passed, giving implementations access to
-/// status, timing, stored flag, and protocol-specific extensions.
+/// this trait with its own configuration and extension types.
 ///
 /// # Example
 ///
@@ -404,14 +393,18 @@ impl Context for CacheContext {
 /// use hitbox_core::{CacheContext, CacheStatusExt};
 ///
 /// // For HTTP responses (implemented in hitbox-http)
-/// response.cache_status(&cache_context, &config);
+/// let http_ctx = cache_context.with_extensions(Some(http_data));
+/// response.cache_status(&http_ctx, &config);
 /// ```
 pub trait CacheStatusExt {
     /// Configuration type for applying cache status (e.g., header name for HTTP).
     type Config;
 
+    /// Protocol-specific extension type carried by [`CacheContext`].
+    type Extensions;
+
     /// Applies cache status information to the response.
-    fn cache_status(&mut self, context: &CacheContext, config: &Self::Config);
+    fn cache_status(&mut self, context: &CacheContext<Self::Extensions>, config: &Self::Config);
 }
 
 #[cfg(test)]
@@ -433,7 +426,7 @@ mod tests {
         println!("BoxContext size: {} bytes", box_ctx_size);
         println!("S4 inline space: {} bytes", s4_space);
 
-        // CacheContext now exceeds S4 due to timing + stored + extensions fields.
+        // CacheContext now exceeds S4 due to timing + stored fields.
         // SmallBox automatically falls back to heap allocation, which is fine
         // since context is created once per request.
         println!(
@@ -460,5 +453,18 @@ mod tests {
         assert!(!CacheStatus::Forward(ForwardReason::Miss).is_served_from_cache());
         assert!(!CacheStatus::Forward(ForwardReason::Expired).is_served_from_cache());
         assert!(!CacheStatus::Forward(ForwardReason::Bypass).is_served_from_cache());
+    }
+
+    #[test]
+    fn test_with_extensions() {
+        let ctx: CacheContext = CacheContext {
+            status: CacheStatus::Hit,
+            stored: true,
+            ..Default::default()
+        };
+        let ext_ctx = ctx.with_extensions(Some(42u16));
+        assert_eq!(ext_ctx.status, CacheStatus::Hit);
+        assert!(ext_ctx.stored);
+        assert_eq!(ext_ctx.extensions, Some(42u16));
     }
 }
