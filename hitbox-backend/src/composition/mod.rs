@@ -429,7 +429,7 @@ where
                     let (expire, stale) = (l1_value.expire(), l1_value.stale());
                     let envelope = CompositionEnvelope::L1(l1_value);
                     match envelope.serialize() {
-                        Ok(packed) => Ok(Some(CacheValue::new(packed, expire, stale))),
+                        Ok(packed) => Ok(Some(CacheValue::new(packed, expire, stale, None))),
                         Err(e) => Err(e),
                     }
                 }
@@ -454,7 +454,7 @@ where
                     let (expire, stale) = (l2_value.expire(), l2_value.stale());
                     let envelope = CompositionEnvelope::L2(l2_value);
                     match envelope.serialize() {
-                        Ok(packed) => Ok(Some(CacheValue::new(packed, expire, stale))),
+                        Ok(packed) => Ok(Some(CacheValue::new(packed, expire, stale, None))),
                         Err(e) => Err(e),
                     }
                 }
@@ -681,7 +681,12 @@ where
                                 };
                                 internal_ctx.set_source(ResponseSource::Backend(source));
 
-                                Ok(Some(CacheValue::new(deserialized, meta.expire, meta.stale)))
+                                Ok(Some(CacheValue::new(
+                                    deserialized,
+                                    meta.expire,
+                                    meta.stale,
+                                    None,
+                                )))
                             }
                             None => Err(BackendError::InternalError(Box::new(
                                 std::io::Error::other("deserialization produced no result"),
@@ -730,7 +735,7 @@ where
                         Ok(()) => match deserialized_opt {
                             Some(deserialized) => {
                                 let cache_value =
-                                    CacheValue::new(deserialized, meta.expire, meta.stale);
+                                    CacheValue::new(deserialized, meta.expire, meta.stale, None);
 
                                 // Set cache status and source for L2 hit
                                 internal_ctx.set_status(CacheStatus::Hit);
@@ -824,7 +829,7 @@ where
                         .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
                     let l1_len = l1_bytes.len();
-                    let l1_value = CacheValue::new(l1_bytes, value.expire(), value.stale());
+                    let l1_value = CacheValue::new(l1_bytes, value.expire(), value.stale(), None);
 
                     // Write to L1 with metrics
                     let timer = Timer::new();
@@ -869,7 +874,7 @@ where
                         .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
                     let l1_len = l1_bytes.len();
-                    let l1_value = CacheValue::new(l1_bytes, value.expire(), value.stale());
+                    let l1_value = CacheValue::new(l1_bytes, value.expire(), value.stale(), None);
 
                     // Write to L1 with metrics
                     let timer = Timer::new();
@@ -912,8 +917,8 @@ where
         let l2_len = l2_bytes.len();
 
         // Create raw values for Backend::write
-        let l1_value = CacheValue::new(l1_bytes, value.expire(), value.stale());
-        let l2_value = CacheValue::new(l2_bytes, value.expire(), value.stale());
+        let l1_value = CacheValue::new(l1_bytes, value.expire(), value.stale(), None);
+        let l2_value = CacheValue::new(l2_bytes, value.expire(), value.stale(), None);
 
         // Clone backends for 'static closures
         let l1 = self.l1.clone();
@@ -1139,6 +1144,7 @@ mod tests {
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
             None,
+            None,
         );
 
         // Write to populate both layers
@@ -1171,6 +1177,7 @@ mod tests {
                 value: "value1".to_string(),
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
+            None,
             None,
         );
 
@@ -1235,6 +1242,7 @@ mod tests {
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
             None,
+            None,
         );
 
         let backend = CompositionBackend::new(l1.clone(), l2.clone(), TestOffload);
@@ -1266,6 +1274,7 @@ mod tests {
                 value: "value1".to_string(),
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
+            None,
             None,
         );
 
@@ -1308,6 +1317,7 @@ mod tests {
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
             None,
+            None,
         );
 
         // Write via original
@@ -1344,6 +1354,7 @@ mod tests {
                 value: "nested_value".to_string(),
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
+            None,
             None,
         );
 
@@ -1387,6 +1398,7 @@ mod tests {
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
             None,
+            None,
         );
 
         // Write only to inner L2 (redis) - not to moka
@@ -1429,6 +1441,7 @@ mod tests {
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
             None,
+            None,
         );
 
         // Write only to outer L2 (disk) - not to inner composition
@@ -1459,6 +1472,7 @@ mod tests {
                 value: "value1".to_string(),
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
+            None,
             None,
         );
 
@@ -1491,6 +1505,7 @@ mod tests {
                 value: "from_l2".to_string(),
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
+            None,
             None,
         );
 
@@ -1547,6 +1562,7 @@ mod tests {
                 value: "nested".to_string(),
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
+            None,
             None,
         );
 

@@ -427,6 +427,7 @@ where
                     res,
                     config.ttl.map(|duration| Utc::now() + duration),
                     config.stale_ttl.map(|duration| Utc::now() + duration),
+                    Some(Utc::now()),
                 )),
                 CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
             },

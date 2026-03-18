@@ -32,6 +32,7 @@
 //!     "cached data",
 //!     Some(Utc::now() + chrono::Duration::hours(1)),  // expires in 1 hour
 //!     Some(Utc::now() + chrono::Duration::minutes(5)), // stale in 5 minutes
+//!     Some(Utc::now()),                                // created now
 //! );
 //!
 //! match value.cache_state() {
@@ -67,7 +68,7 @@ use crate::response::CacheState;
 ///
 /// // Create a cache value that expires in 1 hour
 /// let expire_time = Utc::now() + chrono::Duration::hours(1);
-/// let value = CacheValue::new("user_data", Some(expire_time), None);
+/// let value = CacheValue::new("user_data", Some(expire_time), None, Some(Utc::now()));
 ///
 /// // Access data via getter
 /// assert_eq!(value.data(), &"user_data");
@@ -85,6 +86,7 @@ pub struct CacheValue<T> {
     data: T,
     expire: Option<DateTime<Utc>>,
     stale: Option<DateTime<Utc>>,
+    created_at: Option<DateTime<Utc>>,
 }
 
 impl<T> CacheValue<T> {
@@ -95,23 +97,33 @@ impl<T> CacheValue<T> {
     /// * `data` - The data to cache
     /// * `expire` - When the data expires (becomes invalid)
     /// * `stale` - When the data becomes stale (should refresh in background)
-    pub fn new(data: T, expire: Option<DateTime<Utc>>, stale: Option<DateTime<Utc>>) -> Self {
+    /// * `created_at` - When the cache entry was originally created (for Age header).
+    ///   Pass `None` for legacy entries or when the creation time is unknown.
+    pub fn new(
+        data: T,
+        expire: Option<DateTime<Utc>>,
+        stale: Option<DateTime<Utc>>,
+        created_at: Option<DateTime<Utc>>,
+    ) -> Self {
         CacheValue {
             data,
             expire,
             stale,
+            created_at,
         }
     }
 
     /// Creates a new cache value using timestamps derived from an [`EntityPolicyConfig`].
     ///
     /// Converts the config's TTL and stale TTL durations into absolute timestamps
-    /// relative to the current time.
+    /// relative to the current time. Sets `created_at` to now.
     pub fn from_config(data: T, config: &EntityPolicyConfig) -> Self {
+        let now = Utc::now();
         Self::new(
             data,
-            config.ttl.map(|d| Utc::now() + d),
-            config.stale_ttl.map(|d| Utc::now() + d),
+            config.ttl.map(|d| now + d),
+            config.stale_ttl.map(|d| now + d),
+            Some(now),
         )
     }
 
@@ -133,6 +145,12 @@ impl<T> CacheValue<T> {
         self.stale
     }
 
+    /// Returns when the cache entry was originally created.
+    #[inline]
+    pub fn created_at(&self) -> Option<DateTime<Utc>> {
+        self.created_at
+    }
+
     /// Consumes the cache value and returns the inner data.
     ///
     /// Discards the expiration metadata.
@@ -144,7 +162,10 @@ impl<T> CacheValue<T> {
     ///
     /// Useful when you need to inspect or modify the metadata independently.
     pub fn into_parts(self) -> (CacheMeta, T) {
-        (CacheMeta::new(self.expire, self.stale), self.data)
+        (
+            CacheMeta::new(self.expire, self.stale, self.created_at),
+            self.data,
+        )
     }
 
     /// Calculate TTL (time-to-live) from the expire time.
@@ -188,24 +209,29 @@ impl<T> CacheValue<T> {
 
 /// Cache expiration metadata without the data.
 ///
-/// Contains just the staleness and expiration timestamps. Useful for
+/// Contains just the staleness, expiration, and creation timestamps. Useful for
 /// passing metadata around without copying the cached data.
-///
-/// # Fields
-///
-/// * `expire` - When the data expires (becomes invalid)
-/// * `stale` - When the data becomes stale (should refresh in background)
 pub struct CacheMeta {
     /// When the cached data expires and becomes invalid.
     pub expire: Option<DateTime<Utc>>,
     /// When the cached data becomes stale and should be refreshed.
     pub stale: Option<DateTime<Utc>>,
+    /// When the cache entry was originally created.
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 impl CacheMeta {
     /// Creates new cache metadata with the given timestamps.
-    pub fn new(expire: Option<DateTime<Utc>>, stale: Option<DateTime<Utc>>) -> CacheMeta {
-        CacheMeta { expire, stale }
+    pub fn new(
+        expire: Option<DateTime<Utc>>,
+        stale: Option<DateTime<Utc>>,
+        created_at: Option<DateTime<Utc>>,
+    ) -> CacheMeta {
+        CacheMeta {
+            expire,
+            stale,
+            created_at,
+        }
     }
 }
 

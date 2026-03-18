@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Preserve HTTP/2 trailers through body buffering and cache serialization roundtrip ([#261](https://github.com/hit-box/hitbox/pull/261))
+- RFC 9211 `Cache-Status` and RFC 9111 `Age` header generation with `HttpCacheStatusConfig` ([#269](https://github.com/hit-box/hitbox/pull/269))
 
 ### Changed
 - **Breaking:** Unified Config-based extractor/predicate API with `Into` shorthands, `Transform::Truncate`, `Transforms::builder()` with typestate, and full 64-char SHA256 for `Hash` ([#202](https://github.com/hit-box/hitbox/pull/202))

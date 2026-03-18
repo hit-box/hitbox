@@ -110,6 +110,7 @@ async fn test_both_layers_fail_set() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -197,6 +198,7 @@ async fn test_both_layers_fail_backend_write() {
             data: "test data".to_string(),
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 

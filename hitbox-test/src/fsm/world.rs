@@ -81,7 +81,7 @@ impl CacheableResponse for SimpleResponse {
     {
         match predicates.check(self).await {
             PredicateResult::Cacheable(response) => {
-                CachePolicy::Cacheable(CacheValue::new(response.0, None, None))
+                CachePolicy::Cacheable(CacheValue::new(response.0, None, None, None))
             }
             PredicateResult::NonCacheable(response) => CachePolicy::NonCacheable(response),
         }
@@ -555,7 +555,7 @@ impl FsmWorld {
             CacheState::Fresh(value) => {
                 // Fresh: expires in the future
                 let expire = Some(Utc::now() + chrono::Duration::hours(1));
-                let cache_value = CacheValue::new(*value, expire, None);
+                let cache_value = CacheValue::new(*value, expire, None, None);
                 let _ = backend
                     .set::<SimpleResponse>(&cache_key, &cache_value, &mut ctx)
                     .await;
@@ -565,7 +565,7 @@ impl FsmWorld {
                 // This means: not expired yet, but past the "fresh" period
                 let expire = Some(Utc::now() + chrono::Duration::hours(1));
                 let stale = Some(Utc::now() - chrono::Duration::seconds(1));
-                let cache_value = CacheValue::new(*value, expire, stale);
+                let cache_value = CacheValue::new(*value, expire, stale, None);
                 let _ = backend
                     .set::<SimpleResponse>(&cache_key, &cache_value, &mut ctx)
                     .await;
@@ -577,7 +577,7 @@ impl FsmWorld {
                 // functionally this tests the same behavior.
                 let expire = Some(Utc::now() - chrono::Duration::hours(1));
                 let stale = Some(Utc::now() - chrono::Duration::minutes(30));
-                let cache_value = CacheValue::new(*value, expire, stale);
+                let cache_value = CacheValue::new(*value, expire, stale, None);
                 let _ = backend
                     .set::<SimpleResponse>(&cache_key, &cache_value, &mut ctx)
                     .await;
@@ -610,7 +610,7 @@ impl FsmWorld {
             CacheState::Empty => {}
             CacheState::Fresh(value) => {
                 let expire = Some(Utc::now() + chrono::Duration::hours(1));
-                let cache_value = CacheValue::new(*value, expire, None);
+                let cache_value = CacheValue::new(*value, expire, None, None);
                 let _ = backend
                     .set::<SimpleResponse>(cache_key, &cache_value, &mut ctx)
                     .await;
@@ -618,7 +618,7 @@ impl FsmWorld {
             CacheState::Stale(value) => {
                 let expire = Some(Utc::now() + chrono::Duration::hours(1));
                 let stale = Some(Utc::now() - chrono::Duration::seconds(1));
-                let cache_value = CacheValue::new(*value, expire, stale);
+                let cache_value = CacheValue::new(*value, expire, stale, None);
                 let _ = backend
                     .set::<SimpleResponse>(cache_key, &cache_value, &mut ctx)
                     .await;
@@ -628,7 +628,7 @@ impl FsmWorld {
                 // See comment in prepopulate_cache for details.
                 let expire = Some(Utc::now() - chrono::Duration::hours(1));
                 let stale = Some(Utc::now() - chrono::Duration::minutes(30));
-                let cache_value = CacheValue::new(*value, expire, stale);
+                let cache_value = CacheValue::new(*value, expire, stale, None);
                 let _ = backend
                     .set::<SimpleResponse>(cache_key, &cache_value, &mut ctx)
                     .await;

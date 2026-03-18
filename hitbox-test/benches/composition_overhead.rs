@@ -54,7 +54,7 @@ fn bench_direct_moka(c: &mut Criterion) {
 
         let response = runtime.block_on(generate_response(*size_bytes));
         let key = CacheKey::from_str("bench", "key1");
-        let value = CacheValue::new(response.clone(), None, None);
+        let value = CacheValue::new(response.clone(), None, None, None);
 
         // Pre-populate for read benchmark
         runtime
@@ -122,7 +122,7 @@ fn bench_composition_concrete(c: &mut Criterion) {
 
         let response = runtime.block_on(generate_response(*size_bytes));
         let key = CacheKey::from_str("bench", "key1");
-        let value = CacheValue::new(response.clone(), None, None);
+        let value = CacheValue::new(response.clone(), None, None, None);
 
         // Pre-populate for read benchmark
         runtime
@@ -191,7 +191,7 @@ fn bench_composition_outer_dyn(c: &mut Criterion) {
 
         let response = runtime.block_on(generate_response(*size_bytes));
         let key = CacheKey::from_str("bench", "key1");
-        let value = CacheValue::new(response.clone(), None, None);
+        let value = CacheValue::new(response.clone(), None, None, None);
 
         // Pre-populate for read benchmark
         runtime
@@ -269,7 +269,7 @@ fn bench_composition_inner_dyn(c: &mut Criterion) {
 
         let response = runtime.block_on(generate_response(*size_bytes));
         let key = CacheKey::from_str("bench", "key1");
-        let value = CacheValue::new(response.clone(), None, None);
+        let value = CacheValue::new(response.clone(), None, None, None);
 
         // Pre-populate for read benchmark
         runtime
@@ -349,7 +349,7 @@ fn bench_composition_both_dyn(c: &mut Criterion) {
 
         let response = runtime.block_on(generate_response(*size_bytes));
         let key = CacheKey::from_str("bench", "key1");
-        let value = CacheValue::new(response.clone(), None, None);
+        let value = CacheValue::new(response.clone(), None, None, None);
 
         // Pre-populate for read benchmark
         runtime
@@ -434,7 +434,7 @@ fn bench_nested_2_concrete(c: &mut Criterion) {
 
         let response = runtime.block_on(generate_response(*size_bytes));
         let key = CacheKey::from_str("bench", "key1");
-        let value = CacheValue::new(response.clone(), None, None);
+        let value = CacheValue::new(response.clone(), None, None, None);
 
         // Pre-populate for read benchmark
         runtime
@@ -524,7 +524,7 @@ fn bench_nested_2_dyn(c: &mut Criterion) {
 
         let response = runtime.block_on(generate_response(*size_bytes));
         let key = CacheKey::from_str("bench", "key1");
-        let value = CacheValue::new(response.clone(), None, None);
+        let value = CacheValue::new(response.clone(), None, None, None);
 
         // Pre-populate for read benchmark
         runtime
@@ -616,7 +616,7 @@ fn bench_nested_3_concrete(c: &mut Criterion) {
 
         let response = runtime.block_on(generate_response(*size_bytes));
         let key = CacheKey::from_str("bench", "key1");
-        let value = CacheValue::new(response.clone(), None, None);
+        let value = CacheValue::new(response.clone(), None, None, None);
 
         // Pre-populate for read benchmark
         runtime
@@ -719,7 +719,7 @@ fn bench_nested_3_dyn(c: &mut Criterion) {
 
         let response = runtime.block_on(generate_response(*size_bytes));
         let key = CacheKey::from_str("bench", "key1");
-        let value = CacheValue::new(response.clone(), None, None);
+        let value = CacheValue::new(response.clone(), None, None, None);
 
         // Pre-populate for read benchmark
         runtime

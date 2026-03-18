@@ -42,7 +42,7 @@ impl Backend for MemBackend {
         let lock = self.storage.read().await;
         let key_str = String::from_utf8(CacheKeyFormat::UrlEncoded.serialize(key)?).unwrap();
         let value = lock.get(&key_str).cloned();
-        Ok(value.map(|value| CacheValue::new(value, Some(Utc::now()), Some(Utc::now()))))
+        Ok(value.map(|value| CacheValue::new(value, Some(Utc::now()), Some(Utc::now()), None)))
     }
 
     async fn write(&self, key: &CacheKey, value: CacheValue<Raw>) -> BackendResult<()> {
@@ -115,6 +115,7 @@ where
             },
             Some(Utc::now()),
             Some(Utc::now()),
+            None,
         );
         let mut ctx: BoxContext = CacheContext::default().boxed();
         self.backend
@@ -150,6 +151,7 @@ async fn dyn_backend() {
         },
         Some(Utc::now()),
         Some(Utc::now()),
+        None,
     );
     backend.set::<Value>(&key2, &value, &mut ctx).await.unwrap();
     let value = backend.get::<Value>(&key2, &mut ctx).await.unwrap();
@@ -179,6 +181,7 @@ async fn test_composition_with_cloneable_backends() {
             index: 1,
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -220,6 +223,7 @@ async fn test_composition_with_arc_dyn_backends() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
     let mut ctx: BoxContext = CacheContext::default().boxed();
     composition
@@ -250,6 +254,7 @@ async fn test_composition_l1_l2_different_keys() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
     l1_mem.set::<Value>(&key1, &value1, &mut ctx).await.unwrap();
 
@@ -261,6 +266,7 @@ async fn test_composition_l1_l2_different_keys() {
             index: 20,
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
     l2_mem.set::<Value>(&key2, &value2, &mut ctx).await.unwrap();
@@ -301,6 +307,7 @@ async fn test_composition_backend_as_trait_object() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
     l1_mem
         .set::<Value>(&key_l1, &value_l1, &mut ctx)
@@ -315,6 +322,7 @@ async fn test_composition_backend_as_trait_object() {
             index: 22,
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
     l2_mem
@@ -348,6 +356,7 @@ async fn test_composition_backend_as_trait_object() {
             index: 99,
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
     let mut ctx: BoxContext = CacheContext::default().boxed();

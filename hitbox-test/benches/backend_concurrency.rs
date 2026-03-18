@@ -65,7 +65,7 @@ where
             while Instant::now() < deadline {
                 let key_num = (task_id * 1000 + ops) % 1000;
                 let key = CacheKey::from_str("bench", &format!("key-{}", key_num));
-                let value = CacheValue::new(response.clone(), None, None);
+                let value = CacheValue::new(response.clone(), None, None, None);
                 let mut ctx = CacheContext::default().boxed();
 
                 if backend
@@ -166,7 +166,7 @@ where
             while Instant::now() < deadline {
                 let key_num = (task_id * 1000 + ops) % 1000;
                 let key = CacheKey::from_str("bench", &format!("key-{}", key_num));
-                let value = CacheValue::new(response.clone(), None, None);
+                let value = CacheValue::new(response.clone(), None, None, None);
                 let mut ctx = CacheContext::default().boxed();
 
                 // Write
@@ -296,7 +296,7 @@ async fn main() {
         // Pre-populate for read test
         for i in 0..1000 {
             let key = CacheKey::from_str("bench", &format!("key-{}", i));
-            let value = CacheValue::new(response.clone(), None, None);
+            let value = CacheValue::new(response.clone(), None, None, None);
             let mut ctx = CacheContext::default().boxed();
             backend
                 .set::<BenchResponse>(&key, &value, &mut ctx)
@@ -360,7 +360,7 @@ async fn main() {
         // Pre-populate for read test
         for i in 0..1000 {
             let key = CacheKey::from_str("bench", &format!("key-{}", i));
-            let value = CacheValue::new(response.clone(), None, None);
+            let value = CacheValue::new(response.clone(), None, None, None);
             let mut ctx = CacheContext::default().boxed();
             let _ = backend.set::<BenchResponse>(&key, &value, &mut ctx).await;
         }
@@ -442,7 +442,7 @@ async fn main() {
         // Pre-populate for read test
         for i in 0..1000 {
             let key = CacheKey::from_str("bench", &format!("key-{}", i));
-            let value = CacheValue::new(response.clone(), None, None);
+            let value = CacheValue::new(response.clone(), None, None, None);
             let mut ctx = CacheContext::default().boxed();
             let _ = backend.set::<BenchResponse>(&key, &value, &mut ctx).await;
         }

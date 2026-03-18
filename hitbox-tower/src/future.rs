@@ -13,10 +13,9 @@ use std::task::{Context, Poll};
 
 use futures::Future;
 use futures::ready;
-use hitbox::{CacheContext, CacheStatusExt};
-use hitbox_http::{BufferedBody, CacheableHttpResponse};
+use hitbox::{CacheContext, CacheStatus, CacheStatusExt};
+use hitbox_http::{BufferedBody, CacheableHttpResponse, HttpCacheData, HttpCacheStatusConfig};
 use http::Response;
-use http::header::HeaderName;
 use pin_project::pin_project;
 
 /// Future returned by [`CacheService::call`](crate::service::CacheService).
@@ -45,7 +44,7 @@ where
 {
     #[pin]
     inner: F,
-    cache_status_header: HeaderName,
+    cache_status_config: HttpCacheStatusConfig,
 }
 
 impl<F, ResBody, E> CacheServiceFuture<F, ResBody, E>
@@ -54,10 +53,10 @@ where
     ResBody: hyper::body::Body,
 {
     /// Creates a new future that will add cache status headers to the response.
-    pub fn new(inner: F, cache_status_header: HeaderName) -> Self {
+    pub fn new(inner: F, cache_status_config: HttpCacheStatusConfig) -> Self {
         Self {
             inner,
-            cache_status_header,
+            cache_status_config,
         }
     }
 }
@@ -77,8 +76,18 @@ where
 
         // Transform the response and add cache headers
         let response = result.map(|mut cacheable_response| {
-            // Add cache status header based on cache context
-            cacheable_response.cache_status(cache_context.status, this.cache_status_header);
+            // Set HTTP-specific extension data (upstream status code)
+            let http_ext = if matches!(cache_context.status, CacheStatus::Forward(_)) {
+                Some(HttpCacheData {
+                    upstream_status: cacheable_response.parts.status.as_u16(),
+                })
+            } else {
+                None
+            };
+            let http_ctx = cache_context.with_extensions(http_ext);
+
+            // Add cache status headers (RFC 9211 Cache-Status, Age, legacy x-cache-status)
+            cacheable_response.cache_status(&http_ctx, this.cache_status_config);
 
             cacheable_response.into_response()
         });

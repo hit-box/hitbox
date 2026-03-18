@@ -10,7 +10,7 @@
 
 use std::time::Duration;
 
-use hitbox::CacheStatus;
+use hitbox::{CacheStatus, ForwardReason};
 use hitbox_fn::Cache;
 use hitbox_fn::prelude::*;
 use hitbox_moka::MokaBackend;
@@ -124,7 +124,7 @@ async fn main() {
     let (r1, c1) = get_user(UserId(1)).cache(&cache).with_context().await;
     let (r2, c2) = get_user(UserId(1)).cache(&cache).with_context().await;
     assert_eq!(r1, r2);
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 
     // 2. Multiple args
@@ -140,14 +140,14 @@ async fn main() {
         .cache(&cache)
         .with_context()
         .await;
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
-    assert_eq!(c3.status, CacheStatus::Miss); // Different org = different key
+    assert_eq!(c3.status, CacheStatus::Forward(ForwardReason::Miss)); // Different org = different key
 
     // 3. Skip in CacheableResponse (tokens not cached but returned on miss)
     let (r1, c1) = authenticate(UserId(1)).cache(&cache).with_context().await;
     let (r2, c2) = authenticate(UserId(1)).cache(&cache).with_context().await;
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
     assert!(r1.as_ref().unwrap().access_token.is_some()); // Present on miss
     assert!(r2.as_ref().unwrap().access_token.is_none()); // Skipped on hit (not in cache)
@@ -165,12 +165,12 @@ async fn main() {
     };
     let (_, c1) = search(q1).cache(&cache).with_context().await;
     let (_, c2) = search(q2).cache(&cache).with_context().await; // Same key despite different request_id
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 
     // 5. Zero-argument function
     let (_, c1) = get_config().cache(&cache).with_context().await;
     let (_, c2) = get_config().cache(&cache).with_context().await;
-    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c1.status, CacheStatus::Forward(ForwardReason::Miss));
     assert_eq!(c2.status, CacheStatus::Hit);
 }

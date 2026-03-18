@@ -268,6 +268,7 @@ impl CompositionEnvelope {
                     l1_data,
                     header.decode_expire(),
                     header.decode_stale(),
+                    None,
                 )))
             }
             1 => {
@@ -289,6 +290,7 @@ impl CompositionEnvelope {
                     l2_data,
                     header.decode_expire(),
                     header.decode_stale(),
+                    None,
                 )))
             }
             2 => {
@@ -313,8 +315,18 @@ impl CompositionEnvelope {
                 let l2_data = Bytes::copy_from_slice(&data[l1_end..l2_end]);
 
                 Ok(CompositionEnvelope::Both {
-                    l1: CacheValue::new(l1_data, header.decode_expire(), header.decode_stale()),
-                    l2: CacheValue::new(l2_data, header.decode_expire(), header.decode_stale()),
+                    l1: CacheValue::new(
+                        l1_data,
+                        header.decode_expire(),
+                        header.decode_stale(),
+                        None,
+                    ),
+                    l2: CacheValue::new(
+                        l2_data,
+                        header.decode_expire(),
+                        header.decode_stale(),
+                        None,
+                    ),
                 })
             }
             _ => Err(BackendError::InternalError(Box::new(io::Error::new(
@@ -343,7 +355,7 @@ mod tests {
         let expire = Some(Utc::now() + Duration::hours(1));
         let stale = None;
 
-        let envelope = CompositionEnvelope::L1(CacheValue::new(data.clone(), expire, stale));
+        let envelope = CompositionEnvelope::L1(CacheValue::new(data.clone(), expire, stale, None));
 
         let serialized = envelope.serialize().unwrap();
         let deserialized = CompositionEnvelope::deserialize(&serialized).unwrap();
@@ -366,8 +378,8 @@ mod tests {
         let stale = Some(Utc::now() + Duration::minutes(30));
 
         let envelope = CompositionEnvelope::Both {
-            l1: CacheValue::new(l1_data.clone(), expire, stale),
-            l2: CacheValue::new(l2_data.clone(), expire, stale),
+            l1: CacheValue::new(l1_data.clone(), expire, stale, None),
+            l2: CacheValue::new(l2_data.clone(), expire, stale, None),
         };
 
         let serialized = envelope.serialize().unwrap();
@@ -390,8 +402,8 @@ mod tests {
         let l2_data = Bytes::from(vec![1u8; 100_000]);
 
         let envelope = CompositionEnvelope::Both {
-            l1: CacheValue::new(l1_data.clone(), None, None),
-            l2: CacheValue::new(l2_data.clone(), None, None),
+            l1: CacheValue::new(l1_data.clone(), None, None, None),
+            l2: CacheValue::new(l2_data.clone(), None, None, None),
         };
 
         let serialized = envelope.serialize().unwrap();

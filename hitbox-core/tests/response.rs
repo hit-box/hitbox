@@ -37,9 +37,12 @@ impl CacheableResponse for TestResponse {
     {
         match predicates.check(self).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                CachePolicy::Cacheable(res) => {
-                    CachePolicy::Cacheable(CacheValue::new(res, Some(Utc::now()), Some(Utc::now())))
-                }
+                CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
+                    res,
+                    Some(Utc::now()),
+                    Some(Utc::now()),
+                    None,
+                )),
                 CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
             },
             PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),

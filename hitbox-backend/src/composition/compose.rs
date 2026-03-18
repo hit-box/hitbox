@@ -259,6 +259,7 @@ mod tests {
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
             None,
+            None,
         );
 
         // Write and read
@@ -311,6 +312,7 @@ mod tests {
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
             None,
+            None,
         );
 
         // Populate only L2
@@ -354,6 +356,7 @@ mod tests {
                 value: "nested_value".to_string(),
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
+            None,
             None,
         );
 
@@ -408,6 +411,7 @@ mod tests {
                 value: "chain_value".to_string(),
             },
             Some(Utc::now() + chrono::Duration::seconds(60)),
+            None,
             None,
         );
 

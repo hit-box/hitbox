@@ -27,6 +27,10 @@ struct SerializableCacheValue {
     data: Vec<u8>,
     stale: Option<DateTime<Utc>>,
     expire: Option<DateTime<Utc>>,
+    /// When the cache entry was originally created (for Age header).
+    /// Optional for backward compatibility with entries serialized before this field existed.
+    #[serde(default)]
+    created_at: Option<DateTime<Utc>>,
 }
 
 impl From<CacheValue<Raw>> for SerializableCacheValue {
@@ -35,13 +39,19 @@ impl From<CacheValue<Raw>> for SerializableCacheValue {
             data: value.data().to_vec(),
             stale: value.stale(),
             expire: value.expire(),
+            created_at: value.created_at(),
         }
     }
 }
 
 impl From<SerializableCacheValue> for CacheValue<Raw> {
     fn from(value: SerializableCacheValue) -> Self {
-        CacheValue::new(Bytes::from(value.data), value.expire, value.stale)
+        CacheValue::new(
+            Bytes::from(value.data),
+            value.expire,
+            value.stale,
+            value.created_at,
+        )
     }
 }
 
@@ -411,6 +421,7 @@ mod tests {
             Bytes::from(&b"test-value"[..]),
             Some(Utc::now() + chrono::Duration::hours(1)),
             None,
+            None,
         );
 
         // Write with 1 hour TTL
@@ -434,6 +445,7 @@ mod tests {
         let value = CacheValue::new(
             Bytes::from(&b"test-value"[..]),
             Some(Utc::now() + chrono::Duration::hours(1)),
+            None,
             None,
         );
 
@@ -484,6 +496,7 @@ mod tests {
             Bytes::from(&b"memory-value"[..]),
             Some(Utc::now() + chrono::Duration::hours(1)),
             None,
+            None,
         );
 
         // Write
@@ -508,6 +521,7 @@ mod tests {
         let value = CacheValue::new(
             Bytes::from(&b"shared-value"[..]),
             Some(Utc::now() + chrono::Duration::hours(1)),
+            None,
             None,
         );
 
@@ -534,12 +548,12 @@ mod tests {
 
         // Key 1 with 1 hour TTL
         let key1 = CacheKey::from_str("key1", "1");
-        let value1 = CacheValue::new(Bytes::from(&b"value1"[..]), Some(expire_1h), None);
+        let value1 = CacheValue::new(Bytes::from(&b"value1"[..]), Some(expire_1h), None, None);
         backend.write(&key1, value1).await.unwrap();
 
         // Key 2 with 24 hour TTL
         let key2 = CacheKey::from_str("key2", "1");
-        let value2 = CacheValue::new(Bytes::from(&b"value2"[..]), Some(expire_24h), None);
+        let value2 = CacheValue::new(Bytes::from(&b"value2"[..]), Some(expire_24h), None, None);
         backend.write(&key2, value2).await.unwrap();
 
         // Read and verify TTLs are preserved
@@ -573,7 +587,7 @@ mod tests {
         // Write entry that's already expired
         let key = CacheKey::from_str("expired-key", "1");
         let expired_time = Utc::now() - chrono::Duration::seconds(10);
-        let value = CacheValue::new(Bytes::from(&b"expired"[..]), Some(expired_time), None);
+        let value = CacheValue::new(Bytes::from(&b"expired"[..]), Some(expired_time), None, None);
         backend.write(&key, value).await.unwrap();
 
         // Should not be returned (filtered by expire check)
@@ -595,6 +609,7 @@ mod tests {
         let value = CacheValue::new(
             Bytes::from(large_data),
             Some(Utc::now() + chrono::Duration::hours(1)),
+            None,
             None,
         );
 
@@ -632,6 +647,7 @@ mod tests {
             Bytes::from(&b"format-value"[..]),
             Some(Utc::now() + chrono::Duration::hours(1)),
             None,
+            None,
         );
 
         backend.write(&key, value).await.unwrap();
@@ -656,6 +672,7 @@ mod tests {
             let value = CacheValue::new(
                 Bytes::from(&b"persist-value"[..]),
                 Some(Utc::now() + chrono::Duration::hours(1)),
+                None,
                 None,
             );
             backend.write(&key, value).await.unwrap();
@@ -697,6 +714,7 @@ mod tests {
                 let value = CacheValue::new(
                     Bytes::from(chunk.clone()),
                     Some(Utc::now() + chrono::Duration::hours(1)),
+                    None,
                     None,
                 );
                 let _ = backend.write(&key, value).await;

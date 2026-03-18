@@ -26,7 +26,7 @@ async fn test_sequential_l1_hit() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("from_l1"), None, None);
+    let value = CacheValue::new(Bytes::from("from_l1"), None, None, None);
 
     l1.write(&key, value.clone()).await.unwrap();
 
@@ -52,7 +52,7 @@ async fn test_sequential_l2_hit() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("from_l2"), None, None);
+    let value = CacheValue::new(Bytes::from("from_l2"), None, None, None);
 
     l2.write(&key, value.clone()).await.unwrap();
 
@@ -100,7 +100,7 @@ async fn test_sequential_l1_error_l2_hit() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("from_l2"), None, None);
+    let value = CacheValue::new(Bytes::from("from_l2"), None, None, None);
 
     l2.write(&key, value.clone()).await.unwrap();
 
@@ -129,7 +129,7 @@ async fn test_race_l1_hit() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("from_l1"), None, None);
+    let value = CacheValue::new(Bytes::from("from_l1"), None, None, None);
 
     l1.write(&key, value.clone()).await.unwrap();
 
@@ -155,7 +155,7 @@ async fn test_race_l2_hit() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("from_l2"), None, None);
+    let value = CacheValue::new(Bytes::from("from_l2"), None, None, None);
 
     l2.write(&key, value.clone()).await.unwrap();
 
@@ -203,7 +203,7 @@ async fn test_race_l1_error_l2_hit() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("from_l2"), None, None);
+    let value = CacheValue::new(Bytes::from("from_l2"), None, None, None);
 
     l2.write(&key, value.clone()).await.unwrap();
 
@@ -233,12 +233,18 @@ async fn test_parallel_both_hit_prefer_l1() {
 
     let key = CacheKey::from_str("test", "key1");
 
-    l1.write(&key, CacheValue::new(Bytes::from("from_l1"), None, None))
-        .await
-        .unwrap();
-    l2.write(&key, CacheValue::new(Bytes::from("from_l2"), None, None))
-        .await
-        .unwrap();
+    l1.write(
+        &key,
+        CacheValue::new(Bytes::from("from_l1"), None, None, None),
+    )
+    .await
+    .unwrap();
+    l2.write(
+        &key,
+        CacheValue::new(Bytes::from("from_l2"), None, None, None),
+    )
+    .await
+    .unwrap();
 
     let l1_clone = l1.clone();
     let l2_clone = l2.clone();
@@ -263,7 +269,7 @@ async fn test_parallel_l1_miss_l2_hit() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("from_l2"), None, None);
+    let value = CacheValue::new(Bytes::from("from_l2"), None, None, None);
 
     l2.write(&key, value.clone()).await.unwrap();
 
@@ -311,7 +317,7 @@ async fn test_parallel_l1_error_l2_hit() {
     let offload = TestOffloadManager;
 
     let key = CacheKey::from_str("test", "key1");
-    let value = CacheValue::new(Bytes::from("from_l2"), None, None);
+    let value = CacheValue::new(Bytes::from("from_l2"), None, None, None);
 
     l2.write(&key, value.clone()).await.unwrap();
 
@@ -349,12 +355,14 @@ async fn test_parallel_both_hit_l2_fresher_ttl() {
         Bytes::from("from_l1"),
         Some(now + chrono::Duration::seconds(10)),
         None,
+        None,
     );
 
     // L2 has longer TTL (expires in 60 seconds)
     let l2_value = CacheValue::new(
         Bytes::from("from_l2"),
         Some(now + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 
@@ -393,12 +401,14 @@ async fn test_parallel_both_hit_l1_fresher_ttl() {
         Bytes::from("from_l1"),
         Some(now + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // L2 has shorter TTL (expires in 10 seconds)
     let l2_value = CacheValue::new(
         Bytes::from("from_l2"),
         Some(now + chrono::Duration::seconds(10)),
+        None,
         None,
     );
 
@@ -434,9 +444,9 @@ async fn test_parallel_both_hit_equal_ttl() {
     let expiry = now + chrono::Duration::seconds(30);
 
     // Both have same TTL
-    let l1_value = CacheValue::new(Bytes::from("from_l1"), Some(expiry), None);
+    let l1_value = CacheValue::new(Bytes::from("from_l1"), Some(expiry), None, None);
 
-    let l2_value = CacheValue::new(Bytes::from("from_l2"), Some(expiry), None);
+    let l2_value = CacheValue::new(Bytes::from("from_l2"), Some(expiry), None, None);
 
     l1.write(&key, l1_value).await.unwrap();
     l2.write(&key, l2_value).await.unwrap();
@@ -473,10 +483,11 @@ async fn test_parallel_both_hit_l2_no_expiry() {
         Bytes::from("from_l1"),
         Some(now + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // L2 has no expiry (infinite TTL)
-    let l2_value = CacheValue::new(Bytes::from("from_l2"), None, None);
+    let l2_value = CacheValue::new(Bytes::from("from_l2"), None, None, None);
 
     l1.write(&key, l1_value).await.unwrap();
     l2.write(&key, l2_value).await.unwrap();
@@ -509,12 +520,13 @@ async fn test_parallel_both_hit_l1_no_expiry() {
     let now = Utc::now();
 
     // L1 has no expiry (infinite TTL)
-    let l1_value = CacheValue::new(Bytes::from("from_l1"), None, None);
+    let l1_value = CacheValue::new(Bytes::from("from_l1"), None, None, None);
 
     // L2 has expiry
     let l2_value = CacheValue::new(
         Bytes::from("from_l2"),
         Some(now + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 

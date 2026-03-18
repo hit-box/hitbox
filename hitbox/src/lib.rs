@@ -74,7 +74,10 @@ pub mod context;
 pub mod offload;
 
 pub use config::{Config, ConfigBuilder, NotSet, SelectiveConfig};
-pub use context::{BoxContext, CacheContext, CacheStatus, CacheStatusExt, Context, ResponseSource};
+pub use context::{
+    BoxContext, CacheContext, CacheStatus, CacheStatusExt, CacheTiming, Context, ForwardReason,
+    ResponseSource,
+};
 pub use hitbox_core::{CacheConfig, CacheConfigs};
 
 /// Policy configuration for cache behavior.

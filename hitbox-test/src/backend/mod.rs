@@ -46,7 +46,7 @@ impl CacheableResponse for TestResponse {
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
     {
         // Always cacheable for testing
-        CachePolicy::Cacheable(CacheValue::new(self.clone(), None, None))
+        CachePolicy::Cacheable(CacheValue::new(self.clone(), None, None, None))
     }
 
     fn into_cached(self) -> Self::IntoCachedFuture {
@@ -86,7 +86,7 @@ pub async fn run_backend_tests<B: CacheBackend + Send + Sync>(backend: &B) {
 async fn test_write_and_read<B: CacheBackend>(backend: &B) {
     let key = CacheKey::from_str("test", "write-read");
     let response = TestResponse::new(1, "test-response", vec![1, 2, 3, 4, 5]);
-    let value = CacheValue::new(response.clone(), None, None);
+    let value = CacheValue::new(response.clone(), None, None, None);
 
     // Write
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -113,7 +113,7 @@ async fn test_write_and_read_with_metadata<B: CacheBackend>(backend: &B) {
 
     let expire = Some(Utc::now() + chrono::Duration::hours(1));
     let stale = Some(Utc::now() + chrono::Duration::minutes(30));
-    let value = CacheValue::new(response.clone(), expire, stale);
+    let value = CacheValue::new(response.clone(), expire, stale, None);
 
     // Write
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -139,7 +139,7 @@ async fn test_write_and_read_with_metadata<B: CacheBackend>(backend: &B) {
 async fn test_delete_existing<B: CacheBackend>(backend: &B) {
     let key = CacheKey::from_str("test", "delete-existing");
     let response = TestResponse::new(3, "delete-test", vec![]);
-    let value = CacheValue::new(response, None, None);
+    let value = CacheValue::new(response, None, None, None);
 
     // Write
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -192,7 +192,7 @@ async fn test_overwrite<B: CacheBackend>(backend: &B) {
 
     // Write first value
     let response1 = TestResponse::new(4, "original", vec![1, 2, 3]);
-    let value1 = CacheValue::new(response1, None, None);
+    let value1 = CacheValue::new(response1, None, None, None);
     let mut ctx: BoxContext = CacheContext::default().boxed();
     backend
         .set::<TestResponse>(&key, &value1, &mut ctx)
@@ -201,7 +201,7 @@ async fn test_overwrite<B: CacheBackend>(backend: &B) {
 
     // Overwrite with second value
     let response2 = TestResponse::new(5, "updated", vec![4, 5, 6, 7]);
-    let value2 = CacheValue::new(response2.clone(), None, None);
+    let value2 = CacheValue::new(response2.clone(), None, None, None);
     let mut ctx: BoxContext = CacheContext::default().boxed();
     backend
         .set::<TestResponse>(&key, &value2, &mut ctx)
@@ -240,7 +240,7 @@ async fn test_multiple_keys<B: CacheBackend>(backend: &B) {
 
     // Write all
     for (key, response) in &keys_and_values {
-        let value = CacheValue::new(response.clone(), None, None);
+        let value = CacheValue::new(response.clone(), None, None, None);
         let mut ctx: BoxContext = CacheContext::default().boxed();
         backend
             .set::<TestResponse>(key, &value, &mut ctx)
@@ -270,7 +270,7 @@ async fn test_binary_data<B: CacheBackend>(backend: &B) {
     // Create response with various binary data
     let binary_data: Vec<u8> = (0..=255).collect();
     let response = TestResponse::new(99, "binary-test", binary_data.clone());
-    let value = CacheValue::new(response.clone(), None, None);
+    let value = CacheValue::new(response.clone(), None, None, None);
 
     // Write
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -328,7 +328,7 @@ async fn test_expire_metadata_exact_match<B: CacheBackend>(backend: &B) {
 
     // Use a specific expire time
     let expire_time = Utc::now() + chrono::Duration::seconds(3600);
-    let value = CacheValue::new(response.clone(), Some(expire_time), None);
+    let value = CacheValue::new(response.clone(), Some(expire_time), None, None);
 
     // Write
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -364,7 +364,7 @@ async fn test_stale_metadata_exact_match<B: CacheBackend>(backend: &B) {
     // Use specific expire and stale times
     let expire_time = Utc::now() + chrono::Duration::seconds(3600);
     let stale_time = Utc::now() + chrono::Duration::seconds(1800);
-    let value = CacheValue::new(response.clone(), Some(expire_time), Some(stale_time));
+    let value = CacheValue::new(response.clone(), Some(expire_time), Some(stale_time), None);
 
     // Write
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -404,7 +404,7 @@ async fn test_expire_and_stale_combined<B: CacheBackend>(backend: &B) {
     // Set expire far in the future, stale closer
     let expire_time = Utc::now() + chrono::Duration::hours(24);
     let stale_time = Utc::now() + chrono::Duration::hours(1);
-    let value = CacheValue::new(response.clone(), Some(expire_time), Some(stale_time));
+    let value = CacheValue::new(response.clone(), Some(expire_time), Some(stale_time), None);
 
     // Write
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -448,7 +448,7 @@ async fn test_no_metadata<B: CacheBackend>(backend: &B) {
     let response = TestResponse::new(203, "no-metadata-test", vec![10, 11, 12]);
 
     // No expire, no stale
-    let value = CacheValue::new(response.clone(), None, None);
+    let value = CacheValue::new(response.clone(), None, None, None);
 
     // Write
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -482,7 +482,7 @@ pub async fn test_url_encoded_key_json_value<B: Backend + CacheBackend>(backend:
 
     let key = CacheKey::from_str("format-test", "url-json");
     let response = TestResponse::new(100, "url-json-test", vec![1, 2, 3]);
-    let value = CacheValue::new(response.clone(), None, None);
+    let value = CacheValue::new(response.clone(), None, None, None);
 
     // Write and read
     let mut ctx: BoxContext = CacheContext::default().boxed();
@@ -532,7 +532,7 @@ pub async fn test_url_encoded_key_bincode_value<B: Backend + CacheBackend>(backe
 
     let key = CacheKey::from_str("format-test", "url-bincode");
     let response = TestResponse::new(101, "url-bincode-test", vec![4, 5, 6]);
-    let value = CacheValue::new(response.clone(), None, None);
+    let value = CacheValue::new(response.clone(), None, None, None);
 
     let mut ctx: BoxContext = CacheContext::default().boxed();
     backend
@@ -580,7 +580,7 @@ pub async fn test_bitcode_key_json_value<B: Backend + CacheBackend>(backend: &B)
 
     let key = CacheKey::from_str("format-test", "bitcode-json");
     let response = TestResponse::new(102, "bitcode-json-test", vec![7, 8, 9]);
-    let value = CacheValue::new(response.clone(), None, None);
+    let value = CacheValue::new(response.clone(), None, None, None);
 
     let mut ctx: BoxContext = CacheContext::default().boxed();
     backend
@@ -628,7 +628,7 @@ pub async fn test_bitcode_key_bincode_value<B: Backend + CacheBackend>(backend: 
 
     let key = CacheKey::from_str("format-test", "bitcode-bincode");
     let response = TestResponse::new(103, "bitcode-bincode-test", vec![10, 11, 12]);
-    let value = CacheValue::new(response.clone(), None, None);
+    let value = CacheValue::new(response.clone(), None, None, None);
 
     let mut ctx: BoxContext = CacheContext::default().boxed();
     backend
@@ -680,7 +680,7 @@ where
     let large_repeated_data = vec![42u8; 10000]; // 10KB of the same byte
     let key = CacheKey::from_str("compression-test", "verify-compression");
     let response = TestResponse::new(999, "compression-test-data", large_repeated_data);
-    let value = CacheValue::new(response.clone(), None, None);
+    let value = CacheValue::new(response.clone(), None, None, None);
 
     // Serialize the value to get the raw uncompressed serialized bytes
     let ctx = CacheContext::default();

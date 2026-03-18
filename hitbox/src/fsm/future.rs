@@ -437,7 +437,7 @@ where
                     let mut state = response_state.take().expect(POLL_AFTER_READY_ERROR);
                     // For cache miss, set source to Upstream.
                     // For hit/stale, the backend has already set the correct source.
-                    if state.ctx.status() == CacheStatus::Miss {
+                    if matches!(state.ctx.status(), CacheStatus::Forward(_)) {
                         state.ctx.set_source(ResponseSource::Upstream);
                     }
                     let ctx = hitbox_core::finalize_context(state.ctx);

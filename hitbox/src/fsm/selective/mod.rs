@@ -21,7 +21,7 @@ use crate::backend::CacheBackend;
 use crate::concurrency::ConcurrencyManager;
 use crate::fsm::CacheFuture;
 use crate::policy::PolicyConfig;
-use crate::{CacheConfig, CacheContext, CacheableRequest, CacheableResponse};
+use crate::{CacheConfig, CacheContext, CacheStatus, CacheableRequest, CacheableResponse};
 
 use states::{CheckPredicate, Passthrough, SelectiveState, SelectiveStateProj};
 
@@ -249,8 +249,11 @@ where
                     let passthrough = state.as_ref().expect(POLL_AFTER_READY);
                     trace!(parent: &passthrough.span, "FSM state: Passthrough");
                     let response = ready!(upstream_future.poll(cx));
-                    let ctx = CacheContext::default().boxed();
-                    let ctx = hitbox_core::finalize_context(ctx);
+                    let ctx = CacheContext {
+                        status: CacheStatus::Forward(hitbox_core::ForwardReason::Bypass),
+                        ..Default::default()
+                    };
+                    let ctx = hitbox_core::finalize_context(ctx.boxed());
                     return Poll::Ready((response, ctx));
                 }
             };

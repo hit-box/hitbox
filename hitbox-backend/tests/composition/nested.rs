@@ -80,6 +80,7 @@ async fn test_nested_composition_static_dispatch() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Write through nested composition - should populate all 3 levels
@@ -124,6 +125,7 @@ async fn run_refill_3_levels_test<B: CacheBackend + Send + Sync>(
             data: "from_l3".to_string(),
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 
@@ -185,6 +187,7 @@ async fn run_refill_4_levels_test<B: CacheBackend + Send + Sync>(
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Write through composition
@@ -235,6 +238,7 @@ async fn run_no_refill_never_policy_test<B: CacheBackend + Send + Sync>(
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Write through composition
@@ -281,6 +285,7 @@ async fn run_never_policy_skips_refill_test<B: CacheBackend + Send + Sync>(
             data: "from_l3".to_string(),
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 
@@ -504,6 +509,7 @@ async fn test_nested_composition_dynamic_dispatch() {
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
         None,
+        None,
     );
 
     // Write and read through dynamic dispatch
@@ -538,6 +544,7 @@ async fn test_nested_composition_dynamic_as_trait_object() {
             data: "trait_object_value".to_string(),
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 
@@ -599,6 +606,7 @@ async fn run_ttl_preserved_test<B: CacheBackend + Send + Sync>(
         },
         Some(expire_time),
         None,
+        None,
     );
 
     // Write through composition
@@ -653,6 +661,7 @@ async fn run_stale_preserved_test<B: CacheBackend + Send + Sync>(
         },
         Some(expire_time),
         Some(stale_time),
+        None,
     );
 
     // Write through composition
@@ -704,6 +713,7 @@ async fn run_no_ttl_no_stale_test<B: CacheBackend + Send + Sync>(cache: B, l1: &
         TestValue {
             data: "no_ttl_test".to_string(),
         },
+        None,
         None,
         None,
     );
@@ -808,6 +818,7 @@ async fn test_nested_composition_delete_cascades() {
             data: "to_delete".to_string(),
         },
         Some(Utc::now() + chrono::Duration::seconds(60)),
+        None,
         None,
     );
 
