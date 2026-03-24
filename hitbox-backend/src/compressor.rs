@@ -10,6 +10,7 @@
 //! | `GzipCompressor` | Good | Medium | `gzip` |
 //! | `ZstdCompressor` | Best | Fast | `zstd` |
 
+use std::borrow::Cow;
 use thiserror::Error;
 
 /// Error type for compression operations.
@@ -31,10 +32,10 @@ pub enum CompressionError {
 /// and `Arc<dyn Compressor>`.
 pub trait Compressor: Send + Sync + std::fmt::Debug {
     /// Compress the input data.
-    fn compress(&self, data: &[u8]) -> Result<Vec<u8>, CompressionError>;
+    fn compress<'a>(&self, data: Cow<'a, [u8]>) -> Result<Cow<'a, [u8]>, CompressionError>;
 
     /// Decompress the input data.
-    fn decompress(&self, data: &[u8]) -> Result<Vec<u8>, CompressionError>;
+    fn decompress<'a>(&self, data: Cow<'a, [u8]>) -> Result<Cow<'a, [u8]>, CompressionError>;
 
     /// Clone this compressor into a box.
     fn clone_box(&self) -> Box<dyn Compressor>;
@@ -42,11 +43,11 @@ pub trait Compressor: Send + Sync + std::fmt::Debug {
 
 // Blanket implementation for Box<dyn Compressor>
 impl Compressor for Box<dyn Compressor> {
-    fn compress(&self, data: &[u8]) -> Result<Vec<u8>, CompressionError> {
+    fn compress<'a>(&self, data: Cow<'a, [u8]>) -> Result<Cow<'a, [u8]>, CompressionError> {
         (**self).compress(data)
     }
 
-    fn decompress(&self, data: &[u8]) -> Result<Vec<u8>, CompressionError> {
+    fn decompress<'a>(&self, data: Cow<'a, [u8]>) -> Result<Cow<'a, [u8]>, CompressionError> {
         (**self).decompress(data)
     }
 
@@ -57,11 +58,11 @@ impl Compressor for Box<dyn Compressor> {
 
 // Blanket implementation for Arc<dyn Compressor>
 impl Compressor for std::sync::Arc<dyn Compressor> {
-    fn compress(&self, data: &[u8]) -> Result<Vec<u8>, CompressionError> {
+    fn compress<'a>(&self, data: Cow<'a, [u8]>) -> Result<Cow<'a, [u8]>, CompressionError> {
         (**self).compress(data)
     }
 
-    fn decompress(&self, data: &[u8]) -> Result<Vec<u8>, CompressionError> {
+    fn decompress<'a>(&self, data: Cow<'a, [u8]>) -> Result<Cow<'a, [u8]>, CompressionError> {
         (**self).decompress(data)
     }
 
@@ -75,12 +76,12 @@ impl Compressor for std::sync::Arc<dyn Compressor> {
 pub struct PassthroughCompressor;
 
 impl Compressor for PassthroughCompressor {
-    fn compress(&self, data: &[u8]) -> Result<Vec<u8>, CompressionError> {
-        Ok(data.to_vec())
+    fn compress<'a>(&self, data: Cow<'a, [u8]>) -> Result<Cow<'a, [u8]>, CompressionError> {
+        Ok(data)
     }
 
-    fn decompress(&self, data: &[u8]) -> Result<Vec<u8>, CompressionError> {
-        Ok(data.to_vec())
+    fn decompress<'a>(&self, data: Cow<'a, [u8]>) -> Result<Cow<'a, [u8]>, CompressionError> {
+        Ok(data)
     }
 
     fn clone_box(&self) -> Box<dyn Compressor> {
@@ -208,10 +209,12 @@ mod tests {
         let compressor = PassthroughCompressor;
         let data = b"Hello, World!";
 
-        let compressed = compressor.compress(data).unwrap();
+        let compressed = compressor.compress(Cow::Borrowed(data)).unwrap();
+
+        let data = Cow::from(data);
         assert_eq!(compressed, data);
 
-        let decompressed = compressor.decompress(&compressed).unwrap();
+        let decompressed = compressor.decompress(compressed).unwrap();
         assert_eq!(decompressed, data);
     }
 

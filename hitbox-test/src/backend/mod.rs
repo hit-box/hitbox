@@ -8,6 +8,7 @@ use hitbox_core::{
     EntityPolicyConfig, ResponseCachePolicy,
 };
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 /// Test response type for backend testing
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -501,12 +502,12 @@ pub async fn test_url_encoded_key_json_value<B: Backend + CacheBackend>(backend:
     // Decompress the data before validating format
     let decompressed = backend
         .compressor()
-        .decompress(raw_value.data())
+        .decompress(Cow::Borrowed(raw_value.data()))
         .expect("failed to decompress");
 
     // Verify it's valid JSON
     let as_string =
-        String::from_utf8(decompressed.clone()).expect("Value should be valid UTF-8 JSON");
+        String::from_utf8(decompressed.into_owned()).expect("Value should be valid UTF-8 JSON");
     assert!(
         as_string.contains("\"id\"") || as_string.contains("id"),
         "Value should contain JSON fields"
@@ -550,11 +551,11 @@ pub async fn test_url_encoded_key_bincode_value<B: Backend + CacheBackend>(backe
     // Decompress the data before validating format
     let decompressed = backend
         .compressor()
-        .decompress(raw_value.data())
+        .decompress(Cow::Borrowed(raw_value.data()))
         .expect("failed to decompress");
 
     // Verify it's NOT readable JSON (binary format)
-    let as_string = String::from_utf8(decompressed.clone());
+    let as_string = String::from_utf8(decompressed.into_owned());
     assert!(
         as_string.is_err() || !as_string.unwrap().contains("\"id\""),
         "Value should be in Bincode format (binary), not JSON"
@@ -598,12 +599,12 @@ pub async fn test_bitcode_key_json_value<B: Backend + CacheBackend>(backend: &B)
     // Decompress the data before validating format
     let decompressed = backend
         .compressor()
-        .decompress(raw_value.data())
+        .decompress(Cow::Borrowed(raw_value.data()))
         .expect("failed to decompress");
 
     // Verify value is JSON
     let as_string =
-        String::from_utf8(decompressed.clone()).expect("Value should be valid UTF-8 JSON");
+        String::from_utf8(decompressed.into_owned()).expect("Value should be valid UTF-8 JSON");
     assert!(
         as_string.contains("\"id\"") || as_string.contains("id"),
         "Value should be in JSON format"
@@ -646,11 +647,11 @@ pub async fn test_bitcode_key_bincode_value<B: Backend + CacheBackend>(backend: 
     // Decompress the data before validating format
     let decompressed = backend
         .compressor()
-        .decompress(raw_value.data())
+        .decompress(Cow::Borrowed(raw_value.data()))
         .expect("failed to decompress");
 
     // Verify value is binary Bincode
-    let as_string = String::from_utf8(decompressed.clone());
+    let as_string = String::from_utf8(decompressed.into_owned());
     assert!(
         as_string.is_err() || !as_string.unwrap().contains("\"id\""),
         "Value should be in Bincode format (binary), not JSON"

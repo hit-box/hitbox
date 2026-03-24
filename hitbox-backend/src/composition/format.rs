@@ -8,6 +8,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use hitbox_core::{BoxContext, CacheValue, Raw, ReadMode};
 use smol_str::SmolStr;
+use std::borrow::Cow;
 
 use super::context::{CompositionContext, CompositionLayer, upgrade_context};
 use super::envelope::CompositionEnvelope;
@@ -100,11 +101,11 @@ impl CompositionFormat {
         // Compress
         let compress_timer = Timer::new();
         let compressed = compressor
-            .compress(&serialized)
+            .compress(Cow::Borrowed(&serialized))
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
         crate::metrics::record_compress(label, compress_timer.elapsed());
 
-        Ok(Bytes::from(compressed))
+        Ok(Bytes::from(compressed.into_owned()))
     }
 
     /// Serialize data for both layers and return raw compressed bytes without Envelope.
@@ -129,7 +130,7 @@ impl CompositionFormat {
         let l1_compress_timer = Timer::new();
         let l1_compressed = self
             .l1_compressor
-            .compress(&l1_serialized)
+            .compress(Cow::Borrowed(&l1_serialized))
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
         crate::metrics::record_compress(&self.l1_label, l1_compress_timer.elapsed());
 
@@ -147,11 +148,14 @@ impl CompositionFormat {
         let l2_compress_timer = Timer::new();
         let l2_compressed = self
             .l2_compressor
-            .compress(&l2_serialized)
+            .compress(Cow::Borrowed(&l2_serialized))
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
         crate::metrics::record_compress(&self.l2_label, l2_compress_timer.elapsed());
 
-        Ok((Bytes::from(l1_compressed), Bytes::from(l2_compressed)))
+        Ok((
+            Bytes::from(l1_compressed.into_owned()),
+            Bytes::from(l2_compressed.into_owned()),
+        ))
     }
 
     /// Deserialize data from a specific layer.
@@ -175,7 +179,7 @@ impl CompositionFormat {
         // Decompress
         let decompress_timer = Timer::new();
         let decompressed = compressor
-            .decompress(data)
+            .decompress(Cow::Borrowed(data))
             .map_err(|e| FormatError::Deserialize(Box::new(e)))?;
         crate::metrics::record_decompress(label, decompress_timer.elapsed());
 
@@ -214,12 +218,15 @@ impl Format for CompositionFormat {
             let compress_timer = Timer::new();
             let l1_compressed = self
                 .l1_compressor
-                .compress(&l1_serialized)
+                .compress(Cow::Borrowed(&l1_serialized))
                 .map_err(|e| FormatError::Serialize(Box::new(e)))?;
             crate::metrics::record_compress(&self.l1_label, compress_timer.elapsed());
 
-            let composition =
-                CompositionEnvelope::L1(CacheValue::new(Bytes::from(l1_compressed), None, None));
+            let composition = CompositionEnvelope::L1(CacheValue::new(
+                Bytes::from(l1_compressed.into_owned()),
+                None,
+                None,
+            ));
 
             return composition
                 .serialize()
@@ -235,7 +242,7 @@ impl Format for CompositionFormat {
         let l1_compress_timer = Timer::new();
         let l1_compressed = self
             .l1_compressor
-            .compress(&l1_serialized)
+            .compress(Cow::Borrowed(&l1_serialized))
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
         crate::metrics::record_compress(&self.l1_label, l1_compress_timer.elapsed());
 
@@ -253,14 +260,14 @@ impl Format for CompositionFormat {
         let l2_compress_timer = Timer::new();
         let l2_compressed = self
             .l2_compressor
-            .compress(&l2_serialized)
+            .compress(Cow::Borrowed(&l2_serialized))
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
         crate::metrics::record_compress(&self.l2_label, l2_compress_timer.elapsed());
 
         // Pack both compressed values into CompositionEnvelope
         let composition = CompositionEnvelope::Both {
-            l1: CacheValue::new(Bytes::from(l1_compressed), None, None),
-            l2: CacheValue::new(Bytes::from(l2_compressed), None, None),
+            l1: CacheValue::new(Bytes::from(l1_compressed.into_owned()), None, None),
+            l2: CacheValue::new(Bytes::from(l2_compressed.into_owned()), None, None),
         };
 
         // Serialize the CompositionEnvelope using zero-copy repr(C) format
@@ -313,7 +320,7 @@ impl Format for CompositionFormat {
         // Decompress the data
         let decompress_timer = Timer::new();
         let decompressed = compressor
-            .decompress(compressed_data.as_ref())
+            .decompress(Cow::Borrowed(compressed_data.as_ref()))
             .map_err(|e| FormatError::Deserialize(Box::new(e)))?;
         crate::metrics::record_decompress(label, decompress_timer.elapsed());
 

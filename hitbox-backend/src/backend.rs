@@ -5,6 +5,7 @@
 //! - [`Backend`] - Low-level dyn-compatible trait for raw byte operations
 //! - [`CacheBackend`] - High-level trait with typed operations (automatic via blanket impl)
 
+use std::borrow::Cow;
 use std::{future::Future, sync::Arc};
 
 use async_trait::async_trait;
@@ -266,13 +267,13 @@ pub trait CacheBackend: Backend {
                     let format = self.value_format();
 
                     let decompress_timer = Timer::new();
-                    let decompressed = self.compressor().decompress(&raw_data)?;
+                    let decompressed = self.compressor().decompress(Cow::Borrowed(&raw_data))?;
                     crate::metrics::record_decompress(
                         backend_label.as_str(),
                         decompress_timer.elapsed(),
                     );
 
-                    let decompressed_bytes = Bytes::from(decompressed);
+                    let decompressed_bytes = Bytes::from(decompressed.into_owned());
 
                     // Deserialize using with_deserializer - context may be upgraded
                     let deserialize_timer = Timer::new();
@@ -348,7 +349,9 @@ pub trait CacheBackend: Backend {
             crate::metrics::record_serialize(backend_label.as_str(), serialize_timer.elapsed());
 
             let compress_timer = Timer::new();
-            let compressed_value = self.compressor().compress(&serialized_value)?;
+            let compressed_value = self
+                .compressor()
+                .compress(Cow::Borrowed(&serialized_value))?;
             crate::metrics::record_compress(backend_label.as_str(), compress_timer.elapsed());
 
             let compressed_len = compressed_value.len();
@@ -357,7 +360,11 @@ pub trait CacheBackend: Backend {
             let result = self
                 .write(
                     key,
-                    CacheValue::new(Bytes::from(compressed_value), value.expire(), value.stale()),
+                    CacheValue::new(
+                        Bytes::from(compressed_value.into_owned()),
+                        value.expire(),
+                        value.stale(),
+                    ),
                 )
                 .await;
             crate::metrics::record_write(backend_label.as_str(), write_timer.elapsed());
