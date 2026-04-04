@@ -116,8 +116,8 @@ pub enum CacheState<Cached> {
 ///     where
 ///         P: Predicate<Subject = Self::Subject> + Send + Sync,
 ///     {
-///         let ctx = EvalContext::new();
-///         match predicates.check(self, &ctx).await {
+///         let mut ctx = EvalContext::new();
+///         match predicates.check(self, &mut ctx).await {
 ///             PredicateResult::Cacheable(data) => {
 ///                 let cached = data.body.clone();
 ///                 CachePolicy::Cacheable(CacheValue::new(
@@ -209,8 +209,8 @@ macro_rules! impl_cacheable_response_for_scalar {
                 where
                     P: Predicate<Subject = Self::Subject> + Send + Sync,
                 {
-                    let ctx = EvalContext::new();
-                    match predicates.check(self, &ctx).await {
+                    let mut ctx = EvalContext::new();
+                    match predicates.check(self, &mut ctx).await {
                         PredicateResult::Cacheable(data) => {
                             let cached = data.clone();
                             CachePolicy::Cacheable(CacheValue::new(
@@ -267,8 +267,8 @@ where
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        let ctx = EvalContext::new();
-        match predicates.check(self, &ctx).await {
+        let mut ctx = EvalContext::new();
+        match predicates.check(self, &mut ctx).await {
             PredicateResult::Cacheable(data) => {
                 let cached = data.clone();
                 CachePolicy::Cacheable(CacheValue::new(
@@ -370,9 +370,9 @@ where
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        let ctx = EvalContext::new();
+        let mut ctx = EvalContext::new();
         match self {
-            Ok(response) => match predicates.check(response, &ctx).await {
+            Ok(response) => match predicates.check(response, &mut ctx).await {
                 PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                     CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
                         res,

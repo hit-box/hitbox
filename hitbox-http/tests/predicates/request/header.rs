@@ -23,7 +23,7 @@ mod eq_tests {
         let name: HeaderName = "x-test".to_string().parse().unwrap();
         let value: HeaderValue = "test-value".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Eq(name, value));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -37,7 +37,7 @@ mod eq_tests {
         let name: HeaderName = "x-test".to_string().parse().unwrap();
         let value: HeaderValue = "wrong-value".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Eq(name, value));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 
@@ -51,7 +51,7 @@ mod eq_tests {
         let name: HeaderName = "wrong-name".to_string().parse().unwrap();
         let value: HeaderValue = "test-value".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Eq(name, value));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -69,7 +69,7 @@ mod exist_tests {
         let request = CacheableHttpRequest::from_request(request);
         let name: HeaderName = "x-test".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Exist(name));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -81,7 +81,7 @@ mod exist_tests {
         let request = CacheableHttpRequest::from_request(request);
         let name: HeaderName = "x-test".to_string().parse().unwrap();
         let predicate = NeutralRequestPredicate::new().header(Operation::Exist(name));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -103,7 +103,7 @@ mod in_tests {
             "test-value".to_string().parse().unwrap(),
         ];
         let predicate = NeutralRequestPredicate::new().header(Operation::In(name, values));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -120,7 +120,7 @@ mod in_tests {
             "test-value".to_string().parse().unwrap(),
         ];
         let predicate = NeutralRequestPredicate::new().header(Operation::In(name, values));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -138,7 +138,7 @@ mod contains_tests {
         let request = CacheableHttpRequest::from_request(request);
         let predicate = NeutralRequestPredicate::new()
             .header(Operation::contains("content-type".parse().unwrap(), "json"));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -151,7 +151,7 @@ mod contains_tests {
         let request = CacheableHttpRequest::from_request(request);
         let predicate = NeutralRequestPredicate::new()
             .header(Operation::contains("content-type".parse().unwrap(), "json"));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -171,7 +171,7 @@ mod regex_tests {
             "accept".parse().unwrap(),
             Regex::new(r"version=\d+").unwrap(),
         ));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
     }
 
@@ -186,7 +186,7 @@ mod regex_tests {
             "accept".parse().unwrap(),
             Regex::new(r"version=\d+").unwrap(),
         ));
-        let prediction = predicate.check(request, &EvalContext::new()).await;
+        let prediction = predicate.check(request, &mut EvalContext::new()).await;
         assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
     }
 }
@@ -211,7 +211,7 @@ mod constructor_and_from_tests {
         let prediction = predicate
             .check(
                 request_with_header("x-test", "test-value"),
-                &EvalContext::new(),
+                &mut EvalContext::new(),
             )
             .await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
@@ -220,7 +220,10 @@ mod constructor_and_from_tests {
         let predicate =
             NeutralRequestPredicate::new().header(Operation::exist("x-test".parse().unwrap()));
         let prediction = predicate
-            .check(request_with_header("x-test", "any"), &EvalContext::new())
+            .check(
+                request_with_header("x-test", "any"),
+                &mut EvalContext::new(),
+            )
             .await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 
@@ -230,7 +233,10 @@ mod constructor_and_from_tests {
             vec!["val-a".parse().unwrap(), "val-b".parse().unwrap()],
         ));
         let prediction = predicate
-            .check(request_with_header("x-test", "val-b"), &EvalContext::new())
+            .check(
+                request_with_header("x-test", "val-b"),
+                &mut EvalContext::new(),
+            )
             .await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 
@@ -240,7 +246,7 @@ mod constructor_and_from_tests {
         let prediction = predicate
             .check(
                 request_with_header("x-version", "v2.1"),
-                &EvalContext::new(),
+                &mut EvalContext::new(),
             )
             .await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
@@ -254,7 +260,7 @@ mod constructor_and_from_tests {
         let prediction = predicate
             .check(
                 request_with_header("authorization", "Bearer xyz"),
-                &EvalContext::new(),
+                &mut EvalContext::new(),
             )
             .await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));
@@ -266,7 +272,7 @@ mod constructor_and_from_tests {
         let prediction = predicate
             .check(
                 request_with_header("x-test", "exact-value"),
-                &EvalContext::new(),
+                &mut EvalContext::new(),
             )
             .await;
         assert!(matches!(prediction, PredicateResult::Cacheable(_)));

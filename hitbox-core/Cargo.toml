@@ -21,7 +21,6 @@ bytes = { workspace = true }
 smol_str = { workspace = true }
 smallbox = { workspace = true }
 pin-project = { workspace = true }
-tokio = { workspace = true, features = ["sync"] }
 # Optional rkyv support
 rkyv = { workspace = true, optional = true }
 
@@ -32,9 +31,3 @@ rkyv_format = ["dep:rkyv"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-criterion = { workspace = true, features = ["async_tokio"] }
-http = { workspace = true }
-
-[[bench]]
-name = "eval_context"
-harness = false

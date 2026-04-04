@@ -128,10 +128,10 @@ macro_rules! impl_cacheable_request_for_args {
                 E: Extractor<Subject = Self> + Send + Sync + 'a,
             {
                 Box::pin(async move {
-                    let ctx = hitbox::EvalContext::new();
-                    match predicates.check(self, &ctx).await {
+                    let mut ctx = hitbox::EvalContext::new();
+                    match predicates.check(self, &mut ctx).await {
                         PredicateResult::Cacheable(subject) => {
-                            let (subject, key) = extractors.get(subject, &ctx).await.into_cache_key();
+                            let (subject, key) = extractors.get(subject, &mut ctx).await.into_cache_key();
                             CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
                         }
                         PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),
@@ -160,10 +160,10 @@ macro_rules! impl_cacheable_request_for_args {
                 E: Extractor<Subject = Self> + Send + Sync + 'a,
             {
                 Box::pin(async move {
-                    let ctx = hitbox::EvalContext::new();
-                    match predicates.check(self, &ctx).await {
+                    let mut ctx = hitbox::EvalContext::new();
+                    match predicates.check(self, &mut ctx).await {
                         PredicateResult::Cacheable(subject) => {
-                            let (subject, key) = extractors.get(subject, &ctx).await.into_cache_key();
+                            let (subject, key) = extractors.get(subject, &mut ctx).await.into_cache_key();
                             CachePolicy::Cacheable(hitbox::CacheablePolicyData::new(key, subject))
                         }
                         PredicateResult::NonCacheable(subject) => CachePolicy::NonCacheable(subject),

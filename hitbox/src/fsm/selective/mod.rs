@@ -154,8 +154,8 @@ where
             Some(idx) => {
                 let pred = configs.configs()[idx].request_predicates();
                 let predicate_future = Box::pin(async move {
-                    let ctx = hitbox_core::EvalContext::new();
-                    let result = pred.check(request, &ctx).await;
+                    let mut ctx = hitbox_core::EvalContext::new();
+                    let result = pred.check(request, &mut ctx).await;
                     (result, ctx)
                 });
                 trace!(parent: &span, config_index = idx, "Checking first enabled config");

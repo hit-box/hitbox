@@ -678,7 +678,7 @@ async fn test_zero_args_generated_key() {
 
     let extractor = FnExtractor::<Args<()>>::new("no_args_function");
     let (_, key) = extractor
-        .get(Args(()), &hitbox::EvalContext::new())
+        .get(Args(()), &mut hitbox::EvalContext::new())
         .await
         .into_cache_key();
 

@@ -64,7 +64,7 @@ use crate::predicates::version::HasVersion;
 ///         .method(MethodConfig::new())
 ///         .path("/users/{user_id}");
 ///     # let _: &Path<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
-///     let key_parts = extractor.get(cacheable, &hitbox::EvalContext::new()).await;
+///     let key_parts = extractor.get(cacheable, &mut hitbox::EvalContext::new()).await;
 /// }
 /// ```
 #[derive(Debug)]
@@ -168,10 +168,10 @@ where
         E: Extractor<Subject = Self> + Send + Sync + 'a,
     {
         Box::pin(async move {
-            let ctx = EvalContext::new();
-            match predicates.check(self, &ctx).await {
+            let mut ctx = EvalContext::new();
+            match predicates.check(self, &mut ctx).await {
                 PredicateResult::Cacheable(request) => {
-                    let (request, key) = extractors.get(request, &ctx).await.into_cache_key();
+                    let (request, key) = extractors.get(request, &mut ctx).await.into_cache_key();
                     CachePolicy::Cacheable(CacheablePolicyData { key, request })
                 }
                 PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),

@@ -146,7 +146,7 @@ where
 {
     type Subject = E::Subject;
 
-    async fn get(&self, subject: Self::Subject, ctx: &EvalContext) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
         let mut path = actix_router::Path::new(subject.parts().uri.path());
         self.resource.capture_match_info(&mut path);
         let mut matched_parts = path

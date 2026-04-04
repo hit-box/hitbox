@@ -47,10 +47,10 @@ impl CacheableRequest for SimpleRequest {
         E: Extractor<Subject = Self> + Send + Sync + 'a,
     {
         Box::pin(async move {
-            let ctx = EvalContext::new();
-            match predicates.check(self, &ctx).await {
+            let mut ctx = EvalContext::new();
+            match predicates.check(self, &mut ctx).await {
                 PredicateResult::Cacheable(request) => {
-                    let key_parts = extractors.get(request, &ctx).await;
+                    let key_parts = extractors.get(request, &mut ctx).await;
                     let (request, cache_key) = key_parts.into_cache_key();
                     RequestCachePolicy::Cacheable(CacheablePolicyData {
                         key: cache_key,
@@ -80,8 +80,8 @@ impl CacheableResponse for SimpleResponse {
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        let ctx = EvalContext::new();
-        match predicates.check(self, &ctx).await {
+        let mut ctx = EvalContext::new();
+        match predicates.check(self, &mut ctx).await {
             PredicateResult::Cacheable(response) => {
                 CachePolicy::Cacheable(CacheValue::new(response.0, None, None))
             }
@@ -114,7 +114,7 @@ impl Predicate for ConfigurableRequestPredicate {
     async fn check(
         &self,
         subject: Self::Subject,
-        _ctx: &EvalContext,
+        _ctx: &mut EvalContext,
     ) -> PredicateResult<Self::Subject> {
         if self.cacheable {
             PredicateResult::Cacheable(subject)
@@ -136,7 +136,7 @@ impl Predicate for ConfigurableResponsePredicate {
     async fn check(
         &self,
         subject: Self::Subject,
-        _ctx: &EvalContext,
+        _ctx: &mut EvalContext,
     ) -> PredicateResult<Self::Subject> {
         if self.cacheable {
             PredicateResult::Cacheable(subject)
@@ -157,7 +157,7 @@ pub struct FixedKeyExtractor;
 impl Extractor for FixedKeyExtractor {
     type Subject = SimpleRequest;
 
-    async fn get(&self, subject: Self::Subject, _ctx: &EvalContext) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, _ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
         let mut key_parts = KeyParts::new(subject);
         key_parts.push(KeyPart::new("fixed_key", Some("value")));
         key_parts

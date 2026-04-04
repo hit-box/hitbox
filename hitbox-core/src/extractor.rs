@@ -74,7 +74,7 @@ pub trait Extractor {
     /// Extract cache key components from the subject.
     ///
     /// Returns a [`KeyParts`] containing the subject and accumulated key parts.
-    async fn get(&self, subject: Self::Subject, ctx: &EvalContext) -> KeyParts<Self::Subject>;
+    async fn get(&self, subject: Self::Subject, ctx: &mut EvalContext) -> KeyParts<Self::Subject>;
 }
 
 #[async_trait]
@@ -85,7 +85,7 @@ where
 {
     type Subject = T::Subject;
 
-    async fn get(&self, subject: T::Subject, ctx: &EvalContext) -> KeyParts<T::Subject> {
+    async fn get(&self, subject: T::Subject, ctx: &mut EvalContext) -> KeyParts<T::Subject> {
         (**self).get(subject, ctx).await
     }
 }
@@ -98,7 +98,7 @@ where
 {
     type Subject = T::Subject;
 
-    async fn get(&self, subject: T::Subject, ctx: &EvalContext) -> KeyParts<T::Subject> {
+    async fn get(&self, subject: T::Subject, ctx: &mut EvalContext) -> KeyParts<T::Subject> {
         self.as_ref().get(subject, ctx).await
     }
 }
@@ -111,7 +111,7 @@ where
 {
     type Subject = T::Subject;
 
-    async fn get(&self, subject: T::Subject, ctx: &EvalContext) -> KeyParts<T::Subject> {
+    async fn get(&self, subject: T::Subject, ctx: &mut EvalContext) -> KeyParts<T::Subject> {
         self.as_ref().get(subject, ctx).await
     }
 }

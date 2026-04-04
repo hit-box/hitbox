@@ -102,8 +102,8 @@ impl CacheableResponse for Test {
     where
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        let ctx = hitbox_core::EvalContext::new();
-        match predicates.check(self, &ctx).await {
+        let mut ctx = hitbox_core::EvalContext::new();
+        match predicates.check(self, &mut ctx).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                 CachePolicy::Cacheable(res) => {
                     CachePolicy::Cacheable(CachedValue::new(res, Utc::now()))

@@ -49,7 +49,7 @@ where
     async fn check(
         &self,
         subject: Self::Subject,
-        ctx: &EvalContext,
+        ctx: &mut EvalContext,
     ) -> PredicateResult<Self::Subject> {
         match self.predicate.check(subject, ctx).await {
             PredicateResult::Cacheable(s) => PredicateResult::NonCacheable(s),
@@ -87,7 +87,7 @@ where
     async fn check(
         &self,
         subject: Self::Subject,
-        ctx: &EvalContext,
+        ctx: &mut EvalContext,
     ) -> PredicateResult<Self::Subject> {
         match self.left.check(subject, ctx).await {
             PredicateResult::Cacheable(s) => self.right.check(s, ctx).await,
@@ -125,7 +125,7 @@ where
     async fn check(
         &self,
         subject: Self::Subject,
-        ctx: &EvalContext,
+        ctx: &mut EvalContext,
     ) -> PredicateResult<Self::Subject> {
         match self.left.check(subject, ctx).await {
             PredicateResult::NonCacheable(s) => self.right.check(s, ctx).await,

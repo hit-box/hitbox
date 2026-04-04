@@ -126,7 +126,7 @@ async fn test_extractor_with_derived_type() {
     let extractor = FnExtractor::new("test::get_user");
     let args = Args((UserId(42),));
 
-    let key_parts = extractor.get(args, &hitbox::EvalContext::new()).await;
+    let key_parts = extractor.get(args, &mut hitbox::EvalContext::new()).await;
     let (_, key) = key_parts.into_cache_key();
 
     let key_str = key.to_string();
@@ -139,7 +139,7 @@ async fn test_extractor_with_multiple_derived_types() {
     let extractor = FnExtractor::new("test::get_user_for_tenant");
     let args = Args((UserId(1), TenantId("acme".into())));
 
-    let key_parts = extractor.get(args, &hitbox::EvalContext::new()).await;
+    let key_parts = extractor.get(args, &mut hitbox::EvalContext::new()).await;
     let (_, key) = key_parts.into_cache_key();
 
     let key_str = key.to_string();
@@ -164,11 +164,11 @@ async fn test_extractor_skip_not_affect_key() {
     },));
 
     let (_, key1) = extractor
-        .get(args1, &hitbox::EvalContext::new())
+        .get(args1, &mut hitbox::EvalContext::new())
         .await
         .into_cache_key();
     let (_, key2) = extractor
-        .get(args2, &hitbox::EvalContext::new())
+        .get(args2, &mut hitbox::EvalContext::new())
         .await
         .into_cache_key();
 
@@ -181,11 +181,11 @@ async fn test_extractor_different_values_different_keys() {
     let extractor = FnExtractor::new("test::get_user");
 
     let (_, key1) = extractor
-        .get(Args((UserId(1),)), &hitbox::EvalContext::new())
+        .get(Args((UserId(1),)), &mut hitbox::EvalContext::new())
         .await
         .into_cache_key();
     let (_, key2) = extractor
-        .get(Args((UserId(2),)), &hitbox::EvalContext::new())
+        .get(Args((UserId(2),)), &mut hitbox::EvalContext::new())
         .await
         .into_cache_key();
 
@@ -312,7 +312,7 @@ async fn test_extractor_with_scalars() {
     let extractor = FnExtractor::new("test::compute");
     let args = Args((42u64, "key".to_string()));
 
-    let key_parts = extractor.get(args, &hitbox::EvalContext::new()).await;
+    let key_parts = extractor.get(args, &mut hitbox::EvalContext::new()).await;
     let (_, key) = key_parts.into_cache_key();
 
     let key_str = key.to_string();
@@ -326,15 +326,15 @@ async fn test_extractor_scalar_different_values() {
     let extractor = FnExtractor::new("test::add");
 
     let (_, key1) = extractor
-        .get(Args((1i64, 2i64)), &hitbox::EvalContext::new())
+        .get(Args((1i64, 2i64)), &mut hitbox::EvalContext::new())
         .await
         .into_cache_key();
     let (_, key2) = extractor
-        .get(Args((1i64, 3i64)), &hitbox::EvalContext::new())
+        .get(Args((1i64, 3i64)), &mut hitbox::EvalContext::new())
         .await
         .into_cache_key();
     let (_, key3) = extractor
-        .get(Args((1i64, 2i64)), &hitbox::EvalContext::new())
+        .get(Args((1i64, 2i64)), &mut hitbox::EvalContext::new())
         .await
         .into_cache_key();
 

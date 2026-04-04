@@ -225,7 +225,7 @@ where
 {
     type Subject = E::Subject;
 
-    async fn get(&self, subject: Self::Subject, ctx: &EvalContext) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
         let query_map = subject
             .parts()
             .uri

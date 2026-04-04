@@ -22,7 +22,7 @@ async fn test_request_multiple_extractor_some() {
         .method(MethodConfig::new())
         .header("x-test".to_owned());
     let parts = extractor
-        .get(request, &hitbox_core::EvalContext::new())
+        .get(request, &mut hitbox_core::EvalContext::new())
         .await;
     dbg!(parts);
 }

@@ -186,7 +186,7 @@ where
     async fn get(
         &self,
         subject: Self::Subject,
-        _ctx: &hitbox::EvalContext,
+        _ctx: &mut hitbox::EvalContext,
     ) -> KeyParts<Self::Subject> {
         let extracted = subject.extract();
         let mut parts = KeyParts::new(subject);

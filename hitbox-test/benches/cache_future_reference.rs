@@ -275,7 +275,7 @@ fn bench_compare_cache_write(c: &mut Criterion) {
     let request = CacheableHttpRequest::from_request(create_reference_request());
     let (_, cache_key) = rt.block_on(async {
         extractors
-            .get(request, &EvalContext::new())
+            .get(request, &mut EvalContext::new())
             .await
             .into_cache_key()
     });
@@ -347,7 +347,7 @@ fn bench_compare_cache_read(c: &mut Criterion) {
     let request = CacheableHttpRequest::from_request(create_reference_request());
     let (_, cache_key) = rt.block_on(async {
         extractors
-            .get(request, &EvalContext::new())
+            .get(request, &mut EvalContext::new())
             .await
             .into_cache_key()
     });
@@ -452,7 +452,7 @@ fn bench_compare_composition_read(c: &mut Criterion) {
     let request = CacheableHttpRequest::from_request(create_reference_request());
     let (_, cache_key) = rt.block_on(async {
         extractors
-            .get(request, &EvalContext::new())
+            .get(request, &mut EvalContext::new())
             .await
             .into_cache_key()
     });
@@ -574,7 +574,7 @@ fn bench_compare_composition_write(c: &mut Criterion) {
     let request = CacheableHttpRequest::from_request(create_reference_request());
     let (_, cache_key) = rt.block_on(async {
         extractors
-            .get(request, &EvalContext::new())
+            .get(request, &mut EvalContext::new())
             .await
             .into_cache_key()
     });
@@ -692,7 +692,11 @@ fn bench_compare_request_predicates(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(static_predicates.check(request, &EvalContext::new()).await)
+            std::hint::black_box(
+                static_predicates
+                    .check(request, &mut EvalContext::new())
+                    .await,
+            )
         });
     });
 
@@ -700,7 +704,7 @@ fn bench_compare_request_predicates(c: &mut Criterion) {
         let predicates = dynamic_predicates.clone();
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(predicates.check(request, &EvalContext::new()).await)
+            std::hint::black_box(predicates.check(request, &mut EvalContext::new()).await)
         });
     });
 
@@ -726,7 +730,11 @@ fn bench_compare_response_predicates(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let response = CacheableHttpResponse::from_response(create_reference_response());
-            std::hint::black_box(static_predicates.check(response, &EvalContext::new()).await)
+            std::hint::black_box(
+                static_predicates
+                    .check(response, &mut EvalContext::new())
+                    .await,
+            )
         });
     });
 
@@ -734,7 +742,7 @@ fn bench_compare_response_predicates(c: &mut Criterion) {
         let predicates = dynamic_predicates.clone();
         b.to_async(&rt).iter(|| async {
             let response = CacheableHttpResponse::from_response(create_reference_response());
-            std::hint::black_box(predicates.check(response, &EvalContext::new()).await)
+            std::hint::black_box(predicates.check(response, &mut EvalContext::new()).await)
         });
     });
 
@@ -762,7 +770,11 @@ fn bench_compare_extractors(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(static_extractors.get(request, &EvalContext::new()).await)
+            std::hint::black_box(
+                static_extractors
+                    .get(request, &mut EvalContext::new())
+                    .await,
+            )
         });
     });
 
@@ -770,7 +782,7 @@ fn bench_compare_extractors(c: &mut Criterion) {
         let extractors = dynamic_extractors.clone();
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(extractors.get(request, &EvalContext::new()).await)
+            std::hint::black_box(extractors.get(request, &mut EvalContext::new()).await)
         });
     });
 
@@ -807,7 +819,7 @@ fn bench_compare_cache_future_hit(c: &mut Criterion) {
     let request = CacheableHttpRequest::from_request(create_reference_request());
     let (_, static_cache_key) = rt.block_on(async {
         static_extractors
-            .get(request, &EvalContext::new())
+            .get(request, &mut EvalContext::new())
             .await
             .into_cache_key()
     });
@@ -846,7 +858,7 @@ fn bench_compare_cache_future_hit(c: &mut Criterion) {
     let (_, dyn_cache_key) = rt.block_on(async {
         endpoint
             .extractors
-            .get(request, &EvalContext::new())
+            .get(request, &mut EvalContext::new())
             .await
             .into_cache_key()
     });
@@ -1084,7 +1096,11 @@ fn bench_compare_body_request_predicates(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(static_predicates.check(request, &EvalContext::new()).await)
+            std::hint::black_box(
+                static_predicates
+                    .check(request, &mut EvalContext::new())
+                    .await,
+            )
         });
     });
 
@@ -1092,7 +1108,7 @@ fn bench_compare_body_request_predicates(c: &mut Criterion) {
         let predicates = dynamic_predicates.clone();
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(predicates.check(request, &EvalContext::new()).await)
+            std::hint::black_box(predicates.check(request, &mut EvalContext::new()).await)
         });
     });
 
@@ -1118,7 +1134,11 @@ fn bench_compare_body_response_predicates(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let response = CacheableHttpResponse::from_response(create_reference_response());
-            std::hint::black_box(static_predicates.check(response, &EvalContext::new()).await)
+            std::hint::black_box(
+                static_predicates
+                    .check(response, &mut EvalContext::new())
+                    .await,
+            )
         });
     });
 
@@ -1126,7 +1146,7 @@ fn bench_compare_body_response_predicates(c: &mut Criterion) {
         let predicates = dynamic_predicates.clone();
         b.to_async(&rt).iter(|| async {
             let response = CacheableHttpResponse::from_response(create_reference_response());
-            std::hint::black_box(predicates.check(response, &EvalContext::new()).await)
+            std::hint::black_box(predicates.check(response, &mut EvalContext::new()).await)
         });
     });
 
@@ -1154,7 +1174,11 @@ fn bench_compare_body_extractors(c: &mut Criterion) {
     group.bench_function("static", |b| {
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(static_extractors.get(request, &EvalContext::new()).await)
+            std::hint::black_box(
+                static_extractors
+                    .get(request, &mut EvalContext::new())
+                    .await,
+            )
         });
     });
 
@@ -1162,7 +1186,7 @@ fn bench_compare_body_extractors(c: &mut Criterion) {
         let extractors = dynamic_extractors.clone();
         b.to_async(&rt).iter(|| async {
             let request = CacheableHttpRequest::from_request(create_reference_request());
-            std::hint::black_box(extractors.get(request, &EvalContext::new()).await)
+            std::hint::black_box(extractors.get(request, &mut EvalContext::new()).await)
         });
     });
 
@@ -1199,7 +1223,7 @@ fn bench_compare_body_cache_future_hit(c: &mut Criterion) {
     let request = CacheableHttpRequest::from_request(create_reference_request());
     let (_, static_cache_key) = rt.block_on(async {
         static_extractors
-            .get(request, &EvalContext::new())
+            .get(request, &mut EvalContext::new())
             .await
             .into_cache_key()
     });
@@ -1238,7 +1262,7 @@ fn bench_compare_body_cache_future_hit(c: &mut Criterion) {
     let (_, dyn_cache_key) = rt.block_on(async {
         endpoint
             .extractors
-            .get(request, &EvalContext::new())
+            .get(request, &mut EvalContext::new())
             .await
             .into_cache_key()
     });

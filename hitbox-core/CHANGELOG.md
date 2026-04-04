@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `PolicyConfig` and related policy types moved from `hitbox` crate ([#253](https://github.com/hit-box/hitbox/pull/253))
 - **Breaking:** `CacheConfig::policy()` now returns `Arc<PolicyConfig>` instead of `&PolicyConfig` ([#253](https://github.com/hit-box/hitbox/pull/253))
-- **Breaking:** `Predicate::check()` now accepts `&EvalContext` parameter
-- **Breaking:** `Extractor::get()` now accepts `&EvalContext` parameter
+- **Breaking:** `Predicate::check()` now accepts `&mut EvalContext` parameter
+- **Breaking:** `Extractor::get()` now accepts `&mut EvalContext` parameter
 
 ### Changed
 - **Breaking:** `Upstream::call` now takes `self` by value instead of `&mut self` — the FSM calls upstream exactly once, so consuming is semantically correct and simplifies lifetime handling ([#206](https://github.com/hit-box/hitbox/pull/206))

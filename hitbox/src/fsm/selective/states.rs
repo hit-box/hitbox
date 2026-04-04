@@ -97,7 +97,7 @@ impl CheckPredicate {
     pub fn transition<'a, Req, Res, CC, U>(
         self,
         result: PredicateResult<Req>,
-        ctx: EvalContext,
+        mut ctx: EvalContext,
         configs: &CC,
         upstream: &mut Option<U>,
     ) -> CheckPredicateTransition<'a, Req, U::Future>
@@ -116,7 +116,7 @@ impl CheckPredicate {
                     "Config matched, extracting cache key"
                 );
                 let ext = configs.configs()[self.config_index].extractors();
-                let extract_future = Box::pin(async move { ext.get(request, &ctx).await });
+                let extract_future = Box::pin(async move { ext.get(request, &mut ctx).await });
                 CheckPredicateTransition::ExtractKey {
                     extract_future,
                     config_index: self.config_index,
@@ -141,7 +141,7 @@ impl CheckPredicate {
                     Some(next_idx) => {
                         let pred = configs.configs()[next_idx].request_predicates();
                         let predicate_future = Box::pin(async move {
-                            let result = pred.check(request, &ctx).await;
+                            let result = pred.check(request, &mut ctx).await;
                             (result, ctx)
                         });
                         CheckPredicateTransition::NextConfig {

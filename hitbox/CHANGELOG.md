@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `Config` now implements `CacheConfigs` via `slice::from_ref` ([#253](https://github.com/hit-box/hitbox/pull/253))
 - `Config` now stores `policy` as `Arc<PolicyConfig>` ([#253](https://github.com/hit-box/hitbox/pull/253))
-- FSM now threads `&EvalContext` through predicate and extractor evaluation
+- FSM now threads `&mut EvalContext` through predicate and extractor evaluation
 
 ### Changed
 - **Breaking:** Relaxed FSM lifetime bounds from `'static` to `'offload` for `Req`, `ReqP`, and `E` — enables caching of request types containing references ([#206](https://github.com/hit-box/hitbox/pull/206))

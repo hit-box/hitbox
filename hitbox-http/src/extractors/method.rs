@@ -99,7 +99,7 @@ where
 {
     type Subject = E::Subject;
 
-    async fn get(&self, subject: Self::Subject, ctx: &EvalContext) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
         let method = subject.parts().method.to_string();
         let mut parts = self.inner.get(subject, ctx).await;
         parts.push(KeyPart::new("method", Some(method)));
