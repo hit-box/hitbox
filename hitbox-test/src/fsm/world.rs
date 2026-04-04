@@ -14,8 +14,8 @@ use hitbox_backend::composition::policy::RefillPolicy;
 use hitbox_backend::{CacheBackend, CompositionBackend};
 use hitbox_core::{
     CacheKey, CachePolicy, CacheValue, CacheablePolicyData, CacheableRequest, CacheableResponse,
-    EntityPolicyConfig, Extractor, KeyPart, KeyParts, Offload, Predicate, PredicateResult,
-    RequestCachePolicy, ResponseCachePolicy, SmolStr, Upstream,
+    EntityPolicyConfig, EvalContext, Extractor, KeyPart, KeyParts, Offload, Predicate,
+    PredicateResult, RequestCachePolicy, ResponseCachePolicy, SmolStr, Upstream,
 };
 use hitbox_moka::MokaBackend;
 
@@ -47,9 +47,10 @@ impl CacheableRequest for SimpleRequest {
         E: Extractor<Subject = Self> + Send + Sync + 'a,
     {
         Box::pin(async move {
-            match predicates.check(self).await {
+            let mut ctx = EvalContext::new();
+            match predicates.check(self, &mut ctx).await {
                 PredicateResult::Cacheable(request) => {
-                    let key_parts = extractors.get(request).await;
+                    let key_parts = extractors.get(request, &mut ctx).await;
                     let (request, cache_key) = key_parts.into_cache_key();
                     RequestCachePolicy::Cacheable(CacheablePolicyData {
                         key: cache_key,
@@ -79,7 +80,8 @@ impl CacheableResponse for SimpleResponse {
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        match predicates.check(self).await {
+        let mut ctx = EvalContext::new();
+        match predicates.check(self, &mut ctx).await {
             PredicateResult::Cacheable(response) => {
                 CachePolicy::Cacheable(CacheValue::new(response.0, None, None))
             }
@@ -109,7 +111,11 @@ pub struct ConfigurableRequestPredicate {
 impl Predicate for ConfigurableRequestPredicate {
     type Subject = SimpleRequest;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
         if self.cacheable {
             PredicateResult::Cacheable(subject)
         } else {
@@ -127,7 +133,11 @@ pub struct ConfigurableResponsePredicate {
 impl Predicate for ConfigurableResponsePredicate {
     type Subject = SimpleResponse;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
         if self.cacheable {
             PredicateResult::Cacheable(subject)
         } else {
@@ -147,7 +157,7 @@ pub struct FixedKeyExtractor;
 impl Extractor for FixedKeyExtractor {
     type Subject = SimpleRequest;
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, _ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
         let mut key_parts = KeyParts::new(subject);
         key_parts.push(KeyPart::new("fixed_key", Some("value")));
         key_parts

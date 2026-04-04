@@ -19,6 +19,7 @@ use std::fmt::Debug;
 use std::rc::Rc;
 
 use async_trait::async_trait;
+use hitbox::EvalContext;
 use hitbox::{Extractor, KeyPart, KeyParts};
 use hyper::body::Body as HttpBody;
 use jaq_core::box_iter::box_once;
@@ -682,7 +683,7 @@ where
 {
     type Subject = E::Subject;
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
         let (parts, body) = subject.into_parts();
 
         // Collect body
@@ -692,7 +693,7 @@ where
                 let request = CacheableHttpRequest::from_request(http::Request::from_parts(
                     parts, error_body,
                 ));
-                let mut key_parts = self.inner.get(request).await;
+                let mut key_parts = self.inner.get(request, ctx).await;
                 key_parts.push(KeyPart::new("body", None::<String>));
                 return key_parts;
             }
@@ -733,7 +734,7 @@ where
         };
         let request = CacheableHttpRequest::from_request(http::Request::from_parts(parts, body));
 
-        let mut key_parts = self.inner.get(request).await;
+        let mut key_parts = self.inner.get(request, ctx).await;
         for part in extracted_parts {
             key_parts.push(part);
         }

@@ -4,6 +4,8 @@ use std::marker::PhantomData;
 
 use async_trait::async_trait;
 
+use crate::EvalContext;
+
 use super::{Predicate, PredicateResult};
 
 /// A predicate that always returns `Cacheable`.
@@ -42,7 +44,11 @@ where
 {
     type Subject = S;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
         PredicateResult::Cacheable(subject)
     }
 }

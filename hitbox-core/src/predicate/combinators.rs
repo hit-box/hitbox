@@ -18,6 +18,8 @@
 
 use async_trait::async_trait;
 
+use crate::EvalContext;
+
 use super::{Predicate, PredicateResult};
 
 /// Inverts a predicate result.
@@ -44,8 +46,12 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.predicate.check(subject).await {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
+        match self.predicate.check(subject, ctx).await {
             PredicateResult::Cacheable(s) => PredicateResult::NonCacheable(s),
             PredicateResult::NonCacheable(s) => PredicateResult::Cacheable(s),
         }
@@ -78,9 +84,13 @@ where
 {
     type Subject = L::Subject;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.left.check(subject).await {
-            PredicateResult::Cacheable(s) => self.right.check(s).await,
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
+        match self.left.check(subject, ctx).await {
+            PredicateResult::Cacheable(s) => self.right.check(s, ctx).await,
             non_cacheable => non_cacheable,
         }
     }
@@ -112,9 +122,13 @@ where
 {
     type Subject = L::Subject;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.left.check(subject).await {
-            PredicateResult::NonCacheable(s) => self.right.check(s).await,
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
+        match self.left.check(subject, ctx).await {
+            PredicateResult::NonCacheable(s) => self.right.check(s, ctx).await,
             cacheable => cacheable,
         }
     }

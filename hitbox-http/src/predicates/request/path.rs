@@ -6,6 +6,7 @@
 use crate::CacheableHttpRequest;
 use actix_router::ResourceDef;
 use async_trait::async_trait;
+use hitbox::EvalContext;
 use hitbox::predicate::{Predicate, PredicateResult};
 
 /// Matching operations for request paths.
@@ -116,8 +117,12 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.inner.check(request).await {
+    async fn check(
+        &self,
+        request: Self::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
+        match self.inner.check(request, ctx).await {
             PredicateResult::Cacheable(request) => {
                 let is_match = match &self.operation {
                     Operation::Pattern(resource) => resource.is_match(request.parts().uri.path()),

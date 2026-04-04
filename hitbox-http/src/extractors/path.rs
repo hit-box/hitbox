@@ -1,5 +1,6 @@
 use actix_router::ResourceDef;
 use async_trait::async_trait;
+use hitbox::EvalContext;
 use hitbox::{Extractor, KeyPart, KeyParts};
 
 use crate::CacheableHttpRequest;
@@ -145,14 +146,14 @@ where
 {
     type Subject = E::Subject;
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
         let mut path = actix_router::Path::new(subject.parts().uri.path());
         self.resource.capture_match_info(&mut path);
         let mut matched_parts = path
             .iter()
             .map(|(key, value)| KeyPart::new(key, Some(value)))
             .collect::<Vec<_>>();
-        let mut parts = self.inner.get(subject).await;
+        let mut parts = self.inner.get(subject, ctx).await;
         parts.append(&mut matched_parts);
         parts
     }

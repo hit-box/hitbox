@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use hitbox::Extractor;
+use hitbox_core::EvalContext;
 use hitbox_http::extractors::{MethodConfig, NeutralExtractor, method::MethodExtractor};
 use hitbox_http::{BufferedBody, CacheableHttpRequest};
 use http::{Method, Request};
@@ -14,6 +15,6 @@ async fn test_request_method_extractor_some() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().method(MethodConfig::new());
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut EvalContext::new()).await;
     dbg!(parts);
 }

@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use hitbox::Extractor;
+use hitbox_core::EvalContext;
 use hitbox_http::extractors::body::{
     BodyConfig, BodyExtraction, BodyExtractor, IntoBodyExtraction, JqExtraction, RegexExtraction,
     Transforms,
@@ -104,7 +105,7 @@ async fn test_body_extractor_hash_mode() {
     let extractor = NeutralExtractor::new()
         .method(MethodConfig::new())
         .body(BodyConfig::new().hash());
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut EvalContext::new()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let body_part = key_parts.iter().find(|p| p.key() == "body").unwrap();
@@ -125,7 +126,7 @@ async fn test_body_extractor_jq_mode() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().body(BodyConfig::new().jq(".user").unwrap());
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut EvalContext::new()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let body_part = key_parts.iter().find(|p| p.key() == "body").unwrap();
@@ -141,7 +142,7 @@ async fn test_body_extractor_jq_mode_object_result() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().body(BodyConfig::new().jq(".user").unwrap());
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut EvalContext::new()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     assert!(key_parts.iter().any(|p| p.key() == "name"));
@@ -157,7 +158,7 @@ async fn test_body_extractor_jq_mode_edge_cases() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().body(BodyConfig::new().jq(".field").unwrap());
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut EvalContext::new()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let body_part = key_parts.iter().find(|p| p.key() == "body").unwrap();
@@ -170,7 +171,7 @@ async fn test_body_extractor_jq_mode_edge_cases() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().body(BodyConfig::new().jq(".field").unwrap());
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut EvalContext::new()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let body_part = key_parts.iter().find(|p| p.key() == "body").unwrap();
@@ -183,7 +184,7 @@ async fn test_body_extractor_jq_mode_edge_cases() {
         .unwrap();
     let request = CacheableHttpRequest::from_request(request);
     let extractor = NeutralExtractor::new().body(BodyConfig::new().jq(".active").unwrap());
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut EvalContext::new()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let body_part = key_parts.iter().find(|p| p.key() == "body").unwrap();
@@ -206,7 +207,7 @@ async fn test_body_extractor_jq_hash_types() {
             .unwrap();
         let request = CacheableHttpRequest::from_request(request);
         let extractor = NeutralExtractor::new().body(BodyConfig::new().jq(".val | hash").unwrap());
-        let parts = extractor.get(request).await;
+        let parts = extractor.get(request, &mut EvalContext::new()).await;
         let (_subject, cache_key) = parts.into_cache_key();
         let key_parts: Vec<_> = cache_key.parts().collect();
         let body_part = key_parts
@@ -233,7 +234,7 @@ async fn test_body_extractor_regex_mode_single_match() {
             .regex(r"order_id: (\w+)")
             .unwrap(),
     );
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut EvalContext::new()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let order_part = key_parts.iter().find(|p| p.key() == "order").unwrap();
@@ -255,7 +256,7 @@ async fn test_body_extractor_regex_mode_global() {
             .unwrap()
             .global(),
     );
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut EvalContext::new()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     let id_parts: Vec<_> = key_parts.iter().filter(|p| p.key() == "id").collect();
@@ -277,7 +278,7 @@ async fn test_body_extractor_regex_mode_named_groups() {
         transforms: Transforms::None,
     });
     let extractor = NeutralExtractor::new().body(extraction);
-    let parts = extractor.get(request).await;
+    let parts = extractor.get(request, &mut EvalContext::new()).await;
     let (_subject, cache_key) = parts.into_cache_key();
     let key_parts: Vec<_> = cache_key.parts().collect();
     assert!(key_parts.iter().any(|p| p.key() == "user"));

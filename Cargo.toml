@@ -71,3 +71,4 @@ criterion = "0.8"
 # SmallBox for inline trait objects
 smallbox = "0.8"
 
+

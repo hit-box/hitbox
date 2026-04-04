@@ -20,6 +20,7 @@ fn create_stream_body(
 mod eq_tests {
     use super::*;
     use hitbox::predicate::{Predicate, PredicateResult};
+    use hitbox_core::EvalContext;
     use hitbox_http::CacheableHttpResponse;
     use hitbox_http::predicates::NeutralResponsePredicate;
     use hitbox_http::predicates::response::BodyPredicate;
@@ -38,7 +39,7 @@ mod eq_tests {
             Bytes::copy_from_slice(b"hello world"),
         )));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -54,7 +55,7 @@ mod eq_tests {
             Bytes::copy_from_slice(b"goodbye world"),
         )));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::NonCacheable(_)));
     }
 
@@ -70,7 +71,7 @@ mod eq_tests {
             Bytes::copy_from_slice(b"hello world"),
         )));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -85,7 +86,7 @@ mod eq_tests {
         let predicate = NeutralResponsePredicate::new()
             .body(Operation::Plain(PlainOperation::Eq(Bytes::new())));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 }
@@ -94,6 +95,7 @@ mod eq_tests {
 mod contains_tests {
     use super::*;
     use hitbox::predicate::{Predicate, PredicateResult};
+    use hitbox_core::EvalContext;
     use hitbox_http::CacheableHttpResponse;
     use hitbox_http::predicates::NeutralResponsePredicate;
     use hitbox_http::predicates::response::BodyPredicate;
@@ -112,7 +114,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -128,7 +130,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"goodbye")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::NonCacheable(_)));
     }
 
@@ -144,7 +146,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"hello")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -160,7 +162,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -175,7 +177,7 @@ mod contains_tests {
         let predicate = NeutralResponsePredicate::new()
             .body(Operation::Plain(PlainOperation::Contains(Bytes::new())));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         // Empty pattern should always match
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
@@ -194,7 +196,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"lo wo")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -212,7 +214,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -229,7 +231,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -246,7 +248,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"hello")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -263,7 +265,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"llo")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -282,7 +284,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -301,7 +303,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -320,7 +322,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -344,7 +346,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         // Pattern found in prefix, but should be NonCacheable due to error
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
@@ -369,7 +371,7 @@ mod contains_tests {
             PlainOperation::Contains(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::NonCacheable(_)));
     }
 }
@@ -378,6 +380,7 @@ mod contains_tests {
 mod starts_with_tests {
     use super::*;
     use hitbox::predicate::{Predicate, PredicateResult};
+    use hitbox_core::EvalContext;
     use hitbox_http::CacheableHttpResponse;
     use hitbox_http::predicates::NeutralResponsePredicate;
     use hitbox_http::predicates::response::BodyPredicate;
@@ -396,7 +399,7 @@ mod starts_with_tests {
             PlainOperation::Starts(Bytes::copy_from_slice(b"hello")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -412,7 +415,7 @@ mod starts_with_tests {
             PlainOperation::Starts(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::NonCacheable(_)));
     }
 
@@ -428,7 +431,7 @@ mod starts_with_tests {
             PlainOperation::Starts(Bytes::copy_from_slice(b"hello")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -443,7 +446,7 @@ mod starts_with_tests {
         let predicate = NeutralResponsePredicate::new()
             .body(Operation::Plain(PlainOperation::Starts(Bytes::new())));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -459,7 +462,7 @@ mod starts_with_tests {
             PlainOperation::Starts(Bytes::copy_from_slice(b"hello")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::NonCacheable(_)));
     }
 }
@@ -468,6 +471,7 @@ mod starts_with_tests {
 mod ends_with_tests {
     use super::*;
     use hitbox::predicate::{Predicate, PredicateResult};
+    use hitbox_core::EvalContext;
     use hitbox_http::CacheableHttpResponse;
     use hitbox_http::predicates::NeutralResponsePredicate;
     use hitbox_http::predicates::response::BodyPredicate;
@@ -486,7 +490,7 @@ mod ends_with_tests {
             PlainOperation::Ends(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -502,7 +506,7 @@ mod ends_with_tests {
             PlainOperation::Ends(Bytes::copy_from_slice(b"hello")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::NonCacheable(_)));
     }
 
@@ -518,7 +522,7 @@ mod ends_with_tests {
             PlainOperation::Ends(Bytes::copy_from_slice(b"world")),
         ));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -533,7 +537,7 @@ mod ends_with_tests {
         let predicate = NeutralResponsePredicate::new()
             .body(Operation::Plain(PlainOperation::Ends(Bytes::new())));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 }
@@ -542,6 +546,7 @@ mod ends_with_tests {
 mod regexp_tests {
     use super::*;
     use hitbox::predicate::{Predicate, PredicateResult};
+    use hitbox_core::EvalContext;
     use hitbox_http::CacheableHttpResponse;
     use hitbox_http::predicates::NeutralResponsePredicate;
     use hitbox_http::predicates::response::BodyPredicate;
@@ -560,7 +565,7 @@ mod regexp_tests {
         let predicate =
             NeutralResponsePredicate::new().body(Operation::Plain(PlainOperation::RegExp(regex)));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 
@@ -576,7 +581,7 @@ mod regexp_tests {
         let predicate =
             NeutralResponsePredicate::new().body(Operation::Plain(PlainOperation::RegExp(regex)));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::NonCacheable(_)));
     }
 
@@ -592,7 +597,7 @@ mod regexp_tests {
         let predicate =
             NeutralResponsePredicate::new().body(Operation::Plain(PlainOperation::RegExp(regex)));
 
-        let result = predicate.check(response).await;
+        let result = predicate.check(response, &mut EvalContext::new()).await;
         assert!(matches!(result, PredicateResult::Cacheable(_)));
     }
 }

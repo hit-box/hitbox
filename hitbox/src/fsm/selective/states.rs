@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 use futures::future::BoxFuture;
 use hitbox_core::{
-    CacheConfigs, Cacheable, Extractor as _, KeyParts, Offload, Predicate as _, PredicateResult,
-    Upstream,
+    CacheConfigs, Cacheable, EvalContext, Extractor as _, KeyParts, Offload, Predicate as _,
+    PredicateResult, Upstream,
 };
 use pin_project::pin_project;
 use tracing::{Level, Span, debug, field, span, trace};
@@ -36,7 +36,7 @@ pub enum SelectiveState<'a, Inner, Req, UF> {
     /// Checking if current config's request predicates match.
     CheckPredicate {
         #[pin]
-        predicate_future: BoxFuture<'a, PredicateResult<Req>>,
+        predicate_future: BoxFuture<'a, (PredicateResult<Req>, EvalContext)>,
         state: Option<CheckPredicate>,
     },
     /// Matched config — extracting cache key.
@@ -97,6 +97,7 @@ impl CheckPredicate {
     pub fn transition<'a, Req, Res, CC, U>(
         self,
         result: PredicateResult<Req>,
+        mut ctx: EvalContext,
         configs: &CC,
         upstream: &mut Option<U>,
     ) -> CheckPredicateTransition<'a, Req, U::Future>
@@ -115,7 +116,7 @@ impl CheckPredicate {
                     "Config matched, extracting cache key"
                 );
                 let ext = configs.configs()[self.config_index].extractors();
-                let extract_future = Box::pin(async move { ext.get(request).await });
+                let extract_future = Box::pin(async move { ext.get(request, &mut ctx).await });
                 CheckPredicateTransition::ExtractKey {
                     extract_future,
                     config_index: self.config_index,
@@ -139,7 +140,10 @@ impl CheckPredicate {
                 match next {
                     Some(next_idx) => {
                         let pred = configs.configs()[next_idx].request_predicates();
-                        let predicate_future = Box::pin(async move { pred.check(request).await });
+                        let predicate_future = Box::pin(async move {
+                            let result = pred.check(request, &mut ctx).await;
+                            (result, ctx)
+                        });
                         CheckPredicateTransition::NextConfig {
                             predicate_future,
                             config_index: next_idx,

@@ -4,6 +4,7 @@
 pub mod cacheable;
 pub mod config;
 pub mod context;
+pub mod eval_context;
 pub mod extractor;
 pub mod key;
 pub mod label;
@@ -21,6 +22,7 @@ pub use context::{
     BoxContext, CacheContext, CacheStatus, CacheStatusExt, Context, ReadMode, ResponseSource,
     finalize_context,
 };
+pub use eval_context::EvalContext;
 pub use extractor::Extractor;
 pub use key::{CacheKey, KeyPart, KeyParts};
 pub use label::BackendLabel;

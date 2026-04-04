@@ -4,6 +4,7 @@
 
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
+use hitbox::EvalContext;
 use hitbox::predicate::{Predicate, PredicateResult};
 
 /// Operations for matching query parameters.
@@ -123,8 +124,12 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.inner.check(request).await {
+    async fn check(
+        &self,
+        request: Self::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
+        match self.inner.check(request, ctx).await {
             PredicateResult::Cacheable(request) => {
                 let is_cacheable = match request.parts().uri.query().and_then(crate::query::parse) {
                     Some(query_map) => match &self.operation {

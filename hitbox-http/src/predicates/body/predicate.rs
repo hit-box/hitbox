@@ -3,6 +3,7 @@
 //! Provides [`Body`] predicate for matching request or response bodies.
 
 use async_trait::async_trait;
+use hitbox::EvalContext;
 use hitbox::predicate::{Predicate, PredicateResult};
 use hyper::body::Body as HttpBody;
 
@@ -88,8 +89,12 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
-        let inner_result = self.inner.check(subject).await;
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
+        let inner_result = self.inner.check(subject, ctx).await;
 
         let (was_cacheable, subject) = match inner_result {
             PredicateResult::Cacheable(s) => (true, s),

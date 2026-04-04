@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use hitbox_core::{
-    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, Predicate, PredicateResult,
+    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, EvalContext, Predicate,
+    PredicateResult,
 };
 
 #[derive(Clone, Debug)]
@@ -35,7 +36,8 @@ impl CacheableResponse for TestResponse {
     where
         P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        match predicates.check(self).await {
+        let mut ctx = EvalContext::new();
+        match predicates.check(self, &mut ctx).await {
             PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                 CachePolicy::Cacheable(res) => {
                     CachePolicy::Cacheable(CacheValue::new(res, Some(Utc::now()), Some(Utc::now())))
@@ -68,7 +70,11 @@ impl NeuralPredicate {
 impl Predicate for NeuralPredicate {
     type Subject = TestResponse;
 
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject> {
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        _ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
         PredicateResult::Cacheable(subject)
     }
 }

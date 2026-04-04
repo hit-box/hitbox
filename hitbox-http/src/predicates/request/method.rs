@@ -1,5 +1,6 @@
 use crate::CacheableHttpRequest;
 use async_trait::async_trait;
+use hitbox::EvalContext;
 use hitbox::predicate::{Predicate, PredicateResult};
 
 /// Matching operations for HTTP methods.
@@ -106,8 +107,12 @@ where
 {
     type Subject = P::Subject;
 
-    async fn check(&self, request: Self::Subject) -> PredicateResult<Self::Subject> {
-        match self.inner.check(request).await {
+    async fn check(
+        &self,
+        request: Self::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject> {
+        match self.inner.check(request, ctx).await {
             PredicateResult::Cacheable(request) => {
                 let is_cacheable = match &self.operation {
                     Operation::Eq(method) => *method == request.parts().method,

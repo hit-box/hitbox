@@ -38,7 +38,7 @@ use chrono::Utc;
 use pin_project::pin_project;
 
 use crate::{
-    CachePolicy, EntityPolicyConfig,
+    CachePolicy, EntityPolicyConfig, EvalContext,
     predicate::{Predicate, PredicateResult},
     value::CacheValue,
 };
@@ -90,7 +90,7 @@ pub enum CacheState<Cached> {
 /// # Example Implementation
 ///
 /// ```
-/// use hitbox_core::{CacheableResponse, CachePolicy, EntityPolicyConfig};
+/// use hitbox_core::{CacheableResponse, CachePolicy, EntityPolicyConfig, EvalContext};
 /// use hitbox_core::predicate::{Predicate, PredicateResult};
 /// use hitbox_core::response::ResponseCachePolicy;
 /// use hitbox_core::value::CacheValue;
@@ -116,7 +116,8 @@ pub enum CacheState<Cached> {
 ///     where
 ///         P: Predicate<Subject = Self::Subject> + Send + Sync,
 ///     {
-///         match predicates.check(self).await {
+///         let mut ctx = EvalContext::new();
+///         match predicates.check(self, &mut ctx).await {
 ///             PredicateResult::Cacheable(data) => {
 ///                 let cached = data.body.clone();
 ///                 CachePolicy::Cacheable(CacheValue::new(
@@ -208,7 +209,8 @@ macro_rules! impl_cacheable_response_for_scalar {
                 where
                     P: Predicate<Subject = Self::Subject> + Send + Sync,
                 {
-                    match predicates.check(self).await {
+                    let mut ctx = EvalContext::new();
+                    match predicates.check(self, &mut ctx).await {
                         PredicateResult::Cacheable(data) => {
                             let cached = data.clone();
                             CachePolicy::Cacheable(CacheValue::new(
@@ -265,7 +267,8 @@ where
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
     {
-        match predicates.check(self).await {
+        let mut ctx = EvalContext::new();
+        match predicates.check(self, &mut ctx).await {
             PredicateResult::Cacheable(data) => {
                 let cached = data.clone();
                 CachePolicy::Cacheable(CacheValue::new(
@@ -367,8 +370,9 @@ where
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
     {
+        let mut ctx = EvalContext::new();
         match self {
-            Ok(response) => match predicates.check(response).await {
+            Ok(response) => match predicates.check(response, &mut ctx).await {
                 PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
                     CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
                         res,

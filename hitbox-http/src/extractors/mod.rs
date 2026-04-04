@@ -55,6 +55,7 @@
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
+use hitbox::EvalContext;
 use hitbox::{Extractor, KeyParts};
 
 use crate::CacheableHttpRequest;
@@ -127,7 +128,7 @@ where
 {
     type Subject = CacheableHttpRequest<ResBody>;
 
-    async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
+    async fn get(&self, subject: Self::Subject, _ctx: &mut EvalContext) -> KeyParts<Self::Subject> {
         KeyParts::new(subject)
     }
 }

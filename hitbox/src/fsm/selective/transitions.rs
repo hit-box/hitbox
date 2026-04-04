@@ -6,7 +6,7 @@
 #![allow(missing_docs)]
 
 use futures::future::BoxFuture;
-use hitbox_core::{KeyParts, PredicateResult};
+use hitbox_core::{EvalContext, KeyParts, PredicateResult};
 use tracing::Span;
 
 use super::states::{CheckPredicate, ExtractKey, Passthrough, SelectiveState};
@@ -24,7 +24,7 @@ pub enum CheckPredicateTransition<'a, Req, UF> {
     },
     /// Request did not match — try the next enabled config.
     NextConfig {
-        predicate_future: BoxFuture<'a, PredicateResult<Req>>,
+        predicate_future: BoxFuture<'a, (PredicateResult<Req>, EvalContext)>,
         config_index: usize,
     },
     /// No more configs to try — pass through to upstream.

@@ -25,6 +25,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::EvalContext;
+
 pub use combinators::{And, Not, Or, PredicateExt};
 pub use neutral::Neutral;
 
@@ -93,7 +95,11 @@ pub trait Predicate {
     ///
     /// Returns [`PredicateResult::Cacheable`] if the subject should be cached,
     /// or [`PredicateResult::NonCacheable`] if it should bypass the cache.
-    async fn check(&self, subject: Self::Subject) -> PredicateResult<Self::Subject>;
+    async fn check(
+        &self,
+        subject: Self::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<Self::Subject>;
 }
 
 #[async_trait]
@@ -104,8 +110,12 @@ where
 {
     type Subject = T::Subject;
 
-    async fn check(&self, subject: T::Subject) -> PredicateResult<T::Subject> {
-        self.as_ref().check(subject).await
+    async fn check(
+        &self,
+        subject: T::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<T::Subject> {
+        self.as_ref().check(subject, ctx).await
     }
 }
 
@@ -117,8 +127,12 @@ where
 {
     type Subject = T::Subject;
 
-    async fn check(&self, subject: T::Subject) -> PredicateResult<T::Subject> {
-        (*self).check(subject).await
+    async fn check(
+        &self,
+        subject: T::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<T::Subject> {
+        (*self).check(subject, ctx).await
     }
 }
 
@@ -130,8 +144,12 @@ where
 {
     type Subject = T::Subject;
 
-    async fn check(&self, subject: T::Subject) -> PredicateResult<T::Subject> {
-        self.as_ref().check(subject).await
+    async fn check(
+        &self,
+        subject: T::Subject,
+        ctx: &mut EvalContext,
+    ) -> PredicateResult<T::Subject> {
+        self.as_ref().check(subject, ctx).await
     }
 }
 
@@ -147,7 +165,8 @@ mod tests {
         // PredicateExt works on Box<dyn Predicate> because Box<T> is Sized
         let combined = p1.or(p2);
 
-        let result = combined.check(42).await;
+        let mut ctx = EvalContext::new();
+        let result = combined.check(42, &mut ctx).await;
         assert!(matches!(result, PredicateResult::Cacheable(42)));
     }
 
@@ -160,7 +179,8 @@ mod tests {
         // Chain: p1.and(p2).or(p3).not()
         let combined = p1.and(p2).or(p3).not();
 
-        let result = combined.check(42).await;
+        let mut ctx = EvalContext::new();
+        let result = combined.check(42, &mut ctx).await;
         // Neutral returns Cacheable, so: Cacheable AND Cacheable = Cacheable, OR Cacheable = Cacheable, NOT = NonCacheable
         assert!(matches!(result, PredicateResult::NonCacheable(42)));
     }
@@ -174,7 +194,8 @@ mod tests {
         // Can chain after boxing
         let combined = p1.or(p2);
 
-        let result = combined.check(42).await;
+        let mut ctx = EvalContext::new();
+        let result = combined.check(42, &mut ctx).await;
         assert!(matches!(result, PredicateResult::Cacheable(42)));
     }
 
@@ -186,8 +207,9 @@ mod tests {
             Neutral::<i32>::new().not().boxed(),
         ];
 
-        let result1 = predicates[0].check(1).await;
-        let result2 = predicates[1].check(2).await;
+        let mut ctx = EvalContext::new();
+        let result1 = predicates[0].check(1, &mut ctx).await;
+        let result2 = predicates[1].check(2, &mut ctx).await;
 
         assert!(matches!(result1, PredicateResult::Cacheable(1)));
         assert!(matches!(result2, PredicateResult::NonCacheable(2)));
