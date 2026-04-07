@@ -12,9 +12,9 @@ categories = [
     "web-programming",
     "network-programming",
 ]
-description = "Cacheable HTTP Request and Response"
+description = "HTTP predicates and extractors for Hitbox: cache by method, path, headers, query, and response body (with JQ support)."
 readme = "README.md"
-keywords = ["cache", "async", "http", "hitbox"]
+keywords = ["cache", "http", "async", "middleware", "tower"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

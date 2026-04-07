@@ -12,9 +12,9 @@ categories = [
     "network-programming",
     "web-programming",
 ]
-description = "Hitbox integration for Tower framework"
+description = "Tower middleware for HTTP response caching with Hitbox — pluggable backends, stale-while-revalidate, and cache locks."
 readme = "README.md"
-keywords = ["cache", "tower", "async", "http", "hitbox"]
+keywords = ["cache", "tower", "middleware", "async", "http"]
 
 [dependencies]
 tower = { workspace = true }

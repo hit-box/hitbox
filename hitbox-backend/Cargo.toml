@@ -7,9 +7,9 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 categories.workspace = true
-description = "Backend trait for asynchronous caching framework in Rust."
+description = "Cache backend trait with multi-format serialization (Bincode, rkyv, JSON), compression (Zstd, Gzip), and L1/L2 composition."
 readme = "README.md"
-keywords = ["cache", "tower", "async", "cache-backend", "hitbox"]
+keywords = ["cache", "backend", "async", "serialization", "compression"]
 
 [dependencies]
 hitbox-core = { path = "../hitbox-core", version = "0.2" }
