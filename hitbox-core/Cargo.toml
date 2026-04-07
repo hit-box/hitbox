@@ -7,9 +7,9 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 categories.workspace = true
-description = "Asynchronous caching framework core traits."
+description = "Protocol-agnostic core traits (Predicate, Extractor, Backend) for the Hitbox caching framework."
 readme = "README.md"
-keywords = ["cache", "async", "cache-backend", "hitbox", "tokio"]
+keywords = ["cache", "caching", "async", "predicate", "extractor"]
 
 
 [dependencies]

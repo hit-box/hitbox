@@ -7,9 +7,9 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 categories.workspace = true
-description = "In-memory cache backend for Hitbox using Moka."
+description = "Fast in-memory cache backend for Hitbox using Moka with TinyLFU/LRU eviction and per-key TTL."
 readme = "README.md"
-keywords = ["cache", "moka", "async", "in-memory", "hitbox"]
+keywords = ["cache", "moka", "async", "in-memory", "ttl"]
 
 [features]
 default = []

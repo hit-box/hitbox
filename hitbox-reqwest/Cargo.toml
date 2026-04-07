@@ -12,9 +12,9 @@ categories = [
     "network-programming",
     "web-programming",
 ]
-description = "Hitbox cache integration for reqwest HTTP client via reqwest-middleware"
+description = "Client-side HTTP response caching for reqwest via reqwest-middleware, powered by Hitbox."
 readme = "README.md"
-keywords = ["cache", "reqwest", "async", "http", "hitbox"]
+keywords = ["cache", "reqwest", "async", "http", "middleware"]
 
 [package.metadata.docs.rs]
 all-features = true

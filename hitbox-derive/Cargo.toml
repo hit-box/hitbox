@@ -1,8 +1,9 @@
 [package]
 name = "hitbox-derive"
 version = "0.2.1"
-description = "Derive macros for hitbox caching framework"
-keywords = ["cache", "memoization", "async", "macro", "derive"]
+description = "Derive macros (#[cached], CacheableRequest, CacheableResponse) for the Hitbox caching framework."
+keywords = ["cache", "derive", "macro", "memoization", "async"]
+categories = ["caching", "development-tools::procedural-macro-helpers"]
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
