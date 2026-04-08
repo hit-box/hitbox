@@ -26,7 +26,7 @@ use std::time::Duration;
 
 use axum::routing::post;
 use axum::{Json, Router};
-use hitbox_configuration::{Backend, ConfigEndpoint};
+use hitbox_configuration::{Backend, ConfigEndpoints};
 use hitbox_tower::Cache;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
@@ -131,7 +131,7 @@ impl Args {
 #[derive(Debug, Deserialize)]
 struct LoadTestConfig {
     backend: Backend,
-    endpoint: ConfigEndpoint,
+    endpoints: ConfigEndpoints,
 }
 
 // ============================================================================
@@ -496,8 +496,13 @@ async fn start_server_with_cache(
     // Create backend from config
     let backend = config.backend.into_backend()?;
 
-    // Create endpoint config
-    let endpoint_config = config.endpoint.into_endpoint()?;
+    // Create endpoint config (use first endpoint from the list)
+    let endpoint_config = config
+        .endpoints
+        .into_iter()
+        .next()
+        .expect("endpoints list must not be empty")
+        .into_endpoint()?;
 
     // Create cache layer
     let cache_layer = Cache::builder()

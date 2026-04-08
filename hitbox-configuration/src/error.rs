@@ -46,6 +46,17 @@ pub enum ConfigError {
     /// Empty path list in 'in' operation
     #[error("Path 'in' operation requires at least one pattern")]
     EmptyPathList,
+
+    /// Error originating from a specific endpoint in a multi-endpoint configuration
+    #[error("endpoint #{index}: {source}")]
+    EndpointAt {
+        /// Zero-based position of the failing endpoint in the list
+        index: usize,
+        /// Name of the failing endpoint, when one was provided
+        name: Option<String>,
+        #[source]
+        source: Box<ConfigError>,
+    },
 }
 
 impl From<http::method::InvalidMethod> for ConfigError {

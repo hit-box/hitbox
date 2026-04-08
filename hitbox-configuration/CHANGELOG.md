@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 - `Endpoint` now implements `CacheConfigs` for use with `SelectiveCacheFuture` ([#253](https://github.com/hit-box/hitbox/pull/253))
+- `ConfigEndpoints` wrapper type for parsing a list of endpoints from YAML, and optional `name` field on `ConfigEndpoint` / `Endpoint` / `EndpointBuilder` for identifying endpoints in multi-endpoint configurations ([#276](https://github.com/hit-box/hitbox/pull/276))
+- `ConfigError::EndpointAt { index, name, source }` variant carrying positional context when `ConfigEndpoints::into_endpoints` fails on a specific entry ([#276](https://github.com/hit-box/hitbox/pull/276))
 
 ### Changed
 - `Endpoint` now stores `policy` as `Arc<PolicyConfig>` ([#253](https://github.com/hit-box/hitbox/pull/253))
