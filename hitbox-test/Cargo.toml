@@ -70,8 +70,8 @@ jaq-std = "2.1.0"
 jaq-json = { version = "1.1.0", features = ["serde_json"] }
 serial_test = "3.2"
 tempfile = "3"
-testcontainers = { version = "0.26", default-features = false }
-testcontainers-modules = { version = "0.14", default-features = false, features = ["redis"] }
+testcontainers = { version = "0.27", default-features = false }
+testcontainers-modules = { version = "0.15", default-features = false, features = ["redis"] }
 
 [dependencies.rkyv]
 workspace = true
