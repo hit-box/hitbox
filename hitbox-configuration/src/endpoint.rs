@@ -25,6 +25,13 @@ where
     ReqBody: hyper::body::Body,
     ResBody: hyper::body::Body,
 {
+    /// Optional identifier for this endpoint.
+    ///
+    /// Propagated from [`crate::ConfigEndpoint::name`] and surfaced in
+    /// `Debug` output and routing errors. Reserved for future use in
+    /// tracing spans and metrics labels; not currently consumed by
+    /// runtime routing.
+    pub name: Option<String>,
     pub request_predicates: ArcRequestPredicate<ReqBody>,
     pub response_predicates: ArcResponsePredicate<ResBody>,
     pub extractors: ArcRequestExtractor<ReqBody>,
@@ -38,6 +45,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Endpoint")
+            .field("name", &self.name)
             .field("request_predicates", &"...")
             .field("response_predicates", &"...")
             .field("extractors", &"...")
@@ -53,6 +61,7 @@ where
 {
     fn clone(&self) -> Self {
         Self {
+            name: self.name.clone(),
             request_predicates: Arc::clone(&self.request_predicates),
             response_predicates: Arc::clone(&self.response_predicates),
             extractors: Arc::clone(&self.extractors),
@@ -142,6 +151,7 @@ where
     ReqBody: hyper::body::Body,
     ResBody: hyper::body::Body,
 {
+    name: Option<String>,
     request_predicates: Option<ArcRequestPredicate<ReqBody>>,
     response_predicates: Option<ArcResponsePredicate<ResBody>>,
     extractors: Option<ArcRequestExtractor<ReqBody>>,
@@ -156,10 +166,19 @@ where
     /// Create a new builder with default values.
     pub fn new() -> Self {
         Self {
+            name: None,
             request_predicates: None,
             response_predicates: None,
             extractors: None,
             policy: Arc::new(PolicyConfig::default()),
+        }
+    }
+
+    /// Set the endpoint name for debugging and tracing.
+    pub fn name(self, name: impl Into<String>) -> Self {
+        Self {
+            name: Some(name.into()),
+            ..self
         }
     }
 
@@ -216,6 +235,7 @@ where
     {
         let default = Endpoint::<ReqBody, ResBody>::default();
         Endpoint {
+            name: self.name,
             request_predicates: self
                 .request_predicates
                 .unwrap_or(default.request_predicates),

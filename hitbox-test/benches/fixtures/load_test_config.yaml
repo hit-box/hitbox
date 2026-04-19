@@ -13,30 +13,31 @@ backend:
       type: Disabled
 
 # Endpoint configuration
-endpoint:
-  request:
-    - Method: POST
-    - Path: "/api/orders"
-    - Header:
-        x-tenant-id:
-          exist: true
-    - Header:
-        content-type:
-          exist: true
+endpoints:
+  - name: "load-test-endpoint"
+    request:
+      - Method: POST
+      - Path: "/api/orders"
+      - Header:
+          x-tenant-id:
+            exist: true
+      - Header:
+          content-type:
+            exist: true
 
-  response:
-    - Status: 200
-    - Header:
-        content-type:
-          contains: application/json
+    response:
+      - Status: 200
+      - Header:
+          content-type:
+            contains: application/json
 
-  extractors:
-    - Method:
-    - Path: "/api/orders"
-    - Header: x-tenant-id
-    - Header: content-type
-    - Query: include
+    extractors:
+      - Method:
+      - Path: "/api/orders"
+      - Header: x-tenant-id
+      - Header: content-type
+      - Query: include
 
-  policy:
-    Enabled:
-      ttl: 300s
+    policy:
+      Enabled:
+        ttl: 300s

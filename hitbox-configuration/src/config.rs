@@ -104,6 +104,14 @@ impl From<PolicyConfig> for policy::PolicyConfig {
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ConfigEndpoint {
+    /// Optional identifier for this endpoint.
+    ///
+    /// Surfaced in `Debug` output and error messages produced by
+    /// [`ConfigEndpoints::into_endpoints`]. Reserved for future use in
+    /// tracing spans and metrics labels; not currently consumed by
+    /// runtime routing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     #[serde(default)]
     pub request: MaybeUndefined<Request>,
     #[serde(default)]
@@ -164,10 +172,121 @@ impl ConfigEndpoint {
             ) as RequestPredicate<ReqBody>,
         });
         Ok(Endpoint {
+            name: self.name,
             extractors,
             request_predicates,
             response_predicates,
             policy: Arc::new(self.policy.into()),
         })
+    }
+}
+
+// =============================================================================
+// ConfigEndpoints
+// =============================================================================
+
+/// A list of endpoint configurations for multi-endpoint cache routing.
+///
+/// Deserializes transparently from a YAML list of endpoint definitions.
+/// Each endpoint is evaluated in order; first match wins.
+///
+/// # Example
+///
+/// The value parses as a bare YAML list — embed it under whatever key the
+/// surrounding configuration uses (for example, `endpoints:` on a larger
+/// config struct):
+///
+/// ```yaml
+/// - name: "user-by-id"
+///   request:
+///     - Method: GET
+///     - Path: "/api/users/{id}"
+///   policy:
+///     Enabled:
+///       ttl: 300s
+/// - request:
+///     - Method: GET
+///   policy:
+///     Enabled:
+///       ttl: 30s
+/// ```
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+#[serde(transparent)]
+pub struct ConfigEndpoints {
+    pub endpoints: Vec<ConfigEndpoint>,
+}
+
+impl ConfigEndpoints {
+    /// Number of endpoint configurations in the list.
+    pub fn len(&self) -> usize {
+        self.endpoints.len()
+    }
+
+    /// Whether the list contains no endpoints.
+    pub fn is_empty(&self) -> bool {
+        self.endpoints.is_empty()
+    }
+
+    /// Iterate over the endpoint configurations by reference.
+    pub fn iter(&self) -> std::slice::Iter<'_, ConfigEndpoint> {
+        self.endpoints.iter()
+    }
+
+    /// Convert all endpoint configurations into runtime [`Endpoint`] instances.
+    ///
+    /// On failure, the returned error is wrapped in
+    /// [`ConfigError::EndpointAt`] carrying the zero-based index of the
+    /// failing entry and its `name` when present, making it straightforward
+    /// to locate a bad entry in a long list.
+    pub fn into_endpoints<ReqBody, ResBody>(
+        self,
+    ) -> Result<Vec<Endpoint<ReqBody, ResBody>>, ConfigError>
+    where
+        ReqBody: hyper::body::Body + Send + Unpin + Debug + 'static,
+        ReqBody::Error: Debug + Send,
+        ReqBody::Data: Send,
+        ResBody: hyper::body::Body + Send + Unpin + 'static,
+        ResBody::Error: Debug + Send,
+        ResBody::Data: Send,
+    {
+        self.endpoints
+            .into_iter()
+            .enumerate()
+            .map(|(index, ce)| {
+                let name = ce.name.clone();
+                ce.into_endpoint()
+                    .map_err(|source| ConfigError::EndpointAt {
+                        index,
+                        name,
+                        source: Box::new(source),
+                    })
+            })
+            .collect()
+    }
+}
+
+impl IntoIterator for ConfigEndpoints {
+    type Item = ConfigEndpoint;
+    type IntoIter = std::vec::IntoIter<ConfigEndpoint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.endpoints.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a ConfigEndpoints {
+    type Item = &'a ConfigEndpoint;
+    type IntoIter = std::slice::Iter<'a, ConfigEndpoint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.endpoints.iter()
+    }
+}
+
+impl FromIterator<ConfigEndpoint> for ConfigEndpoints {
+    fn from_iter<T: IntoIterator<Item = ConfigEndpoint>>(iter: T) -> Self {
+        Self {
+            endpoints: iter.into_iter().collect(),
+        }
     }
 }
