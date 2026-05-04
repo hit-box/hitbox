@@ -5,6 +5,8 @@ use hitbox::Config;
 use hitbox::concurrency::BroadcastConcurrencyManager;
 use hitbox::offload::OffloadManager;
 use hitbox::policy::PolicyConfig;
+use hitbox::tag::TagExtractor;
+use hitbox_core::tag::NeutralTagExtractor;
 use hitbox_http::CacheableHttpRequest;
 use hitbox_http::CacheableHttpResponse;
 use hitbox_http::extractors::NeutralExtractor;
@@ -33,12 +35,18 @@ pub type BoxResponsePredicate =
     Box<dyn Predicate<Subject = CacheableHttpResponse<axum::body::Body>> + Send + Sync>;
 pub type BoxExtractor =
     Box<dyn Extractor<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>;
+pub type BoxRequestTagExtractor =
+    Box<dyn TagExtractor<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>;
+pub type BoxResponseTagExtractor =
+    Box<dyn TagExtractor<Subject = CacheableHttpResponse<axum::body::Body>> + Send + Sync>;
 
 /// Holds cache configuration components that can be modified by test steps.
 pub struct TestConfig {
     pub request_predicate: Arc<BoxRequestPredicate>,
     pub response_predicate: Arc<BoxResponsePredicate>,
     pub extractor: Arc<BoxExtractor>,
+    pub request_tag_extractor: Arc<BoxRequestTagExtractor>,
+    pub response_tag_extractor: Arc<BoxResponseTagExtractor>,
     pub policy: PolicyConfig,
 }
 
@@ -48,6 +56,8 @@ impl std::fmt::Debug for TestConfig {
             .field("request_predicate", &"...")
             .field("response_predicate", &"...")
             .field("extractor", &"...")
+            .field("request_tag_extractor", &"...")
+            .field("response_tag_extractor", &"...")
             .field("policy", &self.policy)
             .finish()
     }
@@ -59,6 +69,8 @@ impl Clone for TestConfig {
             request_predicate: Arc::clone(&self.request_predicate),
             response_predicate: Arc::clone(&self.response_predicate),
             extractor: Arc::clone(&self.extractor),
+            request_tag_extractor: Arc::clone(&self.request_tag_extractor),
+            response_tag_extractor: Arc::clone(&self.response_tag_extractor),
             policy: self.policy.clone(),
         }
     }
@@ -71,10 +83,18 @@ impl Default for TestConfig {
         let response_predicate: BoxResponsePredicate =
             Box::new(NeutralResponsePredicate::<axum::body::Body>::new());
         let extractor: BoxExtractor = Box::new(NeutralExtractor::<axum::body::Body>::new());
+        let request_tag_extractor: BoxRequestTagExtractor = Box::new(
+            NeutralTagExtractor::<CacheableHttpRequest<axum::body::Body>>::default(),
+        );
+        let response_tag_extractor: BoxResponseTagExtractor = Box::new(
+            NeutralTagExtractor::<CacheableHttpResponse<axum::body::Body>>::default(),
+        );
         Self {
             request_predicate: Arc::new(request_predicate),
             response_predicate: Arc::new(response_predicate),
             extractor: Arc::new(extractor),
+            request_tag_extractor: Arc::new(request_tag_extractor),
+            response_tag_extractor: Arc::new(response_tag_extractor),
             policy: PolicyConfig::default(),
         }
     }
@@ -83,11 +103,19 @@ impl Default for TestConfig {
 impl TestConfig {
     pub fn build(
         &self,
-    ) -> Config<Arc<BoxRequestPredicate>, Arc<BoxResponsePredicate>, Arc<BoxExtractor>> {
+    ) -> Config<
+        Arc<BoxRequestPredicate>,
+        Arc<BoxResponsePredicate>,
+        Arc<BoxExtractor>,
+        Arc<BoxRequestTagExtractor>,
+        Arc<BoxResponseTagExtractor>,
+    > {
         Config::builder()
             .request_predicate(Arc::clone(&self.request_predicate))
             .response_predicate(Arc::clone(&self.response_predicate))
             .extractor(Arc::clone(&self.extractor))
+            .request_tags(Arc::clone(&self.request_tag_extractor))
+            .response_tags(Arc::clone(&self.response_tag_extractor))
             .policy(self.policy.clone())
             .build()
     }

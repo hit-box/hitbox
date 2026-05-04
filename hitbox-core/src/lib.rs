@@ -12,6 +12,7 @@ pub mod policy;
 pub mod predicate;
 pub mod request;
 pub mod response;
+pub mod tag;
 pub mod upstream;
 pub mod value;
 
@@ -21,7 +22,7 @@ pub use context::{
     BoxContext, CacheContext, CacheStatus, CacheStatusExt, Context, ReadMode, ResponseSource,
     finalize_context,
 };
-pub use extractor::Extractor;
+pub use extractor::{Extractor, StaticExtractor};
 pub use key::{CacheKey, KeyPart, KeyParts};
 pub use label::BackendLabel;
 pub use offload::{DisabledOffload, Offload, OffloadKey};
@@ -32,6 +33,10 @@ pub use policy::{
 pub use predicate::{And, Neutral, Not, Or, Predicate, PredicateExt, PredicateResult};
 pub use request::{CacheablePolicyData, CacheableRequest, RequestCachePolicy};
 pub use response::{CacheState, CacheableResponse, ResponseCachePolicy};
+pub use tag::{
+    CacheTag, CacheTags, ChainTagExtractor, ExtractorExt, NeutralTagExtractor, TagAdapter,
+    TagExtractor,
+};
 #[doc(hidden)]
 pub use serde;
 #[doc(hidden)]

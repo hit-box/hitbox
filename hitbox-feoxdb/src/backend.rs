@@ -16,6 +16,7 @@ use hitbox_backend::{
     Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus,
     PassthroughCompressor,
 };
+use hitbox_core::tag::CacheTags;
 use hitbox_core::{BackendLabel, CacheKey, CacheValue, Raw};
 use serde::{Deserialize, Serialize};
 
@@ -25,23 +26,40 @@ use crate::FeOxDbError;
 struct SerializableCacheValue {
     #[serde(with = "serde_bytes")]
     data: Vec<u8>,
+    /// Creation timestamp. `None` for backward compat with pre-0.3 entries.
+    #[serde(default)]
+    created: Option<DateTime<Utc>>,
     stale: Option<DateTime<Utc>>,
     expire: Option<DateTime<Utc>>,
+    /// Tags attached to the entry. `None` for backward compat with pre-tag entries.
+    #[serde(default)]
+    tags: Option<CacheTags>,
 }
 
 impl From<CacheValue<Raw>> for SerializableCacheValue {
     fn from(value: CacheValue<Raw>) -> Self {
         Self {
             data: value.data().to_vec(),
+            created: Some(value.created()),
             stale: value.stale(),
             expire: value.expire(),
+            tags: value.tags().cloned(),
         }
     }
 }
 
 impl From<SerializableCacheValue> for CacheValue<Raw> {
     fn from(value: SerializableCacheValue) -> Self {
-        CacheValue::new(Bytes::from(value.data), value.expire, value.stale)
+        let cv = CacheValue::with_created(
+            Bytes::from(value.data),
+            value.created.unwrap_or(DateTime::UNIX_EPOCH),
+            value.expire,
+            value.stale,
+        );
+        match value.tags {
+            Some(tags) => cv.with_tags(tags),
+            None => cv,
+        }
     }
 }
 

@@ -15,3 +15,7 @@ tarpaulin-report.html
 # Local development
 .context/
 docs/
+
+# Coverage artifacts
+*.profraw
+lcov.info

@@ -808,14 +808,19 @@ where
         let mut con = self.get_connection().await?.clone();
         let cache_key = self.key_format.serialize(key)?;
 
-        // Pipeline: HMGET (data, stale) + PTTL with typed decoding
-        let ((data, stale_ms), pttl): ((Option<Vec<u8>>, Option<i64>), i64) = con
+        // Pipeline: HMGET (data, stale, created, tags) + PTTL with typed decoding
+        let ((data, stale_ms, created_ms, tags_bytes), pttl): (
+            (Option<Vec<u8>>, Option<i64>, Option<i64>, Option<Vec<u8>>),
+            i64,
+        ) = con
             .query_pipeline(
                 redis::pipe()
                     .cmd("HMGET")
                     .arg(&cache_key)
                     .arg("d")
                     .arg("s")
+                    .arg("c")
+                    .arg("t")
                     .cmd("PTTL")
                     .arg(&cache_key),
             )
@@ -833,20 +838,40 @@ where
 
         // Calculate expire from PTTL (milliseconds remaining)
         // PTTL returns: -2 if key doesn't exist, -1 if no TTL, else milliseconds
-        let expire = (pttl > 0).then(|| Utc::now() + chrono::Duration::milliseconds(pttl));
+        let now = Utc::now();
+        let expire = (pttl > 0).then(|| now + chrono::Duration::milliseconds(pttl));
 
-        Ok(Some(CacheValue::new(data, expire, stale)))
+        // Restore created timestamp, fallback to epoch so any tag invalidation wins
+        let created = created_ms
+            .and_then(DateTime::from_timestamp_millis)
+            .unwrap_or(DateTime::UNIX_EPOCH);
+
+        // Restore tags if present
+        let tags = hitbox_backend::deserialize_tags(tags_bytes.as_deref())?;
+
+        let cv = CacheValue::with_created(data, created, expire, stale);
+        Ok(Some(match tags {
+            Some(tags) => cv.with_tags(tags),
+            None => cv,
+        }))
     }
 
     async fn write(&self, key: &CacheKey, value: CacheValue<Raw>) -> BackendResult<()> {
         let mut con = self.get_connection().await?.clone();
         let cache_key = self.key_format.serialize(key)?;
 
-        // Build HSET command with data field, optionally add stale field
+        // Build HSET command with data, created, and optionally stale/tags fields
         let mut cmd = redis::cmd("HSET");
-        cmd.arg(&cache_key).arg("d").arg(value.data().as_ref());
+        cmd.arg(&cache_key)
+            .arg("d")
+            .arg(value.data().as_ref())
+            .arg("c")
+            .arg(value.created().timestamp_millis());
         if let Some(stale) = value.stale() {
             cmd.arg("s").arg(stale.timestamp_millis());
+        }
+        if let Some(tags_bytes) = hitbox_backend::serialize_tags(value.tags())? {
+            cmd.arg("t").arg(tags_bytes);
         }
 
         // Pipeline: HSET + optional PEXPIRE (computed from value.ttl())

@@ -12,10 +12,16 @@ use hitbox_http::{
 use http::Method;
 use serde::{Deserialize, Serialize};
 
+use hitbox_core::tag::NeutralTagExtractor;
+use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
+
 use crate::{
     ConfigError, Request, RequestPredicate, Response, ResponsePredicate,
     endpoint::{Endpoint, RequestExtractor},
-    extractors::Extractor,
+    extractors::{
+        Extractor,
+        tag::{self as tag_config, TagsConfig},
+    },
     types::MaybeUndefined,
 };
 
@@ -110,6 +116,10 @@ pub struct ConfigEndpoint {
     pub response: MaybeUndefined<Response>,
     #[serde(default)]
     pub extractors: MaybeUndefined<Vec<Extractor>>,
+    /// Per-side tag extractor configuration. See [`TagsConfig`] for the
+    /// supported YAML shape (`tags: { request: [...], response: [...] }`).
+    #[serde(default)]
+    pub tags: MaybeUndefined<TagsConfig>,
     pub policy: PolicyConfig,
 }
 
@@ -163,10 +173,32 @@ impl ConfigEndpoint {
                 NeutralRequestPredicate::<ReqBody>::new().method(MethodOp::eq(Method::GET)),
             ) as RequestPredicate<ReqBody>,
         });
+        let (request_tag_cfg, response_tag_cfg) = match self.tags {
+            MaybeUndefined::Value(TagsConfig { request, response }) => (request, response),
+            _ => (Vec::new(), Vec::new()),
+        };
+        let request_tag_extractors: crate::endpoint::ArcRequestTagExtractor<ReqBody> =
+            if request_tag_cfg.is_empty() {
+                Arc::new(NeutralTagExtractor::<CacheableHttpRequest<ReqBody>>::default())
+            } else {
+                Arc::from(tag_config::request::build_request_boxed::<ReqBody>(
+                    request_tag_cfg,
+                )?)
+            };
+        let response_tag_extractors: crate::endpoint::ArcResponseTagExtractor<ResBody> =
+            if response_tag_cfg.is_empty() {
+                Arc::new(NeutralTagExtractor::<CacheableHttpResponse<ResBody>>::default())
+            } else {
+                Arc::from(tag_config::build_response_boxed::<CacheableHttpResponse<ResBody>>(
+                    response_tag_cfg,
+                ))
+            };
         Ok(Endpoint {
             extractors,
             request_predicates,
             response_predicates,
+            request_tag_extractors,
+            response_tag_extractors,
             policy: Arc::new(self.policy.into()),
         })
     }

@@ -136,6 +136,7 @@ mod tests {
     };
     use async_trait::async_trait;
     use chrono::Utc;
+    use hitbox_core::tag::{CacheTag, TagExtractor};
     use hitbox_core::{
         BoxContext, CacheContext, CacheKey, CachePolicy, CacheValue, CacheableResponse,
         EntityPolicyConfig, Predicate, Raw,
@@ -226,11 +227,16 @@ mod tests {
         type IntoCachedFuture = std::future::Ready<CachePolicy<Self::Cached, Self>>;
         type FromCachedFuture = std::future::Ready<Self>;
 
-        async fn cache_policy<P: Predicate<Subject = Self::Subject> + Send + Sync>(
+        async fn cache_policy<P, TE>(
             self,
             _predicate: P,
+            _tag_extractor: TE,
             _config: &EntityPolicyConfig,
-        ) -> CachePolicy<CacheValue<Self::Cached>, Self> {
+        ) -> (CachePolicy<CacheValue<Self::Cached>, Self>, Vec<CacheTag>)
+        where
+            P: Predicate<Subject = Self::Subject> + Send + Sync,
+            TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
+        {
             unimplemented!()
         }
 

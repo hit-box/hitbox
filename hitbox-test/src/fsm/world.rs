@@ -12,6 +12,7 @@ use hitbox::{CacheContext, SelectiveConfig};
 use hitbox_backend::composition::CompositionPolicy;
 use hitbox_backend::composition::policy::RefillPolicy;
 use hitbox_backend::{CacheBackend, CompositionBackend};
+use hitbox_core::tag::{CacheTag, TagExtractor};
 use hitbox_core::{
     CacheKey, CachePolicy, CacheValue, CacheablePolicyData, CacheableRequest, CacheableResponse,
     EntityPolicyConfig, Extractor, KeyPart, KeyParts, Offload, Predicate, PredicateResult,
@@ -29,34 +30,49 @@ use crate::tracing::{SpanCollector, create_span_collector};
 pub struct SimpleRequest(pub u32);
 
 impl CacheableRequest for SimpleRequest {
-    type CachePolicyFuture<'a, P, E>
-        = std::pin::Pin<Box<dyn std::future::Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
-
-    fn cache_policy<'a, P, E>(
-        self,
-        predicates: P,
-        extractors: E,
-    ) -> Self::CachePolicyFuture<'a, P, E>
+    type CachePolicyFuture<'a, P, E, TE>
+        = std::pin::Pin<
+            Box<
+                dyn std::future::Future<Output = (RequestCachePolicy<Self>, Vec<CacheTag>)>
+                    + Send
+                    + 'a,
+            >,
+        >
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
         E: Extractor<Subject = Self> + Send + Sync + 'a,
+        TE: TagExtractor<Subject = Self> + Send + Sync + 'a;
+
+    fn cache_policy<'a, P, E, TE>(
+        self,
+        predicates: P,
+        extractors: E,
+        tag_extractor: TE,
+    ) -> Self::CachePolicyFuture<'a, P, E, TE>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
+        TE: TagExtractor<Subject = Self> + Send + Sync + 'a,
     {
         Box::pin(async move {
             match predicates.check(self).await {
                 PredicateResult::Cacheable(request) => {
                     let key_parts = extractors.get(request).await;
                     let (request, cache_key) = key_parts.into_cache_key();
-                    RequestCachePolicy::Cacheable(CacheablePolicyData {
-                        key: cache_key,
-                        request,
-                    })
+                    let (request, tags) = tag_extractor.extract_tags(request).await;
+                    (
+                        RequestCachePolicy::Cacheable(CacheablePolicyData {
+                            key: cache_key,
+                            request,
+                        }),
+                        tags,
+                    )
                 }
-                PredicateResult::NonCacheable(request) => RequestCachePolicy::NonCacheable(request),
+                PredicateResult::NonCacheable(request) => {
+                    (RequestCachePolicy::NonCacheable(request), Vec::new())
+                }
             }
         })
     }
@@ -71,19 +87,27 @@ impl CacheableResponse for SimpleResponse {
     type IntoCachedFuture = Ready<CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = Ready<Self>;
 
-    async fn cache_policy<P>(
+    async fn cache_policy<P, TE>(
         self,
         predicates: P,
+        tag_extractor: TE,
         _config: &EntityPolicyConfig,
-    ) -> ResponseCachePolicy<Self>
+    ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
     {
         match predicates.check(self).await {
             PredicateResult::Cacheable(response) => {
-                CachePolicy::Cacheable(CacheValue::new(response.0, None, None))
+                let (response, tags) = tag_extractor.extract_tags(response).await;
+                (
+                    CachePolicy::Cacheable(CacheValue::new(response.0, None, None)),
+                    tags,
+                )
             }
-            PredicateResult::NonCacheable(response) => CachePolicy::NonCacheable(response),
+            PredicateResult::NonCacheable(response) => {
+                (CachePolicy::NonCacheable(response), Vec::new())
+            }
         }
     }
 

@@ -6,15 +6,18 @@
 //!
 //! Flow: poll future → create state struct → `.transition()` → `.into_state()`
 
+use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Instant;
 
+use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use futures::ready;
 use hitbox_backend::BackendError;
+use hitbox_core::tag::{CacheTag, CacheTags};
 use hitbox_core::{
     BoxContext, CachePolicy, CacheValue, Cacheable, CacheablePolicyData, EntityPolicyConfig,
     Predicate, ReadMode, RequestCachePolicy, ResponseCachePolicy, Upstream,
@@ -32,6 +35,7 @@ use crate::fsm::transitions::{
 };
 use crate::policy::{EnabledCacheConfig, PolicyConfig, StalePolicy};
 use crate::{CacheKey, CacheState, CacheStatus, CacheableRequest, CacheableResponse, Extractor};
+use hitbox_core::tag::TagExtractor;
 
 // =============================================================================
 // Helper Types
@@ -54,13 +58,113 @@ impl fmt::Display for OptionalKey<'_> {
 // =============================================================================
 
 pub type CacheResult<T> = Result<Option<CacheValue<T>>, BackendError>;
-/// Future that polls the cache and returns (result, context)
+/// Future that polls the cache and returns (result, context).
 pub type PollCacheFuture<T> = BoxFuture<'static, (CacheResult<T>, BoxContext)>;
-/// Future that updates the cache and returns (backend_result, response, context)
+/// Future that updates the cache and returns (backend_result, response, context).
 pub type UpdateCacheFuture<T> = BoxFuture<'static, (Result<(), BackendError>, T, BoxContext)>;
 pub type AwaitResponseFuture<T> = BoxFuture<'static, Result<T, ConcurrencyError>>;
-/// Future that checks request cache policy
-pub type RequestCachePolicyFuture<'a, T> = BoxFuture<'a, RequestCachePolicy<T>>;
+/// Future that checks request cache policy and extracts request tags
+pub type RequestCachePolicyFuture<'a, T> =
+    BoxFuture<'a, (RequestCachePolicy<T>, Vec<CacheTag>)>;
+
+/// Result of querying tag invalidation timestamps from the backend.
+pub type TagInvalidationResult = Result<HashMap<CacheTag, DateTime<Utc>>, BackendError>;
+
+/// Future that fetches tag invalidation timestamps.
+pub type TagInvalidationFuture = BoxFuture<'static, TagInvalidationResult>;
+
+// =============================================================================
+// PollCacheWithTagsFuture - parallel cache + tag fetch
+// =============================================================================
+
+/// Future that polls the cache read and tag invalidation check in parallel.
+///
+/// When `tag_future` is `None` (no tags configured), this degrades to a simple
+/// cache read with zero overhead — the tag future is never polled.
+///
+/// On cache miss or backend error, short-circuits without waiting for tag results.
+#[pin_project]
+pub struct PollCacheWithTagsFuture<T> {
+    #[pin]
+    cache_future: Option<PollCacheFuture<T>>,
+    #[pin]
+    tag_future: Option<TagInvalidationFuture>,
+    /// Stored cache result when it completes before tags.
+    cache_result: Option<(CacheResult<T>, BoxContext)>,
+    /// Stored tag result when it completes before cache.
+    tag_result: Option<TagInvalidationResult>,
+}
+
+impl<T> PollCacheWithTagsFuture<T> {
+    /// Create with both cache and optional tag invalidation futures.
+    pub fn new(cache_future: PollCacheFuture<T>, tag_future: Option<TagInvalidationFuture>) -> Self {
+        Self {
+            cache_future: Some(cache_future),
+            tag_future,
+            cache_result: None,
+            tag_result: None,
+        }
+    }
+
+    /// Create without tag checking (zero overhead path).
+    pub fn without_tags(cache_future: PollCacheFuture<T>) -> Self {
+        Self::new(cache_future, None)
+    }
+}
+
+impl<T> std::future::Future for PollCacheWithTagsFuture<T> {
+    type Output = (CacheResult<T>, Option<TagInvalidationResult>, BoxContext);
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+
+        // Poll cache future if not yet done.
+        // We use `as_pin_mut` to get `Pin<&mut Option<F>>`, then poll the future inside.
+        if this.cache_future.is_some() {
+            // SAFETY: cache_future is Some, project to inner PollCacheFuture
+            let mut fut = this.cache_future.as_mut();
+            // Pin<&mut Option<F>> → poll the future inside
+            // BoxFuture is Unpin, so we can poll it via Pin::new on the inner ref
+            if let Some(inner) = fut.as_mut().as_pin_mut() {
+                if let Poll::Ready((cache_result, ctx)) = inner.poll(cx) {
+                    fut.set(None);
+
+                    // Short-circuit: on cache miss or error, skip tag check entirely
+                    let is_miss_or_error =
+                        cache_result.as_ref().map(Option::is_none).unwrap_or(true);
+                    if is_miss_or_error {
+                        this.tag_future.set(None);
+                        return Poll::Ready((cache_result, None, ctx));
+                    }
+
+                    // If no tag future was configured, return immediately
+                    if this.tag_future.is_none() {
+                        return Poll::Ready((cache_result, None, ctx));
+                    }
+
+                    // Hold cache result while tag future completes
+                    *this.cache_result = Some((cache_result, ctx));
+                }
+            }
+        }
+
+        // Poll tag future if present and not yet done
+        if this.tag_future.is_some() {
+            let mut fut = this.tag_future.as_mut();
+            if let Some(inner) = fut.as_mut().as_pin_mut() {
+                if let Poll::Ready(result) = inner.poll(cx) {
+                    fut.set(None);
+                    if let Some((cache_result, ctx)) = this.cache_result.take() {
+                        return Poll::Ready((cache_result, Some(result), ctx));
+                    }
+                    *this.tag_result = Some(result);
+                }
+            }
+        }
+
+        Poll::Pending
+    }
+}
 
 // =============================================================================
 // ConvertResponseFuture - Zero-cost wrapper using GAT
@@ -104,26 +208,27 @@ impl<Res: CacheableResponse> std::future::Future for ConvertResponseFuture<Res> 
 
 #[allow(missing_docs)]
 #[pin_project(project = StateProj)]
-pub enum State<'req, Res, Req, U, ReqP, E>
+pub enum State<'req, Res, Req, U, ReqP, E, ReqTE>
 where
     Res: CacheableResponse,
     Req: CacheableRequest + 'req,
     U: Upstream<Req, Response = Res> + 'req,
     ReqP: Predicate<Subject = Req>,
     E: Extractor<Subject = Req>,
+    ReqTE: TagExtractor<Subject = Req>,
 {
     /// Initial state - all data needed for the first transition
-    Initial(Option<Initial<Req, ReqP, E, U>>),
-    /// Checking if request should be cached
+    Initial(Option<Initial<Req, ReqP, E, U, ReqTE>>),
+    /// Checking if request should be cached (also extracts request tags)
     CheckRequestCachePolicy {
         #[pin]
         cache_policy_future: RequestCachePolicyFuture<'req, Req>,
         state: Option<CheckRequestCachePolicy<U>>,
     },
-    /// Polling the cache backend - context is captured in the future
+    /// Polling the cache backend and tag invalidation in parallel
     PollCache {
         #[pin]
-        poll_cache: PollCacheFuture<Res::Cached>,
+        poll_cache: PollCacheWithTagsFuture<Res::Cached>,
         state: Option<PollCache<Req, U>>,
     },
     /// Converting cached value to response (cache hit, no refill needed)
@@ -153,7 +258,7 @@ where
     /// Checking if response should be cached
     CheckResponseCachePolicy {
         #[pin]
-        cache_policy: BoxFuture<'static, ResponseCachePolicy<Res>>,
+        cache_policy: BoxFuture<'static, (ResponseCachePolicy<Res>, Option<Vec<CacheTag>>)>,
         state: Option<CheckResponseCachePolicy>,
     },
     /// Updating cache with response - context is captured in the future
@@ -166,13 +271,14 @@ where
     Response(Option<Response<Res>>),
 }
 
-impl<Res, Req, U, ReqP, E> Debug for State<'_, Res, Req, U, ReqP, E>
+impl<Res, Req, U, ReqP, E, ReqTE> Debug for State<'_, Res, Req, U, ReqP, E, ReqTE>
 where
     Res: CacheableResponse,
     Req: CacheableRequest,
     U: Upstream<Req, Response = Res>,
     ReqP: Predicate<Subject = Req>,
     E: Extractor<Subject = Req>,
+    ReqTE: TagExtractor<Subject = Req>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -197,22 +303,24 @@ where
 // =============================================================================
 
 /// Data gathered from Initial state (synchronous).
-pub struct Initial<Req, ReqP, E, U> {
+pub struct Initial<Req, ReqP, E, U, ReqTE> {
     pub request: Req,
     pub predicates: ReqP,
     pub extractors: E,
+    pub tag_extractor: ReqTE,
     pub ctx: BoxContext,
     pub upstream: U,
     /// Tracing span for this state.
     pub span: Span,
 }
 
-impl<Req, ReqP, E, U> Initial<Req, ReqP, E, U> {
+impl<Req, ReqP, E, U, ReqTE> Initial<Req, ReqP, E, U, ReqTE> {
     /// Create a new Initial state with its tracing span.
     pub fn new(
         request: Req,
         predicates: ReqP,
         extractors: E,
+        tag_extractor: ReqTE,
         ctx: BoxContext,
         upstream: U,
         parent: &Span,
@@ -221,6 +329,7 @@ impl<Req, ReqP, E, U> Initial<Req, ReqP, E, U> {
             request,
             predicates,
             extractors,
+            tag_extractor,
             ctx,
             upstream,
             span: span!(parent: parent, Level::TRACE, "fsm.Initial"),
@@ -228,17 +337,18 @@ impl<Req, ReqP, E, U> Initial<Req, ReqP, E, U> {
     }
 }
 
-impl<Req, ReqP, E, U> Initial<Req, ReqP, E, U>
+impl<Req, ReqP, E, U, ReqTE> Initial<Req, ReqP, E, U, ReqTE>
 where
     Req: CacheableRequest + Send,
     ReqP: Predicate<Subject = Req> + Send + Sync,
     E: Extractor<Subject = Req> + Send + Sync,
     U: Upstream<Req>,
+    ReqTE: TagExtractor<Subject = Req> + Send + Sync,
 {
     /// Transition from Initial state.
     ///
     /// Based on policy configuration:
-    /// - Enabled: create CheckRequestCachePolicy future
+    /// - Enabled: create CheckRequestCachePolicy future (runs cache_policy + tag extraction)
     /// - Disabled: call upstream directly
     pub fn transition<'req>(self, policy: &PolicyConfig) -> InitialTransition<'req, Req, U>
     where
@@ -246,12 +356,19 @@ where
         ReqP: 'req,
         E: 'req,
         U: 'req,
+        ReqTE: 'req,
     {
         match policy {
             PolicyConfig::Enabled(_) => {
-                // Box the RPITIT future for storage in FSM state
-                let cache_policy_future =
-                    Box::pin(self.request.cache_policy(self.predicates, self.extractors));
+                let request = self.request;
+                let predicates = self.predicates;
+                let extractors = self.extractors;
+                let tag_extractor = self.tag_extractor;
+                let cache_policy_future = Box::pin(async move {
+                    request
+                        .cache_policy(predicates, extractors, tag_extractor)
+                        .await
+                });
                 InitialTransition::CheckRequestCachePolicy {
                     cache_policy_future,
                     ctx: self.ctx,
@@ -269,7 +386,7 @@ where
     }
 }
 
-impl<Req, ReqP, E, U> std::fmt::Debug for Initial<Req, ReqP, E, U> {
+impl<Req, ReqP, E, U, ReqTE> std::fmt::Debug for Initial<Req, ReqP, E, U, ReqTE> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Initial").finish_non_exhaustive()
     }
@@ -366,15 +483,23 @@ impl PollUpstream {
     ///
     /// This merges the old PollUpstream → UpstreamPolled → next state transitions
     /// into a single step, since UpstreamPolled was a synchronous state.
-    pub fn transition<Res, ResP>(
+    ///
+    /// `response_tag_extractor` is passed into `cache_policy` so tags are
+    /// extracted on `Res::Subject` (the same value the predicate checks).
+    /// All `CacheFuture` constructors materialize a concrete extractor
+    /// (defaulting to [`NeutralTagExtractor`] when none is configured), so
+    /// this is always present.
+    pub fn transition<Res, ResP, ResTE>(
         self,
         upstream_result: Res,
         predicates: ResP,
+        response_tag_extractor: ResTE,
         policy: &PolicyConfig,
     ) -> PollUpstreamTransition<Res>
     where
         Res: CacheableResponse + Send + 'static,
         ResP: Predicate<Subject = Res::Subject> + Send + Sync + 'static,
+        ResTE: TagExtractor<Subject = Res::Subject> + Send + Sync + 'static,
     {
         // Record upstream duration metric
         crate::metrics::record_upstream_duration(self.upstream_start.elapsed());
@@ -390,9 +515,10 @@ impl PollUpstream {
                 };
                 PollUpstreamTransition::CheckResponseCachePolicy {
                     cache_policy_future: Box::pin(async move {
-                        upstream_result
-                            .cache_policy(predicates, &entity_config)
-                            .await
+                        let (policy, tags) = upstream_result
+                            .cache_policy(predicates, response_tag_extractor, &entity_config)
+                            .await;
+                        (policy, Some(tags))
                     }),
                     permit: self.permit,
                     ctx: self.ctx,
@@ -460,9 +586,15 @@ impl CheckResponseCachePolicy {
     }
 
     /// Transition from CheckResponseCachePolicy state after future completes.
+    ///
+    /// `response_tags` carries tags extracted from the upstream response by
+    /// the response tag extractor (if configured). When `Some`, the tags are
+    /// attached to the `CacheValue` before write so they can be checked for
+    /// invalidation on future reads.
     pub fn transition<Res, B, C>(
         self,
         policy: CachePolicy<CacheValue<Res::Cached>, Res>,
+        response_tags: Option<Vec<CacheTag>>,
         backend: Arc<B>,
         concurrency_manager: &C,
     ) -> CheckResponseCachePolicyTransition<Res>
@@ -485,6 +617,11 @@ impl CheckResponseCachePolicy {
                 }
                 let cache_key = self.cache_key;
                 let mut ctx = self.ctx;
+                // Attach response tags before write if any were extracted.
+                let cache_value = match response_tags {
+                    Some(response_tags) => cache_value.with_tags(CacheTags::response_only(response_tags)),
+                    None => cache_value,
+                };
                 let update_cache_future = Box::pin(async move {
                     let update_cache_result =
                         backend.set::<Res>(&cache_key, &cache_value, &mut ctx).await;
@@ -549,6 +686,7 @@ impl<U> CheckRequestCachePolicy<U> {
     pub fn transition<Req, Res, B>(
         self,
         policy: RequestCachePolicy<Req>,
+        request_tags: Vec<CacheTag>,
         backend: Arc<B>,
         cache_key_storage: &mut Option<CacheKey>,
     ) -> CheckRequestCachePolicyTransition<Req, Res, U>
@@ -570,7 +708,8 @@ impl<U> CheckRequestCachePolicy<U> {
                 debug!(?key, "FSM looking up cache key");
                 let _ = cache_key_storage.insert(key.clone());
                 let mut ctx = self.ctx;
-                let poll_cache = Box::pin(async move {
+                let backend_for_tags = backend.clone();
+                let cache_future = Box::pin(async move {
                     let result = backend.get::<Res>(&cache_key_for_get, &mut ctx).await;
                     debug!(
                         found = result.as_ref().map(|r| r.is_some()).unwrap_or(false),
@@ -578,6 +717,15 @@ impl<U> CheckRequestCachePolicy<U> {
                     );
                     (result, ctx)
                 });
+                // Build tag invalidation future only if there are request tags to check
+                let tag_future: Option<TagInvalidationFuture> = if request_tags.is_empty() {
+                    None
+                } else {
+                    Some(Box::pin(async move {
+                        backend_for_tags.invalidated(&request_tags).await
+                    }))
+                };
+                let poll_cache = PollCacheWithTagsFuture::new(cache_future, tag_future);
                 CheckRequestCachePolicyTransition::PollCache {
                     poll_cache,
                     request,
@@ -634,9 +782,14 @@ impl<Req, U> PollCache<Req, U> {
     ///
     /// On cache miss or expired, checks concurrency policy and transitions directly
     /// to either `ConcurrentPollUpstream` or `PollUpstream`.
+    ///
+    /// `tag_invalidation` is the result of querying request-tag invalidation timestamps
+    /// in parallel with the cache read. If any tag was invalidated after the entry's
+    /// `created` timestamp, the entry is treated as expired.
     pub fn transition<Res, B, C>(
         self,
         cache_result: CacheResult<Res::Cached>,
+        tag_invalidation: Option<TagInvalidationResult>,
         mut ctx: BoxContext,
         backend: Arc<B>,
         policy: &PolicyConfig,
@@ -655,6 +808,42 @@ impl<Req, U> PollCache<Req, U> {
 
         match cached {
             Some(cached_value) => {
+                // Check tag invalidation BEFORE TTL-based cache state.
+                // If any request tag was invalidated after the entry was created,
+                // treat the entry as expired (force upstream fetch).
+                if let Some(tag_result) = tag_invalidation {
+                    match tag_result {
+                        Ok(timestamps) if !timestamps.is_empty() => {
+                            let entry_created = cached_value.created();
+                            let invalidated =
+                                timestamps.values().any(|&ts| ts > entry_created);
+                            if invalidated {
+                                debug!(
+                                    "Cache entry invalidated by tag (created={}, latest_tag_ts={:?})",
+                                    entry_created,
+                                    timestamps.values().max()
+                                );
+                                ctx.set_status(CacheStatus::Miss);
+                                return self.transition_to_upstream(
+                                    ctx,
+                                    policy,
+                                    concurrency_manager,
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            warn!("Tag invalidation check failed: {err:?}");
+                            ctx.set_status(CacheStatus::Miss);
+                            return self.transition_to_upstream(
+                                ctx,
+                                policy,
+                                concurrency_manager,
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+
                 let cache_state = cached_value.cache_state();
                 ctx.set_status(CacheStatus::Hit);
 

@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use chrono::Utc;
+use hitbox_core::tag::{CacheTag, NeutralTagExtractor, TagExtractor};
 use hitbox_core::{
     CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, Predicate, PredicateResult,
+    ResponseCachePolicy,
 };
 
 #[derive(Clone, Debug)]
@@ -27,22 +29,32 @@ impl CacheableResponse for TestResponse {
     type IntoCachedFuture = std::future::Ready<CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = std::future::Ready<Self>;
 
-    async fn cache_policy<P>(
+    async fn cache_policy<P, TE>(
         self,
         predicates: P,
+        tag_extractor: TE,
         _config: &EntityPolicyConfig,
-    ) -> hitbox_core::ResponseCachePolicy<Self>
+    ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where
-        P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
+        P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
     {
         match predicates.check(self).await {
-            PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                CachePolicy::Cacheable(res) => {
-                    CachePolicy::Cacheable(CacheValue::new(res, Some(Utc::now()), Some(Utc::now())))
+            PredicateResult::Cacheable(cacheable) => {
+                let (cacheable, tags) = tag_extractor.extract_tags(cacheable).await;
+                match cacheable.into_cached().await {
+                    CachePolicy::Cacheable(res) => (
+                        CachePolicy::Cacheable(CacheValue::new(
+                            res,
+                            Some(Utc::now()),
+                            Some(Utc::now()),
+                        )),
+                        tags,
+                    ),
+                    CachePolicy::NonCacheable(res) => (CachePolicy::NonCacheable(res), tags),
                 }
-                CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
-            },
-            PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
+            }
+            PredicateResult::NonCacheable(res) => (CachePolicy::NonCacheable(res), Vec::new()),
         }
     }
 
@@ -77,13 +89,21 @@ impl Predicate for NeuralPredicate {
 async fn test_cacheable_result() {
     let response: Result<TestResponse, ()> = Ok(TestResponse::new());
     let policy = response
-        .cache_policy(NeuralPredicate::new(), &EntityPolicyConfig::default())
+        .cache_policy(
+            NeuralPredicate::new(),
+            NeutralTagExtractor::default(),
+            &EntityPolicyConfig::default(),
+        )
         .await;
     dbg!(&policy);
 
     let response: Result<TestResponse, ()> = Err(());
     let policy = response
-        .cache_policy(NeuralPredicate::new(), &EntityPolicyConfig::default())
+        .cache_policy(
+            NeuralPredicate::new(),
+            NeutralTagExtractor::default(),
+            &EntityPolicyConfig::default(),
+        )
         .await;
     dbg!(&policy);
 }

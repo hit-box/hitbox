@@ -11,7 +11,10 @@ pub mod format;
 pub mod key;
 pub(crate) mod metrics;
 
-pub use backend::{Backend, BackendResult, CacheBackend, DeleteStatus, SyncBackend, UnsyncBackend};
+pub use backend::{
+    Backend, BackendResult, CacheBackend, DeleteStatus, SyncBackend, UnsyncBackend,
+    deserialize_tags, serialize_tags,
+};
 pub use composition::{Compose, CompositionBackend};
 #[cfg(feature = "gzip")]
 #[cfg_attr(docsrs, doc(cfg(feature = "gzip")))]

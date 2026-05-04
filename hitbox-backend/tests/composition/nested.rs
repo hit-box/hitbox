@@ -7,9 +7,10 @@ use chrono::Utc;
 use std::sync::Arc;
 
 use hitbox_backend::{CacheBackend, CompositionBackend, SyncBackend};
+use hitbox_core::tag::{CacheTag, TagExtractor};
 use hitbox_core::{
     BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse, EntityPolicyConfig,
-    Predicate,
+    Predicate, ResponseCachePolicy,
 };
 use serde::{Deserialize, Serialize};
 
@@ -33,11 +34,16 @@ impl CacheableResponse for TestValue {
     type IntoCachedFuture = std::future::Ready<hitbox_core::CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = std::future::Ready<Self>;
 
-    async fn cache_policy<P: Predicate<Subject = Self::Subject> + Send + Sync>(
+    async fn cache_policy<P, TE>(
         self,
         _predicate: P,
+        _tag_extractor: TE,
         _config: &EntityPolicyConfig,
-    ) -> hitbox_core::ResponseCachePolicy<Self> {
+    ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
+    where
+        P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
+    {
         unimplemented!()
     }
 
