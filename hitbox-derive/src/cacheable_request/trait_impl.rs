@@ -44,7 +44,7 @@ impl<'a> ToTokens for CacheableRequestImpl<'a> {
                     self,
                     predicates: __P,
                     extractors: __E,
-                    tag_extractor: __TE,
+                    tag_extractor: ::std::option::Option<__TE>,
                 ) -> Self::CachePolicyFuture<'__a, __P, __E, __TE>
                 where
                     Self: '__a,
@@ -56,7 +56,14 @@ impl<'a> ToTokens for CacheableRequestImpl<'a> {
                         match predicates.check(self).await {
                             hitbox::predicate::PredicateResult::Cacheable(subject) => {
                                 let (subject, key) = extractors.get(subject).await.into_cache_key();
-                                let (subject, tags) = tag_extractor.extract_tags(subject).await;
+                                let (subject, tags) = match tag_extractor {
+                                    ::std::option::Option::Some(__te) => {
+                                        __te.extract_tags(subject).await
+                                    }
+                                    ::std::option::Option::None => {
+                                        (subject, ::std::vec::Vec::new())
+                                    }
+                                };
                                 (
                                     hitbox::CachePolicy::Cacheable(
                                         hitbox::CacheablePolicyData::new(key, subject)

@@ -32,7 +32,7 @@ impl CacheableResponse for TestResponse {
     async fn cache_policy<P, TE>(
         self,
         predicates: P,
-        tag_extractor: TE,
+        tag_extractor: Option<TE>,
         _config: &EntityPolicyConfig,
     ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where
@@ -41,7 +41,10 @@ impl CacheableResponse for TestResponse {
     {
         match predicates.check(self).await {
             PredicateResult::Cacheable(cacheable) => {
-                let (cacheable, tags) = tag_extractor.extract_tags(cacheable).await;
+                let (cacheable, tags) = match tag_extractor {
+                    Some(te) => te.extract_tags(cacheable).await,
+                    None => (cacheable, Vec::new()),
+                };
                 match cacheable.into_cached().await {
                     CachePolicy::Cacheable(res) => (
                         CachePolicy::Cacheable(CacheValue::new(
@@ -91,7 +94,7 @@ async fn test_cacheable_result() {
     let policy = response
         .cache_policy(
             NeuralPredicate::new(),
-            NeutralTagExtractor::default(),
+            Some(NeutralTagExtractor::default()),
             &EntityPolicyConfig::default(),
         )
         .await;
@@ -101,7 +104,7 @@ async fn test_cacheable_result() {
     let policy = response
         .cache_policy(
             NeuralPredicate::new(),
-            NeutralTagExtractor::default(),
+            Some(NeutralTagExtractor::default()),
             &EntityPolicyConfig::default(),
         )
         .await;

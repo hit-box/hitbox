@@ -80,7 +80,7 @@ impl CacheableResponse for Value {
     async fn cache_policy<P, TE>(
         self,
         _predicates: P,
-        _tag_extractor: TE,
+        _tag_extractor: Option<TE>,
         _: &EntityPolicyConfig,
     ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where

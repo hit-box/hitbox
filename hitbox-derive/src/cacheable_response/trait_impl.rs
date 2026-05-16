@@ -44,7 +44,7 @@ impl<'a> CacheableResponseImpl<'a> {
                 async fn cache_policy<__P, __TE>(
                     self,
                     predicates: __P,
-                    tag_extractor: __TE,
+                    tag_extractor: ::std::option::Option<__TE>,
                     config: &hitbox::EntityPolicyConfig,
                 ) -> (
                     hitbox::ResponseCachePolicy<Self>,
@@ -56,7 +56,14 @@ impl<'a> CacheableResponseImpl<'a> {
                 {
                     match predicates.check(self).await {
                         hitbox::predicate::PredicateResult::Cacheable(data) => {
-                            let (data, tags) = tag_extractor.extract_tags(data).await;
+                            let (data, tags) = match tag_extractor {
+                                ::std::option::Option::Some(__te) => {
+                                    __te.extract_tags(data).await
+                                }
+                                ::std::option::Option::None => {
+                                    (data, ::std::vec::Vec::new())
+                                }
+                            };
                             let cached = data.clone();
                             (
                                 hitbox::CachePolicy::Cacheable(
@@ -108,7 +115,7 @@ impl<'a> CacheableResponseImpl<'a> {
                 async fn cache_policy<__P, __TE>(
                     self,
                     predicates: __P,
-                    tag_extractor: __TE,
+                    tag_extractor: ::std::option::Option<__TE>,
                     config: &hitbox::EntityPolicyConfig,
                 ) -> (
                     hitbox::ResponseCachePolicy<Self>,
@@ -120,7 +127,14 @@ impl<'a> CacheableResponseImpl<'a> {
                 {
                     match predicates.check(self).await {
                         hitbox::predicate::PredicateResult::Cacheable(data) => {
-                            let (data, tags) = tag_extractor.extract_tags(data).await;
+                            let (data, tags) = match tag_extractor {
+                                ::std::option::Option::Some(__te) => {
+                                    __te.extract_tags(data).await
+                                }
+                                ::std::option::Option::None => {
+                                    (data, ::std::vec::Vec::new())
+                                }
+                            };
                             let cached = #cached_name {
                                 #(#field_idents: data.#field_idents,)*
                             };

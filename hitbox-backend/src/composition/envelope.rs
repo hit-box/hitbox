@@ -321,13 +321,14 @@ impl CompositionEnvelope {
         let tags_len = header.tags_len as usize;
 
         // Helper to attach tags to a CacheValue if present.
-        let with_tags_opt = |cv: CacheValue<Raw>, tags_bytes: Option<&[u8]>| -> BackendResult<CacheValue<Raw>> {
-            let tags = crate::deserialize_tags(tags_bytes)?;
-            Ok(match tags {
-                Some(tags) => cv.with_tags(tags),
-                None => cv,
-            })
-        };
+        let with_tags_opt =
+            |cv: CacheValue<Raw>, tags_bytes: Option<&[u8]>| -> BackendResult<CacheValue<Raw>> {
+                let tags = crate::deserialize_tags(tags_bytes)?;
+                Ok(match tags {
+                    Some(tags) => cv.with_tags(tags),
+                    None => cv,
+                })
+            };
 
         match header.discriminant {
             0 => {

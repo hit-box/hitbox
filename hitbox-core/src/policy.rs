@@ -115,6 +115,36 @@ pub enum StalePolicy {
     OffloadRevalidate,
 }
 
+/// Whether tag-based invalidation runs at all.
+///
+/// Gates **both** sides end to end: tag extraction at write time and the
+/// invalidation timestamp queries/comparison at read time. When
+/// [`Skip`](TagInvalidation::Skip), no tag extractor future is constructed
+/// (the heavy request-body / response-body / JQ work never runs) and no
+/// `invalidated()` backend round-trips are issued.
+///
+/// [`Backend::invalidate`] still records timestamps when called explicitly,
+/// so flipping back to [`Check`](TagInvalidation::Check) is safe:
+/// request-side invalidation resumes immediately (request tags are
+/// re-derived on read), response-side self-heals within one TTL (entries
+/// written during `Skip` carry no response tags until they expire and
+/// refill).
+///
+/// [`Backend::invalidate`]: https://docs.rs/hitbox-backend
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+pub enum TagInvalidation {
+    /// Extract tags on write and consult invalidation timestamps on read
+    /// (default).
+    #[default]
+    Check,
+    /// Skip tag extraction and the read-time invalidation check entirely.
+    ///
+    /// Operational safety valve (clock skew / flaky tag store causing
+    /// false invalidations), latency/cost control (tag extraction can be
+    /// heavy; the read check adds backend round-trips), or staged rollout.
+    Skip,
+}
+
 /// Cache behavior policy configuration.
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct CacheBehaviorPolicy {
@@ -135,6 +165,8 @@ pub struct EnabledCacheConfig {
     pub policy: CacheBehaviorPolicy,
     /// Concurrency limit for dogpile prevention.
     pub concurrency: Option<ConcurrencyLimit>,
+    /// Whether tag-based invalidation runs (extraction + read check).
+    pub tag_invalidation: TagInvalidation,
 }
 
 impl Default for EnabledCacheConfig {
@@ -144,6 +176,7 @@ impl Default for EnabledCacheConfig {
             stale: None,
             policy: CacheBehaviorPolicy::default(),
             concurrency: None,
+            tag_invalidation: TagInvalidation::default(),
         }
     }
 }
@@ -175,6 +208,21 @@ impl PolicyConfig {
     pub fn disabled() -> Self {
         Self::Disabled
     }
+
+    /// Whether the FSM should run tag-based invalidation (tag extraction
+    /// on write and the invalidation timestamp check on read).
+    ///
+    /// `false` when caching is disabled (no cache reads happen anyway) or
+    /// when the enabled config selects [`TagInvalidation::Skip`].
+    pub fn tag_invalidation_enabled(&self) -> bool {
+        matches!(
+            self,
+            PolicyConfig::Enabled(EnabledCacheConfig {
+                tag_invalidation: TagInvalidation::Check,
+                ..
+            })
+        )
+    }
 }
 
 /// Builder for [`PolicyConfig`].
@@ -184,6 +232,7 @@ pub struct PolicyConfigBuilder {
     stale: Option<Duration>,
     stale_policy: StalePolicy,
     concurrency: Option<ConcurrencyLimit>,
+    tag_invalidation: TagInvalidation,
 }
 
 impl PolicyConfigBuilder {
@@ -224,6 +273,15 @@ impl PolicyConfigBuilder {
         }
     }
 
+    /// Set whether tag-based invalidation runs (default
+    /// [`TagInvalidation::Check`]).
+    pub fn tag_invalidation(self, tag_invalidation: TagInvalidation) -> Self {
+        Self {
+            tag_invalidation,
+            ..self
+        }
+    }
+
     /// Build the [`PolicyConfig`] with enabled caching.
     pub fn build(self) -> PolicyConfig {
         PolicyConfig::Enabled(EnabledCacheConfig {
@@ -233,6 +291,7 @@ impl PolicyConfigBuilder {
                 stale: self.stale_policy,
             },
             concurrency: self.concurrency,
+            tag_invalidation: self.tag_invalidation,
         })
     }
 }

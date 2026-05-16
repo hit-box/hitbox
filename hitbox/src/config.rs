@@ -371,9 +371,7 @@ where
     ///
     /// Required fields (`request_predicate`, `response_predicate`, `extractor`) must be set.
     /// Tag extractors default to [`NeutralTagExtractor`] if not configured.
-    pub fn build(
-        self,
-    ) -> Config<ReqPred, ResPred, Ext, ReqTagExt::Output, ResTagExt::Output> {
+    pub fn build(self) -> Config<ReqPred, ResPred, Ext, ReqTagExt::Output, ResTagExt::Output> {
         Config {
             request_predicate: Arc::new(self.request_predicate),
             response_predicate: Arc::new(self.response_predicate),

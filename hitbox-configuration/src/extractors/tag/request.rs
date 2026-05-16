@@ -22,8 +22,8 @@
 use std::fmt::Debug;
 
 use hitbox::config::{BoxExtractor, BoxTagExtractor};
-use hitbox_core::tag::{ChainTagExtractor, ExtractorExt, NeutralTagExtractor, TagAdapter};
 use hitbox_core::StaticExtractor;
+use hitbox_core::tag::{ChainTagExtractor, ExtractorExt, NeutralTagExtractor, TagAdapter};
 use hitbox_http::CacheableHttpRequest;
 use hitbox_http::extractors::NeutralExtractor;
 use serde::{Deserialize, Serialize};
@@ -31,8 +31,8 @@ use serde::{Deserialize, Serialize};
 use super::Static;
 use crate::error::ConfigError;
 use crate::extractors::{
-    body::BodyOperation, header::HeaderOperation, method::Method, path::Path,
-    query::QueryOperation, version::Version, Extractor,
+    Extractor, body::BodyOperation, header::HeaderOperation, method::Method, path::Path,
+    query::QueryOperation, version::Version,
 };
 
 /// Request-side tag extractor configuration.

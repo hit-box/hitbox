@@ -41,7 +41,7 @@ impl CacheableResponse for TestResponse {
     async fn cache_policy<P, TE>(
         self,
         _predicates: P,
-        _tag_extractor: TE,
+        _tag_extractor: Option<TE>,
         _config: &EntityPolicyConfig,
     ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where

@@ -69,9 +69,8 @@ pub trait CacheableRequest: Sized {
     ///
     /// Uses GAT to properly capture the lifetime of `Self`, allowing
     /// request types with non-`'static` references.
-    type CachePolicyFuture<'a, P, E, TE>: Future<
-            Output = (RequestCachePolicy<Self>, Vec<CacheTag>),
-        > + Send
+    type CachePolicyFuture<'a, P, E, TE>: Future<Output = (RequestCachePolicy<Self>, Vec<CacheTag>)>
+        + Send
         + 'a
     where
         Self: 'a,
@@ -80,21 +79,26 @@ pub trait CacheableRequest: Sized {
         TE: TagExtractor<Subject = Self> + Send + Sync + 'a;
 
     /// Determine if this request should be cached, extract its key, and
-    /// extract request-side cache tags.
+    /// (optionally) extract request-side cache tags.
     ///
-    /// Tag extraction runs only when the request is cacheable. For
-    /// non-cacheable requests, an empty tag list is returned.
+    /// Tag extraction runs only when the request is cacheable **and**
+    /// `tag_extractor` is `Some`. When it is `None`, no extractor future is
+    /// constructed at all (used to skip extraction entirely via
+    /// [`TagInvalidation::Skip`](crate::policy::TagInvalidation)); the
+    /// returned tag list is empty. Non-cacheable requests also yield an
+    /// empty tag list.
     ///
     /// # Arguments
     ///
     /// * `predicates` - Predicates to evaluate whether the request is cacheable
     /// * `extractors` - Extractors to generate the cache key
-    /// * `tag_extractor` - Extractor for request-side cache tags
+    /// * `tag_extractor` - Optional extractor for request-side cache tags;
+    ///   `None` skips tag extraction
     fn cache_policy<'a, P, E, TE>(
         self,
         predicates: P,
         extractors: E,
-        tag_extractor: TE,
+        tag_extractor: Option<TE>,
     ) -> Self::CachePolicyFuture<'a, P, E, TE>
     where
         Self: 'a,

@@ -25,7 +25,9 @@ use crate::{
 ///
 /// Returns `None` if tags are `None`. Used by backends that store tags
 /// as a separate hash field or payload section.
-pub fn serialize_tags(tags: Option<&hitbox_core::tag::CacheTags>) -> BackendResult<Option<Vec<u8>>> {
+pub fn serialize_tags(
+    tags: Option<&hitbox_core::tag::CacheTags>,
+) -> BackendResult<Option<Vec<u8>>> {
     match tags {
         None => Ok(None),
         Some(tags) => {
@@ -231,7 +233,10 @@ impl Backend for &dyn Backend {
         (*self).invalidate(tag).await
     }
 
-    async fn invalidated(&self, tags: &[CacheTag]) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
+    async fn invalidated(
+        &self,
+        tags: &[CacheTag],
+    ) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
         (*self).invalidated(tags).await
     }
 }
@@ -270,7 +275,10 @@ impl Backend for Box<dyn Backend> {
         (**self).invalidate(tag).await
     }
 
-    async fn invalidated(&self, tags: &[CacheTag]) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
+    async fn invalidated(
+        &self,
+        tags: &[CacheTag],
+    ) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
         (**self).invalidated(tags).await
     }
 }
@@ -309,7 +317,10 @@ impl Backend for Arc<UnsyncBackend> {
         (**self).invalidate(tag).await
     }
 
-    async fn invalidated(&self, tags: &[CacheTag]) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
+    async fn invalidated(
+        &self,
+        tags: &[CacheTag],
+    ) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
         (**self).invalidated(tags).await
     }
 }
@@ -348,7 +359,10 @@ impl Backend for Arc<SyncBackend> {
         (**self).invalidate(tag).await
     }
 
-    async fn invalidated(&self, tags: &[CacheTag]) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
+    async fn invalidated(
+        &self,
+        tags: &[CacheTag],
+    ) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
         (**self).invalidated(tags).await
     }
 }
@@ -505,8 +519,7 @@ pub trait CacheBackend: Backend {
                 value.stale(),
             )
             .with_optional_tags(value.tags().cloned());
-            let result = self.write(key, raw_value)
-                .await;
+            let result = self.write(key, raw_value).await;
             crate::metrics::record_write(backend_label.as_str(), write_timer.elapsed());
 
             match result {

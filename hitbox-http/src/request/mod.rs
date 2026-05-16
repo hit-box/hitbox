@@ -152,13 +152,10 @@ where
 {
     type CachePolicyFuture<'a, P, E, TE>
         = std::pin::Pin<
-            Box<
-                dyn std::future::Future<
-                        Output = (RequestCachePolicy<Self>, Vec<CacheTag>),
-                    > + Send
-                    + 'a,
-            >,
-        >
+        Box<
+            dyn std::future::Future<Output = (RequestCachePolicy<Self>, Vec<CacheTag>)> + Send + 'a,
+        >,
+    >
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
@@ -169,7 +166,7 @@ where
         self,
         predicates: P,
         extractors: E,
-        tag_extractor: TE,
+        tag_extractor: Option<TE>,
     ) -> Self::CachePolicyFuture<'a, P, E, TE>
     where
         Self: 'a,
@@ -182,7 +179,10 @@ where
 
             match predicates.check(request).await {
                 PredicateResult::Cacheable(request) => {
-                    let (request, tags) = tag_extractor.extract_tags(request).await;
+                    let (request, tags) = match tag_extractor {
+                        Some(te) => te.extract_tags(request).await,
+                        None => (request, Vec::new()),
+                    };
                     (
                         CachePolicy::Cacheable(CacheablePolicyData { key, request }),
                         tags,

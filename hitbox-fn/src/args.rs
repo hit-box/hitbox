@@ -4,10 +4,10 @@ use std::future::Future;
 use std::pin::Pin;
 
 use hitbox::{
-    CachePolicy, CacheableRequest, Extractor, KeyPart, Predicate, RequestCachePolicy,
+    CachePolicy, CacheablePolicyData, CacheableRequest, Extractor, KeyPart, Predicate,
+    RequestCachePolicy,
     predicate::PredicateResult,
     tag::{CacheTag, TagExtractor},
-    CacheablePolicyData,
 };
 
 use crate::KeyExtract;
@@ -124,7 +124,7 @@ macro_rules! impl_cacheable_request_for_args {
                 self,
                 predicates: P,
                 extractors: E,
-                tag_extractor: TE,
+                tag_extractor: Option<TE>,
             ) -> Self::CachePolicyFuture<'a, P, E, TE>
             where
                 Self: 'a,
@@ -136,7 +136,10 @@ macro_rules! impl_cacheable_request_for_args {
                     match predicates.check(self).await {
                         PredicateResult::Cacheable(subject) => {
                             let (subject, key) = extractors.get(subject).await.into_cache_key();
-                            let (subject, tags) = tag_extractor.extract_tags(subject).await;
+                            let (subject, tags) = match tag_extractor {
+                                Some(te) => te.extract_tags(subject).await,
+                                None => (subject, Vec::new()),
+                            };
                             (
                                 CachePolicy::Cacheable(CacheablePolicyData::new(key, subject)),
                                 tags,
@@ -162,7 +165,7 @@ macro_rules! impl_cacheable_request_for_args {
                 self,
                 predicates: P,
                 extractors: E,
-                tag_extractor: TE,
+                tag_extractor: Option<TE>,
             ) -> Self::CachePolicyFuture<'a, P, E, TE>
             where
                 Self: 'a,
@@ -174,7 +177,10 @@ macro_rules! impl_cacheable_request_for_args {
                     match predicates.check(self).await {
                         PredicateResult::Cacheable(subject) => {
                             let (subject, key) = extractors.get(subject).await.into_cache_key();
-                            let (subject, tags) = tag_extractor.extract_tags(subject).await;
+                            let (subject, tags) = match tag_extractor {
+                                Some(te) => te.extract_tags(subject).await,
+                                None => (subject, Vec::new()),
+                            };
                             (
                                 CachePolicy::Cacheable(CacheablePolicyData::new(key, subject)),
                                 tags,

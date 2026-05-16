@@ -235,14 +235,10 @@ where
         &self,
         tags: &[CacheTag],
     ) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
-        let lookups = tags.iter().map(|tag| async move {
-            self.tags.get(tag).await.map(|ts| (tag.clone(), ts))
-        });
-        let result = join_all(lookups)
-            .await
-            .into_iter()
-            .flatten()
-            .collect();
+        let lookups = tags
+            .iter()
+            .map(|tag| async move { self.tags.get(tag).await.map(|ts| (tag.clone(), ts)) });
+        let result = join_all(lookups).await.into_iter().flatten().collect();
         Ok(result)
     }
 }

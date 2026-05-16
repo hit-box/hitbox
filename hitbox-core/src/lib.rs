@@ -28,21 +28,21 @@ pub use label::BackendLabel;
 pub use offload::{DisabledOffload, Offload, OffloadKey};
 pub use policy::{
     CacheBehaviorPolicy, CachePolicy, ConcurrencyLimit, EnabledCacheConfig, EntityPolicyConfig,
-    PolicyConfig, PolicyConfigBuilder, StalePolicy,
+    PolicyConfig, PolicyConfigBuilder, StalePolicy, TagInvalidation,
 };
 pub use predicate::{And, Neutral, Not, Or, Predicate, PredicateExt, PredicateResult};
 pub use request::{CacheablePolicyData, CacheableRequest, RequestCachePolicy};
 pub use response::{CacheState, CacheableResponse, ResponseCachePolicy};
-pub use tag::{
-    CacheTag, CacheTags, ChainTagExtractor, ExtractorExt, NeutralTagExtractor, TagAdapter,
-    TagExtractor,
-};
 #[doc(hidden)]
 pub use serde;
 #[doc(hidden)]
 pub use smallbox::space::S4;
 #[doc(hidden)]
 pub use smol_str::SmolStr;
+pub use tag::{
+    CacheTag, CacheTags, ChainTagExtractor, ExtractorExt, NeutralTagExtractor, TagAdapter,
+    TagExtractor,
+};
 pub use upstream::Upstream;
 pub use value::CacheValue;
 

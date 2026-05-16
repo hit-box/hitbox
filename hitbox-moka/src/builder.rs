@@ -9,9 +9,9 @@ use moka::policy::EvictionPolicy;
 
 use crate::backend::MokaBackend;
 use hitbox::{BackendLabel, CacheKey, CacheValue, Raw};
-use hitbox_core::CacheTag;
 use hitbox_backend::format::{Format, JsonFormat};
 use hitbox_backend::{CacheKeyFormat, Compressor, PassthroughCompressor};
+use hitbox_core::CacheTag;
 
 /// Custom expiration policy that calculates TTL from [`CacheValue::expire`] timestamps.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

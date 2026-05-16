@@ -41,6 +41,22 @@ impl From<StalePolicy> for policy::StalePolicy {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+enum TagInvalidation {
+    #[default]
+    Check,
+    Skip,
+}
+
+impl From<TagInvalidation> for policy::TagInvalidation {
+    fn from(t: TagInvalidation) -> Self {
+        match t {
+            TagInvalidation::Check => policy::TagInvalidation::Check,
+            TagInvalidation::Skip => policy::TagInvalidation::Skip,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct CacheBehaviorPolicy {
     #[serde(default)]
@@ -64,6 +80,8 @@ struct EnabledCacheConfig {
     #[serde(default)]
     policy: CacheBehaviorPolicy,
     concurrency: Option<NonZeroU8>,
+    #[serde(default)]
+    tag_invalidation: TagInvalidation,
 }
 
 impl Default for EnabledCacheConfig {
@@ -73,6 +91,7 @@ impl Default for EnabledCacheConfig {
             stale: None,
             policy: CacheBehaviorPolicy::default(),
             concurrency: None,
+            tag_invalidation: TagInvalidation::default(),
         }
     }
 }
@@ -84,6 +103,7 @@ impl From<EnabledCacheConfig> for policy::EnabledCacheConfig {
             stale: s.stale,
             policy: s.policy.into(),
             concurrency: s.concurrency,
+            tag_invalidation: s.tag_invalidation.into(),
         }
     }
 }

@@ -60,18 +60,18 @@ use crate::{
     PassthroughCompressor,
 };
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use envelope::CompositionEnvelope;
 use hitbox_core::{
     BackendLabel, BoxContext, CacheContext, CacheKey, CacheStatus, CacheTag, CacheValue, Cacheable,
     CacheableResponse, Offload, Raw, ResponseSource,
 };
-use chrono::{DateTime, Utc};
-use std::collections::HashMap;
 use policy::{
     CompositionReadPolicy, CompositionWritePolicy, OptimisticParallelWritePolicy, ReadResult,
     RefillPolicy, SequentialReadPolicy,
 };
 use smol_str::SmolStr;
+use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -623,7 +623,10 @@ where
         Ok(())
     }
 
-    async fn invalidated(&self, tags: &[CacheTag]) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
+    async fn invalidated(
+        &self,
+        tags: &[CacheTag],
+    ) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
         let (l1_result, l2_result) =
             futures::join!(self.l1.invalidated(tags), self.l2.invalidated(tags));
         let mut merged = l1_result?;
@@ -879,8 +882,13 @@ where
                         .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
                     let l1_len = l1_bytes.len();
-                    let l1_value = CacheValue::with_created(l1_bytes, value.created(), value.expire(), value.stale())
-                        .with_optional_tags(value.tags().cloned());
+                    let l1_value = CacheValue::with_created(
+                        l1_bytes,
+                        value.created(),
+                        value.expire(),
+                        value.stale(),
+                    )
+                    .with_optional_tags(value.tags().cloned());
 
                     // Write to L1 with metrics
                     let timer = Timer::new();
@@ -925,8 +933,13 @@ where
                         .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
                     let l1_len = l1_bytes.len();
-                    let l1_value = CacheValue::with_created(l1_bytes, value.created(), value.expire(), value.stale())
-                        .with_optional_tags(value.tags().cloned());
+                    let l1_value = CacheValue::with_created(
+                        l1_bytes,
+                        value.created(),
+                        value.expire(),
+                        value.stale(),
+                    )
+                    .with_optional_tags(value.tags().cloned());
 
                     // Write to L1 with metrics
                     let timer = Timer::new();
@@ -1174,7 +1187,7 @@ mod tests {
         async fn cache_policy<P, TE>(
             self,
             _predicate: P,
-            _tag_extractor: TE,
+            _tag_extractor: Option<TE>,
             _config: &EntityPolicyConfig,
         ) -> (CachePolicy<CacheValue<Self::Cached>, Self>, Vec<CacheTag>)
         where

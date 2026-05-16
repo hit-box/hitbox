@@ -83,12 +83,10 @@ impl Default for TestConfig {
         let response_predicate: BoxResponsePredicate =
             Box::new(NeutralResponsePredicate::<axum::body::Body>::new());
         let extractor: BoxExtractor = Box::new(NeutralExtractor::<axum::body::Body>::new());
-        let request_tag_extractor: BoxRequestTagExtractor = Box::new(
-            NeutralTagExtractor::<CacheableHttpRequest<axum::body::Body>>::default(),
-        );
-        let response_tag_extractor: BoxResponseTagExtractor = Box::new(
-            NeutralTagExtractor::<CacheableHttpResponse<axum::body::Body>>::default(),
-        );
+        let request_tag_extractor: BoxRequestTagExtractor =
+            Box::new(NeutralTagExtractor::<CacheableHttpRequest<axum::body::Body>>::default());
+        let response_tag_extractor: BoxResponseTagExtractor =
+            Box::new(NeutralTagExtractor::<CacheableHttpResponse<axum::body::Body>>::default());
         Self {
             request_predicate: Arc::new(request_predicate),
             response_predicate: Arc::new(response_predicate),

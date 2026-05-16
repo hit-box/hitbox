@@ -4,5 +4,5 @@
 
 pub use hitbox_core::policy::{
     CacheBehaviorPolicy, ConcurrencyLimit, EnabledCacheConfig, PolicyConfig, PolicyConfigBuilder,
-    StalePolicy,
+    StalePolicy, TagInvalidation,
 };

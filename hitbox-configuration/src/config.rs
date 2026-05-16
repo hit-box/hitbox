@@ -47,6 +47,22 @@ impl From<StalePolicy> for policy::StalePolicy {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Default)]
+pub enum TagInvalidation {
+    #[default]
+    Check,
+    Skip,
+}
+
+impl From<TagInvalidation> for policy::TagInvalidation {
+    fn from(t: TagInvalidation) -> Self {
+        match t {
+            TagInvalidation::Check => policy::TagInvalidation::Check,
+            TagInvalidation::Skip => policy::TagInvalidation::Skip,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct CacheBehaviorPolicy {
     #[serde(default)]
@@ -70,6 +86,8 @@ pub struct EnabledCacheConfig {
     #[serde(default)]
     policy: CacheBehaviorPolicy,
     concurrency: Option<NonZeroU8>,
+    #[serde(default)]
+    tag_invalidation: TagInvalidation,
 }
 
 impl From<EnabledCacheConfig> for policy::EnabledCacheConfig {
@@ -79,6 +97,7 @@ impl From<EnabledCacheConfig> for policy::EnabledCacheConfig {
             stale: s.stale,
             policy: s.policy.into(),
             concurrency: s.concurrency,
+            tag_invalidation: s.tag_invalidation.into(),
         }
     }
 }
@@ -189,9 +208,9 @@ impl ConfigEndpoint {
             if response_tag_cfg.is_empty() {
                 Arc::new(NeutralTagExtractor::<CacheableHttpResponse<ResBody>>::default())
             } else {
-                Arc::from(tag_config::build_response_boxed::<CacheableHttpResponse<ResBody>>(
-                    response_tag_cfg,
-                ))
+                Arc::from(tag_config::build_response_boxed::<
+                    CacheableHttpResponse<ResBody>,
+                >(response_tag_cfg))
             };
         Ok(Endpoint {
             extractors,

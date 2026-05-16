@@ -11,8 +11,8 @@ use std::sync::Arc;
 use futures::future::BoxFuture;
 use hitbox_core::tag::{CacheTag, TagExtractor as _};
 use hitbox_core::{
-    CacheConfigs, CacheKey, Cacheable, Extractor as _, Offload, Predicate as _,
-    PredicateResult, Upstream,
+    CacheConfigs, CacheKey, Cacheable, Extractor as _, Offload, Predicate as _, PredicateResult,
+    Upstream,
 };
 use pin_project::pin_project;
 use tracing::{Level, Span, debug, field, span, trace};

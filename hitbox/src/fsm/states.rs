@@ -14,7 +14,7 @@ use std::task::{Context, Poll};
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
-use futures::future::BoxFuture;
+use futures::future::{BoxFuture, join};
 use futures::ready;
 use hitbox_backend::BackendError;
 use hitbox_core::tag::{CacheTag, CacheTags};
@@ -64,51 +64,98 @@ pub type PollCacheFuture<T> = BoxFuture<'static, (CacheResult<T>, BoxContext)>;
 pub type UpdateCacheFuture<T> = BoxFuture<'static, (Result<(), BackendError>, T, BoxContext)>;
 pub type AwaitResponseFuture<T> = BoxFuture<'static, Result<T, ConcurrencyError>>;
 /// Future that checks request cache policy and extracts request tags
-pub type RequestCachePolicyFuture<'a, T> =
-    BoxFuture<'a, (RequestCachePolicy<T>, Vec<CacheTag>)>;
+pub type RequestCachePolicyFuture<'a, T> = BoxFuture<'a, (RequestCachePolicy<T>, Vec<CacheTag>)>;
 
 /// Result of querying tag invalidation timestamps from the backend.
 pub type TagInvalidationResult = Result<HashMap<CacheTag, DateTime<Utc>>, BackendError>;
-
-/// Future that fetches tag invalidation timestamps.
-pub type TagInvalidationFuture = BoxFuture<'static, TagInvalidationResult>;
 
 // =============================================================================
 // PollCacheWithTagsFuture - parallel cache + tag fetch
 // =============================================================================
 
-/// Future that polls the cache read and tag invalidation check in parallel.
+/// Future that polls the cache read together with tag-invalidation checks.
 ///
-/// When `tag_future` is `None` (no tags configured), this degrades to a simple
-/// cache read with zero overhead — the tag future is never polled.
+/// Request-side tag invalidation (tags known before the read) runs
+/// concurrently with the cache read. Response-side tag invalidation is
+/// *lazy*: only after a cache hit, and only if the stored entry carries
+/// response tags, a second `invalidated()` query runs for them — its
+/// timestamps are merged into the same map the FSM scans. Both sides are
+/// skipped entirely when `tag_invalidation_enabled` is false (no
+/// `invalidated()` round-trips at all).
 ///
-/// On cache miss or backend error, short-circuits without waiting for tag results.
-#[pin_project]
+/// On a cache miss the response-tag query is never issued (nothing to
+/// check); a request-tag query already in flight still resolves.
 pub struct PollCacheWithTagsFuture<T> {
-    #[pin]
-    cache_future: Option<PollCacheFuture<T>>,
-    #[pin]
-    tag_future: Option<TagInvalidationFuture>,
-    /// Stored cache result when it completes before tags.
-    cache_result: Option<(CacheResult<T>, BoxContext)>,
-    /// Stored tag result when it completes before cache.
-    tag_result: Option<TagInvalidationResult>,
+    inner: BoxFuture<'static, (CacheResult<T>, Option<TagInvalidationResult>, BoxContext)>,
 }
 
 impl<T> PollCacheWithTagsFuture<T> {
-    /// Create with both cache and optional tag invalidation futures.
-    pub fn new(cache_future: PollCacheFuture<T>, tag_future: Option<TagInvalidationFuture>) -> Self {
-        Self {
-            cache_future: Some(cache_future),
-            tag_future,
-            cache_result: None,
-            tag_result: None,
-        }
+    /// Build the combined cache-read + tag-invalidation future.
+    ///
+    /// `tag_invalidation_enabled` gates both sides: when false, no tag
+    /// queries are issued and the cache read is returned as-is.
+    pub fn build<Res, B>(
+        backend: Arc<B>,
+        cache_key: CacheKey,
+        mut ctx: BoxContext,
+        request_tags: Vec<CacheTag>,
+        tag_invalidation_enabled: bool,
+    ) -> Self
+    where
+        Res: CacheableResponse<Cached = T> + Send + 'static,
+        Res::Cached: Cacheable + Send,
+        B: CacheBackend + Send + Sync + 'static,
+        T: Send + 'static,
+    {
+        let inner = Box::pin(async move {
+            let check = tag_invalidation_enabled;
+            let want_req = check && !request_tags.is_empty();
+
+            // Cache read + (optional) request-tag query, concurrently.
+            let (cache_result, req_tag_result): (CacheResult<T>, Option<TagInvalidationResult>) = {
+                let get_fut = backend.get::<Res>(&cache_key, &mut ctx);
+                if want_req {
+                    let (c, t) = join(get_fut, backend.invalidated(&request_tags)).await;
+                    (c, Some(t))
+                } else {
+                    (get_fut.await, None)
+                }
+            };
+
+            // Lazy response-tag check: only on a hit, only when enabled,
+            // only if the stored entry actually carries response tags.
+            let tag_result = if !check {
+                None
+            } else if let Ok(Some(ref cached_value)) = cache_result {
+                let resp_tags = cached_value
+                    .tags()
+                    .and_then(|t| t.response.clone())
+                    .unwrap_or_default();
+                if resp_tags.is_empty() {
+                    req_tag_result
+                } else {
+                    let resp = backend.invalidated(&resp_tags).await;
+                    Some(merge_tag_results(req_tag_result, resp))
+                }
+            } else {
+                req_tag_result
+            };
+
+            (cache_result, tag_result, ctx)
+        });
+        Self { inner }
     }
 
-    /// Create without tag checking (zero overhead path).
-    pub fn without_tags(cache_future: PollCacheFuture<T>) -> Self {
-        Self::new(cache_future, None)
+    /// Build a cache-only future — no tag invalidation, zero overhead.
+    pub fn without_tags(cache_future: PollCacheFuture<T>) -> Self
+    where
+        T: Send + 'static,
+    {
+        let inner = Box::pin(async move {
+            let (result, ctx) = cache_future.await;
+            (result, None, ctx)
+        });
+        Self { inner }
     }
 }
 
@@ -116,53 +163,38 @@ impl<T> std::future::Future for PollCacheWithTagsFuture<T> {
     type Output = (CacheResult<T>, Option<TagInvalidationResult>, BoxContext);
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
+        self.get_mut().inner.as_mut().poll(cx)
+    }
+}
 
-        // Poll cache future if not yet done.
-        // We use `as_pin_mut` to get `Pin<&mut Option<F>>`, then poll the future inside.
-        if this.cache_future.is_some() {
-            // SAFETY: cache_future is Some, project to inner PollCacheFuture
-            let mut fut = this.cache_future.as_mut();
-            // Pin<&mut Option<F>> → poll the future inside
-            // BoxFuture is Unpin, so we can poll it via Pin::new on the inner ref
-            if let Some(inner) = fut.as_mut().as_pin_mut() {
-                if let Poll::Ready((cache_result, ctx)) = inner.poll(cx) {
-                    fut.set(None);
-
-                    // Short-circuit: on cache miss or error, skip tag check entirely
-                    let is_miss_or_error =
-                        cache_result.as_ref().map(Option::is_none).unwrap_or(true);
-                    if is_miss_or_error {
-                        this.tag_future.set(None);
-                        return Poll::Ready((cache_result, None, ctx));
-                    }
-
-                    // If no tag future was configured, return immediately
-                    if this.tag_future.is_none() {
-                        return Poll::Ready((cache_result, None, ctx));
-                    }
-
-                    // Hold cache result while tag future completes
-                    *this.cache_result = Some((cache_result, ctx));
-                }
+/// Merge request-side and response-side tag-invalidation results.
+///
+/// Any backend error propagates — the FSM treats an errored invalidation
+/// check as a forced miss. Otherwise the timestamp maps are unioned,
+/// keeping the latest timestamp per tag.
+fn merge_tag_results(
+    request: Option<TagInvalidationResult>,
+    response: TagInvalidationResult,
+) -> TagInvalidationResult {
+    let mut map = match request {
+        None => HashMap::new(),
+        Some(Ok(m)) => m,
+        Some(Err(e)) => return Err(e),
+    };
+    match response {
+        Ok(resp_map) => {
+            for (tag, ts) in resp_map {
+                map.entry(tag)
+                    .and_modify(|e| {
+                        if ts > *e {
+                            *e = ts;
+                        }
+                    })
+                    .or_insert(ts);
             }
+            Ok(map)
         }
-
-        // Poll tag future if present and not yet done
-        if this.tag_future.is_some() {
-            let mut fut = this.tag_future.as_mut();
-            if let Some(inner) = fut.as_mut().as_pin_mut() {
-                if let Poll::Ready(result) = inner.poll(cx) {
-                    fut.set(None);
-                    if let Some((cache_result, ctx)) = this.cache_result.take() {
-                        return Poll::Ready((cache_result, Some(result), ctx));
-                    }
-                    *this.tag_result = Some(result);
-                }
-            }
-        }
-
-        Poll::Pending
+        Err(e) => Err(e),
     }
 }
 
@@ -363,7 +395,11 @@ where
                 let request = self.request;
                 let predicates = self.predicates;
                 let extractors = self.extractors;
-                let tag_extractor = self.tag_extractor;
+                // `None` skips request-tag extraction entirely (no extractor
+                // future is constructed) when invalidation is disabled.
+                let tag_extractor = policy
+                    .tag_invalidation_enabled()
+                    .then_some(self.tag_extractor);
                 let cache_policy_future = Box::pin(async move {
                     request
                         .cache_policy(predicates, extractors, tag_extractor)
@@ -513,6 +549,11 @@ impl PollUpstream {
                     },
                     PolicyConfig::Disabled => EntityPolicyConfig::default(),
                 };
+                // `None` skips response-tag extraction entirely (no extractor
+                // future is constructed) when invalidation is disabled.
+                let response_tag_extractor = policy
+                    .tag_invalidation_enabled()
+                    .then_some(response_tag_extractor);
                 PollUpstreamTransition::CheckResponseCachePolicy {
                     cache_policy_future: Box::pin(async move {
                         let (policy, tags) = upstream_result
@@ -619,7 +660,9 @@ impl CheckResponseCachePolicy {
                 let mut ctx = self.ctx;
                 // Attach response tags before write if any were extracted.
                 let cache_value = match response_tags {
-                    Some(response_tags) => cache_value.with_tags(CacheTags::response_only(response_tags)),
+                    Some(response_tags) => {
+                        cache_value.with_tags(CacheTags::response_only(response_tags))
+                    }
                     None => cache_value,
                 };
                 let update_cache_future = Box::pin(async move {
@@ -683,11 +726,16 @@ impl<U> CheckRequestCachePolicy<U> {
     }
 
     /// Transition from CheckRequestCachePolicy state after future completes.
+    ///
+    /// `tag_invalidation_enabled` gates the read-time invalidation queries
+    /// (request-tag prefetch and the lazy response-tag check). When false,
+    /// the cache read is returned without any `invalidated()` round-trips.
     pub fn transition<Req, Res, B>(
         self,
         policy: RequestCachePolicy<Req>,
         request_tags: Vec<CacheTag>,
         backend: Arc<B>,
+        tag_invalidation_enabled: bool,
         cache_key_storage: &mut Option<CacheKey>,
     ) -> CheckRequestCachePolicyTransition<Req, Res, U>
     where
@@ -704,28 +752,15 @@ impl<U> CheckRequestCachePolicy<U> {
         );
         match policy {
             CachePolicy::Cacheable(CacheablePolicyData { key, request }) => {
-                let cache_key_for_get = key.clone();
                 debug!(?key, "FSM looking up cache key");
                 let _ = cache_key_storage.insert(key.clone());
-                let mut ctx = self.ctx;
-                let backend_for_tags = backend.clone();
-                let cache_future = Box::pin(async move {
-                    let result = backend.get::<Res>(&cache_key_for_get, &mut ctx).await;
-                    debug!(
-                        found = result.as_ref().map(|r| r.is_some()).unwrap_or(false),
-                        "FSM cache lookup result"
-                    );
-                    (result, ctx)
-                });
-                // Build tag invalidation future only if there are request tags to check
-                let tag_future: Option<TagInvalidationFuture> = if request_tags.is_empty() {
-                    None
-                } else {
-                    Some(Box::pin(async move {
-                        backend_for_tags.invalidated(&request_tags).await
-                    }))
-                };
-                let poll_cache = PollCacheWithTagsFuture::new(cache_future, tag_future);
+                let poll_cache = PollCacheWithTagsFuture::build::<Res, B>(
+                    backend,
+                    key.clone(),
+                    self.ctx,
+                    request_tags,
+                    tag_invalidation_enabled,
+                );
                 CheckRequestCachePolicyTransition::PollCache {
                     poll_cache,
                     request,
@@ -815,8 +850,7 @@ impl<Req, U> PollCache<Req, U> {
                     match tag_result {
                         Ok(timestamps) if !timestamps.is_empty() => {
                             let entry_created = cached_value.created();
-                            let invalidated =
-                                timestamps.values().any(|&ts| ts > entry_created);
+                            let invalidated = timestamps.values().any(|&ts| ts > entry_created);
                             if invalidated {
                                 debug!(
                                     "Cache entry invalidated by tag (created={}, latest_tag_ts={:?})",
@@ -834,11 +868,7 @@ impl<Req, U> PollCache<Req, U> {
                         Err(err) => {
                             warn!("Tag invalidation check failed: {err:?}");
                             ctx.set_status(CacheStatus::Miss);
-                            return self.transition_to_upstream(
-                                ctx,
-                                policy,
-                                concurrency_manager,
-                            );
+                            return self.transition_to_upstream(ctx, policy, concurrency_manager);
                         }
                         _ => {}
                     }

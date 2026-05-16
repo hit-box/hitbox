@@ -45,8 +45,7 @@ pub struct CacheFuture<
     O = DisabledOffload,
     ReqTE = NeutralTagExtractor<Req>,
     ResTE = NeutralTagExtractor<<Res as CacheableResponse>::Subject>,
->
-where
+> where
     U: Upstream<Req, Response = Res>,
     B: CacheBackend,
     Res: CacheableResponse,
@@ -329,30 +328,15 @@ where
         ResTE: 'static,
     {
         let parent_span = span!(Level::DEBUG, "hitbox.cache");
-        let cache_key_for_get = cache_key.clone();
-        let backend_for_get = backend.clone();
-        let mut ctx = CacheContext::default().boxed();
-        let cache_future = Box::pin(async move {
-            let result = backend_for_get
-                .get::<Res>(&cache_key_for_get, &mut ctx)
-                .await;
-            debug!(
-                found = result.as_ref().map(|r| r.is_some()).unwrap_or(false),
-                "FSM cache lookup result"
-            );
-            (result, ctx)
-        });
-
-        // Build tag invalidation future only when request tags are present.
-        let tag_future: Option<states::TagInvalidationFuture> = if request_tags.is_empty() {
-            None
-        } else {
-            let backend_for_tags = backend.clone();
-            Some(Box::pin(async move {
-                backend_for_tags.invalidated(&request_tags).await
-            }))
-        };
-        let poll_cache = states::PollCacheWithTagsFuture::new(cache_future, tag_future);
+        let ctx = CacheContext::default().boxed();
+        let tag_invalidation_enabled = policy.tag_invalidation_enabled();
+        let poll_cache = states::PollCacheWithTagsFuture::build::<Res, B>(
+            backend.clone(),
+            cache_key.clone(),
+            ctx,
+            request_tags,
+            tag_invalidation_enabled,
+        );
         let poll_cache_state =
             states::PollCache::new(request, cache_key.clone(), upstream, &parent_span);
 
@@ -416,11 +400,13 @@ where
                     let (policy, request_tags) = ready!(cache_policy_future.poll(cx));
                     let check_state = state.take().expect(POLL_AFTER_READY_ERROR);
 
+                    let tag_invalidation_enabled = this.policy.tag_invalidation_enabled();
                     check_state
                         .transition(
                             policy,
                             request_tags,
                             this.backend.clone(),
+                            tag_invalidation_enabled,
                             this.cache_key,
                         )
                         .into_state(&*this.span)

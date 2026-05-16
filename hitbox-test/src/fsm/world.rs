@@ -32,12 +32,10 @@ pub struct SimpleRequest(pub u32);
 impl CacheableRequest for SimpleRequest {
     type CachePolicyFuture<'a, P, E, TE>
         = std::pin::Pin<
-            Box<
-                dyn std::future::Future<Output = (RequestCachePolicy<Self>, Vec<CacheTag>)>
-                    + Send
-                    + 'a,
-            >,
-        >
+        Box<
+            dyn std::future::Future<Output = (RequestCachePolicy<Self>, Vec<CacheTag>)> + Send + 'a,
+        >,
+    >
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
@@ -48,7 +46,7 @@ impl CacheableRequest for SimpleRequest {
         self,
         predicates: P,
         extractors: E,
-        tag_extractor: TE,
+        tag_extractor: Option<TE>,
     ) -> Self::CachePolicyFuture<'a, P, E, TE>
     where
         Self: 'a,
@@ -61,7 +59,10 @@ impl CacheableRequest for SimpleRequest {
                 PredicateResult::Cacheable(request) => {
                     let key_parts = extractors.get(request).await;
                     let (request, cache_key) = key_parts.into_cache_key();
-                    let (request, tags) = tag_extractor.extract_tags(request).await;
+                    let (request, tags) = match tag_extractor {
+                        Some(te) => te.extract_tags(request).await,
+                        None => (request, Vec::new()),
+                    };
                     (
                         RequestCachePolicy::Cacheable(CacheablePolicyData {
                             key: cache_key,
@@ -90,7 +91,7 @@ impl CacheableResponse for SimpleResponse {
     async fn cache_policy<P, TE>(
         self,
         predicates: P,
-        tag_extractor: TE,
+        tag_extractor: Option<TE>,
         _config: &EntityPolicyConfig,
     ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where
@@ -99,7 +100,10 @@ impl CacheableResponse for SimpleResponse {
     {
         match predicates.check(self).await {
             PredicateResult::Cacheable(response) => {
-                let (response, tags) = tag_extractor.extract_tags(response).await;
+                let (response, tags) = match tag_extractor {
+                    Some(te) => te.extract_tags(response).await,
+                    None => (response, Vec::new()),
+                };
                 (
                     CachePolicy::Cacheable(CacheValue::new(response.0, None, None)),
                     tags,
@@ -372,6 +376,7 @@ impl FsmWorld {
                 stale: self.config.stale,
                 concurrency: self.config.concurrency,
                 policy: Default::default(),
+                tag_invalidation: Default::default(),
             })
         } else {
             PolicyConfig::Disabled
@@ -494,6 +499,7 @@ impl FsmWorld {
                             stale: cfg.stale,
                             concurrency: cfg.concurrency,
                             policy: Default::default(),
+                            tag_invalidation: Default::default(),
                         })
                     } else {
                         PolicyConfig::Disabled

@@ -110,7 +110,7 @@ pub enum CacheState<Cached> {
 ///     async fn cache_policy<P, TE>(
 ///         self,
 ///         predicates: P,
-///         tag_extractor: TE,
+///         tag_extractor: Option<TE>,
 ///         config: &EntityPolicyConfig,
 ///     ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
 ///     where
@@ -119,7 +119,10 @@ pub enum CacheState<Cached> {
 ///     {
 ///         match predicates.check(self).await {
 ///             PredicateResult::Cacheable(data) => {
-///                 let (data, tags) = tag_extractor.extract_tags(data).await;
+///                 let (data, tags) = match tag_extractor {
+///                     Some(te) => te.extract_tags(data).await,
+///                     None => (data, Vec::new()),
+///                 };
 ///                 let cached = data.body.clone();
 ///                 (
 ///                     CachePolicy::Cacheable(CacheValue::from_config(cached, config)),
@@ -161,24 +164,28 @@ where
     /// Future type for `from_cached` method.
     type FromCachedFuture: Future<Output = Self> + Send;
 
-    /// Determine if this response should be cached and extract response tags.
+    /// Determine if this response should be cached and (optionally) extract
+    /// response tags.
     ///
-    /// Applies predicates to determine cacheability, runs the response tag
-    /// extractor (when cacheable), and converts cacheable responses to their
-    /// cached representation with TTL metadata.
-    ///
-    /// Tag extraction runs on `Self::Subject` — the same value the predicate
-    /// checked. For non-cacheable responses, an empty tag list is returned.
+    /// Applies predicates to determine cacheability and converts cacheable
+    /// responses to their cached representation with TTL metadata. The
+    /// response tag extractor runs only when the response is cacheable
+    /// **and** `tag_extractor` is `Some`. When it is `None`, no extractor
+    /// future is constructed (used to skip extraction entirely via
+    /// [`TagInvalidation::Skip`](crate::policy::TagInvalidation)); the
+    /// returned tag list is empty. Non-cacheable responses also yield an
+    /// empty tag list.
     ///
     /// # Arguments
     ///
     /// * `predicates` - Predicates to evaluate whether the response is cacheable
-    /// * `tag_extractor` - Extractor for response-side cache tags
+    /// * `tag_extractor` - Optional extractor for response-side cache tags;
+    ///   `None` skips tag extraction
     /// * `config` - TTL configuration for the cached entry
     fn cache_policy<P, TE>(
         self,
         predicates: P,
-        tag_extractor: TE,
+        tag_extractor: Option<TE>,
         config: &EntityPolicyConfig,
     ) -> impl Future<Output = (ResponseCachePolicy<Self>, Vec<crate::tag::CacheTag>)> + Send
     where
@@ -213,7 +220,7 @@ macro_rules! impl_cacheable_response_for_scalar {
                 async fn cache_policy<P, TE>(
                     self,
                     predicates: P,
-                    tag_extractor: TE,
+                    tag_extractor: Option<TE>,
                     config: &EntityPolicyConfig,
                 ) -> (ResponseCachePolicy<Self>, Vec<crate::tag::CacheTag>)
                 where
@@ -222,7 +229,10 @@ macro_rules! impl_cacheable_response_for_scalar {
                 {
                     match predicates.check(self).await {
                         PredicateResult::Cacheable(data) => {
-                            let (data, tags) = tag_extractor.extract_tags(data).await;
+                            let (data, tags) = match tag_extractor {
+                    Some(te) => te.extract_tags(data).await,
+                    None => (data, Vec::new()),
+                };
                             let cached = data.clone();
                             (
                                 CachePolicy::Cacheable(CacheValue::from_config(cached, config)),
@@ -274,7 +284,7 @@ where
     async fn cache_policy<P, TE>(
         self,
         predicates: P,
-        tag_extractor: TE,
+        tag_extractor: Option<TE>,
         config: &EntityPolicyConfig,
     ) -> (ResponseCachePolicy<Self>, Vec<crate::tag::CacheTag>)
     where
@@ -283,16 +293,17 @@ where
     {
         match predicates.check(self).await {
             PredicateResult::Cacheable(data) => {
-                let (data, tags) = tag_extractor.extract_tags(data).await;
+                let (data, tags) = match tag_extractor {
+                    Some(te) => te.extract_tags(data).await,
+                    None => (data, Vec::new()),
+                };
                 let cached = data.clone();
                 (
                     CachePolicy::Cacheable(CacheValue::from_config(cached, config)),
                     tags,
                 )
             }
-            PredicateResult::NonCacheable(data) => {
-                (CachePolicy::NonCacheable(data), Vec::new())
-            }
+            PredicateResult::NonCacheable(data) => (CachePolicy::NonCacheable(data), Vec::new()),
         }
     }
 
@@ -380,7 +391,7 @@ where
     async fn cache_policy<P, TE>(
         self,
         predicates: P,
-        tag_extractor: TE,
+        tag_extractor: Option<TE>,
         config: &EntityPolicyConfig,
     ) -> (ResponseCachePolicy<Self>, Vec<crate::tag::CacheTag>)
     where
@@ -390,7 +401,10 @@ where
         match self {
             Ok(response) => match predicates.check(response).await {
                 PredicateResult::Cacheable(cacheable) => {
-                    let (cacheable, tags) = tag_extractor.extract_tags(cacheable).await;
+                    let (cacheable, tags) = match tag_extractor {
+                        Some(te) => te.extract_tags(cacheable).await,
+                        None => (cacheable, Vec::new()),
+                    };
                     match cacheable.into_cached().await {
                         CachePolicy::Cacheable(res) => (
                             CachePolicy::Cacheable(CacheValue::from_config(res, config)),
@@ -405,10 +419,7 @@ where
                     (CachePolicy::NonCacheable(Ok(res)), Vec::new())
                 }
             },
-            Err(error) => (
-                ResponseCachePolicy::NonCacheable(Err(error)),
-                Vec::new(),
-            ),
+            Err(error) => (ResponseCachePolicy::NonCacheable(Err(error)), Vec::new()),
         }
     }
 

@@ -230,7 +230,7 @@ mod tests {
         async fn cache_policy<P, TE>(
             self,
             _predicate: P,
-            _tag_extractor: TE,
+            _tag_extractor: Option<TE>,
             _config: &EntityPolicyConfig,
         ) -> (CachePolicy<CacheValue<Self::Cached>, Self>, Vec<CacheTag>)
         where
