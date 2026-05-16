@@ -40,6 +40,10 @@ type ResPredOf<CC, Req, Res> =
     <ConfigOf<CC, Req, Res> as CacheConfig<Req, ResSubject<Res>>>::ResponsePredicate;
 type ExtractorOf<CC, Req, Res> =
     <ConfigOf<CC, Req, Res> as CacheConfig<Req, ResSubject<Res>>>::Extractor;
+type ReqTagExtractorOf<CC, Req, Res> =
+    <ConfigOf<CC, Req, Res> as CacheConfig<Req, ResSubject<Res>>>::RequestTagExtractor;
+type ResTagExtractorOf<CC, Req, Res> =
+    <ConfigOf<CC, Req, Res> as CacheConfig<Req, ResSubject<Res>>>::ResponseTagExtractor;
 
 /// Type alias for the inner CacheFuture constructed by the selective FSM.
 #[allow(clippy::type_complexity)]
@@ -54,6 +58,8 @@ pub(crate) type InnerCacheFuture<'offload, B, Req, Res, CC, U, CM, O> = CacheFut
     ExtractorOf<CC, Req, Res>,
     CM,
     O,
+    ReqTagExtractorOf<CC, Req, Res>,
+    ResTagExtractorOf<CC, Req, Res>,
 >;
 
 /// Future that selectively applies caching based on multi-config predicate matching.
@@ -90,7 +96,8 @@ where
     U: Upstream<Req, Response = Res>,
     B: CacheBackend,
     Res: CacheableResponse,
-    Req: CacheableRequest,
+    Res::Cached: Send,
+    Req: CacheableRequest + Send,
     CC: CacheConfigs<Req, ResSubject<Res>>,
     CM: ConcurrencyManager<Res>,
     O: Offload<'offload>,
@@ -117,6 +124,7 @@ where
     U: Upstream<Req, Response = Res>,
     B: CacheBackend,
     Res: CacheableResponse,
+    Res::Cached: Send,
     Req: CacheableRequest + Send + 'offload,
     CC: CacheConfigs<Req, ResSubject<Res>>,
     CM: ConcurrencyManager<Res>,
@@ -226,11 +234,13 @@ where
                 } => {
                     let extract = state.as_ref().expect(POLL_AFTER_READY);
                     trace!(parent: &extract.span, "FSM state: ExtractKey");
-                    let key_parts = ready!(extract_future.poll(cx));
+                    let (request, cache_key, request_tags) = ready!(extract_future.poll(cx));
                     let extract = state.take().expect(POLL_AFTER_READY);
                     extract
                         .transition(
-                            key_parts,
+                            request,
+                            cache_key,
+                            request_tags,
                             &*this.configs,
                             this.backend.clone(),
                             &mut *this.upstream,

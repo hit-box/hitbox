@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use moka::Expiry;
 use moka::future::{Cache, CacheBuilder};
 use moka::policy::EvictionPolicy;
@@ -11,6 +11,7 @@ use crate::backend::MokaBackend;
 use hitbox::{BackendLabel, CacheKey, CacheValue, Raw};
 use hitbox_backend::format::{Format, JsonFormat};
 use hitbox_backend::{CacheKeyFormat, Compressor, PassthroughCompressor};
+use hitbox_core::CacheTag;
 
 /// Custom expiration policy that calculates TTL from [`CacheValue::expire`] timestamps.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -54,6 +55,16 @@ impl Expiration {
             }
         })
     }
+}
+
+/// Builds the dedicated, unbounded tag invalidation store.
+///
+/// Tag records (`CacheTag` → `DateTime<Utc>`) are kept apart from the data
+/// cache so data write pressure can never evict an invalidation record.
+/// No `max_capacity` is set, so the store never evicts; there is also no
+/// expiry — records persist for the process lifetime.
+fn build_tag_cache() -> Cache<CacheTag, DateTime<Utc>> {
+    Cache::builder().build()
 }
 
 /// Marker type: capacity has not been configured yet.
@@ -397,6 +408,7 @@ where
 
         MokaBackend {
             cache,
+            tags: build_tag_cache(),
             key_format: self.key_format,
             serializer: self.serializer,
             compressor: self.compressor,
@@ -429,6 +441,7 @@ where
 
         MokaBackend {
             cache,
+            tags: build_tag_cache(),
             key_format: self.key_format,
             serializer: self.serializer,
             compressor: self.compressor,

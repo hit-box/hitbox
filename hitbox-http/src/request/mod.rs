@@ -4,6 +4,7 @@ pub use crate::predicates::request::predicate;
 use hitbox::{
     CacheablePolicyData, RequestCachePolicy,
     predicate::{Predicate, PredicateResult},
+    tag::{CacheTag, TagExtractor},
     {CachePolicy, CacheableRequest, Extractor},
 };
 use http::{Request, request::Parts};
@@ -149,31 +150,47 @@ where
     ReqBody: HttpBody + Send + 'static,
     ReqBody::Error: Send,
 {
-    type CachePolicyFuture<'a, P, E>
-        = std::pin::Pin<Box<dyn std::future::Future<Output = RequestCachePolicy<Self>> + Send + 'a>>
-    where
-        Self: 'a,
-        P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
-
-    fn cache_policy<'a, P, E>(
-        self,
-        predicates: P,
-        extractors: E,
-    ) -> Self::CachePolicyFuture<'a, P, E>
+    type CachePolicyFuture<'a, P, E, TE>
+        = std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = (RequestCachePolicy<Self>, Vec<CacheTag>)> + Send + 'a,
+        >,
+    >
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
         E: Extractor<Subject = Self> + Send + Sync + 'a,
+        TE: TagExtractor<Subject = Self> + Send + Sync + 'a;
+
+    fn cache_policy<'a, P, E, TE>(
+        self,
+        predicates: P,
+        extractors: E,
+        tag_extractor: Option<TE>,
+    ) -> Self::CachePolicyFuture<'a, P, E, TE>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
+        TE: TagExtractor<Subject = Self> + Send + Sync + 'a,
     {
         Box::pin(async move {
             let (request, key) = extractors.get(self).await.into_cache_key();
 
             match predicates.check(request).await {
                 PredicateResult::Cacheable(request) => {
-                    CachePolicy::Cacheable(CacheablePolicyData { key, request })
+                    let (request, tags) = match tag_extractor {
+                        Some(te) => te.extract_tags(request).await,
+                        None => (request, Vec::new()),
+                    };
+                    (
+                        CachePolicy::Cacheable(CacheablePolicyData { key, request }),
+                        tags,
+                    )
                 }
-                PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),
+                PredicateResult::NonCacheable(request) => {
+                    (CachePolicy::NonCacheable(request), Vec::new())
+                }
             }
         })
     }

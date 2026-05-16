@@ -6,6 +6,8 @@ use chrono::Utc;
 use cucumber::gherkin::Step;
 use cucumber::when;
 use hitbox::concurrency::BroadcastConcurrencyManager;
+use hitbox::tag::CacheTag;
+use hitbox_backend::Backend;
 use hitbox_tower::Cache;
 use hurl::{
     runner::{VariableSet, request::eval_request},
@@ -40,6 +42,17 @@ async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Err
         .map_err(|err| anyhow!("hurl request error {:?}", err))?;
 
     world.execute_request(&request).await?;
+    Ok(())
+}
+
+#[when(expr = "tag {string} is invalidated")]
+async fn invalidate_tag(world: &mut HitboxWorld, tag: String) -> Result<(), Error> {
+    let cache_tag = CacheTag::new(tag);
+    world
+        .backend
+        .invalidate(&cache_tag)
+        .await
+        .map_err(|err| anyhow!("backend invalidate failed: {err:?}"))?;
     Ok(())
 }
 

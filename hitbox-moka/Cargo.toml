@@ -22,6 +22,7 @@ hitbox-backend = { path = "../hitbox-backend", version = "0.2" }
 hitbox = { path = "../hitbox", version = "0.2" }
 hitbox-core = { path = "../hitbox-core", version = "0.2" }
 async-trait = { workspace = true }
+futures = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

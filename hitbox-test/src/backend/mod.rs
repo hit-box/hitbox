@@ -3,9 +3,10 @@ use std::future::Ready;
 use chrono::{DateTime, Utc};
 use hitbox_backend::format::FormatExt;
 use hitbox_backend::{Backend, CacheBackend, CacheKeyFormat, DeleteStatus};
+use hitbox_core::tag::{CacheTag, CacheTags, TagExtractor};
 use hitbox_core::{
     BoxContext, CacheContext, CacheKey, CachePolicy, CacheValue, CacheableResponse,
-    EntityPolicyConfig, ResponseCachePolicy,
+    EntityPolicyConfig, Predicate, ResponseCachePolicy,
 };
 use serde::{Deserialize, Serialize};
 
@@ -37,16 +38,21 @@ impl CacheableResponse for TestResponse {
     type IntoCachedFuture = Ready<CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = Ready<Self>;
 
-    async fn cache_policy<P>(
+    async fn cache_policy<P, TE>(
         self,
         _predicates: P,
+        _tag_extractor: Option<TE>,
         _config: &EntityPolicyConfig,
-    ) -> ResponseCachePolicy<Self>
+    ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where
-        P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
+        P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
     {
         // Always cacheable for testing
-        CachePolicy::Cacheable(CacheValue::new(self.clone(), None, None))
+        (
+            CachePolicy::Cacheable(CacheValue::new(self.clone(), None, None)),
+            Vec::new(),
+        )
     }
 
     fn into_cached(self) -> Self::IntoCachedFuture {
@@ -81,6 +87,11 @@ pub async fn run_backend_tests<B: CacheBackend + Send + Sync>(backend: &B) {
     test_stale_metadata_exact_match(backend).await;
     test_expire_and_stale_combined(backend).await;
     test_no_metadata(backend).await;
+    test_tags_round_trip(backend).await;
+    test_request_only_tags_round_trip(backend).await;
+    test_invalidate_then_invalidated(backend).await;
+    test_invalidated_unknown_tags(backend).await;
+    test_invalidate_overwrites_timestamp(backend).await;
 }
 
 async fn test_write_and_read<B: CacheBackend>(backend: &B) {
@@ -469,6 +480,155 @@ async fn test_no_metadata<B: CacheBackend>(backend: &B) {
     assert_eq!(*cached.data(), response, "data should match");
     assert!(cached.expire().is_none(), "expire should be None");
     assert!(cached.stale().is_none(), "stale should be None");
+}
+
+// =============================================================================
+// Tag Storage and Invalidation Tests
+// =============================================================================
+
+async fn test_tags_round_trip<B: CacheBackend>(backend: &B) {
+    let key = CacheKey::from_str("test", "tags-both-sides");
+    let response = TestResponse::new(300, "tags-test", vec![1, 2, 3]);
+    let tags = CacheTags::new(
+        vec![CacheTag::new("user:42"), CacheTag::new("region:eu")],
+        vec![CacheTag::new("etag:abc123")],
+    );
+    let value = CacheValue::new(response.clone(), None, None).with_tags(tags.clone());
+
+    let mut ctx: BoxContext = CacheContext::default().boxed();
+    backend
+        .set::<TestResponse>(&key, &value, &mut ctx)
+        .await
+        .expect("failed to write");
+
+    let mut ctx: BoxContext = CacheContext::default().boxed();
+    let result: Option<CacheValue<TestResponse>> = backend
+        .get::<TestResponse>(&key, &mut ctx)
+        .await
+        .expect("failed to read");
+
+    assert!(result.is_some(), "value should exist");
+    let cached = result.unwrap();
+    assert_eq!(*cached.data(), response, "data should match");
+    let read_tags = cached.tags().expect("tags should be present");
+    assert_eq!(read_tags, &tags, "tags should round-trip identically");
+}
+
+async fn test_request_only_tags_round_trip<B: CacheBackend>(backend: &B) {
+    let key = CacheKey::from_str("test", "tags-request-only");
+    let response = TestResponse::new(301, "request-tags-test", vec![4, 5, 6]);
+    let tags = CacheTags::request_only(vec![CacheTag::new("tenant:7")]);
+    let value = CacheValue::new(response.clone(), None, None).with_tags(tags.clone());
+
+    let mut ctx: BoxContext = CacheContext::default().boxed();
+    backend
+        .set::<TestResponse>(&key, &value, &mut ctx)
+        .await
+        .expect("failed to write");
+
+    let mut ctx: BoxContext = CacheContext::default().boxed();
+    let result: Option<CacheValue<TestResponse>> = backend
+        .get::<TestResponse>(&key, &mut ctx)
+        .await
+        .expect("failed to read");
+
+    let cached = result.expect("value should exist");
+    let read_tags = cached.tags().expect("tags should be present");
+    assert_eq!(
+        read_tags.request,
+        Some(vec![CacheTag::new("tenant:7")]),
+        "request tags should round-trip"
+    );
+    assert_eq!(
+        read_tags.response, None,
+        "response side should remain None (unconfigured)"
+    );
+}
+
+async fn test_invalidate_then_invalidated<B: CacheBackend>(backend: &B) {
+    let tag = CacheTag::new("invalidate-test:basic");
+
+    // Compare at ms precision — backends may truncate timestamps to milliseconds.
+    let before = Utc::now().timestamp_millis();
+    backend
+        .invalidate(&tag)
+        .await
+        .expect("invalidate should succeed");
+    let after = Utc::now().timestamp_millis();
+
+    let timestamps = backend
+        .invalidated(std::slice::from_ref(&tag))
+        .await
+        .expect("invalidated lookup should succeed");
+
+    let ts = timestamps
+        .get(&tag)
+        .expect("timestamp should be present for invalidated tag")
+        .timestamp_millis();
+    assert!(
+        ts >= before && ts <= after,
+        "invalidation timestamp should fall within the call window (ms): ts={}, before={}, after={}",
+        ts,
+        before,
+        after
+    );
+}
+
+async fn test_invalidated_unknown_tags<B: CacheBackend>(backend: &B) {
+    let unknown = vec![
+        CacheTag::new("unknown:never-invalidated-1"),
+        CacheTag::new("unknown:never-invalidated-2"),
+    ];
+
+    let timestamps = backend
+        .invalidated(&unknown)
+        .await
+        .expect("invalidated lookup should succeed");
+
+    assert!(
+        timestamps.is_empty(),
+        "unknown tags should produce an empty map: got {:?}",
+        timestamps
+    );
+}
+
+async fn test_invalidate_overwrites_timestamp<B: CacheBackend>(backend: &B) {
+    let tag = CacheTag::new("invalidate-test:overwrite");
+
+    backend
+        .invalidate(&tag)
+        .await
+        .expect("first invalidate should succeed");
+    let first = backend
+        .invalidated(std::slice::from_ref(&tag))
+        .await
+        .expect("first lookup should succeed")
+        .get(&tag)
+        .copied()
+        .expect("first timestamp should be present");
+
+    // Sleep just enough to guarantee a strictly later timestamp regardless of
+    // backend storage precision (some backends store at ms precision).
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+
+    backend
+        .invalidate(&tag)
+        .await
+        .expect("second invalidate should succeed");
+    let second = backend
+        .invalidated(std::slice::from_ref(&tag))
+        .await
+        .expect("second lookup should succeed")
+        .get(&tag)
+        .copied()
+        .expect("second timestamp should be present");
+
+    assert!(
+        second > first,
+        "second invalidate should write a strictly later timestamp: first={:?}, second={:?}",
+        first,
+        second
+    );
 }
 
 /// Test UrlEncoded key + JSON value format

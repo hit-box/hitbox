@@ -2,10 +2,15 @@ use std::num::NonZeroU8;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::core::{BoxExtractor, HitboxWorld, StepExt};
+use crate::core::{
+    BoxExtractor, BoxRequestTagExtractor, BoxResponseTagExtractor, HitboxWorld, StepExt,
+};
 use crate::handler_state::HandlerName;
 use hitbox::offload::OffloadManager;
 use hitbox::policy;
+use hitbox_configuration::extractors::tag::{
+    self as tag_config, RequestTagExtractor, ResponseTagExtractor,
+};
 use hitbox_configuration::{Request, Response, extractors::Extractor};
 use hitbox_http::extractors::NeutralExtractor;
 
@@ -36,6 +41,22 @@ impl From<StalePolicy> for policy::StalePolicy {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+enum TagInvalidation {
+    #[default]
+    Check,
+    Skip,
+}
+
+impl From<TagInvalidation> for policy::TagInvalidation {
+    fn from(t: TagInvalidation) -> Self {
+        match t {
+            TagInvalidation::Check => policy::TagInvalidation::Check,
+            TagInvalidation::Skip => policy::TagInvalidation::Skip,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct CacheBehaviorPolicy {
     #[serde(default)]
@@ -59,6 +80,8 @@ struct EnabledCacheConfig {
     #[serde(default)]
     policy: CacheBehaviorPolicy,
     concurrency: Option<NonZeroU8>,
+    #[serde(default)]
+    tag_invalidation: TagInvalidation,
 }
 
 impl Default for EnabledCacheConfig {
@@ -68,6 +91,7 @@ impl Default for EnabledCacheConfig {
             stale: None,
             policy: CacheBehaviorPolicy::default(),
             concurrency: None,
+            tag_invalidation: TagInvalidation::default(),
         }
     }
 }
@@ -79,6 +103,7 @@ impl From<EnabledCacheConfig> for policy::EnabledCacheConfig {
             stale: s.stale,
             policy: s.policy.into(),
             concurrency: s.concurrency,
+            tag_invalidation: s.tag_invalidation.into(),
         }
     }
 }
@@ -156,6 +181,34 @@ async fn key_extractors(world: &mut HitboxWorld, step: &Step) -> Result<(), Erro
         |inner, item| item.into_extractors(inner),
     )?;
     world.config.extractor = Arc::new(extractors);
+    Ok(())
+}
+
+#[given(expr = "tags")]
+async fn tags(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+    #[derive(Serialize, Deserialize, Default)]
+    struct Config {
+        #[serde(default)]
+        request: Vec<RequestTagExtractor>,
+        #[serde(default)]
+        response: Vec<ResponseTagExtractor>,
+    }
+    let config = serde_saphyr::from_str::<Config>(
+        step.docstring_content()
+            .ok_or(anyhow!("Missing tags configuration"))?
+            .as_str(),
+    )?;
+
+    if !config.request.is_empty() {
+        let request_tag_extractor: BoxRequestTagExtractor =
+            tag_config::request::build_request_boxed::<axum::body::Body>(config.request)?;
+        world.config.request_tag_extractor = Arc::new(request_tag_extractor);
+    }
+    if !config.response.is_empty() {
+        let response_tag_extractor: BoxResponseTagExtractor =
+            tag_config::build_response_boxed(config.response);
+        world.config.response_tag_extractor = Arc::new(response_tag_extractor);
+    }
     Ok(())
 }
 

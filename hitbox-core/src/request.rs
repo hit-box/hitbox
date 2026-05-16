@@ -17,7 +17,10 @@
 
 use std::future::Future;
 
-use crate::{CacheKey, CachePolicy, extractor::Extractor, predicate::Predicate};
+use crate::{
+    CacheKey, CachePolicy, extractor::Extractor, predicate::Predicate, tag::CacheTag,
+    tag::TagExtractor,
+};
 
 /// A cacheable request bundled with its generated cache key.
 ///
@@ -66,25 +69,40 @@ pub trait CacheableRequest: Sized {
     ///
     /// Uses GAT to properly capture the lifetime of `Self`, allowing
     /// request types with non-`'static` references.
-    type CachePolicyFuture<'a, P, E>: Future<Output = RequestCachePolicy<Self>> + Send + 'a
+    type CachePolicyFuture<'a, P, E, TE>: Future<Output = (RequestCachePolicy<Self>, Vec<CacheTag>)>
+        + Send
+        + 'a
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
+        TE: TagExtractor<Subject = Self> + Send + Sync + 'a;
 
-    /// Determine if this request should be cached and extract its key.
+    /// Determine if this request should be cached, extract its key, and
+    /// (optionally) extract request-side cache tags.
+    ///
+    /// Tag extraction runs only when the request is cacheable **and**
+    /// `tag_extractor` is `Some`. When it is `None`, no extractor future is
+    /// constructed at all (used to skip extraction entirely via
+    /// [`TagInvalidation::Skip`](crate::policy::TagInvalidation)); the
+    /// returned tag list is empty. Non-cacheable requests also yield an
+    /// empty tag list.
     ///
     /// # Arguments
     ///
     /// * `predicates` - Predicates to evaluate whether the request is cacheable
     /// * `extractors` - Extractors to generate the cache key
-    fn cache_policy<'a, P, E>(
+    /// * `tag_extractor` - Optional extractor for request-side cache tags;
+    ///   `None` skips tag extraction
+    fn cache_policy<'a, P, E, TE>(
         self,
         predicates: P,
         extractors: E,
-    ) -> Self::CachePolicyFuture<'a, P, E>
+        tag_extractor: Option<TE>,
+    ) -> Self::CachePolicyFuture<'a, P, E, TE>
     where
         Self: 'a,
         P: Predicate<Subject = Self> + Send + Sync + 'a,
-        E: Extractor<Subject = Self> + Send + Sync + 'a;
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
+        TE: TagExtractor<Subject = Self> + Send + Sync + 'a;
 }

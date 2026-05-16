@@ -34,7 +34,6 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use chrono::Utc;
 use pin_project::pin_project;
 
 use crate::{
@@ -93,8 +92,8 @@ pub enum CacheState<Cached> {
 /// use hitbox_core::{CacheableResponse, CachePolicy, EntityPolicyConfig};
 /// use hitbox_core::predicate::{Predicate, PredicateResult};
 /// use hitbox_core::response::ResponseCachePolicy;
+/// use hitbox_core::tag::{CacheTag, TagExtractor};
 /// use hitbox_core::value::CacheValue;
-/// use chrono::Utc;
 ///
 /// #[derive(Clone)]
 /// struct MyResponse {
@@ -108,24 +107,31 @@ pub enum CacheState<Cached> {
 ///     type IntoCachedFuture = std::future::Ready<CachePolicy<String, Self>>;
 ///     type FromCachedFuture = std::future::Ready<Self>;
 ///
-///     async fn cache_policy<P>(
+///     async fn cache_policy<P, TE>(
 ///         self,
 ///         predicates: P,
+///         tag_extractor: Option<TE>,
 ///         config: &EntityPolicyConfig,
-///     ) -> ResponseCachePolicy<Self>
+///     ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
 ///     where
 ///         P: Predicate<Subject = Self::Subject> + Send + Sync,
+///         TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
 ///     {
 ///         match predicates.check(self).await {
 ///             PredicateResult::Cacheable(data) => {
+///                 let (data, tags) = match tag_extractor {
+///                     Some(te) => te.extract_tags(data).await,
+///                     None => (data, Vec::new()),
+///                 };
 ///                 let cached = data.body.clone();
-///                 CachePolicy::Cacheable(CacheValue::new(
-///                     cached,
-///                     config.ttl.map(|d| Utc::now() + d),
-///                     config.stale_ttl.map(|d| Utc::now() + d),
-///                 ))
+///                 (
+///                     CachePolicy::Cacheable(CacheValue::from_config(cached, config)),
+///                     tags,
+///                 )
 ///             }
-///             PredicateResult::NonCacheable(data) => CachePolicy::NonCacheable(data),
+///             PredicateResult::NonCacheable(data) => {
+///                 (CachePolicy::NonCacheable(data), Vec::new())
+///             }
 ///         }
 ///     }
 ///
@@ -158,22 +164,33 @@ where
     /// Future type for `from_cached` method.
     type FromCachedFuture: Future<Output = Self> + Send;
 
-    /// Determine if this response should be cached.
+    /// Determine if this response should be cached and (optionally) extract
+    /// response tags.
     ///
-    /// Applies predicates to determine cacheability, then converts cacheable
-    /// responses to their cached representation with TTL metadata.
+    /// Applies predicates to determine cacheability and converts cacheable
+    /// responses to their cached representation with TTL metadata. The
+    /// response tag extractor runs only when the response is cacheable
+    /// **and** `tag_extractor` is `Some`. When it is `None`, no extractor
+    /// future is constructed (used to skip extraction entirely via
+    /// [`TagInvalidation::Skip`](crate::policy::TagInvalidation)); the
+    /// returned tag list is empty. Non-cacheable responses also yield an
+    /// empty tag list.
     ///
     /// # Arguments
     ///
     /// * `predicates` - Predicates to evaluate whether the response is cacheable
+    /// * `tag_extractor` - Optional extractor for response-side cache tags;
+    ///   `None` skips tag extraction
     /// * `config` - TTL configuration for the cached entry
-    fn cache_policy<P>(
+    fn cache_policy<P, TE>(
         self,
         predicates: P,
+        tag_extractor: Option<TE>,
         config: &EntityPolicyConfig,
-    ) -> impl Future<Output = ResponseCachePolicy<Self>> + Send
+    ) -> impl Future<Output = (ResponseCachePolicy<Self>, Vec<crate::tag::CacheTag>)> + Send
     where
-        P: Predicate<Subject = Self::Subject> + Send + Sync;
+        P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: crate::tag::TagExtractor<Subject = Self::Subject> + Send + Sync;
 
     /// Convert this response to its cached representation.
     ///
@@ -200,24 +217,31 @@ macro_rules! impl_cacheable_response_for_scalar {
                 type IntoCachedFuture = std::future::Ready<CachePolicy<Self, Self>>;
                 type FromCachedFuture = std::future::Ready<Self>;
 
-                async fn cache_policy<P>(
+                async fn cache_policy<P, TE>(
                     self,
                     predicates: P,
+                    tag_extractor: Option<TE>,
                     config: &EntityPolicyConfig,
-                ) -> ResponseCachePolicy<Self>
+                ) -> (ResponseCachePolicy<Self>, Vec<crate::tag::CacheTag>)
                 where
                     P: Predicate<Subject = Self::Subject> + Send + Sync,
+                    TE: crate::tag::TagExtractor<Subject = Self::Subject> + Send + Sync,
                 {
                     match predicates.check(self).await {
                         PredicateResult::Cacheable(data) => {
+                            let (data, tags) = match tag_extractor {
+                    Some(te) => te.extract_tags(data).await,
+                    None => (data, Vec::new()),
+                };
                             let cached = data.clone();
-                            CachePolicy::Cacheable(CacheValue::new(
-                                cached,
-                                config.ttl.map(|d| Utc::now() + d),
-                                config.stale_ttl.map(|d| Utc::now() + d),
-                            ))
+                            (
+                                CachePolicy::Cacheable(CacheValue::from_config(cached, config)),
+                                tags,
+                            )
                         }
-                        PredicateResult::NonCacheable(data) => CachePolicy::NonCacheable(data),
+                        PredicateResult::NonCacheable(data) => {
+                            (CachePolicy::NonCacheable(data), Vec::new())
+                        }
                     }
                 }
 
@@ -257,24 +281,29 @@ where
     type IntoCachedFuture = std::future::Ready<CachePolicy<Self, Self>>;
     type FromCachedFuture = std::future::Ready<Self>;
 
-    async fn cache_policy<P>(
+    async fn cache_policy<P, TE>(
         self,
         predicates: P,
+        tag_extractor: Option<TE>,
         config: &EntityPolicyConfig,
-    ) -> ResponseCachePolicy<Self>
+    ) -> (ResponseCachePolicy<Self>, Vec<crate::tag::CacheTag>)
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: crate::tag::TagExtractor<Subject = Self::Subject> + Send + Sync,
     {
         match predicates.check(self).await {
             PredicateResult::Cacheable(data) => {
+                let (data, tags) = match tag_extractor {
+                    Some(te) => te.extract_tags(data).await,
+                    None => (data, Vec::new()),
+                };
                 let cached = data.clone();
-                CachePolicy::Cacheable(CacheValue::new(
-                    cached,
-                    config.ttl.map(|d| Utc::now() + d),
-                    config.stale_ttl.map(|d| Utc::now() + d),
-                ))
+                (
+                    CachePolicy::Cacheable(CacheValue::from_config(cached, config)),
+                    tags,
+                )
             }
-            PredicateResult::NonCacheable(data) => CachePolicy::NonCacheable(data),
+            PredicateResult::NonCacheable(data) => (CachePolicy::NonCacheable(data), Vec::new()),
         }
     }
 
@@ -359,27 +388,38 @@ where
     type IntoCachedFuture = ResultIntoCachedFuture<T, E>;
     type FromCachedFuture = ResultFromCachedFuture<T, E>;
 
-    async fn cache_policy<P>(
+    async fn cache_policy<P, TE>(
         self,
         predicates: P,
+        tag_extractor: Option<TE>,
         config: &EntityPolicyConfig,
-    ) -> ResponseCachePolicy<Self>
+    ) -> (ResponseCachePolicy<Self>, Vec<crate::tag::CacheTag>)
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: crate::tag::TagExtractor<Subject = Self::Subject> + Send + Sync,
     {
         match self {
             Ok(response) => match predicates.check(response).await {
-                PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                    CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
-                        res,
-                        config.ttl.map(|duration| Utc::now() + duration),
-                        config.stale_ttl.map(|duration| Utc::now() + duration),
-                    )),
-                    CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
-                },
-                PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(Ok(res)),
+                PredicateResult::Cacheable(cacheable) => {
+                    let (cacheable, tags) = match tag_extractor {
+                        Some(te) => te.extract_tags(cacheable).await,
+                        None => (cacheable, Vec::new()),
+                    };
+                    match cacheable.into_cached().await {
+                        CachePolicy::Cacheable(res) => (
+                            CachePolicy::Cacheable(CacheValue::from_config(res, config)),
+                            tags,
+                        ),
+                        CachePolicy::NonCacheable(res) => {
+                            (CachePolicy::NonCacheable(Ok(res)), tags)
+                        }
+                    }
+                }
+                PredicateResult::NonCacheable(res) => {
+                    (CachePolicy::NonCacheable(Ok(res)), Vec::new())
+                }
             },
-            Err(error) => ResponseCachePolicy::NonCacheable(Err(error)),
+            Err(error) => (ResponseCachePolicy::NonCacheable(Err(error)), Vec::new()),
         }
     }
 

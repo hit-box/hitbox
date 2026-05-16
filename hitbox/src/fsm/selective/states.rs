@@ -9,8 +9,9 @@
 use std::sync::Arc;
 
 use futures::future::BoxFuture;
+use hitbox_core::tag::{CacheTag, TagExtractor as _};
 use hitbox_core::{
-    CacheConfigs, Cacheable, Extractor as _, KeyParts, Offload, Predicate as _, PredicateResult,
+    CacheConfigs, CacheKey, Cacheable, Extractor as _, Offload, Predicate as _, PredicateResult,
     Upstream,
 };
 use pin_project::pin_project;
@@ -39,10 +40,10 @@ pub enum SelectiveState<'a, Inner, Req, UF> {
         predicate_future: BoxFuture<'a, PredicateResult<Req>>,
         state: Option<CheckPredicate>,
     },
-    /// Matched config — extracting cache key.
+    /// Matched config — extracting cache key and request tags.
     ExtractKey {
         #[pin]
-        extract_future: BoxFuture<'a, KeyParts<Req>>,
+        extract_future: BoxFuture<'a, (Req, CacheKey, Vec<CacheTag>)>,
         state: Option<ExtractKey>,
     },
     /// Running inner CacheFuture from PollCache state.
@@ -112,10 +113,16 @@ impl CheckPredicate {
                 trace!(
                     parent: &self.span,
                     config_index = self.config_index,
-                    "Config matched, extracting cache key"
+                    "Config matched, extracting cache key and request tags"
                 );
                 let ext = configs.configs()[self.config_index].extractors();
-                let extract_future = Box::pin(async move { ext.get(request).await });
+                let tag_ext = configs.configs()[self.config_index].request_tag_extractors();
+                let extract_future = Box::pin(async move {
+                    let key_parts = ext.get(request).await;
+                    let (request, cache_key) = key_parts.into_cache_key();
+                    let (request, request_tags) = tag_ext.extract_tags(request).await;
+                    (request, cache_key, request_tags)
+                });
                 CheckPredicateTransition::ExtractKey {
                     extract_future,
                     config_index: self.config_index,
@@ -192,11 +199,16 @@ impl ExtractKey {
 
     /// Transition from ExtractKey state after extract future completes.
     ///
-    /// Always delegates to CacheFuture starting at PollCache state.
+    /// Receives the request, cache key, and request tags from the extract
+    /// future, and delegates to CacheFuture starting at PollCache state with
+    /// request tags pre-attached for parallel invalidation prefetch and
+    /// the response tag extractor from the matched config.
     #[allow(clippy::type_complexity)]
     pub fn transition<'offload, B, Req, Res, CC, U, CM, O>(
         self,
-        key_parts: KeyParts<Req>,
+        request: Req,
+        cache_key: CacheKey,
+        request_tags: Vec<CacheTag>,
         configs: &CC,
         backend: Arc<B>,
         upstream: &mut Option<U>,
@@ -214,19 +226,21 @@ impl ExtractKey {
         CM: ConcurrencyManager<Res> + 'static,
         O: Offload<'offload>,
     {
-        let (request, cache_key) = key_parts.into_cache_key();
         self.span
             .record("cache.key", cache_key.to_string().as_str());
         debug!(
             parent: &self.span,
             config_index = self.config_index,
             cache.key = %cache_key,
+            request_tags = request_tags.len(),
             "Cache key extracted, delegating to CacheFuture"
         );
 
         let upstream = upstream.take().expect(TAKE_ERROR);
-        let response_predicates = configs.configs()[self.config_index].response_predicates();
-        let policy = configs.configs()[self.config_index].policy();
+        let config = &configs.configs()[self.config_index];
+        let response_predicates = config.response_predicates();
+        let response_tag_extractor = config.response_tag_extractors();
+        let policy = config.policy();
         let offload = offload.take().expect(TAKE_ERROR);
         let concurrency_manager = concurrency_manager.take().expect(TAKE_ERROR);
 
@@ -236,6 +250,8 @@ impl ExtractKey {
             request,
             upstream,
             response_predicates,
+            request_tags,
+            response_tag_extractor,
             policy,
             offload,
             concurrency_manager,

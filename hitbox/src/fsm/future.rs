@@ -13,6 +13,7 @@ use std::{
 
 use crate::{CacheContext, CacheStatus, CacheableResponse, ResponseSource};
 use futures::ready;
+use hitbox_core::tag::{NeutralTagExtractor, TagExtractor};
 use hitbox_core::{Cacheable, DisabledOffload, Offload, OffloadKey, Upstream};
 use pin_project::pin_project;
 use tracing::{Level, Span, debug, span, trace};
@@ -31,23 +32,40 @@ const POLL_AFTER_READY_ERROR: &str = "CacheFuture can't be polled after finishin
 /// Drives the state machine through: request predicate check → cache lookup →
 /// upstream call (on miss) → response predicate check → cache update → response.
 #[pin_project(project = CacheFutureProj)]
-pub struct CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O = DisabledOffload>
-where
+pub struct CacheFuture<
+    'offload,
+    B,
+    Req,
+    Res,
+    U,
+    ReqP,
+    ResP,
+    E,
+    C,
+    O = DisabledOffload,
+    ReqTE = NeutralTagExtractor<Req>,
+    ResTE = NeutralTagExtractor<<Res as CacheableResponse>::Subject>,
+> where
     U: Upstream<Req, Response = Res>,
     B: CacheBackend,
     Res: CacheableResponse,
-    Req: CacheableRequest,
+    Res::Cached: Send,
+    Res: Send,
+    Req: CacheableRequest + Send,
     ReqP: Predicate<Subject = Req> + Send + Sync,
     ResP: Predicate<Subject = Res::Subject> + Send + Sync,
     E: Extractor<Subject = Req> + Send + Sync,
     C: ConcurrencyManager<Res>,
     O: Offload<'offload>,
+    ReqTE: TagExtractor<Subject = Req> + Send + Sync,
+    ResTE: TagExtractor<Subject = Res::Subject> + Send + Sync,
 {
     backend: Arc<B>,
     cache_key: Option<CacheKey>,
     #[pin]
-    state: State<'offload, Res, Req, U, ReqP, E>,
+    state: State<'offload, Res, Req, U, ReqP, E, ReqTE>,
     response_predicates: Option<ResP>,
+    response_tag_extractors: Option<ResTE>,
     policy: Arc<crate::policy::PolicyConfig>,
     /// Offload for background revalidation (SWR).
     /// Use `DisabledOffload` (the default) to disable background revalidation.
@@ -64,19 +82,39 @@ where
 }
 
 impl<'offload, B, Req, Res, U, ReqP, ResP, E, C, O>
-    CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O>
+    CacheFuture<
+        'offload,
+        B,
+        Req,
+        Res,
+        U,
+        ReqP,
+        ResP,
+        E,
+        C,
+        O,
+        NeutralTagExtractor<Req>,
+        NeutralTagExtractor<<Res as CacheableResponse>::Subject>,
+    >
 where
     U: Upstream<Req, Response = Res>,
     B: CacheBackend,
     Res: CacheableResponse,
-    Req: CacheableRequest,
+    Res::Cached: Send,
+    Res: Send,
+    Req: CacheableRequest + Send,
     ReqP: Predicate<Subject = Req> + Send + Sync,
     ResP: Predicate<Subject = Res::Subject> + Send + Sync,
     E: Extractor<Subject = Req> + Send + Sync,
     C: ConcurrencyManager<Res>,
     O: Offload<'offload>,
 {
-    /// Creates a new cache future with full configuration.
+    /// Creates a new cache future with no tag invalidation.
+    ///
+    /// Uses [`NeutralTagExtractor`] for both request and response tags. Use
+    /// [`new_with_tags`] to enable tag invalidation.
+    ///
+    /// [`new_with_tags`]: Self::new_with_tags
     pub fn new(
         backend: Arc<B>,
         request: Req,
@@ -88,11 +126,59 @@ where
         offload: O,
         concurrency_manager: C,
     ) -> Self {
+        Self::new_with_tags(
+            backend,
+            request,
+            upstream,
+            request_predicates,
+            response_predicates,
+            key_extractors,
+            NeutralTagExtractor::default(),
+            NeutralTagExtractor::default(),
+            policy,
+            offload,
+            concurrency_manager,
+        )
+    }
+}
+
+impl<'offload, B, Req, Res, U, ReqP, ResP, E, C, O, ReqTE, ResTE>
+    CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O, ReqTE, ResTE>
+where
+    U: Upstream<Req, Response = Res>,
+    B: CacheBackend,
+    Res: CacheableResponse,
+    Res::Cached: Send,
+    Res: Send,
+    Req: CacheableRequest + Send,
+    ReqP: Predicate<Subject = Req> + Send + Sync,
+    ResP: Predicate<Subject = Res::Subject> + Send + Sync,
+    E: Extractor<Subject = Req> + Send + Sync,
+    C: ConcurrencyManager<Res>,
+    O: Offload<'offload>,
+    ReqTE: TagExtractor<Subject = Req> + Send + Sync,
+    ResTE: TagExtractor<Subject = Res::Subject> + Send + Sync,
+{
+    /// Creates a new cache future with explicit request and response tag extractors.
+    pub fn new_with_tags(
+        backend: Arc<B>,
+        request: Req,
+        upstream: U,
+        request_predicates: ReqP,
+        response_predicates: ResP,
+        key_extractors: E,
+        request_tag_extractors: ReqTE,
+        response_tag_extractors: ResTE,
+        policy: Arc<crate::policy::PolicyConfig>,
+        offload: O,
+        concurrency_manager: C,
+    ) -> Self {
         let parent_span = span!(Level::DEBUG, "hitbox.cache");
         let initial_state = states::Initial::new(
             request,
             request_predicates,
             key_extractors,
+            request_tag_extractors,
             CacheContext::default().boxed(),
             upstream,
             &parent_span,
@@ -102,6 +188,7 @@ where
             cache_key: None,
             state: State::Initial(Some(initial_state)),
             response_predicates: Some(response_predicates),
+            response_tag_extractors: Some(response_tag_extractors),
             policy,
             offload,
             is_revalidation: false,
@@ -125,13 +212,17 @@ impl<'offload, B, Req, Res, U, ReqP, ResP, E>
         E,
         NoopConcurrencyManager,
         hitbox_core::DisabledOffload,
+        NeutralTagExtractor<Req>,
+        NeutralTagExtractor<<Res as CacheableResponse>::Subject>,
     >
 where
     U: Upstream<Req, Response = Res>,
     U::Future: Send + 'offload,
     B: CacheBackend,
     Res: CacheableResponse,
-    Req: CacheableRequest,
+    Res::Cached: Send,
+    Res: Send,
+    Req: CacheableRequest + Send,
     ReqP: Predicate<Subject = Req> + Send + Sync,
     ResP: Predicate<Subject = Res::Subject> + Send + Sync,
     E: Extractor<Subject = Req> + Send + Sync,
@@ -178,6 +269,7 @@ where
                 state: Some(state),
             },
             response_predicates: Some(response_predicates),
+            response_tag_extractors: Some(NeutralTagExtractor::default()),
             policy,
             // Revalidation tasks don't spawn further revalidation
             offload: DisabledOffload,
@@ -191,52 +283,60 @@ where
     }
 }
 
-impl<'offload, B, Req, Res, U, ReqP, ResP, E, C, O>
-    CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O>
+impl<'offload, B, Req, Res, U, ReqP, ResP, E, C, O, ReqTE, ResTE>
+    CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O, ReqTE, ResTE>
 where
     U: Upstream<Req, Response = Res>,
     B: CacheBackend + Send + Sync + 'static,
     Res: CacheableResponse,
     Res::Cached: Cacheable + Send,
-    Req: CacheableRequest,
+    Req: CacheableRequest + Send,
     ReqP: Predicate<Subject = Req> + Send + Sync,
     ResP: Predicate<Subject = Res::Subject> + Send + Sync,
     E: Extractor<Subject = Req> + Send + Sync,
     C: ConcurrencyManager<Res>,
     O: Offload<'offload>,
+    ReqTE: TagExtractor<Subject = Req> + Send + Sync,
+    ResTE: TagExtractor<Subject = Res::Subject> + Send + Sync,
 {
     /// Create a CacheFuture starting at `PollCache` state, skipping predicate
     /// evaluation and key extraction.
     ///
-    /// Used by [`SelectiveCacheFuture`](super::SelectiveCacheFuture) after the routing FSM has already evaluated
-    /// request predicates and extracted the cache key.
+    /// Used by [`SelectiveCacheFuture`](super::SelectiveCacheFuture) after the
+    /// routing FSM has already evaluated request predicates and extracted the
+    /// cache key. Pre-extracted request tags are checked in parallel with the
+    /// cache read; the response tag extractor is applied at write time
+    /// (see [`CheckResponseCachePolicy`](states::CheckResponseCachePolicy)).
     ///
-    /// Note: `ReqP` and `E` are phantom types in this path — the FSM starts
-    /// past the states that use them (same pattern as [`revalidate`](Self::revalidate)).
+    /// For the no-tags case, pass an empty `request_tags` Vec and
+    /// [`NeutralTagExtractor`] — the parallel tag fetch is skipped entirely
+    /// when tags are empty.
+    #[allow(clippy::too_many_arguments)]
     pub fn poll_cache(
         backend: Arc<B>,
         cache_key: CacheKey,
         request: Req,
         upstream: U,
         response_predicates: ResP,
+        request_tags: Vec<hitbox_core::tag::CacheTag>,
+        response_tag_extractor: ResTE,
         policy: Arc<crate::policy::PolicyConfig>,
         offload: O,
         concurrency_manager: C,
-    ) -> Self {
+    ) -> Self
+    where
+        ResTE: 'static,
+    {
         let parent_span = span!(Level::DEBUG, "hitbox.cache");
-        let cache_key_for_get = cache_key.clone();
-        let backend_for_get = backend.clone();
-        let mut ctx = CacheContext::default().boxed();
-        let poll_cache = Box::pin(async move {
-            let result = backend_for_get
-                .get::<Res>(&cache_key_for_get, &mut ctx)
-                .await;
-            debug!(
-                found = result.as_ref().map(|r| r.is_some()).unwrap_or(false),
-                "FSM cache lookup result"
-            );
-            (result, ctx)
-        });
+        let ctx = CacheContext::default().boxed();
+        let tag_invalidation_enabled = policy.tag_invalidation_enabled();
+        let poll_cache = states::PollCacheWithTagsFuture::build::<Res, B>(
+            backend.clone(),
+            cache_key.clone(),
+            ctx,
+            request_tags,
+            tag_invalidation_enabled,
+        );
         let poll_cache_state =
             states::PollCache::new(request, cache_key.clone(), upstream, &parent_span);
 
@@ -248,6 +348,7 @@ where
                 state: Some(poll_cache_state),
             },
             response_predicates: Some(response_predicates),
+            response_tag_extractors: Some(response_tag_extractor),
             policy,
             offload,
             is_revalidation: false,
@@ -259,8 +360,8 @@ where
     }
 }
 
-impl<'offload, B, Req, Res, U, ReqP, ResP, E, C, O> Future
-    for CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O>
+impl<'offload, B, Req, Res, U, ReqP, ResP, E, C, O, ReqTE, ResTE> Future
+    for CacheFuture<'offload, B, Req, Res, U, ReqP, ResP, E, C, O, ReqTE, ResTE>
 where
     U: Upstream<Req, Response = Res> + Send + 'offload,
     U::Future: Send + 'offload,
@@ -273,6 +374,8 @@ where
     E: Extractor<Subject = Req> + Send + Sync + 'offload,
     C: ConcurrencyManager<Res> + 'static,
     O: Offload<'offload>,
+    ReqTE: TagExtractor<Subject = Req> + Send + Sync + 'offload,
+    ResTE: TagExtractor<Subject = Res::Subject> + Send + Sync + 'static,
 {
     type Output = (Res, CacheContext);
 
@@ -294,22 +397,30 @@ where
                 } => {
                     let state_ref = state.as_ref().expect(POLL_AFTER_READY_ERROR);
                     trace!(parent: &state_ref.span, "FSM state: CheckRequestCachePolicy");
-                    let policy = ready!(cache_policy_future.poll(cx));
+                    let (policy, request_tags) = ready!(cache_policy_future.poll(cx));
                     let check_state = state.take().expect(POLL_AFTER_READY_ERROR);
 
+                    let tag_invalidation_enabled = this.policy.tag_invalidation_enabled();
                     check_state
-                        .transition(policy, this.backend.clone(), this.cache_key)
+                        .transition(
+                            policy,
+                            request_tags,
+                            this.backend.clone(),
+                            tag_invalidation_enabled,
+                            this.cache_key,
+                        )
                         .into_state(&*this.span)
                 }
                 StateProj::PollCache { poll_cache, state } => {
                     let state_ref = state.as_ref().expect(POLL_AFTER_READY_ERROR);
                     trace!(parent: &state_ref.span, "FSM state: PollCache");
-                    let (cache_result, ctx) = ready!(poll_cache.poll(cx));
+                    let (cache_result, tag_invalidation, ctx) = ready!(poll_cache.poll(cx));
                     let poll_cache_state = state.take().expect(POLL_AFTER_READY_ERROR);
 
                     poll_cache_state
                         .transition(
                             cache_result,
+                            tag_invalidation,
                             ctx,
                             this.backend.clone(),
                             this.policy.as_ref(),
@@ -400,9 +511,18 @@ where
                         .response_predicates
                         .take()
                         .expect("Response predicates already taken");
+                    let response_tag_extractor = this
+                        .response_tag_extractors
+                        .take()
+                        .expect("Response tag extractor already taken");
 
                     poll_upstream
-                        .transition(upstream_result, predicates, this.policy.as_ref())
+                        .transition(
+                            upstream_result,
+                            predicates,
+                            response_tag_extractor,
+                            this.policy.as_ref(),
+                        )
                         .into_state(&*this.span)
                 }
                 StateProj::CheckResponseCachePolicy {
@@ -411,11 +531,16 @@ where
                 } => {
                     let state_ref = state.as_ref().expect(POLL_AFTER_READY_ERROR);
                     trace!(parent: &state_ref.span, "FSM state: CheckResponseCachePolicy");
-                    let policy = ready!(cache_policy.poll(cx));
+                    let (policy, response_tags) = ready!(cache_policy.poll(cx));
                     let check_state = state.take().expect(POLL_AFTER_READY_ERROR);
 
                     check_state
-                        .transition(policy, this.backend.clone(), &*this.concurrency_manager)
+                        .transition(
+                            policy,
+                            response_tags,
+                            this.backend.clone(),
+                            &*this.concurrency_manager,
+                        )
                         .into_state(&*this.span)
                 }
                 StateProj::UpdateCache {
