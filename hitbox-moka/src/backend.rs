@@ -1,12 +1,17 @@
 //! Moka backend implementation.
 
+use std::collections::HashMap;
+
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use futures::future::join_all;
 use hitbox::{BackendLabel, CacheKey, CacheValue, Raw};
 use hitbox_backend::Backend;
 use hitbox_backend::format::{Format, JsonFormat};
 use hitbox_backend::{
     BackendResult, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor,
 };
+use hitbox_core::CacheTag;
 use moka::future::Cache;
 
 /// In-memory cache backend powered by Moka.
@@ -50,6 +55,17 @@ use moka::future::Cache;
 /// - **Write operations**: Fine-grained locking, O(1) average
 /// - **Memory**: Bounded by `max_capacity` entries
 ///
+/// # Tag Invalidation Storage
+///
+/// Tag invalidation timestamps are kept in a **separate, unbounded** Moka
+/// cache rather than sharing the data cache's eviction budget. This
+/// matters for correctness: if a tag's invalidation record were evicted
+/// under data write pressure, a subsequent read would see "no record" and
+/// incorrectly treat the entry as never invalidated, serving stale data.
+/// The dedicated tag store has no size cap and no expiry — records are
+/// tiny (`CacheTag` → `DateTime<Utc>`) and persist for the process
+/// lifetime.
+///
 /// # Caveats
 ///
 /// - Data is **not persisted** — cache is lost on process restart
@@ -68,6 +84,12 @@ where
     C: Compressor,
 {
     pub(crate) cache: Cache<CacheKey, CacheValue<Raw>>,
+    /// Dedicated, unbounded store for tag invalidation timestamps.
+    ///
+    /// Kept separate from `cache` so data write pressure can never evict a
+    /// tag invalidation record (which would silently break invalidation —
+    /// see the type-level "Tag Invalidation Storage" docs).
+    pub(crate) tags: Cache<CacheTag, DateTime<Utc>>,
     pub(crate) key_format: CacheKeyFormat,
     pub(crate) serializer: S,
     pub(crate) compressor: C,
@@ -193,6 +215,35 @@ where
 
     fn compressor(&self) -> &dyn Compressor {
         &self.compressor
+    }
+
+    /// Records a tag invalidation in the dedicated, unbounded tag store.
+    ///
+    /// Overrides the default `Backend` impl (which would route through
+    /// `write` and share the data cache's eviction budget).
+    async fn invalidate(&self, tag: &CacheTag) -> BackendResult<()> {
+        self.tags.insert(tag.clone(), Utc::now()).await;
+        Ok(())
+    }
+
+    /// Looks up invalidation timestamps from the dedicated tag store.
+    ///
+    /// Lookups run concurrently. Tags with no record are absent from the
+    /// returned map (never invalidated). Overrides the default `Backend`
+    /// impl.
+    async fn invalidated(
+        &self,
+        tags: &[CacheTag],
+    ) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
+        let lookups = tags.iter().map(|tag| async move {
+            self.tags.get(tag).await.map(|ts| (tag.clone(), ts))
+        });
+        let result = join_all(lookups)
+            .await
+            .into_iter()
+            .flatten()
+            .collect();
+        Ok(result)
     }
 }
 
