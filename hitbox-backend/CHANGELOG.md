@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `ValueEnvelope`: a reusable, zero-copy value envelope for backends without native TTL/metadata storage (e.g. S3, FeOxDB). Packs `expire`/`stale` into a fixed little-endian header (with a version byte for forward compatibility) followed by the raw, un-re-serialized payload bytes.
+
 ## [0.2.1] - 2026-02-05
 
 ### Changed

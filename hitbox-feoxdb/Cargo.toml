@@ -1,6 +1,6 @@
 [package]
 name = "hitbox-feoxdb"
-version = "0.2.1"
+version = "0.3.0"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -26,11 +26,11 @@ tokio = { workspace = true, features = ["sync", "rt"] }
 # Time handling
 chrono.workspace = true
 
-# Serialization
-serde = { workspace = true }
-serde_bytes = "0.11"
+# Serialization (bincode is used to serialize cache keys)
 bincode.workspace = true
-bytes = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
 
 # Error handling
 thiserror.workspace = true
@@ -38,3 +38,4 @@ thiserror.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = "3"
+bytes = { workspace = true }

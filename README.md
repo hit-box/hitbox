@@ -254,6 +254,7 @@ Backends store cached data. Each backend implements the `Backend` trait with `re
 | Moka | In-memory | `max_capacity` |
 | Redis | Distributed | `connection` (single or cluster mode) |
 | FeOxDB | Embedded | `path` or `in_memory()` |
+| S3 | Object storage (L3) | `bucket`, `endpoint`, `region`, `credentials` |
 
 **Code example**
 
@@ -475,6 +476,7 @@ Change caching rules at runtime - no recompilation needed.
 | `hitbox-moka` | In-memory backend using [Moka](https://github.com/moka-rs/moka) |
 | `hitbox-redis` | Distributed backend using Redis |
 | `hitbox-feoxdb` | Embedded persistent backend using FeOxDB |
+| `hitbox-s3` | Object-storage backend (L3) for S3 / MinIO / R2 / B2 |
 | `hitbox-reqwest` | Client-side caching for [reqwest](https://github.com/seanmonstar/reqwest) via reqwest-middleware |
 
 ## Benchmarks

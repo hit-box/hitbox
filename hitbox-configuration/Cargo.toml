@@ -17,7 +17,7 @@ hitbox-core = { path = "../hitbox-core/", version = "0.2" }
 hitbox-http = { path = "../hitbox-http/", version = "0.2" }
 hitbox-backend = { path = "../hitbox-backend/", version = "0.2" }
 hitbox-moka = { path = "../hitbox-moka/", version = "0.2", optional = true }
-hitbox-feoxdb = { path = "../hitbox-feoxdb/", version = "0.2", optional = true }
+hitbox-feoxdb = { path = "../hitbox-feoxdb/", version = "0.3", optional = true }
 hitbox-redis = { path = "../hitbox-redis/", version = "0.2", optional = true }
 http = { workspace = true }
 hyper = { workspace = true }

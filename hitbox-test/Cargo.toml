@@ -23,7 +23,7 @@ hitbox-core = { path = "../hitbox-core", version = "0.2" }
 hitbox-http = { path = "../hitbox-http", version = "0.2" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.2" }
 hitbox-moka = { path = "../hitbox-moka", version = "0.2" }
-hitbox-feoxdb = { path = "../hitbox-feoxdb", version = "0.2" }
+hitbox-feoxdb = { path = "../hitbox-feoxdb", version = "0.3" }
 hitbox-redis = { path = "../hitbox-redis", version = "0.2" }
 hitbox-tower = { path = "../hitbox-tower", version = "0.2" }
 hitbox-configuration = { path = "../hitbox-configuration", version = "0.2", features = [
