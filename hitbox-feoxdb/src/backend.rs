@@ -4,46 +4,16 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bincode::{
-    config::standard as bincode_config,
-    serde::{decode_from_slice, encode_to_vec},
-};
-use bytes::Bytes;
-use chrono::{DateTime, Utc};
+use bincode::{config::standard as bincode_config, serde::encode_to_vec};
 use feoxdb::{FeoxError, FeoxStore};
 use hitbox_backend::format::{Format, JsonFormat};
 use hitbox_backend::{
     Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus,
-    PassthroughCompressor,
+    PassthroughCompressor, ValueEnvelope,
 };
 use hitbox_core::{BackendLabel, CacheKey, CacheValue, Raw};
-use serde::{Deserialize, Serialize};
 
 use crate::FeOxDbError;
-
-#[derive(Serialize, Deserialize)]
-struct SerializableCacheValue {
-    #[serde(with = "serde_bytes")]
-    data: Vec<u8>,
-    stale: Option<DateTime<Utc>>,
-    expire: Option<DateTime<Utc>>,
-}
-
-impl From<CacheValue<Raw>> for SerializableCacheValue {
-    fn from(value: CacheValue<Raw>) -> Self {
-        Self {
-            data: value.data().to_vec(),
-            stale: value.stale(),
-            expire: value.expire(),
-        }
-    }
-}
-
-impl From<SerializableCacheValue> for CacheValue<Raw> {
-    fn from(value: SerializableCacheValue) -> Self {
-        CacheValue::new(Bytes::from(value.data), value.expire, value.stale)
-    }
-}
 
 /// Disk-based cache backend using FeOxDB.
 ///
@@ -301,26 +271,19 @@ where
 {
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         let store = self.store.clone();
+        let label = self.label.clone();
 
         let key_bytes = encode_to_vec(key, bincode_config())
             .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
         tokio::task::spawn_blocking(move || match store.get(&key_bytes) {
-            Ok(encoded) => {
-                let (serializable, _): (SerializableCacheValue, _) =
-                    decode_from_slice(&encoded, bincode_config())
-                        .map_err(|e| BackendError::InternalError(Box::new(e)))?;
-
-                let cache_value: CacheValue<Raw> = serializable.into();
-
-                if let Some(expire_time) = cache_value.expire()
-                    && expire_time < Utc::now()
-                {
-                    return Ok(None);
-                }
-
-                Ok(Some(cache_value))
-            }
+            // Decode + expiry are handled by the shared envelope policy: a bad
+            // blob (e.g. an old `SerializableCacheValue` entry after the format
+            // change) or an expired entry both read as a cache miss.
+            Ok(encoded) => Ok(ValueEnvelope::decode_unexpired(
+                encoded.to_vec(),
+                label.as_str(),
+            )),
             Err(FeoxError::KeyNotFound) => Ok(None),
             Err(e) => Err(BackendError::InternalError(Box::new(e))),
         })
@@ -334,17 +297,19 @@ where
         let key_bytes = encode_to_vec(key, bincode_config())
             .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
-        // Compute TTL from value.ttl() (derived from value.expire)
+        // Coarse, whole-second TTL hint for FeOxDB's own housekeeping
+        // (server-side eviction). The authoritative expiration lives inside the
+        // envelope at full sub-second precision and is enforced lazily on read.
         let ttl = value.ttl();
 
-        let serializable: SerializableCacheValue = value.into();
-        let value_bytes = encode_to_vec(&serializable, bincode_config())
-            .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+        // Single serialization pass: the header is prepended to the already
+        // serialized/compressed payload, which is never re-encoded.
+        let value_bytes = ValueEnvelope::from(value).serialize()?;
 
         tokio::task::spawn_blocking(move || {
             ttl.map(|ttl_duration| ttl_duration.as_secs())
-                .map(|ttl_secs| store.insert_with_ttl(&key_bytes, &value_bytes, ttl_secs))
-                .unwrap_or_else(|| store.insert(&key_bytes, &value_bytes))
+                .map(|ttl_secs| store.insert_with_ttl(&key_bytes, value_bytes.as_ref(), ttl_secs))
+                .unwrap_or_else(|| store.insert(&key_bytes, value_bytes.as_ref()))
                 .map_err(|e| BackendError::InternalError(Box::new(e)))?;
             Ok(())
         })
@@ -395,6 +360,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::Bytes;
     use chrono::Utc;
     use tempfile::TempDir;
 
@@ -563,6 +529,50 @@ mod tests {
         assert!(
             (read2.expire().unwrap() - expire_24h).abs() < tolerance,
             "key2 expire time should be ~24 hours from now"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_subsecond_ttl_preserved() {
+        // The old SerializableCacheValue path stored the FeOxDB store TTL in
+        // whole seconds. The envelope now preserves the full sub-second
+        // expiration, so millisecond precision must survive a round-trip.
+        let backend = FeOxDbBackend::in_memory().unwrap();
+
+        let key = CacheKey::from_str("subsecond-key", "1");
+        let expire = Utc::now() + chrono::Duration::milliseconds(1500);
+        let value = CacheValue::new(Bytes::from(&b"subsecond"[..]), Some(expire), None);
+        backend.write(&key, value).await.unwrap();
+
+        let read = backend
+            .read(&key)
+            .await
+            .unwrap()
+            .expect("entry should exist");
+
+        // Exact match: the stored expiration is byte-for-byte the original,
+        // including sub-second nanos (would have been truncated before).
+        assert_eq!(read.expire(), Some(expire));
+    }
+
+    #[tokio::test]
+    async fn test_garbage_blob_read_as_miss() {
+        // Simulate an old-format entry (or corruption): a stored blob that is
+        // not a valid ValueEnvelope must be treated as a cache miss, not an
+        // error. We write raw bytes directly via the underlying store.
+        let backend = FeOxDbBackend::in_memory().unwrap();
+
+        let key = CacheKey::from_str("garbage-key", "1");
+        let key_bytes = encode_to_vec(&key, bincode_config()).unwrap();
+        backend
+            .store
+            .insert(&key_bytes, b"not-a-valid-envelope")
+            .unwrap();
+
+        let result = backend.read(&key).await.unwrap();
+        assert!(
+            result.is_none(),
+            "Undecodable blob should be treated as a cache miss"
         );
     }
 

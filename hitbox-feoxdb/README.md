@@ -111,12 +111,26 @@ I/O operations and disk usage, which can improve performance.
 
 ## TTL Handling
 
-FeOxDB natively supports per-key TTL. When writing a cache entry with an
-expiration time, the TTL is computed and passed to FeOxDB's `insert_with_ttl`.
-Expired entries are automatically cleaned up by the database.
+Each cache entry is stored using the unified [`ValueEnvelope`] from
+`hitbox-backend`: a small little-endian header carrying the `expire`/`stale`
+timestamps, followed by the raw value bytes (the payload is never
+re-serialized). The envelope is the authoritative source of expiration and
+preserves **full sub-second precision**.
 
-As a safety measure, the backend also checks expiration during reads to
-handle edge cases where cleanup hasn't occurred yet.
+FeOxDB also natively supports per-key TTL. The backend still passes a coarse,
+whole-second TTL hint to FeOxDB's `insert_with_ttl` for the store's own
+housekeeping, but the precise expiration enforced on read comes from the
+envelope. Expiration is checked lazily during reads, so an entry past its
+`expire` timestamp is returned as a cache miss even if the store has not yet
+evicted it.
+
+> **Breaking change (0.3.0):** the on-disk value format changed. Cache files
+> written by 0.2.x are not readable by 0.3.0. Undecodable entries are treated as
+> a cache miss (logged at `warn`), so upgrading simply rebuilds the cache from
+> upstream — no manual migration step is needed. A leading version byte in the
+> envelope makes future format changes non-breaking.
+
+[`ValueEnvelope`]: hitbox_backend::ValueEnvelope
 
 ## When to Use This Backend
 

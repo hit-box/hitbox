@@ -1,0 +1,52 @@
+[package]
+name = "hitbox-s3"
+version = "0.1.0"
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+categories.workspace = true
+description = "S3-compatible object storage backend for the Hitbox cache."
+readme = "README.md"
+keywords = ["cache", "backend", "s3", "object-storage", "hitbox"]
+
+[dependencies]
+# Hitbox dependencies
+hitbox-backend = { path = "../hitbox-backend", version = "0.2" }
+hitbox-core = { path = "../hitbox-core", version = "0.2" }
+
+# AWS SDK
+aws-sdk-s3 = "1"
+aws-config = "1"
+
+# Async support
+async-trait = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# Utilities
+bytes = { workspace = true }
+hex = "0.4"
+
+# Error handling
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util", "macros"] }
+testcontainers = { version = "0.26", default-features = false }
+testcontainers-modules = { version = "0.14", default-features = false, features = [
+    "minio",
+] }
+
+[features]
+default = []
+# Enables helpers intended only for tests/dev (e.g. bucket creation).
+test-utils = []
+# Enables Docker-backed integration tests (MinIO via testcontainers).
+integration = ["test-utils"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

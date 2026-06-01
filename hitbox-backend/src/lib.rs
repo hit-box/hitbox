@@ -6,6 +6,7 @@ pub mod backend;
 pub mod composition;
 pub mod compressor;
 pub mod context;
+pub mod envelope;
 pub mod error;
 pub mod format;
 pub mod key;
@@ -20,6 +21,7 @@ pub use compressor::GzipCompressor;
 #[cfg_attr(docsrs, doc(cfg(feature = "zstd")))]
 pub use compressor::ZstdCompressor;
 pub use compressor::{CompressionError, Compressor, PassthroughCompressor};
+pub use envelope::ValueEnvelope;
 pub use error::BackendError;
 #[cfg(feature = "rkyv_format")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rkyv_format")))]

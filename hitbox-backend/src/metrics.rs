@@ -181,6 +181,15 @@ lazy_static! {
         );
         "hitbox_backend_serialize_duration_seconds"
     };
+
+    /// Metric name for value-envelope decode failures counter.
+    pub static ref BACKEND_DECODE_ERRORS: &'static str = {
+        metrics::describe_counter!(
+            "hitbox_backend_decode_errors_total",
+            "Total value-envelope decode failures treated as cache misses, per backend."
+        );
+        "hitbox_backend_decode_errors_total"
+    };
 }
 
 // Read metrics
@@ -318,3 +327,17 @@ pub fn record_serialize(backend: &str, duration: Duration) {
 #[cfg(not(feature = "metrics"))]
 #[inline]
 pub fn record_serialize(_backend: &str, _duration: Duration) {}
+
+// Decode metrics
+
+/// Record a value-envelope decode failure (treated as a cache miss).
+#[cfg(feature = "metrics")]
+#[inline]
+pub fn record_decode_error(backend: &str) {
+    metrics::counter!(*BACKEND_DECODE_ERRORS, "backend" => backend.to_string()).increment(1);
+}
+
+/// Record a decode failure (no-op when `metrics` feature disabled).
+#[cfg(not(feature = "metrics"))]
+#[inline]
+pub fn record_decode_error(_backend: &str) {}
