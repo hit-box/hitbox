@@ -22,7 +22,6 @@ aws-config = "1"
 
 # Async support
 async-trait = { workspace = true }
-tokio = { workspace = true, features = ["sync", "rt"] }
 
 # Time handling
 chrono = { workspace = true }
@@ -30,7 +29,6 @@ chrono = { workspace = true }
 # Utilities
 bytes = { workspace = true }
 hex = "0.4"
-tracing = { workspace = true }
 
 # Error handling
 thiserror = { workspace = true }

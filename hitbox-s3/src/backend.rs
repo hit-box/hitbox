@@ -118,6 +118,10 @@ pub(crate) fn encode_s3_key(
         .serialize(key)
         .map_err(|e| BackendError::InternalError(Box::new(e)))?;
     let hex = hex::encode(bytes);
+    // Trim any trailing slash so a prefix passed as `"hitbox/"` does not
+    // produce a double-slash key (`hitbox//<hex>`); the join below adds the
+    // single separator.
+    let prefix = prefix.trim_end_matches('/');
     let s3_key = if prefix.is_empty() {
         hex
     } else {
@@ -253,6 +257,14 @@ mod tests {
         assert!(s3_key.starts_with("cache/"));
         let hex_part = s3_key.strip_prefix("cache/").unwrap();
         assert!(hex_part.bytes().all(|b| b.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn trailing_slash_prefix_does_not_double_slash() {
+        let key = CacheKey::from_str("user", "1");
+        let s3_key = encode_s3_key("cache/", &CacheKeyFormat::Bitcode, &key).unwrap();
+        assert!(s3_key.starts_with("cache/"));
+        assert!(!s3_key.contains("//"));
     }
 
     #[test]
