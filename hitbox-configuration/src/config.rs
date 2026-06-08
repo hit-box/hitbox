@@ -208,9 +208,9 @@ impl ConfigEndpoint {
             if response_tag_cfg.is_empty() {
                 Arc::new(NeutralTagExtractor::<CacheableHttpResponse<ResBody>>::default())
             } else {
-                Arc::from(tag_config::build_response_boxed::<
-                    CacheableHttpResponse<ResBody>,
-                >(response_tag_cfg))
+                Arc::from(tag_config::response::build_response_boxed::<ResBody>(
+                    response_tag_cfg,
+                )?)
             };
         Ok(Endpoint {
             extractors,

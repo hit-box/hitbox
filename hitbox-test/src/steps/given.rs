@@ -206,7 +206,7 @@ async fn tags(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
     }
     if !config.response.is_empty() {
         let response_tag_extractor: BoxResponseTagExtractor =
-            tag_config::build_response_boxed(config.response);
+            tag_config::response::build_response_boxed::<axum::body::Body>(config.response)?;
         world.config.response_tag_extractor = Arc::new(response_tag_extractor);
     }
     Ok(())

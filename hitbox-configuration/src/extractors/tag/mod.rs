@@ -8,11 +8,11 @@
 //!   Version) — those reuse the
 //!   [`TagAdapter`](hitbox_core::tag::TagAdapter) compatibility layer to
 //!   turn a key extractor into a tag extractor.
-//! - [`ResponseTagExtractor`] — response-side. Currently only `Static`.
-//!   Dynamic response variants (e.g. extracting an ETag header from the
-//!   response, or fields from the response body) are blocked on a
-//!   response-shape extractor enum that does not yet exist; once it lands,
-//!   mirrored variants will be added here.
+//! - [`response::ResponseTagExtractor`] — response-side. Supports [`Static`]
+//!   plus `Header` (a `"<header>=<value>"` tag from a response header),
+//!   reusing the request-side header config and the shared
+//!   [`HeaderConfig::select`](hitbox_http::extractors::header::HeaderConfig::select)
+//!   machinery. Body-derived response tags are a future addition.
 //!
 //! Both sides share the [`Static`] form, which emits a fixed list of tags.
 //! Three YAML shapes are supported (no overlap, no string parsing — each
@@ -30,14 +30,14 @@
 //! ```
 
 pub mod request;
+pub mod response;
 
-use hitbox::config::BoxTagExtractor;
-use hitbox_core::tag::ExtractorExt;
-use hitbox_core::{KeyPart, StaticExtractor};
+use hitbox_core::KeyPart;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 pub use request::RequestTagExtractor;
+pub use response::ResponseTagExtractor;
 
 /// Static tag form — three YAML shapes, each with a single semantic.
 ///
@@ -90,49 +90,6 @@ impl Static {
     }
 }
 
-/// Configuration enum for response-side tag extractors.
-///
-/// Currently only `Static` is supported. Once a response-shape extractor
-/// enum exists, its variants will be mirrored here for the same
-/// [`TagAdapter`](hitbox_core::tag::TagAdapter)-based compatibility layer
-/// already used for request-side tags.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub enum ResponseTagExtractor {
-    /// Emit a fixed list of tags. See [`Static`] for the supported shapes.
-    Static(Static),
-}
-
-impl ResponseTagExtractor {
-    /// Convert this configuration variant into a runtime tag extractor.
-    pub fn into_tag_extractor<S>(self) -> BoxTagExtractor<S>
-    where
-        S: Send + 'static,
-    {
-        match self {
-            ResponseTagExtractor::Static(s) => {
-                Box::new(StaticExtractor::<S>::new(s.into_key_parts()).as_tag())
-            }
-        }
-    }
-}
-
-/// Build a boxed runtime tag extractor for the response side from a list
-/// of [`ResponseTagExtractor`] config variants.
-pub fn build_response_boxed<S>(configs: Vec<ResponseTagExtractor>) -> BoxTagExtractor<S>
-where
-    S: Send + 'static,
-{
-    let mut all_parts: Vec<KeyPart> = Vec::new();
-    for cfg in configs {
-        match cfg {
-            ResponseTagExtractor::Static(s) => {
-                all_parts.extend(s.into_key_parts());
-            }
-        }
-    }
-    Box::new(StaticExtractor::<S>::new(all_parts).as_tag())
-}
-
 /// Grouping of request- and response-side tag extractor configs.
 ///
 /// Mirrors the YAML shape:
@@ -160,36 +117,35 @@ pub struct TagsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hitbox_core::tag::TagExtractor as TagExtractorTrait;
+    use hitbox_core::tag::CacheTag;
 
-    #[tokio::test]
-    async fn static_single_emits_one_literal_tag() {
-        let cfg = ResponseTagExtractor::Static(Static::Single("endpoint:users".into()));
-        let ext: BoxTagExtractor<()> = cfg.into_tag_extractor();
-        let (_subject, tags) = ext.extract_tags(()).await;
+    /// Project a [`Static`] form's key parts into tags the same way the
+    /// runtime `StaticExtractor::as_tag()` path does.
+    fn static_tags(s: Static) -> Vec<CacheTag> {
+        s.into_key_parts().iter().map(CacheTag::from).collect()
+    }
+
+    #[test]
+    fn static_single_emits_one_literal_tag() {
+        let tags = static_tags(Static::Single("endpoint:users".into()));
         assert_eq!(tags.len(), 1);
         assert_eq!(tags[0].as_str(), "endpoint:users");
     }
 
-    #[tokio::test]
-    async fn static_list_emits_literal_tags() {
-        let cfg =
-            ResponseTagExtractor::Static(Static::List(vec!["v1".into(), "deprecated".into()]));
-        let ext: BoxTagExtractor<()> = cfg.into_tag_extractor();
-        let (_subject, tags) = ext.extract_tags(()).await;
+    #[test]
+    fn static_list_emits_literal_tags() {
+        let tags = static_tags(Static::List(vec!["v1".into(), "deprecated".into()]));
         assert_eq!(tags.len(), 2);
         assert_eq!(tags[0].as_str(), "v1");
         assert_eq!(tags[1].as_str(), "deprecated");
     }
 
-    #[tokio::test]
-    async fn static_map_emits_key_value_tags_in_insertion_order() {
+    #[test]
+    fn static_map_emits_key_value_tags_in_insertion_order() {
         let mut map = IndexMap::new();
         map.insert("user".into(), "42".into());
         map.insert("region".into(), "eu".into());
-        let cfg = ResponseTagExtractor::Static(Static::Map(map));
-        let ext: BoxTagExtractor<()> = cfg.into_tag_extractor();
-        let (_subject, tags) = ext.extract_tags(()).await;
+        let tags = static_tags(Static::Map(map));
         assert_eq!(tags.len(), 2);
         assert_eq!(tags[0].as_str(), "user=42");
         assert_eq!(tags[1].as_str(), "region=eu");

@@ -317,6 +317,67 @@ Feature: Tag-Based Cache Invalidation
     And GetBook should be called 1 time
 
   # ============================================================================
+  # Dynamic response tags: a response Header extractor derives the tag from the
+  # actual response header (here `etag: book-v1`), reusing the same header
+  # machinery as the request side. Invalidating the derived tag misses.
+  # ============================================================================
+
+  @tag-invalidation @miss @response-side @dynamic
+  Scenario: Response Header tag extractor — invalidating the header-derived tag misses
+    Given tags
+      """
+      response:
+        - Header: "etag"
+      """
+    # The handler returns "etag: book-v1"; the extractor stores tag "etag=book-v1".
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime?test_headers=true
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 1 time
+
+    When sleep 20ms
+    And tag "etag=book-v1" is invalidated
+    And sleep 20ms
+
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime?test_headers=true
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 2 times
+
+  @tag-invalidation @hit @response-side @dynamic
+  Scenario: Response Header tag extractor — invalidating an unrelated version is a hit
+    Given tags
+      """
+      response:
+        - Header: "etag"
+      """
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime?test_headers=true
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+
+    # Invalidate a different entity version — the stored "etag=book-v1" is unaffected.
+    When sleep 20ms
+    And tag "etag=book-v2" is invalidated
+    And sleep 20ms
+
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime?test_headers=true
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "HIT"
+    And GetBook should be called 1 time
+
+  # ============================================================================
   # Compatibility layer: any Extractor variant can serve as a tag extractor
   # via TagAdapter. Here Path emits author_id / book_id KeyParts; those become
   # CacheTags of the form "author_id=robert-sheckley" / "book_id=victim-prime".
