@@ -153,6 +153,170 @@ Feature: Tag-Based Cache Invalidation
     And GetBook should be called 1 time
 
   # ============================================================================
+  # Response-side invalidation. Response tags are extracted at WRITE time and
+  # stored on the cache entry; the FSM reads them back on the next cache hit and
+  # queries their invalidation timestamps (the lazy post-hit check). These
+  # scenarios configure ONLY a response tag, so the second miss can be caused by
+  # nothing but that read-back path — positive proof it is wired end-to-end.
+  # ============================================================================
+
+  @tag-invalidation @miss @response-side
+  Scenario: Cache hit ignored when a response tag is invalidated
+    Given tags
+      """
+      response:
+        - Static:
+            etag: "v1"
+      """
+    # First request — miss; the response is cached WITH "etag=v1" stored on the entry.
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 1 time
+
+    # Invalidate the response-derived tag (stored on the entry at write time).
+    When sleep 20ms
+    And tag "etag=v1" is invalidated
+    And sleep 20ms
+
+    # Second request — must miss: the FSM reads the stored response tag back and
+    # checks it. No request tag is configured, so this is the only path that can
+    # force the miss.
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 2 times
+
+  @tag-invalidation @hit @response-side
+  Scenario: Cache hit served when the response tag is not invalidated
+    Given tags
+      """
+      response:
+        - Static:
+            etag: "v1"
+      """
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 1 time
+
+    # No invalidation — the stored response tag check passes, second request hits.
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "HIT"
+    And GetBook should be called 1 time
+
+  @tag-invalidation @hit @response-side
+  Scenario: Cache hit served when an unrelated tag is invalidated (response side)
+    Given tags
+      """
+      response:
+        - Static:
+            etag: "v1"
+      """
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+
+    # Invalidate a different response tag — the stored "etag=v1" is unaffected.
+    When sleep 20ms
+    And tag "etag=v2" is invalidated
+    And sleep 20ms
+
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "HIT"
+    And GetBook should be called 1 time
+
+  @tag-invalidation @miss @response-side
+  Scenario: Request and response tags merged — invalidating the response tag misses
+    Given tags
+      """
+      request:
+        - Static:
+            user: "42"
+      response:
+        - Static:
+            etag: "v1"
+      """
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 1 time
+
+    # Invalidate only the response tag. The request tag ("user=42") is checked in
+    # parallel and is clean; the response tag is checked lazily after the hit.
+    # Both result maps are merged — the response invalidation must still force a miss.
+    When sleep 20ms
+    And tag "etag=v1" is invalidated
+    And sleep 20ms
+
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 2 times
+
+  @tag-invalidation @hit @response-side @skip-policy
+  Scenario: TagInvalidation Skip disables the response read-path
+    Given hitbox with policy
+      ```yaml
+      Enabled:
+        ttl: 10s
+        tag_invalidation: Skip
+      ```
+    And tags
+      """
+      response:
+        - Static:
+            etag: "v1"
+      """
+    # With Skip, the response tag is neither extracted/stored at write nor checked
+    # at read — so invalidating it has no effect and the second request hits.
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 1 time
+
+    When sleep 20ms
+    And tag "etag=v1" is invalidated
+    And sleep 20ms
+
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "HIT"
+    And GetBook should be called 1 time
+
+  # ============================================================================
   # Compatibility layer: any Extractor variant can serve as a tag extractor
   # via TagAdapter. Here Path emits author_id / book_id KeyParts; those become
   # CacheTags of the form "author_id=robert-sheckley" / "book_id=victim-prime".
