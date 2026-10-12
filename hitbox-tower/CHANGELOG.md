@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Redundant intra-doc link targets in the `service` and `upstream` module docs rejected by rustdoc ([#293](https://github.com/hit-box/hitbox/pull/293))
+
 ## [0.2.0] - 2026-01-27
 ### Added
 - Initial release
