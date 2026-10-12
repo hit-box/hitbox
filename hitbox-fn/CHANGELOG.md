@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Compile-fail snapshot tests run only on the MSRV, so newer compiler diagnostics don't break them ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+
 ## [0.2.1] - 2026-02-17
 
 ### Added
