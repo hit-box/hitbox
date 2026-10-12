@@ -1,6 +1,6 @@
 //! Upstream adapter for bridging Tower services to Hitbox.
 //!
-//! This module provides [`TowerUpstream`](crate::upstream::TowerUpstream), an adapter
+//! This module provides [`TowerUpstream`], an adapter
 //! that implements Hitbox's [`Upstream`] trait for Tower services. This allows the
 //! caching layer to call the wrapped service on cache misses.
 //!
