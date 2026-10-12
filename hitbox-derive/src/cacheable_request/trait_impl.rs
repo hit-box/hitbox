@@ -29,7 +29,7 @@ impl<'a> ToTokens for CacheableRequestImpl<'a> {
                         dyn ::std::future::Future<
                             Output = (
                                 hitbox::RequestCachePolicy<Self>,
-                                ::std::vec::Vec<hitbox_core::tag::CacheTag>,
+                                ::std::vec::Vec<hitbox::tag::CacheTag>,
                             )
                         > + Send + '__a
                     >
@@ -38,7 +38,7 @@ impl<'a> ToTokens for CacheableRequestImpl<'a> {
                     Self: '__a,
                     __P: hitbox::predicate::Predicate<Subject = Self> + Send + Sync + '__a,
                     __E: hitbox::Extractor<Subject = Self> + Send + Sync + '__a,
-                    __TE: hitbox_core::tag::TagExtractor<Subject = Self> + Send + Sync + '__a;
+                    __TE: hitbox::tag::TagExtractor<Subject = Self> + Send + Sync + '__a;
 
                 fn cache_policy<'__a, __P, __E, __TE>(
                     self,
@@ -50,7 +50,7 @@ impl<'a> ToTokens for CacheableRequestImpl<'a> {
                     Self: '__a,
                     __P: hitbox::predicate::Predicate<Subject = Self> + Send + Sync + '__a,
                     __E: hitbox::Extractor<Subject = Self> + Send + Sync + '__a,
-                    __TE: hitbox_core::tag::TagExtractor<Subject = Self> + Send + Sync + '__a,
+                    __TE: hitbox::tag::TagExtractor<Subject = Self> + Send + Sync + '__a,
                 {
                     ::std::boxed::Box::pin(async move {
                         match predicates.check(self).await {
