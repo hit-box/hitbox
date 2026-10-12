@@ -115,12 +115,22 @@ impl CheckPredicate {
                     config_index = self.config_index,
                     "Config matched, extracting cache key and request tags"
                 );
-                let ext = configs.configs()[self.config_index].extractors();
-                let tag_ext = configs.configs()[self.config_index].request_tag_extractors();
+                let config = &configs.configs()[self.config_index];
+                let ext = config.extractors();
+                // `None` skips request-tag extraction entirely (no extractor
+                // future is constructed) when the selected config disables
+                // tag invalidation, matching the regular cache future.
+                let tag_ext = config
+                    .policy()
+                    .tag_invalidation_enabled()
+                    .then(|| config.request_tag_extractors());
                 let extract_future = Box::pin(async move {
                     let key_parts = ext.get(request).await;
                     let (request, cache_key) = key_parts.into_cache_key();
-                    let (request, request_tags) = tag_ext.extract_tags(request).await;
+                    let (request, request_tags) = match tag_ext {
+                        Some(tag_ext) => tag_ext.extract_tags(request).await,
+                        None => (request, Vec::new()),
+                    };
                     (request, cache_key, request_tags)
                 });
                 CheckPredicateTransition::ExtractKey {
