@@ -14,6 +14,8 @@ use hitbox_backend::{
 use hitbox_core::CacheTag;
 use moka::future::Cache;
 
+use crate::metrics::{record_capacity, record_tag_records};
+
 /// In-memory cache backend powered by Moka.
 ///
 /// `MokaBackend` provides a high-performance, concurrent in-memory cache with
@@ -64,7 +66,8 @@ use moka::future::Cache;
 /// incorrectly treat the entry as never invalidated, serving stale data.
 /// The dedicated tag store has no size cap and no expiry — records are
 /// tiny (`CacheTag` → `DateTime<Utc>`) and persist for the process
-/// lifetime.
+/// lifetime. Its size is observable via [`tag_record_count()`] and, with the
+/// `metrics` feature, the `hitbox_moka_tag_records` gauge.
 ///
 /// # Caveats
 ///
@@ -77,6 +80,7 @@ use moka::future::Cache;
 /// [`JsonFormat`]: hitbox_backend::format::JsonFormat
 /// [`Compressor`]: hitbox_backend::Compressor
 /// [`PassthroughCompressor`]: hitbox_backend::PassthroughCompressor
+/// [`tag_record_count()`]: MokaBackend::tag_record_count
 #[derive(Clone)]
 pub struct MokaBackend<S = JsonFormat, C = PassthroughCompressor>
 where
@@ -136,11 +140,22 @@ where
         self.cache.weighted_size()
     }
 
-    /// Records current cache capacity metrics.
+    /// Returns the approximate number of tag invalidation records.
     ///
-    /// Updates the `hitbox_moka_entries` and `hitbox_moka_size_bytes` gauges
-    /// with the current cache state. The backend's label is used as the
-    /// `backend` metric label.
+    /// Tag records live in a dedicated, unbounded store (see the type-level
+    /// "Tag Invalidation Storage" docs), so this grows with every distinct
+    /// tag ever invalidated. Like [`entry_count()`], the value is approximate.
+    ///
+    /// [`entry_count()`]: Self::entry_count
+    pub fn tag_record_count(&self) -> u64 {
+        self.tags.entry_count()
+    }
+
+    /// Records current cache metrics.
+    ///
+    /// Updates the `hitbox_moka_entries`, `hitbox_moka_size_bytes` and
+    /// `hitbox_moka_tag_records` gauges with the current cache state. The
+    /// backend's label is used as the `backend` metric label.
     ///
     /// This method is a no-op when the `metrics` feature is disabled.
     ///
@@ -151,11 +166,23 @@ where
     /// backend.record_metrics();
     /// ```
     pub fn record_metrics(&self) {
-        crate::metrics::record_capacity(
+        self.record_data_metrics();
+        self.record_tag_metrics();
+    }
+
+    /// Updates the data-store gauges. Called on every data write and remove.
+    fn record_data_metrics(&self) {
+        record_capacity(
             self.label.as_str(),
             self.entry_count(),
             self.weighted_size(),
         );
+    }
+
+    /// Updates the tag-store gauge. Called on every tag invalidation, the
+    /// store's only writer, so data writes don't pay for it.
+    fn record_tag_metrics(&self) {
+        record_tag_records(self.label.as_str(), self.tag_record_count());
     }
 }
 
@@ -188,13 +215,13 @@ where
 
     async fn write(&self, key: &CacheKey, value: CacheValue<Raw>) -> BackendResult<()> {
         self.cache.insert(key.clone(), value).await;
-        self.record_metrics();
+        self.record_data_metrics();
         Ok(())
     }
 
     async fn remove(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
         let value = self.cache.remove(key).await;
-        self.record_metrics();
+        self.record_data_metrics();
         match value {
             Some(_) => Ok(DeleteStatus::Deleted(1)),
             None => Ok(DeleteStatus::Missing),
@@ -223,6 +250,7 @@ where
     /// `write` and share the data cache's eviction budget).
     async fn invalidate(&self, tag: &CacheTag) -> BackendResult<()> {
         self.tags.insert(tag.clone(), Utc::now()).await;
+        self.record_tag_metrics();
         Ok(())
     }
 
@@ -249,4 +277,39 @@ where
     S: Format + Send + Sync,
     C: Compressor + Send + Sync,
 {
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+    use hitbox_core::KeyPart;
+
+    use super::*;
+
+    fn make_key(id: u32) -> CacheKey {
+        CacheKey::new("test", 1, vec![KeyPart::new("id", Some(id.to_string()))])
+    }
+
+    #[tokio::test]
+    async fn tag_record_count_tracks_distinct_invalidated_tags() {
+        let backend = MokaBackend::builder().max_entries(100).build();
+
+        // Data writes don't touch the tag store.
+        for id in 0..10 {
+            let value = CacheValue::new(Bytes::from_static(b"payload"), None, None);
+            backend.write(&make_key(id), value).await.unwrap();
+        }
+        backend.tags.run_pending_tasks().await;
+        assert_eq!(backend.tag_record_count(), 0);
+
+        backend.invalidate(&CacheTag::new("user=42")).await.unwrap();
+        backend.invalidate(&CacheTag::new("region=eu")).await.unwrap();
+        backend.tags.run_pending_tasks().await;
+        assert_eq!(backend.tag_record_count(), 2);
+
+        // Re-invalidating a tag refreshes its timestamp, not its record count.
+        backend.invalidate(&CacheTag::new("user=42")).await.unwrap();
+        backend.tags.run_pending_tasks().await;
+        assert_eq!(backend.tag_record_count(), 2);
+    }
 }
