@@ -77,7 +77,7 @@ impl CacheTag {
     ///
     /// Uses the given prefix as the key namespace. The tag value is stored
     /// as a key part.
-    /// Converts this tag into a [`CacheKey`](crate::CacheKey) for storing
+    /// Converts this tag into a [`CacheKey`] for storing
     /// invalidation timestamps.
     pub fn to_cache_key(&self, prefix: &str) -> CacheKey {
         CacheKey::new(prefix, 0, vec![KeyPart::new("tag", Some(self.as_str()))])
@@ -91,7 +91,7 @@ impl std::fmt::Display for CacheTag {
 }
 
 impl From<&crate::KeyPart> for CacheTag {
-    /// Converts a [`KeyPart`](crate::KeyPart) into a [`CacheTag`].
+    /// Converts a [`KeyPart`] into a [`CacheTag`].
     ///
     /// Format: `"key=value"` or `"key"` (if value is `None`).
     fn from(part: &crate::KeyPart) -> Self {
@@ -189,7 +189,7 @@ pub trait TagExtractor {
     /// Extract cache tags from the subject.
     ///
     /// Takes ownership of the subject and returns it alongside the tags,
-    /// mirroring the [`Extractor`](crate::Extractor) ownership pattern.
+    /// mirroring the [`Extractor`] ownership pattern.
     async fn extract_tags(&self, subject: Self::Subject) -> (Self::Subject, Vec<CacheTag>);
 }
 
@@ -234,7 +234,7 @@ where
 
 /// Adapter that wraps an [`Extractor`] to use it as a [`TagExtractor`].
 ///
-/// Converts each [`KeyPart`](crate::KeyPart) produced by the extractor into
+/// Converts each [`KeyPart`] produced by the extractor into
 /// a [`CacheTag`]. This allows reusing existing extractor implementations
 /// (e.g., HTTP method, path extractors) for tag-based invalidation.
 ///
@@ -281,16 +281,16 @@ where
 /// ```ignore
 /// use hitbox_core::tag::ExtractorExt;
 ///
-/// let tag_extractor = request::extractor::<Body>().path().as_tag();
+/// let tag_extractor = request::extractor::<Body>().path().into_tag_extractor();
 /// ```
 ///
 /// [`Extractor`]: crate::Extractor
 pub trait ExtractorExt: Extractor + Sized {
     /// Wraps this extractor as a [`TagExtractor`].
     ///
-    /// Each [`KeyPart`](crate::KeyPart) produced by the extractor is converted
+    /// Each [`KeyPart`] produced by the extractor is converted
     /// into a [`CacheTag`].
-    fn as_tag(self) -> TagAdapter<Self> {
+    fn into_tag_extractor(self) -> TagAdapter<Self> {
         TagAdapter::new(self)
     }
 }
@@ -377,7 +377,7 @@ mod tests {
 
     /// Tag extractor that emits a fixed list of tags. Test-only — production
     /// code should use [`StaticExtractor`](crate::StaticExtractor) plus
-    /// [`ExtractorExt::as_tag`].
+    /// [`ExtractorExt::into_tag_extractor`].
     struct FixedTags(Vec<CacheTag>);
 
     #[async_trait]

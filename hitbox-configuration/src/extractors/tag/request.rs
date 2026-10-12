@@ -1,9 +1,9 @@
 //! Request-side tag extractor configuration.
 //!
 //! [`RequestTagExtractor`] mirrors [`crate::extractors::Extractor`] and adds
-//! the [`Static`](super::Static) variant. Every key extractor variant
+//! the [`Static`] variant. Every key extractor variant
 //! (Path, Method, Query, Body, Header, Version) is reused here as a tag
-//! extractor via the [`TagAdapter`](hitbox_core::tag::TagAdapter)
+//! extractor via the [`TagAdapter`]
 //! compatibility layer — each `KeyPart` produced by the underlying
 //! extractor becomes a [`CacheTag`](hitbox_core::tag::CacheTag) of the form
 //! `"key=value"` (or just `"key"` when the value is `None`).
@@ -16,7 +16,7 @@
 //! ```
 //!
 //! When multiple variants are supplied, the resulting tag extractors are
-//! combined via [`ChainTagExtractor`](hitbox_core::tag::ChainTagExtractor)
+//! combined via [`ChainTagExtractor`]
 //! at runtime — tags from each entry are concatenated in order.
 
 use std::fmt::Debug;
@@ -39,7 +39,7 @@ use crate::extractors::{
 ///
 /// `Static` emits literal / `key=value` tags (see [`Static`]). All other
 /// variants reuse a key [`Extractor`] and wrap it with [`TagAdapter`] —
-/// the same compatibility layer exposed by [`ExtractorExt::as_tag`] in
+/// the same compatibility layer exposed by [`ExtractorExt::into_tag_extractor`] in
 /// `hitbox-core`.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum RequestTagExtractor {
@@ -72,7 +72,8 @@ impl RequestTagExtractor {
     {
         match self {
             RequestTagExtractor::Static(s) => Ok(Box::new(
-                StaticExtractor::<CacheableHttpRequest<ReqBody>>::new(s.into_key_parts()).as_tag(),
+                StaticExtractor::<CacheableHttpRequest<ReqBody>>::new(s.into_key_parts())
+                    .into_tag_extractor(),
             )),
             RequestTagExtractor::Path(p) => wrap_extractor::<ReqBody>(Extractor::Path(p)),
             RequestTagExtractor::Method(m) => wrap_extractor::<ReqBody>(Extractor::Method(m)),
@@ -108,7 +109,7 @@ where
 /// of [`RequestTagExtractor`] config variants.
 ///
 /// Multiple entries are composed via
-/// [`ChainTagExtractor`](hitbox_core::tag::ChainTagExtractor) at runtime —
+/// [`ChainTagExtractor`] at runtime —
 /// tags from each entry are concatenated in order.
 pub fn build_request_boxed<ReqBody>(
     configs: Vec<RequestTagExtractor>,

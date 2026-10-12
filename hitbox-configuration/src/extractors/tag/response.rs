@@ -4,9 +4,9 @@
 //! [`RequestTagExtractor`](super::RequestTagExtractor) where it can:
 //!
 //! - `Static` — subject-agnostic literal / `key=value` tags (see
-//!   [`Static`](super::Static)).
+//!   [`Static`]).
 //! - `Header` — a `"<header>=<value>"` tag from a response header, reusing the
-//!   request-side [`HeaderOperation`](crate::extractors::header::HeaderOperation)
+//!   request-side [`HeaderOperation`]
 //!   config and the shared
 //!   [`HeaderConfig::select`](hitbox_http::extractors::header::HeaderConfig::select)
 //!   machinery (exact / prefix selection, regex value extraction, transforms).
@@ -15,7 +15,7 @@
 //! request data. Body-derived response tags are a future addition.
 //!
 //! When multiple entries are supplied they are combined via
-//! [`ChainTagExtractor`](hitbox_core::tag::ChainTagExtractor) at runtime.
+//! [`ChainTagExtractor`] at runtime.
 
 use std::fmt::Debug;
 
@@ -33,7 +33,7 @@ use crate::extractors::header::HeaderOperation;
 /// Response-side tag extractor configuration.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum ResponseTagExtractor {
-    /// Subject-agnostic literal / `key=value` tags. See [`Static`](super::Static).
+    /// Subject-agnostic literal / `key=value` tags. See [`Static`].
     Static(Static),
     /// Emit a `"<header>=<value>"` tag from a response header.
     ///
@@ -56,7 +56,8 @@ impl ResponseTagExtractor {
     {
         match self {
             ResponseTagExtractor::Static(s) => Ok(Box::new(
-                StaticExtractor::<CacheableHttpResponse<ResBody>>::new(s.into_key_parts()).as_tag(),
+                StaticExtractor::<CacheableHttpResponse<ResBody>>::new(s.into_key_parts())
+                    .into_tag_extractor(),
             )),
             ResponseTagExtractor::Header(op) => {
                 let config = op.into_header_config()?;
@@ -70,7 +71,7 @@ impl ResponseTagExtractor {
 /// [`ResponseTagExtractor`] config variants.
 ///
 /// Multiple entries are composed via
-/// [`ChainTagExtractor`](hitbox_core::tag::ChainTagExtractor) at runtime — tags
+/// [`ChainTagExtractor`] at runtime — tags
 /// from each entry are concatenated in order.
 pub fn build_response_boxed<ResBody>(
     configs: Vec<ResponseTagExtractor>,

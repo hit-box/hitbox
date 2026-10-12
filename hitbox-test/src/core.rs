@@ -39,6 +39,13 @@ pub type BoxRequestTagExtractor =
     Box<dyn TagExtractor<Subject = CacheableHttpRequest<axum::body::Body>> + Send + Sync>;
 pub type BoxResponseTagExtractor =
     Box<dyn TagExtractor<Subject = CacheableHttpResponse<axum::body::Body>> + Send + Sync>;
+pub type TestCacheConfig = Config<
+    Arc<BoxRequestPredicate>,
+    Arc<BoxResponsePredicate>,
+    Arc<BoxExtractor>,
+    Arc<BoxRequestTagExtractor>,
+    Arc<BoxResponseTagExtractor>,
+>;
 
 /// Holds cache configuration components that can be modified by test steps.
 pub struct TestConfig {
@@ -84,9 +91,9 @@ impl Default for TestConfig {
             Box::new(NeutralResponsePredicate::<axum::body::Body>::new());
         let extractor: BoxExtractor = Box::new(NeutralExtractor::<axum::body::Body>::new());
         let request_tag_extractor: BoxRequestTagExtractor =
-            Box::new(NeutralTagExtractor::<CacheableHttpRequest<axum::body::Body>>::default());
+            Box::<NeutralTagExtractor<CacheableHttpRequest<axum::body::Body>>>::default();
         let response_tag_extractor: BoxResponseTagExtractor =
-            Box::new(NeutralTagExtractor::<CacheableHttpResponse<axum::body::Body>>::default());
+            Box::<NeutralTagExtractor<CacheableHttpResponse<axum::body::Body>>>::default();
         Self {
             request_predicate: Arc::new(request_predicate),
             response_predicate: Arc::new(response_predicate),
@@ -99,15 +106,7 @@ impl Default for TestConfig {
 }
 
 impl TestConfig {
-    pub fn build(
-        &self,
-    ) -> Config<
-        Arc<BoxRequestPredicate>,
-        Arc<BoxResponsePredicate>,
-        Arc<BoxExtractor>,
-        Arc<BoxRequestTagExtractor>,
-        Arc<BoxResponseTagExtractor>,
-    > {
+    pub fn build(&self) -> TestCacheConfig {
         Config::builder()
             .request_predicate(Arc::clone(&self.request_predicate))
             .response_predicate(Arc::clone(&self.response_predicate))

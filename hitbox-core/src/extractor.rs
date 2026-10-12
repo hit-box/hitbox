@@ -120,7 +120,7 @@ where
 ///
 /// Useful for embedding constant data in cache keys — environment markers,
 /// service identifiers, deployment tags — and, when wrapped via
-/// [`ExtractorExt::as_tag`](crate::tag::ExtractorExt::as_tag), for
+/// [`ExtractorExt::into_tag_extractor`](crate::tag::ExtractorExt::into_tag_extractor), for
 /// constant-tag invalidation namespaces.
 ///
 /// `Subject` is a phantom slot — the extractor never inspects the subject.
@@ -139,7 +139,7 @@ where
 /// ]);
 /// ```
 ///
-/// As a tag extractor (via `as_tag`):
+/// As a tag extractor (via `into_tag_extractor`):
 /// ```ignore
 /// use hitbox_core::{KeyPart, StaticExtractor};
 /// use hitbox_core::tag::ExtractorExt;
@@ -148,7 +148,7 @@ where
 /// let tag_ext = StaticExtractor::<()>::new(vec![
 ///     KeyPart::new("user", Some("42")),
 ///     KeyPart::new("region", Some("eu")),
-/// ]).as_tag();
+/// ]).into_tag_extractor();
 /// ```
 pub struct StaticExtractor<S> {
     parts: Vec<KeyPart>,
@@ -234,7 +234,7 @@ mod tests {
             KeyPart::new("user", Some("42")),
             KeyPart::new("region", Some("eu")),
         ])
-        .as_tag();
+        .into_tag_extractor();
 
         use crate::tag::TagExtractor;
         let (subject, tags) = tag_ext.extract_tags(123).await;

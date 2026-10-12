@@ -103,9 +103,10 @@ impl<T> PollCacheWithTagsFuture<T> {
     ) -> Self
     where
         Res: CacheableResponse<Cached = T> + Send + 'static,
-        Res::Cached: Cacheable + Send,
         B: CacheBackend + Send + Sync + 'static,
-        T: Send + 'static,
+        // `Cacheable` on `T` itself (not just `Res::Cached`) keeps the
+        // `Cached = T` binding well-formed when `rkyv_format` adds bounds.
+        T: Cacheable + Send + 'static,
     {
         let inner = Box::pin(async move {
             let check = tag_invalidation_enabled;
@@ -464,11 +465,12 @@ where
                 let tag_extractor = policy
                     .tag_invalidation_enabled()
                     .then_some(self.tag_extractor);
-                let cache_policy_future = Box::pin(async move {
-                    request
-                        .cache_policy(predicates, extractors, tag_extractor)
-                        .await
-                });
+                // Box the GAT future directly rather than awaiting it inside an
+                // async block: proving such a block `Send` makes rustc 1.91
+                // (the MSRV) require `'static` request types.
+                let cache_policy_future: RequestCachePolicyFuture<'req, Req> = Box::pin(
+                    request.cache_policy::<'req, _, _, _>(predicates, extractors, tag_extractor),
+                );
                 InitialTransition::CheckRequestCachePolicy {
                     cache_policy_future,
                     ctx: self.ctx,

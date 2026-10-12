@@ -3,13 +3,14 @@
 //! Request-side tags reuse key [`Extractor`](hitbox::Extractor)s via the
 //! [`TagAdapter`](hitbox::tag::TagAdapter) compatibility layer. The response
 //! side has no key extractors — a response never contributes to the cache key
-//! — so these are direct [`TagExtractor`] implementations over
+//! — so these are direct [`TagExtractor`](hitbox::tag::TagExtractor) implementations over
 //! [`CacheableHttpResponse`].
 //!
 //! Header reading itself is **not** duplicated: it lives on
 //! [`HeaderConfig::select`](crate::extractors::header::HeaderConfig::select),
 //! shared with the request key [`Header`](crate::extractors::header::Header)
-//! extractor. The response side adds only the [`KeyPart`] → [`CacheTag`]
+//! extractor. The response side adds only the [`KeyPart`](hitbox::KeyPart) →
+//! [`CacheTag`](hitbox::tag::CacheTag)
 //! projection (the same `"name=value"` conversion the request `TagAdapter`
 //! uses).
 

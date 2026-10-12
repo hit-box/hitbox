@@ -45,8 +45,7 @@ pub fn deserialize_tags(
     bytes: Option<&[u8]>,
 ) -> BackendResult<Option<hitbox_core::tag::CacheTags>> {
     match bytes {
-        None => Ok(None),
-        Some(bytes) if bytes.is_empty() => Ok(None),
+        None | Some([]) => Ok(None),
         Some(bytes) => {
             let (tags, _) = bincode::serde::decode_from_slice(bytes, bincode::config::standard())
                 .map_err(|e| BackendError::InternalError(Box::new(e)))?;

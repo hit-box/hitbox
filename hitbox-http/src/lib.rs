@@ -25,7 +25,7 @@ pub mod response;
 /// Response-side cache tag extractors.
 ///
 /// Direct [`TagExtractor`](hitbox::tag::TagExtractor) implementations over
-/// [`CacheableHttpResponse`] — e.g. [`ResponseHeaderTagExtractor`](tags::ResponseHeaderTagExtractor)
+/// [`CacheableHttpResponse`] — e.g. [`ResponseHeaderTagExtractor`]
 /// for tagging cached entries by a response header such as `ETag`.
 pub mod tags;
 

@@ -73,7 +73,7 @@ pub enum Static {
 
 impl Static {
     /// Convert into the [`KeyPart`] sequence consumed by
-    /// [`StaticExtractor`] (and via [`ExtractorExt::as_tag`], by
+    /// [`StaticExtractor`] (and via [`ExtractorExt::into_tag_extractor`], by
     /// [`TagAdapter`](hitbox_core::tag::TagAdapter)).
     pub(crate) fn into_key_parts(self) -> Vec<KeyPart> {
         match self {
@@ -120,7 +120,7 @@ mod tests {
     use hitbox_core::tag::CacheTag;
 
     /// Project a [`Static`] form's key parts into tags the same way the
-    /// runtime `StaticExtractor::as_tag()` path does.
+    /// runtime `StaticExtractor::into_tag_extractor()` path does.
     fn static_tags(s: Static) -> Vec<CacheTag> {
         s.into_key_parts().iter().map(CacheTag::from).collect()
     }

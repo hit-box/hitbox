@@ -160,6 +160,7 @@ where
     ResTE: TagExtractor<Subject = Res::Subject> + Send + Sync,
 {
     /// Creates a new cache future with explicit request and response tag extractors.
+    #[allow(clippy::too_many_arguments)]
     pub fn new_with_tags(
         backend: Arc<B>,
         request: Req,
@@ -310,7 +311,7 @@ where
     /// routing FSM has already evaluated request predicates and extracted the
     /// cache key. Pre-extracted request tags are checked in parallel with the
     /// cache read; the response tag extractor is applied at write time
-    /// (see [`CheckResponseCachePolicy`](states::CheckResponseCachePolicy)).
+    /// (see `CheckResponseCachePolicy`).
     ///
     /// For the no-tags case, pass an empty `request_tags` Vec and
     /// [`NeutralTagExtractor`] — the parallel tag fetch is skipped entirely

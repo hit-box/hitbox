@@ -265,7 +265,7 @@ let config = Config::builder()
     .request_predicate(request::predicate().method(http::Method::GET).path("/api/users/{user_id}"))
     .response_predicate(response::predicate().status(StatusClass::Success))
     .extractor(request::extractor().method(MethodConfig::new()).path("/api/users/{user_id}"))
-    .request_tags(request::extractor().path("/api/users/{user_id}").as_tag())
+    .request_tags(request::extractor().path("/api/users/{user_id}").into_tag_extractor())
     .response_tags(ResponseHeaderTagExtractor::new("etag"))
     .policy(PolicyConfig::builder().ttl(Duration::from_secs(300)).build())
     .build();

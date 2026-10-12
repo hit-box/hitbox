@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Tag-based cache invalidation primitives: `CacheTag`, `CacheTags`, the `TagExtractor` trait, `ChainTagExtractor`, `NeutralTagExtractor`, and `TagAdapter` / `ExtractorExt::as_tag()` to reuse any key `Extractor` as a tag extractor ([#280](https://github.com/hit-box/hitbox/pull/280))
+- Tag-based cache invalidation primitives: `CacheTag`, `CacheTags`, the `TagExtractor` trait, `ChainTagExtractor`, `NeutralTagExtractor`, and `TagAdapter` / `ExtractorExt::into_tag_extractor()` to reuse any key `Extractor` as a tag extractor ([#280](https://github.com/hit-box/hitbox/pull/280))
 - `StaticExtractor` for fixed key parts or tags ([#280](https://github.com/hit-box/hitbox/pull/280))
 - `TagInvalidation` on `EnabledCacheConfig` (`Check` by default, or `Skip` to disable tag extraction and the read-time check), with `PolicyConfigBuilder::tag_invalidation()` and `PolicyConfig::tag_invalidation_enabled()` ([#280](https://github.com/hit-box/hitbox/pull/280))
 - `CacheValue` carries its creation time and optional tags: `with_created()`, `created()`, `with_creation_time()`, `with_tags()`, `with_optional_tags()`, `tags()` ([#280](https://github.com/hit-box/hitbox/pull/280))
