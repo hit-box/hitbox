@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Breaking:** `Config` and `ConfigBuilder` gain type parameters for the request and response tag extractors ([#280](https://github.com/hit-box/hitbox/pull/280))
+- **Breaking:** `CacheFuture::revalidate` takes the response tag extractor, so background revalidation re-tags the refreshed entry ([#280](https://github.com/hit-box/hitbox/pull/280))
 
 ### Added
 - `SelectiveCacheFuture` for multi-config routing with first-match-wins strategy ([#253](https://github.com/hit-box/hitbox/pull/253))

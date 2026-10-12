@@ -200,7 +200,7 @@ where
     }
 }
 
-impl<'offload, B, Req, Res, U, ReqP, ResP, E>
+impl<'offload, B, Req, Res, U, ReqP, ResP, E, ResTE>
     CacheFuture<
         'offload,
         B,
@@ -213,7 +213,7 @@ impl<'offload, B, Req, Res, U, ReqP, ResP, E>
         NoopConcurrencyManager,
         hitbox_core::DisabledOffload,
         NeutralTagExtractor<Req>,
-        NeutralTagExtractor<<Res as CacheableResponse>::Subject>,
+        ResTE,
     >
 where
     U: Upstream<Req, Response = Res>,
@@ -226,6 +226,7 @@ where
     ReqP: Predicate<Subject = Req> + Send + Sync,
     ResP: Predicate<Subject = Res::Subject> + Send + Sync,
     E: Extractor<Subject = Req> + Send + Sync,
+    ResTE: TagExtractor<Subject = Res::Subject> + Send + Sync,
 {
     /// Create a CacheFuture for background revalidation (Stale-While-Revalidate).
     ///
@@ -239,6 +240,8 @@ where
     /// * `request` - Request to send to upstream
     /// * `upstream` - Upstream service to call
     /// * `response_predicates` - Predicates to check if response should be cached
+    /// * `response_tag_extractors` - Response tag extractor; the refreshed entry
+    ///   is re-tagged with it, so response-tag invalidation keeps working
     /// * `policy` - Cache policy configuration (TTL, stale TTL)
     ///
     /// Note: `request_predicates` and `key_extractors` are not needed for revalidation
@@ -249,6 +252,7 @@ where
         request: Req,
         upstream: U,
         response_predicates: ResP,
+        response_tag_extractors: ResTE,
         policy: Arc<crate::policy::PolicyConfig>,
     ) -> Self {
         let upstream_future = upstream.call(request);
@@ -269,7 +273,7 @@ where
                 state: Some(state),
             },
             response_predicates: Some(response_predicates),
-            response_tag_extractors: Some(NeutralTagExtractor::default()),
+            response_tag_extractors: Some(response_tag_extractors),
             policy,
             // Revalidation tasks don't spawn further revalidation
             offload: DisabledOffload,
@@ -465,9 +469,12 @@ where
                     let result = handle_stale_state.transition(response, ctx, this.policy.as_ref());
 
                     // Handle offload revalidation if requested
-                    // Note: DisabledOffload::register is a no-op, so this does nothing when offload is disabled
+                    // Note: DisabledOffload::register is a no-op, so this does nothing when offload is disabled.
+                    // The foreground request returns the stale value without polling upstream,
+                    // so the response predicates and tag extractors move to the revalidation.
                     if let Some(offload_data) = result.offload_data
                         && let Some(response_predicates) = this.response_predicates.take()
+                        && let Some(response_tag_extractors) = this.response_tag_extractors.take()
                     {
                         let backend = this.backend.clone();
                         let policy = this.policy.clone();
@@ -477,13 +484,14 @@ where
 
                         // Create revalidation future using the existing FSM
                         // ReqP and E are phantom types in revalidation path
-                        let revalidate_future: CacheFuture<'_, _, _, _, _, ReqP, _, E, _, _> =
+                        let revalidate_future: CacheFuture<'_, _, _, _, _, ReqP, _, E, _, _, _, _> =
                             CacheFuture::revalidate(
                                 backend,
                                 cache_key.clone(),
                                 request,
                                 upstream,
                                 response_predicates,
+                                response_tag_extractors,
                                 policy,
                             );
 

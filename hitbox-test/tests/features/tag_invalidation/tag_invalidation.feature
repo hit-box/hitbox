@@ -316,6 +316,57 @@ Feature: Tag-Based Cache Invalidation
     And response header "X-Cache-Status" is "HIT"
     And GetBook should be called 1 time
 
+  @serial @tag-invalidation @miss @response-side @revalidation
+  Scenario: Response tags survive background revalidation
+    Given hitbox with policy
+      ```yaml
+      Enabled:
+        ttl: 300ms
+        stale: 100ms
+        policy:
+          stale: OffloadRevalidate
+      ```
+    And offload revalidation is enabled
+    And tags
+      """
+      response:
+        - Static:
+            etag: "v1"
+      """
+    # First request — miss; the entry is cached with "etag=v1".
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 1 time
+
+    # After the stale mark — the stale entry is served and a background
+    # revalidation rewrites it.
+    When sleep 150ms
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "STALE"
+    When wait for background tasks
+    Then GetBook should be called 2 times
+
+    # The refreshed entry must still carry "etag=v1".
+    When sleep 20ms
+    And tag "etag=v1" is invalidated
+    And sleep 20ms
+
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 3 times
+
   # ============================================================================
   # Invalidation during an in-flight upstream call. The upstream may have read
   # the data before it changed, so the entry that call produces must not
