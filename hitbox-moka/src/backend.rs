@@ -303,7 +303,10 @@ mod tests {
         assert_eq!(backend.tag_record_count(), 0);
 
         backend.invalidate(&CacheTag::new("user=42")).await.unwrap();
-        backend.invalidate(&CacheTag::new("region=eu")).await.unwrap();
+        backend
+            .invalidate(&CacheTag::new("region=eu"))
+            .await
+            .unwrap();
         backend.tags.run_pending_tasks().await;
         assert_eq!(backend.tag_record_count(), 2);
 
