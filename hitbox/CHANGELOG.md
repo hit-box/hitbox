@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Tag invalidation in the cache FSM: request tags are looked up concurrently with the cache read, response tags stored on an entry are checked after a hit, and an entry whose tag was invalidated after it was created is treated as a miss, as is any entry whose tag lookup fails. Entries are stamped with the time their upstream call started, so an invalidation issued during that call still expires them ([#280](https://github.com/hit-box/hitbox/pull/280))
+- `ConfigBuilder::request_tags()` / `response_tags()` and `CacheFuture::new_with_tags()` ([#280](https://github.com/hit-box/hitbox/pull/280))
+- `hitbox::tag` module re-exporting the tag primitives, and `TagInvalidation` in `hitbox::policy` ([#280](https://github.com/hit-box/hitbox/pull/280))
+
+### Changed
+- **Breaking:** `Config` and `ConfigBuilder` gain type parameters for the request and response tag extractors ([#280](https://github.com/hit-box/hitbox/pull/280))
+
+### Added
 - `SelectiveCacheFuture` for multi-config routing with first-match-wins strategy ([#253](https://github.com/hit-box/hitbox/pull/253))
 - `SelectiveConfig` container for multiple `CacheConfig` instances ([#253](https://github.com/hit-box/hitbox/pull/253))
 

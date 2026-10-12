@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `Backend::invalidate()` and `Backend::invalidated()` with default implementations that store tag invalidation timestamps as regular entries under `Backend::tag_key_prefix()` (`__hitbox_tag` by default), so every backend supports tag invalidation ([#280](https://github.com/hit-box/hitbox/pull/280))
+- `CompositionBackend` records invalidations in both layers and merges lookups so the latest timestamp per tag wins ([#280](https://github.com/hit-box/hitbox/pull/280))
+- `serialize_tags` / `deserialize_tags` helpers for backends that store tags alongside entries ([#280](https://github.com/hit-box/hitbox/pull/280))
 
 ## [0.2.1] - 2026-02-05
 
