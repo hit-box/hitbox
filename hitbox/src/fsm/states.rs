@@ -198,6 +198,70 @@ fn merge_tag_results(
     }
 }
 
+/// Whether any tag invalidation time expires an entry created at `created`.
+///
+/// Compared at millisecond granularity with `>=`. Backends may store either
+/// timestamp truncated to milliseconds (the default tag encoding does, and
+/// Redis stores entry creation times that way), and truncation must never let
+/// an invalidation issued at or after creation look older than the entry.
+/// Truncating both sides preserves that ordering; the cost is that an
+/// invalidation issued earlier within the same millisecond as the creation
+/// also expires the entry, causing one extra miss.
+fn expired_by_tags(
+    created: DateTime<Utc>,
+    invalidated_at: impl IntoIterator<Item = DateTime<Utc>>,
+) -> bool {
+    let created = created.timestamp_millis();
+    invalidated_at
+        .into_iter()
+        .any(|ts| ts.timestamp_millis() >= created)
+}
+
+#[cfg(test)]
+mod tag_expiry_tests {
+    use super::*;
+
+    fn at(rfc3339: &str) -> DateTime<Utc> {
+        rfc3339.parse().unwrap()
+    }
+
+    #[test]
+    fn truncated_invalidation_in_same_millisecond_expires_entry() {
+        // Default tag encoding truncates to ms; the entry keeps nanoseconds.
+        let created = at("2026-10-12T18:50:22.960601955Z");
+        let invalidated = at("2026-10-12T18:50:22.960Z");
+        assert!(expired_by_tags(created, [invalidated]));
+    }
+
+    #[test]
+    fn equal_millisecond_timestamps_expire_entry() {
+        // Redis stores both timestamps in ms, so they can compare equal.
+        let ts = at("2026-10-12T18:50:22.960Z");
+        assert!(expired_by_tags(ts, [ts]));
+    }
+
+    #[test]
+    fn later_invalidation_expires_entry() {
+        let created = at("2026-10-12T18:50:22.960Z");
+        assert!(expired_by_tags(created, [at("2026-10-12T18:50:22.961Z")]));
+    }
+
+    #[test]
+    fn invalidation_in_an_earlier_millisecond_keeps_entry() {
+        let created = at("2026-10-12T18:50:22.960601955Z");
+        assert!(!expired_by_tags(
+            created,
+            [at("2026-10-12T18:50:22.959999999Z")]
+        ));
+    }
+
+    #[test]
+    fn no_invalidations_keep_entry() {
+        let created = at("2026-10-12T18:50:22.960Z");
+        assert!(!expired_by_tags(created, []));
+    }
+}
+
 // =============================================================================
 // ConvertResponseFuture - Zero-cost wrapper using GAT
 // =============================================================================
@@ -866,8 +930,7 @@ impl<Req, U> PollCache<Req, U> {
                     match tag_result {
                         Ok(timestamps) if !timestamps.is_empty() => {
                             let entry_created = cached_value.created();
-                            let invalidated = timestamps.values().any(|&ts| ts > entry_created);
-                            if invalidated {
+                            if expired_by_tags(entry_created, timestamps.values().copied()) {
                                 debug!(
                                     "Cache entry invalidated by tag (created={}, latest_tag_ts={:?})",
                                     entry_created,
