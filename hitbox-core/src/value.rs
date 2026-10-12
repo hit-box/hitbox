@@ -170,6 +170,18 @@ impl<T> CacheValue<T> {
         self
     }
 
+    /// Overrides the creation timestamp (builder-style).
+    ///
+    /// Tag invalidation expires an entry when a tag was invalidated after the
+    /// entry's creation time. The cache FSM uses this to stamp an entry with
+    /// the time its upstream call *started*: the data can be no newer than
+    /// that, so an invalidation issued while the upstream was still running
+    /// must not be outdated by the entry it produced.
+    pub fn with_creation_time(mut self, created: DateTime<Utc>) -> Self {
+        self.created = created;
+        self
+    }
+
     /// Creates a new cache value using timestamps derived from an [`EntityPolicyConfig`].
     ///
     /// Sets the creation time to now and converts the config's TTL and stale TTL

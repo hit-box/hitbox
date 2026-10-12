@@ -479,6 +479,9 @@ pub struct PollUpstream {
     pub cache_key: Option<CacheKey>,
     /// Start time for measuring upstream call duration.
     pub upstream_start: Instant,
+    /// Wall-clock time the upstream call started; becomes the cached entry's
+    /// creation time (see [`PollUpstream::transition`]).
+    pub upstream_started_at: DateTime<Utc>,
     /// Tracing span for this state (created on entry, entered on each poll).
     pub span: Span,
 }
@@ -509,6 +512,7 @@ impl PollUpstream {
                 ctx,
                 cache_key,
                 upstream_start: Instant::now(),
+                upstream_started_at: Utc::now(),
                 span: span.clone(),
             },
             future.instrument(span),
@@ -525,6 +529,11 @@ impl PollUpstream {
     /// All `CacheFuture` constructors materialize a concrete extractor
     /// (defaulting to [`NeutralTagExtractor`] when none is configured), so
     /// this is always present.
+    ///
+    /// A cacheable value is stamped with the time the upstream call
+    /// *started*, not when its response was processed. Otherwise a tag
+    /// invalidated while the upstream was still reading the old data would
+    /// predate the entry and never expire it.
     pub fn transition<Res, ResP, ResTE>(
         self,
         upstream_result: Res,
@@ -554,11 +563,18 @@ impl PollUpstream {
                 let response_tag_extractor = policy
                     .tag_invalidation_enabled()
                     .then_some(response_tag_extractor);
+                let upstream_started_at = self.upstream_started_at;
                 PollUpstreamTransition::CheckResponseCachePolicy {
                     cache_policy_future: Box::pin(async move {
                         let (policy, tags) = upstream_result
                             .cache_policy(predicates, response_tag_extractor, &entity_config)
                             .await;
+                        let policy = match policy {
+                            CachePolicy::Cacheable(value) => CachePolicy::Cacheable(
+                                value.with_creation_time(upstream_started_at),
+                            ),
+                            non_cacheable => non_cacheable,
+                        };
                         (policy, Some(tags))
                     }),
                     permit: self.permit,

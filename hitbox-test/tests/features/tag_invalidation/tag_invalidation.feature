@@ -317,6 +317,40 @@ Feature: Tag-Based Cache Invalidation
     And GetBook should be called 1 time
 
   # ============================================================================
+  # Invalidation during an in-flight upstream call. The upstream may have read
+  # the data before it changed, so the entry that call produces must not
+  # outlive the invalidation. Entries are stamped with the time the upstream
+  # call started, not when its response arrived.
+  # ============================================================================
+
+  @tag-invalidation @miss @race
+  Scenario: Invalidation during an in-flight upstream call expires the resulting entry
+    Given tags
+      """
+      request:
+        - Static:
+            user: "42"
+      """
+    And upstream delay for GetBook is 200ms
+    # The tag is invalidated 50ms into the 200ms upstream call.
+    When request is executed while tag "user=42" is invalidated after 50ms
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 1 time
+
+    # The cached entry may hold pre-invalidation data, so it must not be served.
+    When execute request
+      ```hurl
+      GET http://localhost/v1/authors/robert-sheckley/books/victim-prime
+      ```
+    Then response status is 200
+    And response header "X-Cache-Status" is "MISS"
+    And GetBook should be called 2 times
+
+  # ============================================================================
   # Dynamic response tags: a response Header extractor derives the tag from the
   # actual response header (here `etag: book-v1`), reusing the same header
   # machinery as the request side. Invalidating the derived tag misses.
