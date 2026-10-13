@@ -22,9 +22,16 @@ pub mod request;
 ///
 /// Also re-exports [`response::predicate()`] entry point for building response predicate chains.
 pub mod response;
+/// Response-side cache tag extractors.
+///
+/// Direct [`TagExtractor`](hitbox::tag::TagExtractor) implementations over
+/// [`CacheableHttpResponse`] — e.g. [`ResponseHeaderTagExtractor`]
+/// for tagging cached entries by a response header such as `ETag`.
+pub mod tags;
 
 pub use body::{BufferedBody, CollectExactResult, CollectedBody, PartialBufferedBody, Remaining};
 pub use cache_status::DEFAULT_CACHE_STATUS_HEADER;
 pub use cacheable::CacheableSubject;
 pub use request::CacheableHttpRequest;
 pub use response::{CacheableHttpResponse, SerializableHttpResponse};
+pub use tags::ResponseHeaderTagExtractor;

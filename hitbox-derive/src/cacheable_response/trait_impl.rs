@@ -41,23 +41,39 @@ impl<'a> CacheableResponseImpl<'a> {
                 type IntoCachedFuture = std::future::Ready<hitbox::CachePolicy<Self, Self>>;
                 type FromCachedFuture = std::future::Ready<Self>;
 
-                async fn cache_policy<__P>(
+                async fn cache_policy<__P, __TE>(
                     self,
                     predicates: __P,
+                    tag_extractor: ::std::option::Option<__TE>,
                     config: &hitbox::EntityPolicyConfig,
-                ) -> hitbox::ResponseCachePolicy<Self>
+                ) -> (
+                    hitbox::ResponseCachePolicy<Self>,
+                    ::std::vec::Vec<hitbox::tag::CacheTag>,
+                )
                 where
                     __P: hitbox::predicate::Predicate<Subject = Self::Subject> + Send + Sync,
+                    __TE: hitbox::tag::TagExtractor<Subject = Self::Subject> + Send + Sync,
                 {
                     match predicates.check(self).await {
                         hitbox::predicate::PredicateResult::Cacheable(data) => {
+                            let (data, tags) = match tag_extractor {
+                                ::std::option::Option::Some(__te) => {
+                                    __te.extract_tags(data).await
+                                }
+                                ::std::option::Option::None => {
+                                    (data, ::std::vec::Vec::new())
+                                }
+                            };
                             let cached = data.clone();
-                            hitbox::CachePolicy::Cacheable(
-                                hitbox::CacheValue::from_config(cached, config),
+                            (
+                                hitbox::CachePolicy::Cacheable(
+                                    hitbox::CacheValue::from_config(cached, config),
+                                ),
+                                tags,
                             )
                         }
                         hitbox::predicate::PredicateResult::NonCacheable(data) => {
-                            hitbox::CachePolicy::NonCacheable(data)
+                            (hitbox::CachePolicy::NonCacheable(data), ::std::vec::Vec::new())
                         }
                     }
                 }
@@ -96,25 +112,41 @@ impl<'a> CacheableResponseImpl<'a> {
                 type IntoCachedFuture = std::future::Ready<hitbox::CachePolicy<Self::Cached, Self>>;
                 type FromCachedFuture = std::future::Ready<Self>;
 
-                async fn cache_policy<__P>(
+                async fn cache_policy<__P, __TE>(
                     self,
                     predicates: __P,
+                    tag_extractor: ::std::option::Option<__TE>,
                     config: &hitbox::EntityPolicyConfig,
-                ) -> hitbox::ResponseCachePolicy<Self>
+                ) -> (
+                    hitbox::ResponseCachePolicy<Self>,
+                    ::std::vec::Vec<hitbox::tag::CacheTag>,
+                )
                 where
                     __P: hitbox::predicate::Predicate<Subject = Self::Subject> + Send + Sync,
+                    __TE: hitbox::tag::TagExtractor<Subject = Self::Subject> + Send + Sync,
                 {
                     match predicates.check(self).await {
                         hitbox::predicate::PredicateResult::Cacheable(data) => {
+                            let (data, tags) = match tag_extractor {
+                                ::std::option::Option::Some(__te) => {
+                                    __te.extract_tags(data).await
+                                }
+                                ::std::option::Option::None => {
+                                    (data, ::std::vec::Vec::new())
+                                }
+                            };
                             let cached = #cached_name {
                                 #(#field_idents: data.#field_idents,)*
                             };
-                            hitbox::CachePolicy::Cacheable(
-                                hitbox::CacheValue::from_config(cached, config),
+                            (
+                                hitbox::CachePolicy::Cacheable(
+                                    hitbox::CacheValue::from_config(cached, config),
+                                ),
+                                tags,
                             )
                         }
                         hitbox::predicate::PredicateResult::NonCacheable(data) => {
-                            hitbox::CachePolicy::NonCacheable(data)
+                            (hitbox::CachePolicy::NonCacheable(data), ::std::vec::Vec::new())
                         }
                     }
                 }

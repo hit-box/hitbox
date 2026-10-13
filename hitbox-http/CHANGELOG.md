@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `ResponseHeaderTagExtractor` (`hitbox_http::tags`) tags cached entries by a response header such as `ETag`, with the same name selection, regex value extraction, and transforms as the request `Header` extractor ([#280](https://github.com/hit-box/hitbox/pull/280))
+- `HeaderConfig::new()` and `HeaderConfig::select()`; the request `Header` extractor and the response tag extractor share one header-reading path ([#280](https://github.com/hit-box/hitbox/pull/280))
+
+### Changed
+- `CacheableHttpRequest` and `CacheableHttpResponse` implement the tag-aware `cache_policy` signatures ([#280](https://github.com/hit-box/hitbox/pull/280))
+
+### Added
 - Preserve HTTP/2 trailers through body buffering and cache serialization roundtrip ([#261](https://github.com/hit-box/hitbox/pull/261))
 
 ### Changed

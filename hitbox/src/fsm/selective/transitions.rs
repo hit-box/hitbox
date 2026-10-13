@@ -6,7 +6,8 @@
 #![allow(missing_docs)]
 
 use futures::future::BoxFuture;
-use hitbox_core::{KeyParts, PredicateResult};
+use hitbox_core::tag::CacheTag;
+use hitbox_core::{CacheKey, PredicateResult};
 use tracing::Span;
 
 use super::states::{CheckPredicate, ExtractKey, Passthrough, SelectiveState};
@@ -17,9 +18,9 @@ use super::states::{CheckPredicate, ExtractKey, Passthrough, SelectiveState};
 
 /// Transitions from CheckPredicate state.
 pub enum CheckPredicateTransition<'a, Req, UF> {
-    /// Request matched — extract cache key from this config.
+    /// Request matched — extract cache key and request tags from this config.
     ExtractKey {
-        extract_future: BoxFuture<'a, KeyParts<Req>>,
+        extract_future: BoxFuture<'a, (Req, CacheKey, Vec<CacheTag>)>,
         config_index: usize,
     },
     /// Request did not match — try the next enabled config.

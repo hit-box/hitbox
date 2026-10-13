@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `Args<T>` implements the tag-aware `CacheableRequest::cache_policy`; `#[cached]` users need no changes ([#280](https://github.com/hit-box/hitbox/pull/280))
+
 ### Added
 - `CacheAccess` trait for `#[cached]` macro — supports `Cache<B,CM,O>`, `&Cache`, and `Arc<Cache>` ([#206](https://github.com/hit-box/hitbox/pull/206))
 

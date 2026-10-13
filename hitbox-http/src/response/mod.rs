@@ -4,11 +4,12 @@ use std::fmt::Debug;
 use std::future::Ready;
 
 use bytes::Bytes;
-use chrono::Utc;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use hitbox::{
-    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, predicate::PredicateResult,
+    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, Predicate, ResponseCachePolicy,
+    predicate::PredicateResult,
+    tag::{CacheTag, TagExtractor},
 };
 use http::{HeaderMap, Response, response::Parts};
 use hyper::body::Body as HttpBody;
@@ -413,24 +414,31 @@ where
     type IntoCachedFuture = BoxFuture<'static, CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = Ready<Self>;
 
-    async fn cache_policy<P>(
+    async fn cache_policy<P, TE>(
         self,
         predicates: P,
+        tag_extractor: Option<TE>,
         config: &EntityPolicyConfig,
-    ) -> hitbox::ResponseCachePolicy<Self>
+    ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where
-        P: hitbox::Predicate<Subject = Self::Subject> + Send + Sync,
+        P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
     {
         match predicates.check(self).await {
-            PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
-                    res,
-                    config.ttl.map(|duration| Utc::now() + duration),
-                    config.stale_ttl.map(|duration| Utc::now() + duration),
-                )),
-                CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
-            },
-            PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
+            PredicateResult::Cacheable(cacheable) => {
+                let (cacheable, tags) = match tag_extractor {
+                    Some(te) => te.extract_tags(cacheable).await,
+                    None => (cacheable, Vec::new()),
+                };
+                match cacheable.into_cached().await {
+                    CachePolicy::Cacheable(res) => (
+                        CachePolicy::Cacheable(CacheValue::from_config(res, config)),
+                        tags,
+                    ),
+                    CachePolicy::NonCacheable(res) => (CachePolicy::NonCacheable(res), tags),
+                }
+            }
+            PredicateResult::NonCacheable(res) => (CachePolicy::NonCacheable(res), Vec::new()),
         }
     }
 

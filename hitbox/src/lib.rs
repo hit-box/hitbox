@@ -106,6 +106,14 @@ pub mod extractor {
     pub use hitbox_core::Extractor;
 }
 
+/// Cache tag types and tag extractors.
+///
+/// Re-exports the tag invalidation primitives from
+/// [`hitbox-core`](https://docs.rs/hitbox-core).
+pub mod tag {
+    pub use hitbox_core::tag::*;
+}
+
 /// The `hitbox` prelude.
 ///
 /// Provides convenient access to the most commonly used types:

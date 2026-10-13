@@ -6,6 +6,7 @@ use std::{
 use async_trait::async_trait;
 use bincode::{
     config::standard as bincode_config,
+    error::DecodeError,
     serde::{decode_from_slice, encode_to_vec},
 };
 use bytes::Bytes;
@@ -16,13 +17,38 @@ use hitbox_backend::{
     Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus,
     PassthroughCompressor,
 };
+use hitbox_core::tag::CacheTags;
 use hitbox_core::{BackendLabel, CacheKey, CacheValue, Raw};
 use serde::{Deserialize, Serialize};
 
 use crate::FeOxDbError;
 
+/// On-disk record.
+///
+/// bincode decodes fields by position, never by name, and ignores
+/// `#[serde(default)]`. Fields may therefore only be **appended**, never
+/// inserted or reordered: a binary that predates a field then reads the
+/// leading fields it knows and ignores the trailing bytes. Records written
+/// before an appended field fail to decode with this shape and are read via
+/// [`LegacyCacheValue`].
 #[derive(Serialize, Deserialize)]
 struct SerializableCacheValue {
+    #[serde(with = "serde_bytes")]
+    data: Vec<u8>,
+    stale: Option<DateTime<Utc>>,
+    expire: Option<DateTime<Utc>>,
+    // Appended for tag invalidation.
+    created: DateTime<Utc>,
+    tags: Option<CacheTags>,
+}
+
+/// Record shape written before tag invalidation: `data, stale, expire`.
+///
+/// Such records carry no creation time, so they are read as created at the
+/// Unix epoch: any invalidation of a matching request tag expires them.
+#[derive(Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
+struct LegacyCacheValue {
     #[serde(with = "serde_bytes")]
     data: Vec<u8>,
     stale: Option<DateTime<Utc>>,
@@ -35,13 +61,49 @@ impl From<CacheValue<Raw>> for SerializableCacheValue {
             data: value.data().to_vec(),
             stale: value.stale(),
             expire: value.expire(),
+            created: value.created(),
+            tags: value.tags().cloned(),
         }
     }
 }
 
 impl From<SerializableCacheValue> for CacheValue<Raw> {
     fn from(value: SerializableCacheValue) -> Self {
-        CacheValue::new(Bytes::from(value.data), value.expire, value.stale)
+        let cv = CacheValue::with_created(
+            Bytes::from(value.data),
+            value.created,
+            value.expire,
+            value.stale,
+        );
+        match value.tags {
+            Some(tags) => cv.with_tags(tags),
+            None => cv,
+        }
+    }
+}
+
+impl From<LegacyCacheValue> for CacheValue<Raw> {
+    fn from(value: LegacyCacheValue) -> Self {
+        CacheValue::with_created(
+            Bytes::from(value.data),
+            DateTime::UNIX_EPOCH,
+            value.expire,
+            value.stale,
+        )
+    }
+}
+
+/// Decodes a stored record, falling back to the pre-tag layout.
+///
+/// A legacy record is always shorter than the current layout, so decoding it
+/// with [`SerializableCacheValue`] fails with `UnexpectedEnd` rather than
+/// misreading fields. On failure the current-layout error is returned.
+fn decode_record(bytes: &[u8]) -> Result<CacheValue<Raw>, DecodeError> {
+    match decode_from_slice::<SerializableCacheValue, _>(bytes, bincode_config()) {
+        Ok((record, _)) => Ok(record.into()),
+        Err(err) => decode_from_slice::<LegacyCacheValue, _>(bytes, bincode_config())
+            .map(|(legacy, _)| legacy.into())
+            .map_err(|_| err),
     }
 }
 
@@ -312,11 +374,8 @@ where
 
         tokio::task::spawn_blocking(move || match store.get(&key_bytes) {
             Ok(encoded) => {
-                let (serializable, _): (SerializableCacheValue, _) =
-                    decode_from_slice(&encoded, bincode_config())
-                        .map_err(|e| BackendError::InternalError(Box::new(e)))?;
-
-                let cache_value: CacheValue<Raw> = serializable.into();
+                let cache_value = decode_record(&encoded)
+                    .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
                 if let Some(expire_time) = cache_value.expire()
                     && expire_time < Utc::now()
@@ -401,7 +460,72 @@ where
 mod tests {
     use super::*;
     use chrono::Utc;
+    use hitbox_core::tag::CacheTag;
     use tempfile::TempDir;
+
+    fn tagged_value() -> CacheValue<Raw> {
+        CacheValue::with_created(
+            Bytes::from_static(b"payload"),
+            Utc::now() - chrono::Duration::hours(2),
+            Some(Utc::now() + chrono::Duration::minutes(5)),
+            Some(Utc::now() + chrono::Duration::minutes(1)),
+        )
+        .with_tags(CacheTags::response_only(vec![CacheTag::new("etag=v1")]))
+    }
+
+    #[test]
+    fn current_record_round_trips() {
+        let value = tagged_value();
+        let bytes = encode_to_vec(
+            SerializableCacheValue::from(value.clone()),
+            bincode_config(),
+        )
+        .unwrap();
+
+        let decoded = decode_record(&bytes).unwrap();
+        assert_eq!(decoded.data(), value.data());
+        assert_eq!(decoded.created(), value.created());
+        assert_eq!(decoded.stale(), value.stale());
+        assert_eq!(decoded.expire(), value.expire());
+        assert_eq!(decoded.tags(), value.tags());
+    }
+
+    /// Records written before tag invalidation stay readable.
+    #[test]
+    fn legacy_record_reads_as_created_at_epoch() {
+        let value = tagged_value();
+        let legacy = LegacyCacheValue {
+            data: value.data().to_vec(),
+            stale: value.stale(),
+            expire: value.expire(),
+        };
+        let bytes = encode_to_vec(&legacy, bincode_config()).unwrap();
+
+        let decoded = decode_record(&bytes).unwrap();
+        assert_eq!(decoded.data(), value.data());
+        assert_eq!(decoded.stale(), value.stale());
+        assert_eq!(decoded.expire(), value.expire());
+        assert_eq!(decoded.created(), DateTime::UNIX_EPOCH);
+        assert!(decoded.tags().is_none());
+    }
+
+    /// A binary from before tag invalidation decodes current records with the
+    /// legacy shape; its fields must land unshifted (rollback safety).
+    #[test]
+    fn pre_tag_binary_reads_current_record_prefix() {
+        let value = tagged_value();
+        let bytes = encode_to_vec(
+            SerializableCacheValue::from(value.clone()),
+            bincode_config(),
+        )
+        .unwrap();
+
+        let (legacy, _): (LegacyCacheValue, _) =
+            decode_from_slice(&bytes, bincode_config()).unwrap();
+        assert_eq!(legacy.data, value.data().to_vec());
+        assert_eq!(legacy.stale, value.stale());
+        assert_eq!(legacy.expire, value.expire());
+    }
 
     #[tokio::test]
     async fn test_write_and_read() {

@@ -157,6 +157,7 @@ See the [memoization_derive](./examples/examples/memoization_derive.rs) example 
 ### Core Features
 - [Stale Cache](#stale-cache) Serve stale data within grace period while revalidating in background
 - [Dogpile Prevention](#dogpile-prevention) Configurable concurrency limit with broadcast to prevent redundant upstream calls
+- [Tag Invalidation](#tag-invalidation) Expire every entry carrying a tag, with tags derived from requests or responses
 - [Pluggable Backends](#pluggable-backends) Choose Moka, Redis, FeOxDB, or implement the Backend trait for your own storage
 - [Composable Backends](#composable-backends) Combine backends into L1/L2/L3 tiers for optimal performance
 - [Serialization](#serialization) Choose between bincode, rkyv, JSON, or RON formats
@@ -243,6 +244,34 @@ let cache = Cache::builder()
     .config(policy)
     .concurrency_manager(concurrency_manager)
     .build();
+```
+
+## Tag Invalidation
+
+TTL expires entries on a schedule; tags expire them when the data behind them changes. Each cached entry carries tags derived from the request (such as `user_id=42` from the path) or from the upstream response (such as its `ETag`), and invalidating a tag expires every entry that carries it. Invalidation is passive: it records a timestamp for the tag, and any entry created before that timestamp is a miss on its next read. Nothing is scanned or deleted, so invalidating a tag costs one small write however many entries carry it.
+
+- Request tags are derived on every read; response tags are stored with the entry
+- An entry is stamped with the time its upstream call started, so an invalidation issued while that call is in flight still expires it
+- If the tag lookup fails, the entry is treated as a miss rather than served unchecked
+- `TagInvalidation::Skip` turns off tag extraction and the lookups on read
+- Every backend supports tags; on Redis, use a `volatile-*` `maxmemory-policy` so tag records (which have no TTL) are never evicted
+
+**Code example**
+
+```rust
+// Tag each cached user with "user_id=<id>", reusing the path extractor,
+// and with the ETag the upstream returned
+let config = Config::builder()
+    .request_predicate(request::predicate().method(http::Method::GET).path("/api/users/{user_id}"))
+    .response_predicate(response::predicate().status(StatusClass::Success))
+    .extractor(request::extractor().method(MethodConfig::new()).path("/api/users/{user_id}"))
+    .request_tags(request::extractor().path("/api/users/{user_id}").into_tag_extractor())
+    .response_tags(ResponseHeaderTagExtractor::new("etag"))
+    .policy(PolicyConfig::builder().ttl(Duration::from_secs(300)).build())
+    .build();
+
+// After user 42 changes, expire every cached response tagged with it
+backend.invalidate(&CacheTag::new("user_id=42")).await?;
 ```
 
 ## Pluggable Backends
