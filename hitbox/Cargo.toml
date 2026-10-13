@@ -7,9 +7,9 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 categories.workspace = true
-description = "Asynchronous caching framework."
+description = "Async caching framework with stale-while-revalidate, dogpile prevention, and pluggable backends (Moka, Redis, FeOxDB)."
 readme = "README.md"
-keywords = ["cache", "async", "cache-backend", "hitbox", "tokio"]
+keywords = ["cache", "caching", "async", "tower", "middleware"]
 
 [dependencies]
 hitbox-core = { path = "../hitbox-core", version = "0.2", features = [] }

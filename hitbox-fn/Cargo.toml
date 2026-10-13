@@ -1,8 +1,9 @@
 [package]
 name = "hitbox-fn"
 version = "0.2.1"
-description = "Function memoization for hitbox caching framework"
-keywords = ["cache", "memoization", "async", "function"]
+description = "Async function memoization with pluggable cache backends, built on the Hitbox caching framework."
+keywords = ["cache", "memoization", "async", "function", "derive"]
+categories = ["caching", "asynchronous"]
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
