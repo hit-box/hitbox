@@ -523,6 +523,9 @@ where
     ///
     /// This method blocks until the entire body is received. For very large
     /// bodies or slow streams, this may take significant time and memory.
+    // The error variant is the body itself, returned so it can still be
+    // forwarded upstream; boxing it would only add an allocation.
+    #[allow(clippy::result_large_err)]
     pub async fn collect(self) -> Result<CollectedBody, Self>
     where
         B::Data: Send,

@@ -14,7 +14,11 @@ use hitbox_backend::{
 use redis::Client;
 use redis::aio::ConnectionManager;
 #[cfg(feature = "cluster")]
+use redis::cluster::ClusterClientBuilder;
+#[cfg(feature = "cluster")]
 use redis::cluster_async::ClusterConnection;
+#[cfg(feature = "cluster")]
+use redis::cluster_read_routing::RandomReplicaStrategy;
 use tokio::sync::OnceCell;
 
 use crate::error::Error;
@@ -495,13 +499,10 @@ where
                     }
                     #[cfg(feature = "cluster")]
                     ConnectionMode::Cluster(config) => {
-                        let mut builder = redis::cluster::ClusterClientBuilder::new(
-                            config.nodes.iter().map(|s| s.as_str()),
-                        );
+                        let mut builder =
+                            ClusterClientBuilder::new(config.nodes.iter().map(|s| s.as_str()));
                         if config.read_from_replicas {
-                            builder = builder.read_routing_strategy(
-                                redis::cluster_read_routing::RandomReplicaStrategy,
-                            );
+                            builder = builder.read_routing_strategy(RandomReplicaStrategy);
                         }
                         if let Some(ref username) = self.username {
                             builder = builder.username(username.clone());

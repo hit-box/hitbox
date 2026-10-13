@@ -93,8 +93,13 @@ where
     /// or in tests to verify disk behavior synchronously.
     ///
     /// No-op in memory-only mode.
-    pub fn flush(&self) {
-        self.store.flush();
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if syncing to disk fails.
+    pub fn flush(&self) -> Result<(), FeOxDbError> {
+        self.store.flush()?;
+        Ok(())
     }
 }
 
@@ -659,7 +664,7 @@ mod tests {
                 None,
             );
             backend.write(&key, value).await.unwrap();
-            backend.flush();
+            backend.flush().unwrap();
         }
 
         // Reopen and verify data persisted
@@ -702,11 +707,11 @@ mod tests {
                 let _ = backend.write(&key, value).await;
                 // Periodic flush to persist data incrementally
                 if i % 5 == 4 {
-                    backend.flush();
+                    let _ = backend.flush();
                     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                 }
             }
-            backend.flush();
+            let _ = backend.flush();
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
 

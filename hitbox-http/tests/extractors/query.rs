@@ -10,7 +10,7 @@ use http_body_util::Empty;
 #[tokio::test]
 async fn test_request_query_extractor_some() {
     let uri = http::uri::Uri::builder()
-        .path_and_query("test-path?key=value")
+        .path_and_query("/test-path?key=value")
         .build()
         .unwrap();
     let request = Request::builder()
@@ -29,7 +29,7 @@ async fn test_request_query_extractor_some() {
 #[tokio::test]
 async fn test_request_query_extractor_none() {
     let uri = http::uri::Uri::builder()
-        .path_and_query("test-path?key=value")
+        .path_and_query("/test-path?key=value")
         .build()
         .unwrap();
     let request = Request::builder()
@@ -47,7 +47,7 @@ async fn test_request_query_extractor_none() {
 #[tokio::test]
 async fn test_request_query_extractor_multiple() {
     let uri = http::uri::Uri::builder()
-        .path_and_query("test-path?cars[]=Saab&cars[]=Audi")
+        .path_and_query("/test-path?cars[]=Saab&cars[]=Audi")
         .build()
         .unwrap();
     let request = Request::builder()
@@ -66,7 +66,7 @@ async fn test_request_query_extractor_multiple() {
 #[tokio::test]
 async fn test_request_query_extractor_from_string() {
     let uri = http::uri::Uri::builder()
-        .path_and_query("test-path?page=5")
+        .path_and_query("/test-path?page=5")
         .build()
         .unwrap();
     let request = Request::builder()
@@ -85,7 +85,7 @@ async fn test_request_query_extractor_from_string() {
 #[tokio::test]
 async fn test_request_query_extractor_starts_with() {
     let uri = http::uri::Uri::builder()
-        .path_and_query("test-path?filter_name=alice&filter_role=admin&page=1")
+        .path_and_query("/test-path?filter_name=alice&filter_role=admin&page=1")
         .build()
         .unwrap();
     let request = Request::builder()
@@ -107,7 +107,7 @@ async fn test_request_query_extractor_starts_with() {
 #[tokio::test]
 async fn test_request_query_extractor_with_regex_value() {
     let uri = http::uri::Uri::builder()
-        .path_and_query("test-path?version=v3.2.1")
+        .path_and_query("/test-path?version=v3.2.1")
         .build()
         .unwrap();
     let request = Request::builder()
@@ -129,7 +129,7 @@ async fn test_request_query_extractor_with_regex_value() {
 #[tokio::test]
 async fn test_request_query_extractor_with_transform() {
     let uri = http::uri::Uri::builder()
-        .path_and_query("test-path?search=HeLLo")
+        .path_and_query("/test-path?search=HeLLo")
         .build()
         .unwrap();
     let request = Request::builder()

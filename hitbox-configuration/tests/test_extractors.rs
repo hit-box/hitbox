@@ -16,7 +16,7 @@ fn test_extractors_serialize() {
         ..Default::default()
     };
     let yaml_str = serde_saphyr::to_string(&original_endpoint).unwrap();
-    println!("{}", &yaml_str);
+    println!("{}", yaml_str);
     let config = r"
 policy:
   Enabled: {}
