@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adapted `CacheableRequest` impl to GAT-based `CachePolicyFuture` ([#206](https://github.com/hit-box/hitbox/pull/206))
 - **Breaking:** `BufferedBody::Complete` and `collect()` API changed to carry optional trailers ([#261](https://github.com/hit-box/hitbox/pull/261))
 
+### Fixed
+- Clippy `result_large_err` on `BufferedBody::collect()` and query extractor tests rejected by `http` 1.5 ([#293](https://github.com/hit-box/hitbox/pull/293))
+
 ## [0.2.1] - 2026-02-09
 
 ### Fixed
