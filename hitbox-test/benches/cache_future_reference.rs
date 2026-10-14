@@ -27,7 +27,7 @@ use hitbox_backend::composition::policy::{
 };
 use hitbox_backend::format::BincodeFormat;
 use hitbox_backend::{CacheBackend, CompositionBackend, PassthroughCompressor};
-use hitbox_configuration::{Backend as ConfigBackend, ConfigEndpoint};
+use hitbox_configuration::{Backend as ConfigBackend, ConfigEndpoints, Endpoint};
 use hitbox_core::DisabledOffload;
 use hitbox_core::Upstream;
 use hitbox_http::extractors::MethodConfig;
@@ -631,7 +631,7 @@ fn bench_compare_composition_write(c: &mut Criterion) {
 #[derive(Debug, serde::Deserialize)]
 struct BenchConfig {
     backend: ConfigBackend,
-    endpoint: ConfigEndpoint,
+    endpoints: ConfigEndpoints,
 }
 
 /// Load configuration from YAML
@@ -642,6 +642,16 @@ fn load_config() -> BenchConfig {
 /// Load body configuration from YAML
 fn load_body_config() -> BenchConfig {
     serde_saphyr::from_str(REFERENCE_CONFIG_BODY).expect("Failed to parse body reference config")
+}
+
+/// Extract the first endpoint from a list of endpoint configurations.
+fn first_endpoint(endpoints: ConfigEndpoints) -> Endpoint<InnerBody, InnerBody> {
+    endpoints
+        .into_iter()
+        .next()
+        .expect("endpoints list must not be empty")
+        .into_endpoint()
+        .expect("Failed to create endpoint")
 }
 
 // Type alias for dynamic backend (must match the blanket impl in hitbox_backend)
@@ -663,10 +673,7 @@ fn bench_compare_request_predicates(c: &mut Criterion) {
 
     // Dynamic dispatch predicates (from config)
     let config = load_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_predicates = endpoint.request_predicates;
 
     group.bench_function("static", |b| {
@@ -697,10 +704,7 @@ fn bench_compare_response_predicates(c: &mut Criterion) {
 
     // Dynamic dispatch predicates (from config)
     let config = load_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_predicates = endpoint.response_predicates;
 
     group.bench_function("static", |b| {
@@ -733,10 +737,7 @@ fn bench_compare_extractors(c: &mut Criterion) {
 
     // Dynamic dispatch extractors (from config)
     let config = load_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_extractors = endpoint.extractors;
 
     group.bench_function("static", |b| {
@@ -811,10 +812,7 @@ fn bench_compare_cache_future_hit(c: &mut Criterion) {
         .backend
         .into_backend()
         .expect("Failed to create backend");
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dyn_policy = Arc::clone(&endpoint.policy);
 
     // Pre-populate dynamic cache
@@ -943,10 +941,7 @@ fn bench_compare_cache_future_miss(c: &mut Criterion) {
         .backend
         .into_backend()
         .expect("Failed to create backend");
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dyn_policy = Arc::clone(&endpoint.policy);
     let dyn_backend_arc: Arc<DynBackend> = Arc::new(dyn_backend);
 
@@ -1046,10 +1041,7 @@ fn bench_compare_body_request_predicates(c: &mut Criterion) {
 
     // Dynamic dispatch predicates (from body config)
     let config = load_body_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_predicates = endpoint.request_predicates;
 
     group.bench_function("static", |b| {
@@ -1080,10 +1072,7 @@ fn bench_compare_body_response_predicates(c: &mut Criterion) {
 
     // Dynamic dispatch predicates (from body config)
     let config = load_body_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_predicates = endpoint.response_predicates;
 
     group.bench_function("static", |b| {
@@ -1116,10 +1105,7 @@ fn bench_compare_body_extractors(c: &mut Criterion) {
 
     // Dynamic dispatch extractors (from body config)
     let config = load_body_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_extractors = endpoint.extractors;
 
     group.bench_function("static", |b| {
@@ -1194,10 +1180,7 @@ fn bench_compare_body_cache_future_hit(c: &mut Criterion) {
         .backend
         .into_backend()
         .expect("Failed to create backend");
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dyn_policy = Arc::clone(&endpoint.policy);
 
     // Pre-populate dynamic cache
@@ -1325,10 +1308,7 @@ fn bench_compare_body_cache_future_miss(c: &mut Criterion) {
         .backend
         .into_backend()
         .expect("Failed to create backend");
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dyn_policy = Arc::clone(&endpoint.policy);
     let dyn_backend_arc: Arc<DynBackend> = Arc::new(dyn_backend);
 

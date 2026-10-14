@@ -26,8 +26,8 @@ use std::time::Duration;
 
 use axum::routing::post;
 use axum::{Json, Router};
-use hitbox_configuration::{Backend, ConfigEndpoint};
-use hitbox_tower::Cache;
+use hitbox_configuration::{Backend, ConfigEndpoints};
+use hitbox_tower::{Cache, SelectiveConfig};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 
@@ -131,7 +131,7 @@ impl Args {
 #[derive(Debug, Deserialize)]
 struct LoadTestConfig {
     backend: Backend,
-    endpoint: ConfigEndpoint,
+    endpoints: ConfigEndpoints,
 }
 
 // ============================================================================
@@ -496,13 +496,18 @@ async fn start_server_with_cache(
     // Create backend from config
     let backend = config.backend.into_backend()?;
 
-    // Create endpoint config
-    let endpoint_config = config.endpoint.into_endpoint()?;
+    // Install every endpoint: the first one whose request predicates match
+    // handles the request, as in a service configured with the same list
+    let endpoints = config.endpoints.into_endpoints()?;
+    anyhow::ensure!(
+        !endpoints.is_empty(),
+        "config must define at least one endpoint"
+    );
 
     // Create cache layer
     let cache_layer = Cache::builder()
         .backend(backend)
-        .config(endpoint_config)
+        .config(SelectiveConfig::new(endpoints))
         .build();
 
     let state = AppState { sleep_ms };

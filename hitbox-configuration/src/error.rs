@@ -46,6 +46,27 @@ pub enum ConfigError {
     /// Empty path list in 'in' operation
     #[error("Path 'in' operation requires at least one pattern")]
     EmptyPathList,
+
+    /// Error originating from a specific endpoint in a multi-endpoint configuration
+    ///
+    /// The message names the endpoint only; the underlying error is available
+    /// through [`std::error::Error::source`], so error reporters print it once.
+    #[error("Invalid endpoint at index {index}{}", endpoint_name(.name))]
+    EndpointAt {
+        /// Zero-based position of the failing endpoint in the list
+        index: usize,
+        /// Name of the failing endpoint, when one was provided
+        name: Option<String>,
+        #[source]
+        source: Box<ConfigError>,
+    },
+}
+
+/// Formats an optional endpoint name as a ``" (`name`)"`` suffix for [`ConfigError::EndpointAt`].
+fn endpoint_name(name: &Option<String>) -> String {
+    name.as_deref()
+        .map(|name| format!(" (`{name}`)"))
+        .unwrap_or_default()
 }
 
 impl From<http::method::InvalidMethod> for ConfigError {
