@@ -1,7 +1,10 @@
 use std::error::Error as _;
 
 use bytes::Bytes;
+use hitbox::predicate::PredicateResult;
 use hitbox_configuration::{ConfigEndpoint, ConfigEndpoints, ConfigError, Endpoint};
+use hitbox_http::{BufferedBody, CacheableHttpRequest};
+use http::Request as HttpRequest;
 use http_body_util::Empty;
 
 type ReqBody = Empty<Bytes>;
@@ -250,4 +253,42 @@ fn test_into_endpoints_error_message_without_name() {
         .expect_err("conversion should fail on invalid HTTP method");
 
     assert_eq!(err.to_string(), "Invalid endpoint at index 0");
+}
+
+/// Each listed endpoint keeps its own request predicates, so a request the
+/// first entry rejects can still be cached by a later one.
+#[tokio::test]
+async fn test_into_endpoints_keeps_per_endpoint_predicates() {
+    let yaml_input = r#"
+- name: users
+  request:
+    - Method: GET
+    - Path: "/api/users/{id}"
+  policy:
+    Enabled:
+      ttl: 60s
+- name: orders
+  request:
+    - Method: POST
+    - Path: /api/orders
+  policy:
+    Enabled:
+      ttl: 300s
+"#;
+    let config: ConfigEndpoints = serde_saphyr::from_str(yaml_input).unwrap();
+    let endpoints = config.into_endpoints::<ReqBody, ResBody>().unwrap();
+    let order_request = || {
+        CacheableHttpRequest::from_request(
+            HttpRequest::builder()
+                .method("POST")
+                .uri("/api/orders")
+                .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
+                .unwrap(),
+        )
+    };
+
+    let users = endpoints[0].request_predicates.check(order_request()).await;
+    assert!(matches!(users, PredicateResult::NonCacheable(_)));
+    let orders = endpoints[1].request_predicates.check(order_request()).await;
+    assert!(matches!(orders, PredicateResult::Cacheable(_)));
 }
