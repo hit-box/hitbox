@@ -1,3 +1,5 @@
+use std::error::Error as _;
+
 use bytes::Bytes;
 use hitbox_configuration::{ConfigEndpoint, ConfigEndpoints, ConfigError, Endpoint};
 use http_body_util::Empty;
@@ -201,4 +203,51 @@ fn test_into_endpoints_error_includes_index_and_name() {
         }
         other => panic!("expected ConfigError::EndpointAt, got: {other:?}"),
     }
+}
+
+#[test]
+fn test_into_endpoints_error_message_names_endpoint_once() {
+    let yaml_input = r#"
+- name: good-endpoint
+  request:
+    - Method: GET
+  policy:
+    Enabled:
+      ttl: 60s
+- name: broken-endpoint
+  request:
+    - Method: "INVALID METHOD"
+  policy:
+    Enabled:
+      ttl: 60s
+"#;
+    let config: ConfigEndpoints = serde_saphyr::from_str(yaml_input).unwrap();
+    let err = config
+        .into_endpoints::<ReqBody, ResBody>()
+        .expect_err("conversion should fail on invalid HTTP method");
+
+    // The inner error is reported through `source()`, not repeated in the message.
+    assert_eq!(
+        err.to_string(),
+        "Invalid endpoint at index 1 (`broken-endpoint`)"
+    );
+    let source = err.source().expect("EndpointAt carries the inner error");
+    assert_eq!(source.to_string(), "Invalid HTTP method: INVALID METHOD");
+}
+
+#[test]
+fn test_into_endpoints_error_message_without_name() {
+    let yaml_input = r#"
+- request:
+    - Method: "INVALID METHOD"
+  policy:
+    Enabled:
+      ttl: 60s
+"#;
+    let config: ConfigEndpoints = serde_saphyr::from_str(yaml_input).unwrap();
+    let err = config
+        .into_endpoints::<ReqBody, ResBody>()
+        .expect_err("conversion should fail on invalid HTTP method");
+
+    assert_eq!(err.to_string(), "Invalid endpoint at index 0");
 }
