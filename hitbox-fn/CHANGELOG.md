@@ -6,12 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `Args<T>` implements the tag-aware `CacheableRequest::cache_policy`; `#[cached]` users need no changes ([#280](https://github.com/hit-box/hitbox/pull/280))
+
 ### Added
 - `CacheAccess` trait for `#[cached]` macro — supports `Cache<B,CM,O>`, `&Cache`, and `Arc<Cache>` ([#206](https://github.com/hit-box/hitbox/pull/206))
 
 ### Changed
 - Relaxed `'static` bounds — `Args`, `FnExtractor`, and `FnUpstream` now support non-`'static` lifetimes ([#206](https://github.com/hit-box/hitbox/pull/206))
 - Removed direct `hitbox-core` dependency in favor of `hitbox` re-exports ([#206](https://github.com/hit-box/hitbox/pull/206))
+
+### Fixed
+- Compile-fail snapshot tests run only on the MSRV, so newer compiler diagnostics don't break them ([#293](https://github.com/hit-box/hitbox/pull/293))
 
 ## [0.2.1] - 2026-02-17
 

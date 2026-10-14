@@ -219,6 +219,7 @@ fn create_policy() -> Arc<PolicyConfig> {
         stale: None,
         policy: Default::default(),
         concurrency: None,
+        tag_invalidation: Default::default(),
     }))
 }
 

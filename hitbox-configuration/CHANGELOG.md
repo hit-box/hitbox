@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `tags:` endpoint section with `request` and `response` lists: request tags accept `Static` and every extractor variant (`Path`, `Method`, `Query`, `Header`, `Body`, `Version`), response tags accept `Static` and `Header` ([#280](https://github.com/hit-box/hitbox/pull/280))
+- `Static` tag form: a string or a list emits literal tags, a mapping emits `key=value` tags ([#280](https://github.com/hit-box/hitbox/pull/280))
+- `tag_invalidation: Check | Skip` under `policy: Enabled` ([#280](https://github.com/hit-box/hitbox/pull/280))
+- `HeaderOperation::into_header_config()` ([#280](https://github.com/hit-box/hitbox/pull/280))
+
+### Added
 - Initial release
 - `Endpoint` now implements `CacheConfigs` for use with `SelectiveCacheFuture` ([#253](https://github.com/hit-box/hitbox/pull/253))
 - `ConfigEndpoints` wrapper type for parsing a list of endpoints from YAML, and optional `name` field on `ConfigEndpoint` / `Endpoint` / `EndpointBuilder` for identifying endpoints in multi-endpoint configurations ([#276](https://github.com/hit-box/hitbox/pull/276))

@@ -6,8 +6,11 @@ use chrono::Utc;
 use cucumber::gherkin::Step;
 use cucumber::when;
 use hitbox::concurrency::BroadcastConcurrencyManager;
+use hitbox::tag::CacheTag;
+use hitbox_backend::Backend;
 use hitbox_tower::Cache;
 use hurl::{
+    http::RequestSpec,
     runner::{VariableSet, request::eval_request},
     util::path::ContextDir,
 };
@@ -15,8 +18,8 @@ use hurl_core::{error::DisplaySourceError, parser::parse_hurl_file, text::Format
 use std::str::FromStr;
 use std::time::Duration;
 
-#[when(expr = "execute request")]
-async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+/// Parses the step's hurl docstring into a request spec.
+fn request_spec(step: &Step) -> Result<RequestSpec, Error> {
     let hurl_request = step
         .docstring_content()
         .ok_or_else(|| anyhow!("request not provided"))?;
@@ -24,7 +27,7 @@ async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Err
     let hurl_file = parse_hurl_file(&hurl_request).map_err(|err| {
         anyhow!(
             "hurl request parse error: {}",
-            &err.message(&hurl_request.lines().collect::<Vec<_>>())
+            err.message(&hurl_request.lines().collect::<Vec<_>>())
                 .to_string(Format::Ansi)
         )
     })?;
@@ -36,10 +39,48 @@ async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Err
         .ok_or_else(|| anyhow!("request not found"))?
         .request;
 
-    let request = eval_request(parsed_request, &variables, &ContextDir::default())
-        .map_err(|err| anyhow!("hurl request error {:?}", err))?;
+    eval_request(parsed_request, &variables, &ContextDir::default())
+        .map_err(|err| anyhow!("hurl request error {:?}", err))
+}
 
+#[when(expr = "execute request")]
+async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Error> {
+    let request = request_spec(step)?;
     world.execute_request(&request).await?;
+    Ok(())
+}
+
+/// Runs the request and, `delay_ms` into it, invalidates `tag` — so the
+/// invalidation lands while the upstream call is still in flight (pair with
+/// an upstream delay longer than `delay_ms`).
+#[when(expr = "request is executed while tag {string} is invalidated after {int}ms")]
+async fn execute_request_with_concurrent_invalidation(
+    world: &mut HitboxWorld,
+    tag: String,
+    delay_ms: u64,
+    step: &Step,
+) -> Result<(), Error> {
+    let request = request_spec(step)?;
+    let backend = world.backend.clone();
+    let invalidation = async move {
+        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+        backend.invalidate(&CacheTag::new(tag)).await
+    };
+
+    let (response, invalidation) = tokio::join!(world.execute_request(&request), invalidation);
+    response?;
+    invalidation.map_err(|err| anyhow!("backend invalidate failed: {err:?}"))?;
+    Ok(())
+}
+
+#[when(expr = "tag {string} is invalidated")]
+async fn invalidate_tag(world: &mut HitboxWorld, tag: String) -> Result<(), Error> {
+    let cache_tag = CacheTag::new(tag);
+    world
+        .backend
+        .invalidate(&cache_tag)
+        .await
+        .map_err(|err| anyhow!("backend invalidate failed: {err:?}"))?;
     Ok(())
 }
 
@@ -78,28 +119,7 @@ async fn concurrent_requests(
 ) -> Result<(), Error> {
     use std::sync::Arc;
 
-    // Parse the hurl request
-    let hurl_request = step
-        .docstring_content()
-        .ok_or_else(|| anyhow!("request not provided"))?;
-
-    let hurl_file = parse_hurl_file(&hurl_request).map_err(|err| {
-        anyhow!(
-            "hurl request parse error: {}",
-            &err.message(&hurl_request.lines().collect::<Vec<_>>())
-                .to_string(Format::Ansi)
-        )
-    })?;
-
-    let variables = VariableSet::new();
-    let parsed_request = &hurl_file
-        .entries
-        .first()
-        .ok_or_else(|| anyhow!("request not found"))?
-        .request;
-
-    let request_spec = eval_request(parsed_request, &variables, &ContextDir::default())
-        .map_err(|err| anyhow!("hurl request error {:?}", err))?;
+    let request_spec = request_spec(step)?;
 
     // Build the cache layer with concurrency manager for dogpile prevention
     let concurrency_manager: BroadcastConcurrencyManager<_> = BroadcastConcurrencyManager::new();

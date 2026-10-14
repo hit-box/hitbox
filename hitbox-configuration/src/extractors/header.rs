@@ -32,7 +32,8 @@
 //! ```
 
 use hitbox_http::extractors::header::{
-    Header as HttpHeader, NameSelector as HttpNameSelector, ValueExtractor as HttpValueExtractor,
+    HeaderConfig as HttpHeaderConfig, HeaderExtractor, NameSelector as HttpNameSelector,
+    ValueExtractor as HttpValueExtractor,
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -105,15 +106,15 @@ pub enum HeaderOperation {
 }
 
 impl HeaderOperation {
-    pub fn into_extractors<ReqBody>(
-        self,
-        inner: RequestExtractor<ReqBody>,
-    ) -> Result<RequestExtractor<ReqBody>, ConfigError>
-    where
-        ReqBody: hyper::body::Body + Send + 'static,
-        ReqBody::Error: Send,
-        ReqBody::Data: Send,
-    {
+    /// Resolve into a runtime [`HttpHeaderConfig`] (name selector, value
+    /// extractor, transforms).
+    ///
+    /// Shared by the request key extractor ([`into_extractors`]) and the
+    /// response header tag extractor, so the config→runtime mapping lives in
+    /// one place.
+    ///
+    /// [`into_extractors`]: HeaderOperation::into_extractors
+    pub fn into_header_config(self) -> Result<HttpHeaderConfig, ConfigError> {
         let (name_selector, value_extractor, transforms) = match self {
             HeaderOperation::Simple(name) => (
                 HttpNameSelector::Exact(name),
@@ -147,12 +148,24 @@ impl HeaderOperation {
             }
         };
 
-        Ok(Box::new(HttpHeader::new_with(
-            inner,
+        Ok(HttpHeaderConfig::new(
             name_selector,
             value_extractor,
             transforms,
-        )))
+        ))
+    }
+
+    pub fn into_extractors<ReqBody>(
+        self,
+        inner: RequestExtractor<ReqBody>,
+    ) -> Result<RequestExtractor<ReqBody>, ConfigError>
+    where
+        ReqBody: hyper::body::Body + Send + 'static,
+        ReqBody::Error: Send,
+        ReqBody::Data: Send,
+    {
+        let config = self.into_header_config()?;
+        Ok(Box::new(inner.header(config)))
     }
 }
 

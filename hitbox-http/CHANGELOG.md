@@ -7,12 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `ResponseHeaderTagExtractor` (`hitbox_http::tags`) tags cached entries by a response header such as `ETag`, with the same name selection, regex value extraction, and transforms as the request `Header` extractor ([#280](https://github.com/hit-box/hitbox/pull/280))
+- `HeaderConfig::new()` and `HeaderConfig::select()`; the request `Header` extractor and the response tag extractor share one header-reading path ([#280](https://github.com/hit-box/hitbox/pull/280))
+
+### Changed
+- `CacheableHttpRequest` and `CacheableHttpResponse` implement the tag-aware `cache_policy` signatures ([#280](https://github.com/hit-box/hitbox/pull/280))
+
+### Added
 - Preserve HTTP/2 trailers through body buffering and cache serialization roundtrip ([#261](https://github.com/hit-box/hitbox/pull/261))
 
 ### Changed
 - **Breaking:** Unified Config-based extractor/predicate API with `Into` shorthands, `Transform::Truncate`, `Transforms::builder()` with typestate, and full 64-char SHA256 for `Hash` ([#202](https://github.com/hit-box/hitbox/pull/202))
 - Adapted `CacheableRequest` impl to GAT-based `CachePolicyFuture` ([#206](https://github.com/hit-box/hitbox/pull/206))
 - **Breaking:** `BufferedBody::Complete` and `collect()` API changed to carry optional trailers ([#261](https://github.com/hit-box/hitbox/pull/261))
+
+### Fixed
+- Clippy `result_large_err` on `BufferedBody::collect()` and query extractor tests rejected by `http` 1.5 ([#293](https://github.com/hit-box/hitbox/pull/293))
 
 ## [0.2.1] - 2026-02-09
 

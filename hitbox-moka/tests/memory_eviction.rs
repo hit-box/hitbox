@@ -455,3 +455,52 @@ async fn test_explicit_tiny_lfu_policy_with_byte_capacity() {
         "Should have at most 3 entries with TinyLFU"
     );
 }
+
+// =============================================================================
+// Tag invalidation store is isolated from data eviction
+// =============================================================================
+
+/// Regression test: tag invalidation records must NOT share the data
+/// cache's eviction budget.
+///
+/// Without a dedicated tag store, writing enough data entries to trigger
+/// LRU eviction could evict a tag's invalidation record. A subsequent
+/// `invalidated()` lookup would then return nothing, and the FSM would
+/// incorrectly treat tagged entries as never invalidated — serving stale
+/// data. The dedicated unbounded tag store prevents this.
+#[tokio::test]
+async fn tag_records_survive_data_eviction_pressure() {
+    use hitbox_core::CacheTag;
+
+    // Data cache holds at most 2 entries.
+    let backend = MokaBackend::builder().max_entries(2).build();
+
+    let tag = CacheTag::new("user=42");
+    backend.invalidate(&tag).await.unwrap();
+
+    // Write far more data entries than the cache can hold, forcing
+    // repeated LRU eviction of data records.
+    for i in 0..100 {
+        let key = make_key(i);
+        let value = make_value(64);
+        backend.write(&key, value).await.unwrap();
+    }
+    backend.cache().run_pending_tasks().await;
+
+    // Data was evicted down to the 2-entry cap...
+    assert!(
+        backend.entry_count() <= 2,
+        "data cache should have evicted down to its 2-entry cap, got {}",
+        backend.entry_count()
+    );
+
+    // ...but the tag invalidation record must still be present.
+    let timestamps = backend
+        .invalidated(std::slice::from_ref(&tag))
+        .await
+        .unwrap();
+    assert!(
+        timestamps.contains_key(&tag),
+        "tag invalidation record was lost under data eviction pressure"
+    );
+}

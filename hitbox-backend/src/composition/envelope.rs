@@ -8,7 +8,7 @@
 //! ## Format Layout
 //!
 //! ```text
-//! [EnvelopeHeader (48 bytes)][L1 data][L2 data (if Both variant)]
+//! [EnvelopeHeader (56 bytes)][L1 data][L2 data (if Both variant)][Tags bincode (if tags_len > 0)]
 //! ```
 //!
 //! ## Performance
@@ -30,20 +30,21 @@ use crate::{BackendError, BackendResult};
 
 /// Fixed-size header for envelope format using repr(C) with bytemuck for safe zero-copy casting.
 ///
-/// Layout (with explicit padding for alignment):
+/// Layout (fields grouped by size to minimize padding):
 /// - discriminant: 1 byte (0=L1, 1=L2, 2=Both)
-/// - _pad1: 3 bytes (explicit padding to align u32)
+/// - _pad1: 3 bytes (align to u32)
 /// - l1_len: 4 bytes (u32 little-endian)
 /// - l2_len: 4 bytes (u32 little-endian)
-/// - _pad2: 4 bytes (explicit padding to align i64)
-/// - expire_secs: 8 bytes (i64 little-endian) - seconds since Unix epoch, 0 if None
+/// - tags_len: 4 bytes (u32 little-endian) - length of bincode tag bytes after data; 0 = no tags
+/// - created_secs: 8 bytes (i64 little-endian) - seconds since Unix epoch
+/// - expire_secs: 8 bytes (i64 little-endian) - 0 if None
+/// - stale_secs: 8 bytes (i64 little-endian) - 0 if None
+/// - created_nanos: 4 bytes (u32 little-endian) - nanoseconds component
 /// - expire_nanos: 4 bytes (u32 little-endian) - nanoseconds component
-/// - _pad3: 4 bytes (explicit padding to align i64)
-/// - stale_secs: 8 bytes (i64 little-endian) - seconds since Unix epoch, 0 if None
 /// - stale_nanos: 4 bytes (u32 little-endian) - nanoseconds component
-/// - _pad4: 4 bytes (explicit padding for struct alignment)
+/// - _pad2: 4 bytes (struct tail alignment)
 ///
-/// Total: 48 bytes (with explicit padding)
+/// Total: 56 bytes
 ///
 /// Padding fields are explicitly defined and zero-initialized to satisfy bytemuck's Pod trait
 /// requirements. This enables safe zero-copy type conversion while maintaining optimal alignment.
@@ -54,19 +55,29 @@ struct EnvelopeHeader {
     _pad1: [u8; 3],
     l1_len: u32,
     l2_len: u32,
-    _pad2: [u8; 4],
+    tags_len: u32, // length of bincode-serialized CacheTags after L1+L2 data; 0 = no tags
+    // i64 fields grouped together (8-byte aligned, no inter-field padding)
+    created_secs: i64,
     expire_secs: i64,
-    expire_nanos: u32,
-    _pad3: [u8; 4],
     stale_secs: i64,
+    // u32 fields grouped together
+    created_nanos: u32,
+    expire_nanos: u32,
     stale_nanos: u32,
-    _pad4: [u8; 4],
+    _pad2: [u8; 4], // struct tail alignment to 8
 }
 
 impl EnvelopeHeader {
     const SIZE: usize = std::mem::size_of::<Self>();
 
-    fn new_l1(l1_len: usize, expire: Option<DateTime<Utc>>, stale: Option<DateTime<Utc>>) -> Self {
+    fn new_l1(
+        l1_len: usize,
+        tags_len: usize,
+        created: DateTime<Utc>,
+        expire: Option<DateTime<Utc>>,
+        stale: Option<DateTime<Utc>>,
+    ) -> Self {
+        let (created_secs, created_nanos) = Self::encode_created(created);
         let (expire_secs, expire_nanos) = Self::encode_timestamp(expire);
         let (stale_secs, stale_nanos) = Self::encode_timestamp(stale);
 
@@ -75,17 +86,25 @@ impl EnvelopeHeader {
             _pad1: [0; 3],
             l1_len: l1_len as u32,
             l2_len: 0,
-            _pad2: [0; 4],
+            tags_len: tags_len as u32,
+            created_secs,
             expire_secs,
-            expire_nanos,
-            _pad3: [0; 4],
             stale_secs,
+            created_nanos,
+            expire_nanos,
             stale_nanos,
-            _pad4: [0; 4],
+            _pad2: [0; 4],
         }
     }
 
-    fn new_l2(l2_len: usize, expire: Option<DateTime<Utc>>, stale: Option<DateTime<Utc>>) -> Self {
+    fn new_l2(
+        l2_len: usize,
+        tags_len: usize,
+        created: DateTime<Utc>,
+        expire: Option<DateTime<Utc>>,
+        stale: Option<DateTime<Utc>>,
+    ) -> Self {
+        let (created_secs, created_nanos) = Self::encode_created(created);
         let (expire_secs, expire_nanos) = Self::encode_timestamp(expire);
         let (stale_secs, stale_nanos) = Self::encode_timestamp(stale);
 
@@ -94,22 +113,26 @@ impl EnvelopeHeader {
             _pad1: [0; 3],
             l1_len: 0,
             l2_len: l2_len as u32,
-            _pad2: [0; 4],
+            tags_len: tags_len as u32,
+            created_secs,
             expire_secs,
-            expire_nanos,
-            _pad3: [0; 4],
             stale_secs,
+            created_nanos,
+            expire_nanos,
             stale_nanos,
-            _pad4: [0; 4],
+            _pad2: [0; 4],
         }
     }
 
     fn new_both(
         l1_len: usize,
         l2_len: usize,
+        tags_len: usize,
+        created: DateTime<Utc>,
         expire: Option<DateTime<Utc>>,
         stale: Option<DateTime<Utc>>,
     ) -> Self {
+        let (created_secs, created_nanos) = Self::encode_created(created);
         let (expire_secs, expire_nanos) = Self::encode_timestamp(expire);
         let (stale_secs, stale_nanos) = Self::encode_timestamp(stale);
 
@@ -118,14 +141,19 @@ impl EnvelopeHeader {
             _pad1: [0; 3],
             l1_len: l1_len as u32,
             l2_len: l2_len as u32,
-            _pad2: [0; 4],
+            tags_len: tags_len as u32,
+            created_secs,
             expire_secs,
-            expire_nanos,
-            _pad3: [0; 4],
             stale_secs,
+            created_nanos,
+            expire_nanos,
             stale_nanos,
-            _pad4: [0; 4],
+            _pad2: [0; 4],
         }
+    }
+
+    fn encode_created(created: DateTime<Utc>) -> (i64, u32) {
+        (created.timestamp(), created.timestamp_subsec_nanos())
     }
 
     fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> (i64, u32) {
@@ -164,6 +192,17 @@ impl EnvelopeHeader {
         Ok(*bytemuck::from_bytes::<Self>(&data[..Self::SIZE]))
     }
 
+    /// Decode created timestamp. Falls back to `UNIX_EPOCH` for old entries
+    /// that don't have a created timestamp, so any tag invalidation wins.
+    fn decode_created(&self) -> DateTime<Utc> {
+        if self.created_secs == 0 && self.created_nanos == 0 {
+            DateTime::UNIX_EPOCH
+        } else {
+            DateTime::from_timestamp(self.created_secs, self.created_nanos)
+                .unwrap_or(DateTime::UNIX_EPOCH)
+        }
+    }
+
     fn decode_expire(&self) -> Option<DateTime<Utc>> {
         Self::decode_timestamp(self.expire_secs, self.expire_nanos)
     }
@@ -194,39 +233,66 @@ impl CompositionEnvelope {
     pub(crate) fn serialize(&self) -> BackendResult<Bytes> {
         match self {
             CompositionEnvelope::L1(value) => {
-                let header =
-                    EnvelopeHeader::new_l1(value.data().len(), value.expire(), value.stale());
-                let total_size = EnvelopeHeader::SIZE + value.data().len();
+                let tags_bytes = crate::serialize_tags(value.tags())?;
+                let tags_len = tags_bytes.as_ref().map_or(0, Vec::len);
+                let header = EnvelopeHeader::new_l1(
+                    value.data().len(),
+                    tags_len,
+                    value.created(),
+                    value.expire(),
+                    value.stale(),
+                );
+                let total_size = EnvelopeHeader::SIZE + value.data().len() + tags_len;
                 let mut buf = Vec::with_capacity(total_size);
 
                 buf.write_all(header.as_bytes())
                     .map_err(|e| BackendError::InternalError(Box::new(e)))?;
                 buf.write_all(value.data())
                     .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+                if let Some(bytes) = tags_bytes {
+                    buf.write_all(&bytes)
+                        .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+                }
 
                 Ok(Bytes::from(buf))
             }
             CompositionEnvelope::L2(value) => {
-                let header =
-                    EnvelopeHeader::new_l2(value.data().len(), value.expire(), value.stale());
-                let total_size = EnvelopeHeader::SIZE + value.data().len();
+                let tags_bytes = crate::serialize_tags(value.tags())?;
+                let tags_len = tags_bytes.as_ref().map_or(0, Vec::len);
+                let header = EnvelopeHeader::new_l2(
+                    value.data().len(),
+                    tags_len,
+                    value.created(),
+                    value.expire(),
+                    value.stale(),
+                );
+                let total_size = EnvelopeHeader::SIZE + value.data().len() + tags_len;
                 let mut buf = Vec::with_capacity(total_size);
 
                 buf.write_all(header.as_bytes())
                     .map_err(|e| BackendError::InternalError(Box::new(e)))?;
                 buf.write_all(value.data())
                     .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+                if let Some(bytes) = tags_bytes {
+                    buf.write_all(&bytes)
+                        .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+                }
 
                 Ok(Bytes::from(buf))
             }
             CompositionEnvelope::Both { l1, l2 } => {
+                let tags_bytes = crate::serialize_tags(l1.tags())?;
+                let tags_len = tags_bytes.as_ref().map_or(0, Vec::len);
                 let header = EnvelopeHeader::new_both(
                     l1.data().len(),
                     l2.data().len(),
+                    tags_len,
+                    l1.created(),
                     l1.expire(),
                     l1.stale(),
                 );
-                let total_size = EnvelopeHeader::SIZE + l1.data().len() + l2.data().len();
+                let total_size =
+                    EnvelopeHeader::SIZE + l1.data().len() + l2.data().len() + tags_len;
                 let mut buf = Vec::with_capacity(total_size);
 
                 buf.write_all(header.as_bytes())
@@ -235,6 +301,10 @@ impl CompositionEnvelope {
                     .map_err(|e| BackendError::InternalError(Box::new(e)))?;
                 buf.write_all(l2.data())
                     .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+                if let Some(bytes) = tags_bytes {
+                    buf.write_all(&bytes)
+                        .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+                }
 
                 Ok(Bytes::from(buf))
             }
@@ -248,48 +318,70 @@ impl CompositionEnvelope {
 
         let payload_start = EnvelopeHeader::SIZE;
 
+        let tags_len = header.tags_len as usize;
+
+        // Helper to attach tags to a CacheValue if present.
+        let with_tags_opt =
+            |cv: CacheValue<Raw>, tags_bytes: Option<&[u8]>| -> BackendResult<CacheValue<Raw>> {
+                let tags = crate::deserialize_tags(tags_bytes)?;
+                Ok(match tags {
+                    Some(tags) => cv.with_tags(tags),
+                    None => cv,
+                })
+            };
+
         match header.discriminant {
             0 => {
                 // L1
                 let l1_len = header.l1_len as usize;
-                if data.len() < payload_start + l1_len {
+                let l1_end = payload_start + l1_len;
+                let tags_end = l1_end + tags_len;
+                if data.len() < tags_end {
                     return Err(BackendError::InternalError(Box::new(io::Error::new(
                         io::ErrorKind::UnexpectedEof,
                         format!(
                             "L1 envelope data too short: expected {} bytes, got {}",
-                            payload_start + l1_len,
+                            tags_end,
                             data.len()
                         ),
                     ))));
                 }
 
-                let l1_data = Bytes::copy_from_slice(&data[payload_start..payload_start + l1_len]);
-                Ok(CompositionEnvelope::L1(CacheValue::new(
+                let l1_data = Bytes::copy_from_slice(&data[payload_start..l1_end]);
+                let tags_bytes = (tags_len > 0).then(|| &data[l1_end..tags_end]);
+                let cv = CacheValue::with_created(
                     l1_data,
+                    header.decode_created(),
                     header.decode_expire(),
                     header.decode_stale(),
-                )))
+                );
+                Ok(CompositionEnvelope::L1(with_tags_opt(cv, tags_bytes)?))
             }
             1 => {
                 // L2
                 let l2_len = header.l2_len as usize;
-                if data.len() < payload_start + l2_len {
+                let l2_end = payload_start + l2_len;
+                let tags_end = l2_end + tags_len;
+                if data.len() < tags_end {
                     return Err(BackendError::InternalError(Box::new(io::Error::new(
                         io::ErrorKind::UnexpectedEof,
                         format!(
                             "L2 envelope data too short: expected {} bytes, got {}",
-                            payload_start + l2_len,
+                            tags_end,
                             data.len()
                         ),
                     ))));
                 }
 
-                let l2_data = Bytes::copy_from_slice(&data[payload_start..payload_start + l2_len]);
-                Ok(CompositionEnvelope::L2(CacheValue::new(
+                let l2_data = Bytes::copy_from_slice(&data[payload_start..l2_end]);
+                let tags_bytes = (tags_len > 0).then(|| &data[l2_end..tags_end]);
+                let cv = CacheValue::with_created(
                     l2_data,
+                    header.decode_created(),
                     header.decode_expire(),
                     header.decode_stale(),
-                )))
+                );
+                Ok(CompositionEnvelope::L2(with_tags_opt(cv, tags_bytes)?))
             }
             2 => {
                 // Both
@@ -297,13 +389,14 @@ impl CompositionEnvelope {
                 let l2_len = header.l2_len as usize;
                 let l1_end = payload_start + l1_len;
                 let l2_end = l1_end + l2_len;
+                let tags_end = l2_end + tags_len;
 
-                if data.len() < l2_end {
+                if data.len() < tags_end {
                     return Err(BackendError::InternalError(Box::new(io::Error::new(
                         io::ErrorKind::UnexpectedEof,
                         format!(
                             "Both envelope data too short: expected {} bytes, got {}",
-                            l2_end,
+                            tags_end,
                             data.len()
                         ),
                     ))));
@@ -311,10 +404,23 @@ impl CompositionEnvelope {
 
                 let l1_data = Bytes::copy_from_slice(&data[payload_start..l1_end]);
                 let l2_data = Bytes::copy_from_slice(&data[l1_end..l2_end]);
+                let tags_bytes = (tags_len > 0).then(|| &data[l2_end..tags_end]);
 
+                let l1_cv = CacheValue::with_created(
+                    l1_data,
+                    header.decode_created(),
+                    header.decode_expire(),
+                    header.decode_stale(),
+                );
+                let l2_cv = CacheValue::with_created(
+                    l2_data,
+                    header.decode_created(),
+                    header.decode_expire(),
+                    header.decode_stale(),
+                );
                 Ok(CompositionEnvelope::Both {
-                    l1: CacheValue::new(l1_data, header.decode_expire(), header.decode_stale()),
-                    l2: CacheValue::new(l2_data, header.decode_expire(), header.decode_stale()),
+                    l1: with_tags_opt(l1_cv, tags_bytes)?,
+                    l2: with_tags_opt(l2_cv, tags_bytes)?,
                 })
             }
             _ => Err(BackendError::InternalError(Box::new(io::Error::new(
@@ -333,8 +439,8 @@ mod tests {
     #[test]
     fn test_envelope_header_size() {
         // Ensure header is the expected size for repr(C) with padding
-        // repr(C) adds padding for alignment, so actual size is 48 bytes
-        assert_eq!(EnvelopeHeader::SIZE, 48);
+        // repr(C) adds padding for alignment, so actual size is 56 bytes
+        assert_eq!(EnvelopeHeader::SIZE, 56);
     }
 
     #[test]

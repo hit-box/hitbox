@@ -7,9 +7,9 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 categories.workspace = true
-description = "Configuration support for Hitbox caching framework"
+description = "YAML-based configuration for Hitbox caching: define endpoints, backends, predicates, and extractors in config files."
 readme = "README.md"
-keywords = ["cache", "configuration", "yaml", "hitbox", "tower"]
+keywords = ["cache", "configuration", "yaml", "tower", "middleware"]
 
 [dependencies]
 hitbox = { path = "../hitbox/", version = "0.2" }

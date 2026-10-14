@@ -7,8 +7,11 @@
 //!
 //! - `hitbox_moka_entries` - Current number of entries in the cache (gauge)
 //! - `hitbox_moka_size_bytes` - Current weighted size in bytes (gauge)
+//! - `hitbox_moka_tag_records` - Current number of tag invalidation records in
+//!   the dedicated tag store (gauge). The store is unbounded, so this grows with
+//!   every distinct tag ever invalidated.
 //!
-//! Both metrics include a `backend` label to distinguish between multiple Moka instances.
+//! All metrics include a `backend` label to distinguish between multiple Moka instances.
 
 #[cfg(feature = "metrics")]
 use lazy_static::lazy_static;
@@ -32,6 +35,15 @@ lazy_static! {
         );
         "hitbox_moka_size_bytes"
     };
+
+    /// Metric name for tag invalidation record count gauge.
+    pub static ref MOKA_TAG_RECORDS: &'static str = {
+        metrics::describe_gauge!(
+            "hitbox_moka_tag_records",
+            "Current number of tag invalidation records in the Moka tag store."
+        );
+        "hitbox_moka_tag_records"
+    };
 }
 
 /// Record current cache capacity metrics.
@@ -54,3 +66,21 @@ pub fn record_capacity(backend: &str, entries: u64, size_bytes: u64) {
 #[cfg(not(feature = "metrics"))]
 #[inline]
 pub fn record_capacity(_backend: &str, _entries: u64, _size_bytes: u64) {}
+
+/// Record the current number of tag invalidation records.
+///
+/// # Arguments
+///
+/// * `backend` - Backend label for metric identification
+/// * `records` - Current number of records in the tag store
+#[cfg(feature = "metrics")]
+#[inline]
+pub fn record_tag_records(backend: &str, records: u64) {
+    metrics::gauge!(*MOKA_TAG_RECORDS, "backend" => backend.to_string()).set(records as f64);
+}
+
+/// Record the current number of tag invalidation records (no-op when `metrics`
+/// feature disabled).
+#[cfg(not(feature = "metrics"))]
+#[inline]
+pub fn record_tag_records(_backend: &str, _records: u64) {}

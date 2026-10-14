@@ -60,9 +60,10 @@ use crate::{
     PassthroughCompressor,
 };
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use envelope::CompositionEnvelope;
 use hitbox_core::{
-    BackendLabel, BoxContext, CacheContext, CacheKey, CacheStatus, CacheValue, Cacheable,
+    BackendLabel, BoxContext, CacheContext, CacheKey, CacheStatus, CacheTag, CacheValue, Cacheable,
     CacheableResponse, Offload, Raw, ResponseSource,
 };
 use policy::{
@@ -70,6 +71,7 @@ use policy::{
     RefillPolicy, SequentialReadPolicy,
 };
 use smol_str::SmolStr;
+use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -426,10 +428,18 @@ where
             let result = match read_result {
                 Ok(Some(l1_value)) => {
                     crate::metrics::record_read_bytes(&l1_label, l1_value.data().len());
-                    let (expire, stale) = (l1_value.expire(), l1_value.stale());
+                    let (created, expire, stale, tags) = (
+                        l1_value.created(),
+                        l1_value.expire(),
+                        l1_value.stale(),
+                        l1_value.tags().cloned(),
+                    );
                     let envelope = CompositionEnvelope::L1(l1_value);
                     match envelope.serialize() {
-                        Ok(packed) => Ok(Some(CacheValue::new(packed, expire, stale))),
+                        Ok(packed) => Ok(Some(
+                            CacheValue::with_created(packed, created, expire, stale)
+                                .with_optional_tags(tags),
+                        )),
                         Err(e) => Err(e),
                     }
                 }
@@ -451,10 +461,18 @@ where
             let result = match read_result {
                 Ok(Some(l2_value)) => {
                     crate::metrics::record_read_bytes(&l2_label, l2_value.data().len());
-                    let (expire, stale) = (l2_value.expire(), l2_value.stale());
+                    let (created, expire, stale, tags) = (
+                        l2_value.created(),
+                        l2_value.expire(),
+                        l2_value.stale(),
+                        l2_value.tags().cloned(),
+                    );
                     let envelope = CompositionEnvelope::L2(l2_value);
                     match envelope.serialize() {
-                        Ok(packed) => Ok(Some(CacheValue::new(packed, expire, stale))),
+                        Ok(packed) => Ok(Some(
+                            CacheValue::with_created(packed, created, expire, stale)
+                                .with_optional_tags(tags),
+                        )),
                         Err(e) => Err(e),
                     }
                 }
@@ -596,6 +614,33 @@ where
     fn compressor(&self) -> &dyn Compressor {
         &PassthroughCompressor
     }
+
+    async fn invalidate(&self, tag: &CacheTag) -> BackendResult<()> {
+        let (l1_result, l2_result) =
+            futures::join!(self.l1.invalidate(tag), self.l2.invalidate(tag));
+        l1_result?;
+        l2_result?;
+        Ok(())
+    }
+
+    async fn invalidated(
+        &self,
+        tags: &[CacheTag],
+    ) -> BackendResult<HashMap<CacheTag, DateTime<Utc>>> {
+        let (l1_result, l2_result) =
+            futures::join!(self.l1.invalidated(tags), self.l2.invalidated(tags));
+        let mut merged = l1_result?;
+        let l2_timestamps = l2_result?;
+
+        // Union semantics: take the latest timestamp per tag
+        for (tag, ts) in l2_timestamps {
+            merged
+                .entry(tag)
+                .and_modify(|existing| *existing = (*existing).max(ts))
+                .or_insert(ts);
+        }
+        Ok(merged)
+    }
 }
 
 impl<L1, L2, O, R, W> CacheBackend for CompositionBackend<L1, L2, O, R, W>
@@ -681,7 +726,15 @@ where
                                 };
                                 internal_ctx.set_source(ResponseSource::Backend(source));
 
-                                Ok(Some(CacheValue::new(deserialized, meta.expire, meta.stale)))
+                                Ok(Some(
+                                    CacheValue::with_created(
+                                        deserialized,
+                                        meta.created,
+                                        meta.expire,
+                                        meta.stale,
+                                    )
+                                    .with_optional_tags(meta.tags),
+                                ))
                             }
                             None => Err(BackendError::InternalError(Box::new(
                                 std::io::Error::other("deserialization produced no result"),
@@ -729,8 +782,13 @@ where
                     ) {
                         Ok(()) => match deserialized_opt {
                             Some(deserialized) => {
-                                let cache_value =
-                                    CacheValue::new(deserialized, meta.expire, meta.stale);
+                                let cache_value = CacheValue::with_created(
+                                    deserialized,
+                                    meta.created,
+                                    meta.expire,
+                                    meta.stale,
+                                )
+                                .with_optional_tags(meta.tags);
 
                                 // Set cache status and source for L2 hit
                                 internal_ctx.set_status(CacheStatus::Hit);
@@ -824,7 +882,13 @@ where
                         .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
                     let l1_len = l1_bytes.len();
-                    let l1_value = CacheValue::new(l1_bytes, value.expire(), value.stale());
+                    let l1_value = CacheValue::with_created(
+                        l1_bytes,
+                        value.created(),
+                        value.expire(),
+                        value.stale(),
+                    )
+                    .with_optional_tags(value.tags().cloned());
 
                     // Write to L1 with metrics
                     let timer = Timer::new();
@@ -869,7 +933,13 @@ where
                         .map_err(|e| BackendError::InternalError(Box::new(e)))?;
 
                     let l1_len = l1_bytes.len();
-                    let l1_value = CacheValue::new(l1_bytes, value.expire(), value.stale());
+                    let l1_value = CacheValue::with_created(
+                        l1_bytes,
+                        value.created(),
+                        value.expire(),
+                        value.stale(),
+                    )
+                    .with_optional_tags(value.tags().cloned());
 
                     // Write to L1 with metrics
                     let timer = Timer::new();
@@ -912,8 +982,12 @@ where
         let l2_len = l2_bytes.len();
 
         // Create raw values for Backend::write
-        let l1_value = CacheValue::new(l1_bytes, value.expire(), value.stale());
-        let l2_value = CacheValue::new(l2_bytes, value.expire(), value.stale());
+        let l1_value =
+            CacheValue::with_created(l1_bytes, value.created(), value.expire(), value.stale())
+                .with_optional_tags(value.tags().cloned());
+        let l2_value =
+            CacheValue::with_created(l2_bytes, value.created(), value.expire(), value.stale())
+                .with_optional_tags(value.tags().cloned());
 
         // Clone backends for 'static closures
         let l1 = self.l1.clone();
@@ -1001,6 +1075,7 @@ mod tests {
     use crate::{Backend, CacheKeyFormat, Compressor, PassthroughCompressor};
     use async_trait::async_trait;
     use chrono::Utc;
+    use hitbox_core::tag::{CacheTag, TagExtractor};
     use hitbox_core::{
         BoxContext, CacheContext, CachePolicy, CacheStatus, CacheValue, CacheableResponse,
         EntityPolicyConfig, Predicate, Raw, ResponseSource,
@@ -1109,11 +1184,16 @@ mod tests {
         type IntoCachedFuture = std::future::Ready<CachePolicy<Self::Cached, Self>>;
         type FromCachedFuture = std::future::Ready<Self>;
 
-        async fn cache_policy<P: Predicate<Subject = Self::Subject> + Send + Sync>(
+        async fn cache_policy<P, TE>(
             self,
             _predicate: P,
+            _tag_extractor: Option<TE>,
             _config: &EntityPolicyConfig,
-        ) -> CachePolicy<CacheValue<Self::Cached>, Self> {
+        ) -> (CachePolicy<CacheValue<Self::Cached>, Self>, Vec<CacheTag>)
+        where
+            P: Predicate<Subject = Self::Subject> + Send + Sync,
+            TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
+        {
             unimplemented!("Not used in these tests")
         }
 

@@ -61,9 +61,9 @@ pub mod config;
 /// Cache context and status types.
 ///
 /// This module provides:
-/// - [`CacheContext`](context::CacheContext) — metadata passed through the request lifecycle
-/// - [`CacheStatus`](context::CacheStatus) — indicates whether a response came from cache
-/// - [`ResponseSource`](context::ResponseSource) — identifies where the response originated
+/// - [`CacheContext`] — metadata passed through the request lifecycle
+/// - [`CacheStatus`] — indicates whether a response came from cache
+/// - [`ResponseSource`] — identifies where the response originated
 pub mod context;
 
 /// Background task offloading for stale-while-revalidate.
@@ -104,6 +104,14 @@ pub mod predicate {
 /// Extractors pull components from requests to build unique cache keys.
 pub mod extractor {
     pub use hitbox_core::Extractor;
+}
+
+/// Cache tag types and tag extractors.
+///
+/// Re-exports the tag invalidation primitives from
+/// [`hitbox-core`](https://docs.rs/hitbox-core).
+pub mod tag {
+    pub use hitbox_core::tag::*;
 }
 
 /// The `hitbox` prelude.
