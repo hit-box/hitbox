@@ -32,7 +32,7 @@ use hitbox_core::DisabledOffload;
 use hitbox_core::Upstream;
 use hitbox_http::extractors::MethodConfig;
 use hitbox_http::extractors::NeutralExtractor;
-use hitbox_http::extractors::body::{BodyExtraction, BodyExtractor, JqExtraction};
+use hitbox_http::extractors::body::{BodyExtraction, BodyExtractor};
 use hitbox_http::extractors::header::{
     Header, NameSelector as HeaderNameSelector, ValueExtractor as HeaderValueExtractor,
 };
@@ -244,7 +244,7 @@ fn create_response_predicates_with_body()
 
 /// Extend extractors with body jq extractor
 fn create_extractors_with_body() -> impl hitbox::Extractor<Subject = BenchRequest> + Send + Sync {
-    let jq_extraction = JqExtraction::compile(
+    let jq_extraction = JqExpression::compile(
         "{customer_id: .order.customer_id, shipping: .order.shipping_method}",
     )
     .unwrap();

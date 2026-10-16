@@ -16,15 +16,10 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::rc::Rc;
 
 use async_trait::async_trait;
 use hitbox::{Extractor, KeyPart, KeyParts};
 use hyper::body::Body as HttpBody;
-use jaq_core::box_iter::box_once;
-use jaq_core::load::{Arena, File, Loader};
-use jaq_core::{Bind, Ctx, Exn, Filter, Native, RcIter};
-use jaq_json::Val;
 use regex::Regex;
 use serde_json::Value;
 use tracing::warn;
@@ -32,6 +27,8 @@ use tracing::warn;
 pub use super::transform::Transform;
 use super::transform::{apply_hash, apply_transform_chain};
 use crate::CacheableHttpRequest;
+pub use crate::jq::JqExpression;
+use crate::jq::ParsedBody;
 
 /// Body extraction mode for generating cache key parts.
 ///
@@ -45,128 +42,9 @@ pub enum BodyExtraction {
     /// Hash the entire body using SHA256 (full 64 hex characters).
     Hash,
     /// Extract values from JSON body using a jq expression.
-    Jq(JqExtraction),
+    Jq(JqExpression),
     /// Extract values using regular expression captures.
     Regex(RegexExtraction),
-}
-
-/// A compiled jq expression for extracting values from JSON bodies.
-///
-/// Includes a custom `hash` function for hashing extracted values.
-///
-/// # Examples
-///
-/// ```
-/// use hitbox_http::extractors::body::JqExtraction;
-///
-/// // Extract user ID from JSON body
-/// let extraction = JqExtraction::compile(".user.id").unwrap();
-///
-/// // Extract and hash a sensitive field
-/// let extraction = JqExtraction::compile(".password | hash").unwrap();
-/// ```
-#[derive(Clone)]
-pub struct JqExtraction {
-    filter: Filter<Native<Val>>,
-}
-
-impl Debug for JqExtraction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("JqExtraction").finish_non_exhaustive()
-    }
-}
-
-/// Result type for jq functions.
-type JqResult = Result<Val, jaq_core::Error<Val>>;
-
-/// Custom jq functions for hitbox.
-fn custom_jq_funs() -> impl Iterator<Item = (&'static str, Box<[Bind]>, Native<Val>)> {
-    let v0: Box<[Bind]> = Box::new([]);
-
-    [
-        // hash: SHA256 hash of the string value (truncated to 16 hex chars)
-        (
-            "hash",
-            v0,
-            Native::new(|_, cv| {
-                let val = cv.1;
-                let result: JqResult = match &val {
-                    Val::Str(s) => {
-                        let hash = apply_hash(s);
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Int(n) => {
-                        let hash = apply_hash(&n.to_string());
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Float(f) => {
-                        let hash = apply_hash(&f.to_string());
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Bool(b) => {
-                        let hash = apply_hash(&b.to_string());
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Null => {
-                        let hash = apply_hash("null");
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Num(n) => {
-                        let hash = apply_hash(n);
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Arr(_) | Val::Obj(_) => {
-                        // For arrays and objects, serialize to JSON string first
-                        let json: Value = val.clone().into();
-                        let hash = apply_hash(&json.to_string());
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                };
-                box_once(result.map_err(Exn::from))
-            }),
-        ),
-    ]
-    .into_iter()
-}
-
-impl JqExtraction {
-    /// Compiles a jq expression for extracting values from JSON bodies.
-    ///
-    /// The compiled filter can be reused across multiple requests.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err(String)` if the expression is invalid:
-    /// - Parse errors (syntax errors in the jq expression)
-    /// - Compile errors (undefined functions, type mismatches)
-    ///
-    /// The error message includes details about the parsing or compilation failure.
-    pub fn compile(expression: &str) -> Result<Self, String> {
-        let program = File {
-            code: expression,
-            path: (),
-        };
-        let loader = Loader::new(jaq_std::defs().chain(jaq_json::defs()));
-        let arena = Arena::default();
-        let modules = loader
-            .load(&arena, program)
-            .map_err(|e| format!("jq parse error: {:?}", e))?;
-        let filter = jaq_core::Compiler::default()
-            .with_funs(
-                jaq_std::funs()
-                    .chain(jaq_json::funs())
-                    .chain(custom_jq_funs()),
-            )
-            .compile(modules)
-            .map_err(|e| format!("jq compile error: {:?}", e))?;
-        Ok(Self { filter })
-    }
-
-    fn apply(&self, input: Value) -> Vec<Value> {
-        let inputs = RcIter::new(core::iter::empty());
-        let out = self.filter.run((Ctx::new([], &inputs), Val::from(input)));
-        out.filter_map(|r| r.ok()).map(|v| v.into()).collect()
-    }
 }
 
 /// Configuration for regex-based body extraction.
@@ -355,7 +233,7 @@ pub struct HashMode;
 /// JQ mode for [`BodyConfig`].
 #[derive(Debug, Clone)]
 pub struct JqMode {
-    extraction: JqExtraction,
+    extraction: JqExpression,
 }
 
 /// Regex mode for [`BodyConfig`].
@@ -455,7 +333,7 @@ impl BodyConfig<NoMode> {
             key: self.key,
             transforms: self.transforms,
             mode: JqMode {
-                extraction: JqExtraction::compile(expression)?,
+                extraction: JqExpression::compile(expression)?,
             },
         })
     }
@@ -683,7 +561,7 @@ where
     type Subject = E::Subject;
 
     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
-        let (parts, body) = subject.into_parts();
+        let (mut parts, body) = subject.into_parts();
 
         // Collect body
         let collected = match body.collect().await {
@@ -707,17 +585,16 @@ where
                 let hash = apply_hash(&body_str);
                 vec![KeyPart::new("body", Some(hash))]
             }
-            BodyExtraction::Jq(jq) => match serde_json::from_str(&body_str) {
-                Ok(json_value) => {
-                    let results = jq.apply(json_value);
-                    extract_jq_parts(results)
+            BodyExtraction::Jq(jq) => {
+                match ParsedBody::get_or_parse(&mut parts.extensions, &payload) {
+                    Some(input) => extract_jq_parts(jq.outputs(input)),
+                    None => {
+                        warn!("Jq body extraction failed: invalid JSON, falling back to body hash");
+                        let hash = apply_hash(&body_str);
+                        vec![KeyPart::new("body", Some(hash))]
+                    }
                 }
-                Err(err) => {
-                    warn!(%err, "Jq body extraction failed: invalid JSON, falling back to body hash");
-                    let hash = apply_hash(&body_str);
-                    vec![KeyPart::new("body", Some(hash))]
-                }
-            },
+            }
             BodyExtraction::Regex(regex_ext) => extract_regex_parts(
                 &body_str,
                 &regex_ext.regex,

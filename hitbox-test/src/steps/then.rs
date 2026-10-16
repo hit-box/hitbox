@@ -2,11 +2,7 @@ use crate::core::HitboxWorld;
 use crate::handler_state::HandlerName;
 use anyhow::{Error, anyhow};
 use cucumber::{gherkin::Step, then};
-use jaq_core::{
-    Ctx, RcIter,
-    load::{Arena, File, Loader},
-};
-use jaq_json::Val;
+use hitbox_http::predicates::body::JqExpression;
 use serde_json::Value;
 
 #[then(expr = "response status is {int}")]
@@ -45,8 +41,9 @@ fn response_body_jq(world: &mut HitboxWorld, jq_expression: String) -> Result<()
     let json_value: Value = serde_json::from_str(&body_text)
         .map_err(|e| anyhow!("Failed to parse response body as JSON: {}", e))?;
 
-    // Use jaq to evaluate the expression
-    let result = apply_jq_expression(&jq_expression, json_value)?;
+    let result = JqExpression::compile(&jq_expression)
+        .map_err(|e| anyhow!("Invalid JQ expression '{}': {}", jq_expression, e))?
+        .apply(json_value);
 
     // Check if the result is truthy (for expressions like `.title=="Victim Prime"`)
     let is_truthy = match result {
@@ -62,39 +59,6 @@ fn response_body_jq(world: &mut HitboxWorld, jq_expression: String) -> Result<()
     }
 
     Ok(())
-}
-
-fn apply_jq_expression(expression: &str, input: Value) -> Result<Option<Value>, Error> {
-    let program = File {
-        code: expression,
-        path: (),
-    };
-    let loader = Loader::new(jaq_std::defs().chain(jaq_json::defs()));
-    let arena = Arena::default();
-    let modules = loader
-        .load(&arena, program)
-        .map_err(|e| anyhow!("Failed to load JQ program: {:?}", e))?;
-    let filter = jaq_core::Compiler::default()
-        .with_funs(jaq_std::funs().chain(jaq_json::funs()))
-        .compile(modules)
-        .map_err(|e| anyhow!("Failed to compile JQ program: {:?}", e))?;
-    let inputs = RcIter::new(core::iter::empty());
-    let out = filter.run((Ctx::new([], &inputs), Val::from(input)));
-    let results: Result<Vec<_>, _> = out.collect();
-
-    match results {
-        Ok(values) if values.eq(&vec![Val::Null]) => Ok(None),
-        Ok(values) if !values.is_empty() => {
-            let values: Vec<Value> = values.into_iter().map(|v| v.into()).collect();
-            if values.len() == 1 {
-                Ok(Some(values.into_iter().next().unwrap()))
-            } else {
-                Ok(Some(Value::Array(values)))
-            }
-        }
-        Ok(_) => Ok(None),
-        Err(e) => Err(anyhow!("JQ execution error: {:?}", e)),
-    }
 }
 
 #[then(expr = "response headers contain {string} header")]
