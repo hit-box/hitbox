@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `jq_body` benchmark comparing jq predicates and extractors with 0.2 ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+
 ### Changed
 - jq predicates and extractors share one parse of the body per request or response ([#PR](https://github.com/hit-box/hitbox/pull/PR))
 - **Breaking:** jq runs on jaq 3; some jq-derived keys change (indexing `null`, number literal text, big integers, `NaN` bodies) ([#PR](https://github.com/hit-box/hitbox/pull/PR))
