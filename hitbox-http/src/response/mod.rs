@@ -11,12 +11,13 @@ use hitbox::{
     predicate::PredicateResult,
     tag::{CacheTag, TagExtractor},
 };
-use http::{HeaderMap, Response, response::Parts};
+use http::{Extensions, HeaderMap, Response, response::Parts};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
 use crate::CacheableSubject;
 use crate::body::BufferedBody;
+use crate::jq::ParsedBody;
 use crate::predicates::header::HasHeaders;
 use crate::predicates::version::HasVersion;
 
@@ -93,7 +94,9 @@ where
     ///
     /// Use this after cache policy evaluation to send the response to the client.
     pub fn into_response(self) -> Response<BufferedBody<ResBody>> {
-        Response::from_parts(self.parts, self.body)
+        let mut parts = self.parts;
+        ParsedBody::remove(&mut parts.extensions);
+        Response::from_parts(parts, self.body)
     }
 }
 
@@ -110,6 +113,10 @@ where
 
     fn from_parts(parts: Self::Parts, body: BufferedBody<Self::Body>) -> Self {
         Self { parts, body }
+    }
+
+    fn extensions_mut(parts: &mut Self::Parts) -> &mut Extensions {
+        &mut parts.extensions
     }
 }
 

@@ -104,7 +104,7 @@ impl BodyOperation {
             }
             BodyOperation::Jq(jq_op) => Ok(Box::new(
                 inner.body(extractors::body::BodyExtraction::Jq(
-                    extractors::body::JqExtraction::compile(&jq_op.jq)
+                    extractors::body::JqExpression::compile(&jq_op.jq)
                         .map_err(ConfigError::InvalidPredicate)?,
                 )),
             )),

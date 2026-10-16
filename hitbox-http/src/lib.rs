@@ -5,6 +5,7 @@ pub mod body;
 mod cache_status;
 mod cacheable;
 pub mod extractors;
+pub mod jq;
 pub mod predicates;
 pub mod query;
 /// HTTP request types and cache policy evaluation.

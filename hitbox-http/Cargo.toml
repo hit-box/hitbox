@@ -35,9 +35,11 @@ actix-router = "0.5"
 serde_qs = "0.15"
 serde = { workspace = true }
 serde_json = { workspace = true }
-jaq-core = "2.1.0"
-jaq-std = "2.1.0"
-jaq-json = { version = "1.1.0", features = ["serde_json"] }
+jaq-core = "3.1"
+jaq-std = "3.0"
+# `sync` makes `Val` `Send + Sync`, so a parsed body can be shared through
+# the subject's `http::Extensions`.
+jaq-json = { version = "2.0", features = ["sync"] }
 prost = "0.14"
 prost-reflect = { version = "0.16", features = ["serde", "derive"] }
 protox = "0.9"

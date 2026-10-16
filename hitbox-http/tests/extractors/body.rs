@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use hitbox::Extractor;
 use hitbox_http::extractors::body::{
-    BodyConfig, BodyExtraction, BodyExtractor, IntoBodyExtraction, JqExtraction, RegexExtraction,
+    BodyConfig, BodyExtraction, BodyExtractor, IntoBodyExtraction, JqExpression, RegexExtraction,
     Transforms,
 };
 use hitbox_http::extractors::transform::Transform;
@@ -85,10 +85,10 @@ fn test_body_config_default() {
 }
 
 #[test]
-fn test_jq_extraction_debug() {
-    let jq = JqExtraction::compile(".field").unwrap();
+fn test_jq_expression_debug_shows_source() {
+    let jq = JqExpression::compile(".field").unwrap();
     let debug = format!("{:?}", jq);
-    assert!(debug.contains("JqExtraction"));
+    assert_eq!(debug, r#"JqExpression(".field")"#);
 }
 
 // --- Body extractor with hash mode ---

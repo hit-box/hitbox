@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- jq predicates and extractors share one parse of the body per request or response ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+- **Breaking:** jq runs on jaq 3; some jq-derived keys change (indexing `null`, number literal text, big integers, `NaN` bodies) ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+- **Breaking:** `JqExtraction` is replaced by `JqExpression` (`hitbox_http::jq`); `CacheableSubject` gains `extensions_mut`; `Operation::check` takes `&mut Extensions` ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+
+### Fixed
+- jq integer overflow near `i64::MAX`/`i64::MIN` ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+
 ### Added
 - `ResponseHeaderTagExtractor` (`hitbox_http::tags`) tags cached entries by a response header such as `ETag`, with the same name selection, regex value extraction, and transforms as the request `Header` extractor ([#280](https://github.com/hit-box/hitbox/pull/280))
 - `HeaderConfig::new()` and `HeaderConfig::select()`; the request `Header` extractor and the response tag extractor share one header-reading path ([#280](https://github.com/hit-box/hitbox/pull/280))

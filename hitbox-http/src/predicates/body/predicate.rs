@@ -96,8 +96,9 @@ where
             PredicateResult::NonCacheable(s) => (false, s),
         };
 
-        let (parts, body) = subject.into_parts();
-        let body_result = self.operation.check(body).await;
+        let (mut parts, body) = subject.into_parts();
+        let extensions = P::Subject::extensions_mut(&mut parts);
+        let body_result = self.operation.check(body, extensions).await;
 
         // Combine: final is Cacheable only if both inner AND body are Cacheable
         match body_result {

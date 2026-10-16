@@ -7,11 +7,12 @@ use hitbox::{
     tag::{CacheTag, TagExtractor},
     {CachePolicy, CacheableRequest, Extractor},
 };
-use http::{Request, request::Parts};
+use http::{Extensions, Request, request::Parts};
 use hyper::body::Body as HttpBody;
 
 use crate::CacheableSubject;
 use crate::body::BufferedBody;
+use crate::jq::ParsedBody;
 use crate::predicates::header::HasHeaders;
 use crate::predicates::version::HasVersion;
 
@@ -93,7 +94,9 @@ where
     ///
     /// Use this after cache policy evaluation to continue processing the request.
     pub fn into_request(self) -> Request<BufferedBody<ReqBody>> {
-        Request::from_parts(self.parts, self.body)
+        let mut parts = self.parts;
+        ParsedBody::remove(&mut parts.extensions);
+        Request::from_parts(parts, self.body)
     }
 
     /// Returns a reference to the request metadata.
@@ -124,6 +127,10 @@ where
 
     fn from_parts(parts: Self::Parts, body: BufferedBody<Self::Body>) -> Self {
         Self { parts, body }
+    }
+
+    fn extensions_mut(parts: &mut Self::Parts) -> &mut Extensions {
+        &mut parts.extensions
     }
 }
 
