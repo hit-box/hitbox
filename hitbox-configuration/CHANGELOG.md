@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- Body `jq` extractors use `JqExpression` on jaq 3 ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+- Body `jq` extractors use `JqExpression` on jaq 3 ([#294](https://github.com/hit-box/hitbox/pull/294))
 
 ### Added
 - `tags:` endpoint section with `request` and `response` lists: request tags accept `Static` and every extractor variant (`Path`, `Method`, `Query`, `Header`, `Body`, `Version`), response tags accept `Static` and `Header` ([#280](https://github.com/hit-box/hitbox/pull/280))

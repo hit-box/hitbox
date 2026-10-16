@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- jq step and benches use `JqExpression`; direct jaq dependencies dropped ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+- jq step and benches use `JqExpression`; direct jaq dependencies dropped ([#294](https://github.com/hit-box/hitbox/pull/294))
 
 ### Added
 - Initial release
