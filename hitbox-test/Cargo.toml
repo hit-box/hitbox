@@ -41,7 +41,6 @@ axum-test = "18.2"
 reqwest = "0.13"
 cucumber = { version = "0.23", features = ["output-junit", "libtest"] }
 serde-saphyr = { workspace = true }
-serde_yaml = "0.9"
 indexmap = { version = "2", features = ["serde"] }
 serde = { workspace = true, features = ["rc"] }
 anyhow = "1"
