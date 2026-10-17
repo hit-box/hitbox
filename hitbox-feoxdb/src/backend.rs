@@ -94,7 +94,8 @@ where
     ///
     /// No-op in memory-only mode.
     pub fn flush(&self) {
-        self.store.flush();
+        // feoxdb 0.5.1+ returns sync errors; 0.2.x keeps the infallible signature
+        let _ = self.store.flush();
     }
 }
 
