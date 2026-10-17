@@ -1,3 +1,6 @@
+// Diagnostics change between compiler releases, so the `.stderr` snapshots
+// are recorded with the MSRV: `cargo +1.91.1 test -p hitbox-fn --test compile_fail`.
+#[rustversion::attr(not(stable(1.91)), ignore = "snapshots are recorded with the MSRV")]
 #[test]
 fn compile_fail() {
     let t = trybuild::TestCases::new();

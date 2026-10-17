@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Redundant intra-doc link targets in the `context` module docs rejected by rustdoc ([#297](https://github.com/hit-box/hitbox/pull/297))
+
 ## [0.2.4] - 2026-02-17
 
 ### Added

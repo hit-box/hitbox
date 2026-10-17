@@ -499,7 +499,9 @@ where
                             config.nodes.iter().map(|s| s.as_str()),
                         );
                         if config.read_from_replicas {
-                            builder = builder.read_from_replicas();
+                            builder = builder.read_routing_strategy(
+                                redis::cluster_read_routing::RandomReplicaStrategy,
+                            );
                         }
                         if let Some(ref username) = self.username {
                             builder = builder.username(username.clone());

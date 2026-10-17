@@ -30,3 +30,4 @@ hitbox-derive = { path = "../hitbox-derive" }
 hitbox-backend = { path = "../hitbox-backend" }
 dashmap = { workspace = true }
 trybuild = "1"
+rustversion = "1"
