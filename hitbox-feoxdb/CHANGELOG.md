@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- Deadlock in `feoxdb` 0.5.3 and 0.5.4 when the data file is full or fragmented: require `feoxdb` below 0.5.3 ([#295](https://github.com/hit-box/hitbox/issues/295), [#PR](https://github.com/hit-box/hitbox/pull/PR))
+- Deadlock in `feoxdb` 0.5.3 and 0.5.4 when the data file is full or fragmented: require `feoxdb` below 0.5.3 ([#295](https://github.com/hit-box/hitbox/issues/295), [#296](https://github.com/hit-box/hitbox/pull/296))
 
 ## [0.2.1] - 2026-02-09
 
