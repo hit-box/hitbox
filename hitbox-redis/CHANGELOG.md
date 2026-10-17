@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- Bump minimum `redis` dependency to 1.2 and migrate from deprecated `ClusterClientBuilder::read_from_replicas()` to `read_routing_strategy(RandomReplicaStrategy)`.
+- Bump minimum `redis` dependency to 1.2 and migrate from deprecated `ClusterClientBuilder::read_from_replicas()` to `read_routing_strategy(RandomReplicaStrategy)` ([#297](https://github.com/hit-box/hitbox/pull/297))
 
 ## [0.2.1] - 2026-02-09
 
