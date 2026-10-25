@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Deadlock when a write batch overflows `max_file_size`, caused by `feoxdb` 0.5.3+ re-locking its free-space map while still holding it ([#293](https://github.com/hit-box/hitbox/pull/293))
 
+## [0.2.2] - 2026-10-17
+
+### Fixed
+- Deadlock in `feoxdb` 0.5.3 and 0.5.4 when the data file is full or fragmented: require `feoxdb` below 0.5.3 ([#295](https://github.com/hit-box/hitbox/issues/295), [#296](https://github.com/hit-box/hitbox/pull/296))
+
 ## [0.2.1] - 2026-02-09
 
 ### Fixed
