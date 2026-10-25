@@ -61,9 +61,9 @@ pub mod config;
 /// Cache context and status types.
 ///
 /// This module provides:
-/// - [`CacheContext`](context::CacheContext) — metadata passed through the request lifecycle
-/// - [`CacheStatus`](context::CacheStatus) — indicates whether a response came from cache
-/// - [`ResponseSource`](context::ResponseSource) — identifies where the response originated
+/// - [`CacheContext`] — metadata passed through the request lifecycle
+/// - [`CacheStatus`] — indicates whether a response came from cache
+/// - [`ResponseSource`] — identifies where the response originated
 pub mod context;
 
 /// Background task offloading for stale-while-revalidate.

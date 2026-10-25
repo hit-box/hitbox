@@ -2,7 +2,7 @@
 //!
 //! This module provides [`CacheService`](crate::service::CacheService), the Tower
 //! `Service` that performs the actual caching logic. Users typically don't construct
-//! this directly — it's created by the [`Cache`](crate::Cache) layer.
+//! this directly — it's created by the [`Cache`] layer.
 
 use hitbox::concurrency::ConcurrencyManager;
 use hitbox::config::CacheConfig;

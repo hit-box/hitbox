@@ -8,7 +8,7 @@ use http_body_util::Empty;
 #[tokio::test]
 async fn test_request_query_extractor_some() {
     let uri = http::uri::Uri::builder()
-        .path_and_query("test-path?key=value")
+        .path_and_query("/test-path?key=value")
         .build()
         .unwrap();
     let request = Request::builder()
@@ -24,7 +24,7 @@ async fn test_request_query_extractor_some() {
 #[tokio::test]
 async fn test_request_query_extractor_none() {
     let uri = http::uri::Uri::builder()
-        .path_and_query("test-path?key=value")
+        .path_and_query("/test-path?key=value")
         .build()
         .unwrap();
     let request = Request::builder()
@@ -40,7 +40,7 @@ async fn test_request_query_extractor_none() {
 #[tokio::test]
 async fn test_request_query_extractor_multiple() {
     let uri = http::uri::Uri::builder()
-        .path_and_query("test-path?cars[]=Saab&cars[]=Audi")
+        .path_and_query("/test-path?cars[]=Saab&cars[]=Audi")
         .build()
         .unwrap();
     let request = Request::builder()

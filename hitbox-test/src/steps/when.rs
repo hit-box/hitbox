@@ -24,7 +24,7 @@ async fn execute_request(world: &mut HitboxWorld, step: &Step) -> Result<(), Err
     let hurl_file = parse_hurl_file(&hurl_request).map_err(|err| {
         anyhow!(
             "hurl request parse error: {}",
-            &err.message(&hurl_request.lines().collect::<Vec<_>>())
+            err.message(&hurl_request.lines().collect::<Vec<_>>())
                 .to_string(Format::Ansi)
         )
     })?;
@@ -86,7 +86,7 @@ async fn concurrent_requests(
     let hurl_file = parse_hurl_file(&hurl_request).map_err(|err| {
         anyhow!(
             "hurl request parse error: {}",
-            &err.message(&hurl_request.lines().collect::<Vec<_>>())
+            err.message(&hurl_request.lines().collect::<Vec<_>>())
                 .to_string(Format::Ansi)
         )
     })?;
