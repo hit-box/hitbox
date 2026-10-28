@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `serialize_tags` / `deserialize_tags` helpers for backends that store tags alongside entries ([#280](https://github.com/hit-box/hitbox/pull/280))
 
 ### Changed
-- **Breaking:** `Compressor::compress` and `Compressor::decompress` take and return `Raw` (`Bytes`) instead of `&[u8]` → `Vec<u8>`, so `PassthroughCompressor` returns the value without copying it ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+- **Breaking:** `Compressor::compress` and `Compressor::decompress` take and return `Raw` (`Bytes`) instead of `&[u8]` → `Vec<u8>`, so `PassthroughCompressor` returns the value without copying it ([#300](https://github.com/hit-box/hitbox/pull/300))
 
 ## [0.2.1] - 2026-02-05
 
