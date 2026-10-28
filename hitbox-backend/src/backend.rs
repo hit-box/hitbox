@@ -414,19 +414,17 @@ pub trait CacheBackend: Backend {
                     let format = self.value_format();
 
                     let decompress_timer = Timer::new();
-                    let decompressed = self.compressor().decompress(&raw_data)?;
+                    let decompressed = self.compressor().decompress(raw_data)?;
                     crate::metrics::record_decompress(
                         backend_label.as_str(),
                         decompress_timer.elapsed(),
                     );
 
-                    let decompressed_bytes = Bytes::from(decompressed);
-
                     // Deserialize using with_deserializer - context may be upgraded
                     let deserialize_timer = Timer::new();
                     let mut deserialized_opt: Option<T::Cached> = None;
                     format.with_deserializer(
-                        &decompressed_bytes,
+                        &decompressed,
                         &mut |deserializer| {
                             let value: T::Cached = deserializer.deserialize()?;
                             deserialized_opt = Some(value);
@@ -505,14 +503,14 @@ pub trait CacheBackend: Backend {
             crate::metrics::record_serialize(backend_label.as_str(), serialize_timer.elapsed());
 
             let compress_timer = Timer::new();
-            let compressed_value = self.compressor().compress(&serialized_value)?;
+            let compressed_value = self.compressor().compress(serialized_value)?;
             crate::metrics::record_compress(backend_label.as_str(), compress_timer.elapsed());
 
             let compressed_len = compressed_value.len();
 
             let write_timer = Timer::new();
             let raw_value = CacheValue::with_created(
-                Bytes::from(compressed_value),
+                compressed_value,
                 value.created(),
                 value.expire(),
                 value.stale(),

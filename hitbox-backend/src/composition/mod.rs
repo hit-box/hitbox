@@ -697,7 +697,7 @@ where
                     // Deserialize using CompositionFormat (records decompress/deserialize metrics)
                     let mut deserialized_opt: Option<T::Cached> = None;
                     match format_for_l1.deserialize_layer(
-                        &raw_data,
+                        raw_data,
                         CompositionLayer::L1,
                         &mut |deserializer| {
                             let value: T::Cached = deserializer.deserialize()?;
@@ -771,7 +771,7 @@ where
                     // which sets ReadMode::Refill - CacheFuture will handle the actual refill
                     let mut deserialized_opt: Option<T::Cached> = None;
                     match format_for_l2.deserialize_layer(
-                        &raw_data,
+                        raw_data,
                         CompositionLayer::L2,
                         &mut |deserializer| {
                             let value: T::Cached = deserializer.deserialize()?;

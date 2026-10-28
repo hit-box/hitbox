@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CompositionBackend` records invalidations in both layers and merges lookups so the latest timestamp per tag wins ([#280](https://github.com/hit-box/hitbox/pull/280))
 - `serialize_tags` / `deserialize_tags` helpers for backends that store tags alongside entries ([#280](https://github.com/hit-box/hitbox/pull/280))
 
+### Changed
+- **Breaking:** `Compressor::compress` and `Compressor::decompress` take and return `Raw` (`Bytes`) instead of `&[u8]` → `Vec<u8>`, so `PassthroughCompressor` returns the value without copying it ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+
 ## [0.2.1] - 2026-02-05
 
 ### Changed
