@@ -17,8 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Bincode, JSON and RON formats and the gzip and zstd compressors return buffers without spare capacity, so in-process backends such as moka no longer hold up to 2× the memory their byte limit counts ([#302](https://github.com/hit-box/hitbox/pull/302))
 
+## [0.2.2] - 2026-10-30
+
 ### Security
-- Require `zstd` 0.14, which fixes RUSTSEC-2026-0391, RUSTSEC-2026-0398 and RUSTSEC-2026-0403 in the `zstd` feature ([#306](https://github.com/hit-box/hitbox/pull/306))
+- Require `zstd` 0.14, which fixes RUSTSEC-2026-0391, RUSTSEC-2026-0398 and RUSTSEC-2026-0403 in the `zstd` feature ([#307](https://github.com/hit-box/hitbox/pull/307))
 
 ## [0.2.1] - 2026-02-05
 
