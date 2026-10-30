@@ -392,6 +392,57 @@ mod tests {
     }
 
     #[test]
+    fn test_same_format_shares_payload() {
+        let composition = CompositionFormat::new(
+            Arc::new(BincodeFormat),
+            Arc::new(BincodeFormat),
+            Arc::new(PassthroughCompressor),
+            Arc::new(PassthroughCompressor),
+            SmolStr::new_static("test.l1"),
+            SmolStr::new_static("test.l2"),
+        );
+
+        let serialized = composition
+            .serialize(&TestData::large(), &CacheContext::default())
+            .unwrap();
+
+        match CompositionEnvelope::deserialize(&serialized).unwrap() {
+            CompositionEnvelope::Both { l1, l2 } => {
+                assert_eq!(l1.data().as_ptr(), l2.data().as_ptr());
+            }
+            _ => panic!("Expected Both variant"),
+        }
+    }
+
+    #[cfg(feature = "gzip")]
+    #[test]
+    fn test_same_format_different_compressors_store_both_payloads() {
+        use crate::{Compressor, GzipCompressor};
+
+        let composition = CompositionFormat::new(
+            Arc::new(BincodeFormat),
+            Arc::new(BincodeFormat),
+            Arc::new(PassthroughCompressor),
+            Arc::new(GzipCompressor::new()),
+            SmolStr::new_static("test.l1"),
+            SmolStr::new_static("test.l2"),
+        );
+
+        let serialized = composition
+            .serialize(&TestData::large(), &CacheContext::default())
+            .unwrap();
+
+        match CompositionEnvelope::deserialize(&serialized).unwrap() {
+            CompositionEnvelope::Both { l1, l2 } => {
+                assert_ne!(l1.data(), l2.data());
+                let l2_decompressed = GzipCompressor::new().decompress(l2.data().clone()).unwrap();
+                assert_eq!(*l1.data(), l2_decompressed);
+            }
+            _ => panic!("Expected Both variant"),
+        }
+    }
+
+    #[test]
     fn test_different_formats() {
         let composition = CompositionFormat::new(
             Arc::new(JsonFormat),
@@ -441,10 +492,10 @@ mod tests {
         );
         let composition_diff_size = composition_diff.serialize(&data, &ctx).unwrap().len();
 
-        // Composition should be roughly 2x the single format size (plus small bincode overhead)
+        // Same format without compression stores the payload once (plus the envelope header)
         assert!(
-            composition_same_size < json_size * 2 + 100,
-            "Same format composition size should be ~2x single format"
+            composition_same_size < json_size + 100,
+            "Same format composition size should be ~1x single format"
         );
 
         assert!(
