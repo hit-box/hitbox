@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `Compressor::compress` and `Compressor::decompress` take and return `Raw` (`Bytes`) instead of `&[u8]` → `Vec<u8>`, so `PassthroughCompressor` returns the value without copying it ([#300](https://github.com/hit-box/hitbox/pull/300))
 
 ### Fixed
-- Bincode, JSON and RON formats and the gzip and zstd compressors return buffers without spare capacity, so in-process backends such as moka no longer hold up to 2× the memory their byte limit counts ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+- Bincode, JSON and RON formats and the gzip and zstd compressors return buffers without spare capacity, so in-process backends such as moka no longer hold up to 2× the memory their byte limit counts ([#302](https://github.com/hit-box/hitbox/pull/302))
 
 ## [0.2.1] - 2026-02-05
 
