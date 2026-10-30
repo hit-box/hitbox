@@ -11,6 +11,9 @@
 //! [EnvelopeHeader (56 bytes)][L1 data][L2 data (if Both variant)][Tags bincode (if tags_len > 0)]
 //! ```
 //!
+//! When both layers of a Both variant hold the same buffer, the payload is
+//! stored once and L2 shares it after deserialization.
+//!
 //! ## Performance
 //!
 //! Compared to bitcode serialization:
@@ -31,7 +34,7 @@ use crate::{BackendError, BackendResult};
 /// Fixed-size header for envelope format using repr(C) with bytemuck for safe zero-copy casting.
 ///
 /// Layout (fields grouped by size to minimize padding):
-/// - discriminant: 1 byte (0=L1, 1=L2, 2=Both)
+/// - discriminant: 1 byte (0=L1, 1=L2, 2=Both, 3=Both with one payload shared by L1 and L2)
 /// - _pad1: 3 bytes (align to u32)
 /// - l1_len: 4 bytes (u32 little-endian)
 /// - l2_len: 4 bytes (u32 little-endian)
@@ -230,6 +233,7 @@ impl CompositionEnvelope {
     /// Serialize envelope to bytes using zero-copy repr(C) format.
     ///
     /// This avoids re-serializing the already-serialized payload data.
+    /// A Both variant whose layers hold the same buffer stores it once.
     pub(crate) fn serialize(&self) -> BackendResult<Bytes> {
         match self {
             CompositionEnvelope::L1(value) => {
@@ -281,26 +285,37 @@ impl CompositionEnvelope {
                 Ok(Bytes::from(buf))
             }
             CompositionEnvelope::Both { l1, l2 } => {
+                // CompositionFormat hands both layers the same buffer when they use
+                // the same format without compression. Equal contents in separate
+                // buffers are stored twice: comparing them would cost a full scan.
+                let shared =
+                    l1.data().as_ptr() == l2.data().as_ptr() && l1.data().len() == l2.data().len();
+                let l2_len = if shared { 0 } else { l2.data().len() };
+
                 let tags_bytes = crate::serialize_tags(l1.tags())?;
                 let tags_len = tags_bytes.as_ref().map_or(0, Vec::len);
-                let header = EnvelopeHeader::new_both(
-                    l1.data().len(),
-                    l2.data().len(),
-                    tags_len,
-                    l1.created(),
-                    l1.expire(),
-                    l1.stale(),
-                );
-                let total_size =
-                    EnvelopeHeader::SIZE + l1.data().len() + l2.data().len() + tags_len;
+                let header = EnvelopeHeader {
+                    discriminant: if shared { 3 } else { 2 },
+                    ..EnvelopeHeader::new_both(
+                        l1.data().len(),
+                        l2_len,
+                        tags_len,
+                        l1.created(),
+                        l1.expire(),
+                        l1.stale(),
+                    )
+                };
+                let total_size = EnvelopeHeader::SIZE + l1.data().len() + l2_len + tags_len;
                 let mut buf = Vec::with_capacity(total_size);
 
                 buf.write_all(header.as_bytes())
                     .map_err(|e| BackendError::InternalError(Box::new(e)))?;
                 buf.write_all(l1.data())
                     .map_err(|e| BackendError::InternalError(Box::new(e)))?;
-                buf.write_all(l2.data())
-                    .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+                if !shared {
+                    buf.write_all(l2.data())
+                        .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+                }
                 if let Some(bytes) = tags_bytes {
                     buf.write_all(&bytes)
                         .map_err(|e| BackendError::InternalError(Box::new(e)))?;
@@ -383,8 +398,8 @@ impl CompositionEnvelope {
                 );
                 Ok(CompositionEnvelope::L2(with_tags_opt(cv, tags_bytes)?))
             }
-            2 => {
-                // Both
+            2 | 3 => {
+                // Both; with discriminant 3 the payload is stored once and l2_len is 0
                 let l1_len = header.l1_len as usize;
                 let l2_len = header.l2_len as usize;
                 let l1_end = payload_start + l1_len;
@@ -403,7 +418,11 @@ impl CompositionEnvelope {
                 }
 
                 let l1_data = Bytes::copy_from_slice(&data[payload_start..l1_end]);
-                let l2_data = Bytes::copy_from_slice(&data[l1_end..l2_end]);
+                let l2_data = if header.discriminant == 3 {
+                    l1_data.clone()
+                } else {
+                    Bytes::copy_from_slice(&data[l1_end..l2_end])
+                };
                 let tags_bytes = (tags_len > 0).then(|| &data[l2_end..tags_end]);
 
                 let l1_cv = CacheValue::with_created(
@@ -435,6 +454,7 @@ impl CompositionEnvelope {
 mod tests {
     use super::*;
     use chrono::Duration;
+    use hitbox_core::{CacheTag, CacheTags};
 
     #[test]
     fn test_envelope_header_size() {
@@ -485,6 +505,67 @@ mod tests {
                 assert_eq!(*l2.data(), l2_data);
                 assert!(l1.expire().is_some());
                 assert!(l1.stale().is_some());
+            }
+            _ => panic!("Expected Both variant"),
+        }
+    }
+
+    #[test]
+    fn test_roundtrip_both_shared() {
+        let data = Bytes::from(vec![1u8; 1000]);
+        let expire = Some(Utc::now() + Duration::hours(1));
+        let stale = Some(Utc::now() + Duration::minutes(30));
+        let tags = CacheTags::response_only(vec![CacheTag::new("user:1")]);
+        let value = CacheValue::new(data.clone(), expire, stale).with_tags(tags.clone());
+
+        let envelope = CompositionEnvelope::Both {
+            l1: value.clone(),
+            l2: value.clone(),
+        };
+
+        let serialized = envelope.serialize().unwrap();
+        // The payload is stored once: the same size as an L1-only envelope
+        let l1_only = CompositionEnvelope::L1(value).serialize().unwrap();
+        assert_eq!(serialized.len(), l1_only.len());
+
+        match CompositionEnvelope::deserialize(&serialized).unwrap() {
+            CompositionEnvelope::Both { l1, l2 } => {
+                assert_eq!(*l1.data(), data);
+                // L2 shares the L1 buffer instead of holding a copy of it
+                assert_eq!(l1.data().as_ptr(), l2.data().as_ptr());
+                assert_eq!(l1.data().len(), l2.data().len());
+                for layer in [&l1, &l2] {
+                    assert_eq!(layer.expire(), expire);
+                    assert_eq!(layer.stale(), stale);
+                    assert_eq!(layer.tags(), Some(&tags));
+                }
+            }
+            _ => panic!("Expected Both variant"),
+        }
+    }
+
+    #[test]
+    fn test_both_equal_contents_in_separate_buffers() {
+        let l1_data = Bytes::from(vec![7u8; 1000]);
+        let l2_data = Bytes::from(vec![7u8; 1000]);
+
+        let envelope = CompositionEnvelope::Both {
+            l1: CacheValue::new(l1_data.clone(), None, None),
+            l2: CacheValue::new(l2_data.clone(), None, None),
+        };
+
+        let serialized = envelope.serialize().unwrap();
+        // Only the same buffer is stored once, not equal contents
+        assert_eq!(
+            serialized.len(),
+            EnvelopeHeader::SIZE + l1_data.len() + l2_data.len()
+        );
+
+        match CompositionEnvelope::deserialize(&serialized).unwrap() {
+            CompositionEnvelope::Both { l1, l2 } => {
+                assert_eq!(*l1.data(), l1_data);
+                assert_eq!(*l2.data(), l2_data);
+                assert_ne!(l1.data().as_ptr(), l2.data().as_ptr());
             }
             _ => panic!("Expected Both variant"),
         }
