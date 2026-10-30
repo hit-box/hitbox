@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-30
+
 ### Security
 - Require `zstd` 0.14, which fixes RUSTSEC-2026-0391, RUSTSEC-2026-0398 and RUSTSEC-2026-0403 in the `zstd` feature ([#307](https://github.com/hit-box/hitbox/pull/307))
 
