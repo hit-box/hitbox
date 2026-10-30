@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Breaking:** `Compressor::compress` and `Compressor::decompress` take and return `Raw` (`Bytes`) instead of `&[u8]` → `Vec<u8>`, so `PassthroughCompressor` returns the value without copying it ([#300](https://github.com/hit-box/hitbox/pull/300))
-- `CompositionBackend` behind `dyn Backend` or nested in another composition stores a payload shared by both layers once in its envelope, halving the copies per write when L1 and L2 use the same format without compression ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+- `CompositionBackend` behind `dyn Backend` or nested in another composition stores a payload shared by both layers once in its envelope, halving the copies per write when L1 and L2 use the same format without compression ([#303](https://github.com/hit-box/hitbox/pull/303))
 
 ## [0.2.1] - 2026-02-05
 
