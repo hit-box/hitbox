@@ -23,6 +23,8 @@ impl Format for JsonFormat {
         let mut erased = <dyn erased_serde::Serializer>::erase(&mut ser);
         let mut format_ser = FormatSerializer::Serde(&mut erased);
         f(&mut format_ser)?;
+        // Drop the growth slack: in-process backends store the buffer as is
+        buf.shrink_to_fit();
         Ok(Bytes::from(buf))
     }
 

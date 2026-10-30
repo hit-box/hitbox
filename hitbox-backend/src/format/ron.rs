@@ -26,6 +26,8 @@ impl Format for RonFormat {
             let mut format_ser = FormatSerializer::Serde(&mut erased);
             f(&mut format_ser)?;
         }
+        // Drop the growth slack: in-process backends store the buffer as is
+        buf.shrink_to_fit();
         Ok(Bytes::from(buf.into_bytes()))
     }
 

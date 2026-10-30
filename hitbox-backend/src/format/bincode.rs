@@ -53,8 +53,10 @@ impl Format for BincodeFormat {
         let mut format_ser = FormatSerializer::Bincode(BincodeEncoder(&mut encoder));
         f(&mut format_ser)?;
 
-        // Extract the buffer from the encoder
-        let buf = encoder.into_writer().into_vec();
+        // Extract the buffer from the encoder and drop its growth slack:
+        // in-process backends store it as is
+        let mut buf = encoder.into_writer().into_vec();
+        buf.shrink_to_fit();
         Ok(Bytes::from(buf))
     }
 

@@ -34,6 +34,9 @@ pub enum CompressionError {
 /// and `Arc<dyn Compressor>`.
 pub trait Compressor: Send + Sync + std::fmt::Debug {
     /// Compress the input data.
+    ///
+    /// Return a buffer without spare capacity. In-process backends store it
+    /// as is, so spare capacity uses memory that their byte limits do not count.
     fn compress(&self, data: Raw) -> Result<Raw, CompressionError>;
 
     /// Decompress the input data.
@@ -134,7 +137,10 @@ impl Compressor for GzipCompressor {
             .map_err(|e| CompressionError::CompressionFailed(e.to_string()))?;
         encoder
             .finish()
-            .map(Raw::from)
+            .map(|mut buf| {
+                buf.shrink_to_fit();
+                Raw::from(buf)
+            })
             .map_err(|e| CompressionError::CompressionFailed(e.to_string()))
     }
 
@@ -191,7 +197,10 @@ impl Default for ZstdCompressor {
 impl Compressor for ZstdCompressor {
     fn compress(&self, data: Raw) -> Result<Raw, CompressionError> {
         zstd::encode_all(&data[..], self.level)
-            .map(Raw::from)
+            .map(|mut buf| {
+                buf.shrink_to_fit();
+                Raw::from(buf)
+            })
             .map_err(|e| CompressionError::CompressionFailed(e.to_string()))
     }
 
@@ -223,6 +232,44 @@ mod tests {
         let decompressed = compressor.decompress(compressed).unwrap();
         assert_eq!(decompressed, data);
         assert_eq!(decompressed.as_ptr(), data.as_ptr());
+    }
+
+    /// Capacity of the allocation behind a buffer that no one else references.
+    #[cfg(any(feature = "gzip", feature = "zstd"))]
+    fn capacity(raw: Raw) -> usize {
+        raw.try_into_mut().expect("buffer is not shared").capacity()
+    }
+
+    /// Poorly compressible bytes, so the encoder writes its output in several chunks.
+    #[cfg(any(feature = "gzip", feature = "zstd"))]
+    fn noisy_data() -> Raw {
+        let mut state = 0x2545_f491_4f6c_dd1d_u64;
+        (0..1 << 20)
+            .map(|_| {
+                // xorshift64
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                state as u8
+            })
+            .collect::<Vec<u8>>()
+            .into()
+    }
+
+    #[cfg(feature = "gzip")]
+    #[test]
+    fn test_gzip_output_has_no_spare_capacity() {
+        let compressed = GzipCompressor::new().compress(noisy_data()).unwrap();
+        let len = compressed.len();
+        assert_eq!(capacity(compressed), len);
+    }
+
+    #[cfg(feature = "zstd")]
+    #[test]
+    fn test_zstd_output_has_no_spare_capacity() {
+        let compressed = ZstdCompressor::new().compress(noisy_data()).unwrap();
+        let len = compressed.len();
+        assert_eq!(capacity(compressed), len);
     }
 
     #[cfg(feature = "gzip")]
