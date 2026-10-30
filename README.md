@@ -5,6 +5,8 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Blog](https://img.shields.io/badge/blog-hitbox.rs-orange)](https://blog.hitbox.rs/)
 
+> `main` holds unreleased changes and may differ from the published crates. See [docs.rs](https://docs.rs/hitbox) for the released version; 0.2.x fixes land on the [`release-0.2.x`](https://github.com/hit-box/hitbox/tree/release-0.2.x) branch.
+
 Highly customizable async caching framework for Rust designed for high-performance applications.
 
 Protocol-agnostic async core + first-class HTTP support via hitbox-http. Pluggable backends from in-memory to distributed solutions such as Redis. Built on tower, works with any tokio-based service.
