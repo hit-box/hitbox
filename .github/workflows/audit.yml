@@ -24,6 +24,20 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  # Schedules run only on the default branch, so 0.2.x is checked from here.
+  # Fails the run instead of filing issues, which would not name the branch.
+  security_audit_release_0_2:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: release-0.2.x
+      - name: Generate Cargo.lock
+        run: cargo generate-lockfile
+      - uses: taiki-e/install-action@cargo-audit
+      - run: cargo audit
+
   deny:
     runs-on: ubuntu-latest
     steps:
