@@ -22,7 +22,10 @@ async fn generate_response(size_bytes: usize) -> hitbox_http::SerializableHttpRe
         .status(200)
         .header("content-type", "application/json")
         .header("cache-control", "public, max-age=3600")
-        .body(BufferedBody::<BenchBody>::Complete(Some(body)))
+        .body(BufferedBody::<BenchBody>::Complete {
+            data: Some(body),
+            trailers: None,
+        })
         .unwrap();
 
     let cacheable = CacheableHttpResponse::from_response(response);

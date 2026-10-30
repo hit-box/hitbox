@@ -63,11 +63,11 @@ use std::time::Duration;
 
 use axum::{Router, extract::Path, routing::get};
 use hitbox::policy::PolicyConfig;
-use hitbox::{Config, Neutral};
-use hitbox_http::extractors::Method as MethodExtractor;
-use hitbox_http::extractors::path::PathExtractor;
-use hitbox_http::predicates::request::Method;
+use hitbox::Config;
+use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
+use hitbox_http::predicates::request::{MethodPredicate, PathPredicate};
 use hitbox_http::predicates::response::{StatusClass, StatusCodePredicate};
+use hitbox_http::{request, response};
 use hitbox_moka::MokaBackend;
 use hitbox_tower::Cache;
 
@@ -85,9 +85,9 @@ async fn main() {
 
     // Users list - long TTL (60s)
     let users_config = Config::builder()
-        .request_predicate(Method::new(http::Method::GET).unwrap())
-        .response_predicate(Neutral::new().status_code_class(StatusClass::Success))
-        .extractor(MethodExtractor::new().path("/api/users"))
+        .request_predicate(request::predicate().method(http::Method::GET).path("/api/users"))
+        .response_predicate(response::predicate().status(StatusClass::Success))
+        .extractor(request::extractor().method(MethodConfig::new()).path("/api/users"))
         .policy(
             PolicyConfig::builder()
                 .ttl(Duration::from_secs(60))
@@ -98,10 +98,9 @@ async fn main() {
 
     // Single user - short TTL (10s)
     let user_config = Config::builder()
-        .request_predicate(Method::new(http::Method::GET).unwrap())
-        .response_predicate(Neutral::new().status_code_class(StatusClass::Success))
-
-        .extractor(MethodExtractor::new().path("/api/users/{id}"))
+        .request_predicate(request::predicate().method(http::Method::GET).path("/api/users/{id}"))
+        .response_predicate(response::predicate().status(StatusClass::Success))
+        .extractor(request::extractor().method(MethodConfig::new()).path("/api/users/{id}"))
         .policy(
             PolicyConfig::builder()
                 .ttl(Duration::from_secs(10))
@@ -158,6 +157,7 @@ See the [memoization_derive](./examples/examples/memoization_derive.rs) example 
 ### Core Features
 - [Stale Cache](#stale-cache) Serve stale data within grace period while revalidating in background
 - [Dogpile Prevention](#dogpile-prevention) Configurable concurrency limit with broadcast to prevent redundant upstream calls
+- [Tag Invalidation](#tag-invalidation) Expire every entry carrying a tag, with tags derived from requests or responses
 - [Pluggable Backends](#pluggable-backends) Choose Moka, Redis, FeOxDB, or implement the Backend trait for your own storage
 - [Composable Backends](#composable-backends) Combine backends into L1/L2/L3 tiers for optimal performance
 - [Serialization](#serialization) Choose between bincode, rkyv, JSON, or RON formats
@@ -244,6 +244,34 @@ let cache = Cache::builder()
     .config(policy)
     .concurrency_manager(concurrency_manager)
     .build();
+```
+
+## Tag Invalidation
+
+TTL expires entries on a schedule; tags expire them when the data behind them changes. Each cached entry carries tags derived from the request (such as `user_id=42` from the path) or from the upstream response (such as its `ETag`), and invalidating a tag expires every entry that carries it. Invalidation is passive: it records a timestamp for the tag, and any entry created before that timestamp is a miss on its next read. Nothing is scanned or deleted, so invalidating a tag costs one small write however many entries carry it.
+
+- Request tags are derived on every read; response tags are stored with the entry
+- An entry is stamped with the time its upstream call started, so an invalidation issued while that call is in flight still expires it
+- If the tag lookup fails, the entry is treated as a miss rather than served unchecked
+- `TagInvalidation::Skip` turns off tag extraction and the lookups on read
+- Every backend supports tags; on Redis, use a `volatile-*` `maxmemory-policy` so tag records (which have no TTL) are never evicted
+
+**Code example**
+
+```rust
+// Tag each cached user with "user_id=<id>", reusing the path extractor,
+// and with the ETag the upstream returned
+let config = Config::builder()
+    .request_predicate(request::predicate().method(http::Method::GET).path("/api/users/{user_id}"))
+    .response_predicate(response::predicate().status(StatusClass::Success))
+    .extractor(request::extractor().method(MethodConfig::new()).path("/api/users/{user_id}"))
+    .request_tags(request::extractor().path("/api/users/{user_id}").into_tag_extractor())
+    .response_tags(ResponseHeaderTagExtractor::new("etag"))
+    .policy(PolicyConfig::builder().ttl(Duration::from_secs(300)).build())
+    .build();
+
+// After user 42 changes, expire every cached response tagged with it
+backend.invalidate(&CacheTag::new("user_id=42")).await?;
 ```
 
 ## Pluggable Backends
@@ -386,18 +414,17 @@ HTTP Extractors build cache keys from request components. They extract values fr
 **Code example**
 
 ```rust
-use hitbox_http::extractors::{
-    Method as MethodExtractor,
-    Path as PathExtractor,
-    query::QueryExtractor,
-    header::HeaderExtractor,
-};
+use hitbox_http::request;
+use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
+use hitbox_http::extractors::query::QueryExtractor;
+use hitbox_http::extractors::header::HeaderExtractor;
 
 // Extract method, path params, query params, and headers for cache key
-MethodExtractor::new()
+request::extractor()
+    .method(MethodConfig::new())
     .path("/v1/authors/{author_id}/books/{book_id}")
-    .query("page".to_string())
-    .header("Accept-Language".to_string())
+    .query("page")
+    .header("Accept-Language")
 ```
 
 A request to `/v1/authors/123/books/456?page=1` with `Accept-Language: en` produces a cache key with `method`, `author_id`, `book_id`, `page`, and `Accept-Language` components.

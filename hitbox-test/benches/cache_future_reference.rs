@@ -27,11 +27,12 @@ use hitbox_backend::composition::policy::{
 };
 use hitbox_backend::format::BincodeFormat;
 use hitbox_backend::{CacheBackend, CompositionBackend, PassthroughCompressor};
-use hitbox_configuration::{Backend as ConfigBackend, ConfigEndpoint};
+use hitbox_configuration::{Backend as ConfigBackend, ConfigEndpoints, Endpoint};
 use hitbox_core::DisabledOffload;
 use hitbox_core::Upstream;
+use hitbox_http::extractors::MethodConfig;
 use hitbox_http::extractors::NeutralExtractor;
-use hitbox_http::extractors::body::{BodyExtraction, BodyExtractor, JqExtraction};
+use hitbox_http::extractors::body::{BodyExtraction, BodyExtractor};
 use hitbox_http::extractors::header::{
     Header, NameSelector as HeaderNameSelector, ValueExtractor as HeaderValueExtractor,
 };
@@ -48,8 +49,9 @@ use hitbox_http::predicates::header::HeaderPredicate;
 use hitbox_http::predicates::request::header::Operation as HeaderOperation;
 use hitbox_http::predicates::request::method::MethodPredicate;
 use hitbox_http::predicates::request::path::PathPredicate;
+use hitbox_http::predicates::response::StatusCodePredicate as _;
 use hitbox_http::predicates::response::header::Operation as ResponseHeaderOperation;
-use hitbox_http::predicates::response::status::{StatusClass, StatusCodePredicate};
+use hitbox_http::predicates::response::status::StatusClass;
 use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
 use hitbox_http::{BufferedBody, CacheableHttpRequest, CacheableHttpResponse};
 use hitbox_moka::MokaBackend;
@@ -85,7 +87,7 @@ impl Upstream<BenchRequest> for MockUpstream {
     type Response = BenchResponse;
     type Future = Ready<Self::Response>;
 
-    fn call(&mut self, _req: BenchRequest) -> Self::Future {
+    fn call(self, _req: BenchRequest) -> Self::Future {
         // Create a fresh response each time (no Clone needed)
         std::future::ready(CacheableHttpResponse::from_response(
             create_reference_response(),
@@ -110,7 +112,7 @@ fn create_reference_request() -> Request<ReqBody> {
         .header("accept", "application/json")
         .header("accept-language", "en-US,en;q=0.9")
         .header("user-agent", "ApiClient/2.0 (Production)")
-        .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+        .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
         .unwrap()
 }
 
@@ -124,7 +126,10 @@ fn create_reference_response() -> Response<ReqBody> {
         .header("x-response-time", "42ms")
         .header("x-ratelimit-limit", "1000")
         .header("x-ratelimit-remaining", "999")
-        .body(BufferedBody::Complete(Some(Bytes::from(RESPONSE_BODY))))
+        .body(BufferedBody::Complete {
+            data: Some(Bytes::from(RESPONSE_BODY)),
+            trailers: None,
+        })
         .unwrap()
 }
 
@@ -147,7 +152,7 @@ fn create_response_predicates()
 -> impl Predicate<Subject = <BenchResponse as CacheableResponse>::Subject> + Send + Sync {
     NeutralResponsePredicate::<InnerBody>::new()
         // Only cache 2xx successful responses
-        .status_code_class(StatusClass::Success)
+        .status(StatusClass::Success)
         // Require content-type header
         .header(ResponseHeaderOperation::Exist(
             "content-type".parse().unwrap(),
@@ -163,7 +168,7 @@ fn create_extractors() -> impl hitbox::Extractor<Subject = BenchRequest> + Send 
     let base = NeutralExtractor::<InnerBody>::new();
 
     // Method extractor
-    let with_method = base.method();
+    let with_method = base.method(MethodConfig::new());
 
     // Path extractor (extracts user_id)
     let with_path = with_method.path("/v1/users/{user_id}/orders");
@@ -214,6 +219,7 @@ fn create_policy() -> Arc<PolicyConfig> {
         stale: None,
         policy: Default::default(),
         concurrency: None,
+        tag_invalidation: Default::default(),
     }))
 }
 
@@ -238,7 +244,7 @@ fn create_response_predicates_with_body()
 
 /// Extend extractors with body jq extractor
 fn create_extractors_with_body() -> impl hitbox::Extractor<Subject = BenchRequest> + Send + Sync {
-    let jq_extraction = JqExtraction::compile(
+    let jq_extraction = JqExpression::compile(
         "{customer_id: .order.customer_id, shipping: .order.shipping_method}",
     )
     .unwrap();
@@ -625,7 +631,7 @@ fn bench_compare_composition_write(c: &mut Criterion) {
 #[derive(Debug, serde::Deserialize)]
 struct BenchConfig {
     backend: ConfigBackend,
-    endpoint: ConfigEndpoint,
+    endpoints: ConfigEndpoints,
 }
 
 /// Load configuration from YAML
@@ -636,6 +642,16 @@ fn load_config() -> BenchConfig {
 /// Load body configuration from YAML
 fn load_body_config() -> BenchConfig {
     serde_saphyr::from_str(REFERENCE_CONFIG_BODY).expect("Failed to parse body reference config")
+}
+
+/// Extract the first endpoint from a list of endpoint configurations.
+fn first_endpoint(endpoints: ConfigEndpoints) -> Endpoint<InnerBody, InnerBody> {
+    endpoints
+        .into_iter()
+        .next()
+        .expect("endpoints list must not be empty")
+        .into_endpoint()
+        .expect("Failed to create endpoint")
 }
 
 // Type alias for dynamic backend (must match the blanket impl in hitbox_backend)
@@ -657,10 +673,7 @@ fn bench_compare_request_predicates(c: &mut Criterion) {
 
     // Dynamic dispatch predicates (from config)
     let config = load_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_predicates = endpoint.request_predicates;
 
     group.bench_function("static", |b| {
@@ -691,10 +704,7 @@ fn bench_compare_response_predicates(c: &mut Criterion) {
 
     // Dynamic dispatch predicates (from config)
     let config = load_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_predicates = endpoint.response_predicates;
 
     group.bench_function("static", |b| {
@@ -727,10 +737,7 @@ fn bench_compare_extractors(c: &mut Criterion) {
 
     // Dynamic dispatch extractors (from config)
     let config = load_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_extractors = endpoint.extractors;
 
     group.bench_function("static", |b| {
@@ -805,11 +812,8 @@ fn bench_compare_cache_future_hit(c: &mut Criterion) {
         .backend
         .into_backend()
         .expect("Failed to create backend");
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
-    let dyn_policy = Arc::new(endpoint.policy.clone());
+    let endpoint = first_endpoint(config.endpoints);
+    let dyn_policy = Arc::clone(&endpoint.policy);
 
     // Pre-populate dynamic cache
     let request = CacheableHttpRequest::from_request(create_reference_request());
@@ -937,11 +941,8 @@ fn bench_compare_cache_future_miss(c: &mut Criterion) {
         .backend
         .into_backend()
         .expect("Failed to create backend");
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
-    let dyn_policy = Arc::new(endpoint.policy.clone());
+    let endpoint = first_endpoint(config.endpoints);
+    let dyn_policy = Arc::clone(&endpoint.policy);
     let dyn_backend_arc: Arc<DynBackend> = Arc::new(dyn_backend);
 
     // Use atomic counters for unique request IDs
@@ -975,7 +976,7 @@ fn bench_compare_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;
@@ -1012,7 +1013,7 @@ fn bench_compare_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;
@@ -1040,10 +1041,7 @@ fn bench_compare_body_request_predicates(c: &mut Criterion) {
 
     // Dynamic dispatch predicates (from body config)
     let config = load_body_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_predicates = endpoint.request_predicates;
 
     group.bench_function("static", |b| {
@@ -1074,10 +1072,7 @@ fn bench_compare_body_response_predicates(c: &mut Criterion) {
 
     // Dynamic dispatch predicates (from body config)
     let config = load_body_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_predicates = endpoint.response_predicates;
 
     group.bench_function("static", |b| {
@@ -1110,10 +1105,7 @@ fn bench_compare_body_extractors(c: &mut Criterion) {
 
     // Dynamic dispatch extractors (from body config)
     let config = load_body_config();
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
+    let endpoint = first_endpoint(config.endpoints);
     let dynamic_extractors = endpoint.extractors;
 
     group.bench_function("static", |b| {
@@ -1188,11 +1180,8 @@ fn bench_compare_body_cache_future_hit(c: &mut Criterion) {
         .backend
         .into_backend()
         .expect("Failed to create backend");
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
-    let dyn_policy = Arc::new(endpoint.policy.clone());
+    let endpoint = first_endpoint(config.endpoints);
+    let dyn_policy = Arc::clone(&endpoint.policy);
 
     // Pre-populate dynamic cache
     let request = CacheableHttpRequest::from_request(create_reference_request());
@@ -1319,11 +1308,8 @@ fn bench_compare_body_cache_future_miss(c: &mut Criterion) {
         .backend
         .into_backend()
         .expect("Failed to create backend");
-    let endpoint = config
-        .endpoint
-        .into_endpoint::<InnerBody, InnerBody>()
-        .expect("Failed to create endpoint");
-    let dyn_policy = Arc::new(endpoint.policy.clone());
+    let endpoint = first_endpoint(config.endpoints);
+    let dyn_policy = Arc::clone(&endpoint.policy);
     let dyn_backend_arc: Arc<DynBackend> = Arc::new(dyn_backend);
 
     // Use atomic counters for unique request IDs
@@ -1357,7 +1343,7 @@ fn bench_compare_body_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;
@@ -1394,7 +1380,7 @@ fn bench_compare_body_cache_future_miss(c: &mut Criterion) {
                     .header("authorization", "Bearer token")
                     .header("x-tenant-id", "tenant-abc-123")
                     .header("x-idempotency-key", format!("idem-{}", unique_id))
-                    .body(BufferedBody::Complete(Some(Bytes::from(REQUEST_BODY))))
+                    .body(BufferedBody::Complete { data: Some(Bytes::from(REQUEST_BODY)), trailers: None })
                     .unwrap();
                 let request = CacheableHttpRequest::from_request(request);
                 let upstream = MockUpstream;

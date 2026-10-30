@@ -7,8 +7,8 @@ use http_body_util::Full;
 type TestBody = BufferedBody<Full<Bytes>>;
 
 async fn body_to_string(body: TestBody) -> String {
-    let bytes = body.collect().await.unwrap();
-    String::from_utf8_lossy(&bytes).to_string()
+    let collected = body.collect().await.unwrap();
+    String::from_utf8_lossy(&collected.data).to_string()
 }
 
 fn compare_responses(original: &Response<TestBody>, restored: &Response<TestBody>) -> Vec<String> {
@@ -62,23 +62,31 @@ async fn assert_responses_equal(original: Response<TestBody>, restored: Response
     let (original_parts, original_body) = original.into_parts();
     let (restored_parts, restored_body) = restored.into_parts();
 
-    let original_bytes = original_body.collect().await.unwrap();
-    let restored_bytes = restored_body.collect().await.unwrap();
+    let original_collected = original_body.collect().await.unwrap();
+    let restored_collected = restored_body.collect().await.unwrap();
 
-    if original_bytes != restored_bytes {
+    if original_collected.data != restored_collected.data {
         panic!(
             "Response body mismatch:\nExpected: {:?}\nGot: {:?}",
-            String::from_utf8_lossy(&original_bytes),
-            String::from_utf8_lossy(&restored_bytes)
+            String::from_utf8_lossy(&original_collected.data),
+            String::from_utf8_lossy(&restored_collected.data)
         );
     }
 
     let original = Response::from_parts(
         original_parts,
-        BufferedBody::Complete(Some(original_bytes.clone())),
+        BufferedBody::Complete {
+            data: Some(original_collected.data),
+            trailers: original_collected.trailers,
+        },
     );
-    let restored =
-        Response::from_parts(restored_parts, BufferedBody::Complete(Some(restored_bytes)));
+    let restored = Response::from_parts(
+        restored_parts,
+        BufferedBody::Complete {
+            data: Some(restored_collected.data),
+            trailers: restored_collected.trailers,
+        },
+    );
 
     let differences = compare_responses(&original, &restored);
 
@@ -488,4 +496,60 @@ async fn test_comparison_detects_multivalue_count_mismatch() {
         .append("set-cookie", HeaderValue::from_static("a=1"));
 
     assert_responses_equal(original, different).await;
+}
+
+#[tokio::test]
+async fn test_roundtrip_preserves_trailers() {
+    use http::HeaderMap;
+
+    // Build a response with trailers (simulating a gRPC response)
+    let mut trailer_map = HeaderMap::new();
+    trailer_map.insert("grpc-status", HeaderValue::from_static("0"));
+    trailer_map.insert("grpc-message", HeaderValue::from_static("OK"));
+
+    let response = Response::builder()
+        .status(200)
+        .header("content-type", "application/grpc")
+        .body(BufferedBody::Complete {
+            data: Some(Bytes::from("\x00\x00\x00\x00\x05hello")),
+            trailers: Some(trailer_map),
+        })
+        .unwrap();
+
+    let restored = roundtrip_test(response).await;
+
+    assert_eq!(restored.status(), StatusCode::OK);
+    assert_eq!(
+        restored.headers().get("content-type").unwrap(),
+        "application/grpc"
+    );
+
+    // Collect the restored body and verify trailers survived the roundtrip
+    let collected = restored.into_body().collect().await.unwrap();
+    assert_eq!(collected.data, Bytes::from("\x00\x00\x00\x00\x05hello"));
+    let trailers = collected
+        .trailers
+        .expect("Trailers should survive cache roundtrip");
+    assert_eq!(trailers.get("grpc-status").unwrap(), "0");
+    assert_eq!(trailers.get("grpc-message").unwrap(), "OK");
+}
+
+#[tokio::test]
+async fn test_roundtrip_without_trailers_still_works() {
+    // Ensure existing non-trailer responses still work (backwards compat)
+    let response = Response::builder()
+        .status(200)
+        .header("content-type", "text/plain")
+        .body(BufferedBody::Passthrough(Full::new(Bytes::from(
+            "no trailers here",
+        ))))
+        .unwrap();
+
+    let restored = roundtrip_test(response).await;
+
+    assert_eq!(restored.status(), StatusCode::OK);
+    let collected = restored.into_body().collect().await.unwrap();
+    assert_eq!(collected.data, Bytes::from("no trailers here"));
+    // No trailers expected
+    assert!(collected.trailers.is_none());
 }

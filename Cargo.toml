@@ -55,7 +55,7 @@ chrono = { version = "0.4", default-features = false, features = ["serde"] }
 # Error handling and utilities
 thiserror = "2"
 tracing = { version = "0.1", default-features = false }
-futures = { version = "0.3", default-features = false }
+futures = { version = "0.3", default-features = false, features = ["alloc"] }
 pin-project = "1"
 regex = "1"
 smol_str = { version = "0.3", features = ["serde"] }

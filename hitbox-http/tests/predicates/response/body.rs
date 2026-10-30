@@ -2,7 +2,7 @@ use bytes::Bytes;
 use hitbox::predicate::{Predicate, PredicateResult};
 use hitbox_http::predicates::NeutralResponsePredicate;
 use hitbox_http::predicates::response::body::BodyPredicate;
-use hitbox_http::predicates::response::{JqExpression, JqOperation, Operation};
+use hitbox_http::predicates::response::{JqExpression, JqOperation, Operation, PlainOperation};
 use hitbox_http::{BufferedBody, CacheableHttpResponse};
 use http::Response;
 use serde_json::json;
@@ -227,4 +227,62 @@ async fn test_response_body_jq_array_map() {
 
     let prediction = predicate.check(response).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+}
+
+#[cfg(test)]
+mod constructor_tests {
+    use super::*;
+    use http_body_util::Full;
+
+    #[tokio::test]
+    async fn test_limit_constructor() {
+        // cacheable (within limit)
+        let body = Full::new(Bytes::from("small body"));
+        let response = CacheableHttpResponse::from_response(
+            Response::builder()
+                .body(BufferedBody::Passthrough(body))
+                .unwrap(),
+        );
+        let predicate = NeutralResponsePredicate::new().body(Operation::limit(1024));
+        let prediction = predicate.check(response).await;
+        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+
+        // non-cacheable (exceeds limit)
+        let body = Full::new(Bytes::from("a".repeat(100)));
+        let response = CacheableHttpResponse::from_response(
+            Response::builder()
+                .body(BufferedBody::Passthrough(body))
+                .unwrap(),
+        );
+        let predicate = NeutralResponsePredicate::new().body(Operation::limit(10));
+        let prediction = predicate.check(response).await;
+        assert!(matches!(prediction, PredicateResult::NonCacheable(_)));
+    }
+
+    #[tokio::test]
+    async fn test_plain_and_jq_constructors() {
+        // plain constructor
+        let body = Full::new(Bytes::from(r#"{"success":true}"#));
+        let response = CacheableHttpResponse::from_response(
+            Response::builder()
+                .body(BufferedBody::Passthrough(body))
+                .unwrap(),
+        );
+        let predicate = NeutralResponsePredicate::new()
+            .body(Operation::plain(PlainOperation::Contains("success".into())));
+        let prediction = predicate.check(response).await;
+        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+
+        // jq constructor
+        let body = Full::new(Bytes::from(r#"{"status":"ok"}"#));
+        let response = CacheableHttpResponse::from_response(
+            Response::builder()
+                .body(BufferedBody::Passthrough(body))
+                .unwrap(),
+        );
+        let predicate = NeutralResponsePredicate::new()
+            .body(Operation::jq(".status", JqOperation::Eq(json!("ok"))).unwrap());
+        let prediction = predicate.check(response).await;
+        assert!(matches!(prediction, PredicateResult::Cacheable(_)));
+    }
 }

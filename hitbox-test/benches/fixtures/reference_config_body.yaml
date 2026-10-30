@@ -11,52 +11,53 @@ backend:
     compression:
       type: Disabled
 
-endpoint:
-  request:
-    - Method: POST
-    - Path: "/v1/users/{user_id}/orders"
-    - Header:
-        authorization:
-          exist: true
-    - Header:
-        x-tenant-id:
-          exist: true
-    - Header:
-        x-idempotency-key:
-          exist: true
-    - Body:
-        jq:
-          expression: ".order.customer_id"
-          exist: true
+endpoints:
+  - name: "bench-endpoint-body"
+    request:
+      - Method: POST
+      - Path: "/v1/users/{user_id}/orders"
+      - Header:
+          authorization:
+            exist: true
+      - Header:
+          x-tenant-id:
+            exist: true
+      - Header:
+          x-idempotency-key:
+            exist: true
+      - Body:
+          jq:
+            expression: ".order.customer_id"
+            exist: true
 
-  response:
-    - Status:
-        class: Success
-    - Header:
-        content-type:
-          exist: true
-    - Header:
-        cache-control:
-          exist: true
-    - Body:
-        jq:
-          expression: ".data | type"
-          eq: "array"
+    response:
+      - Status:
+          class: Success
+      - Header:
+          content-type:
+            exist: true
+      - Header:
+          cache-control:
+            exist: true
+      - Body:
+          jq:
+            expression: ".data | type"
+            eq: "array"
 
-  extractors:
-    - Method:
-    - Path: "/v1/users/{user_id}/orders"
-    - Query: include
-    - Query: fields
-    - Header: x-tenant-id
-    - Header:
-        name: authorization
-        transform:
-          - Hash
-    - Header: x-idempotency-key
-    - Body:
-        jq: "{customer_id: .order.customer_id, shipping: .order.shipping_method}"
+    extractors:
+      - Method:
+      - Path: "/v1/users/{user_id}/orders"
+      - Query: include
+      - Query: fields
+      - Header: x-tenant-id
+      - Header:
+          name: authorization
+          transform:
+            - Hash
+      - Header: x-idempotency-key
+      - Body:
+          jq: "{customer_id: .order.customer_id, shipping: .order.shipping_method}"
 
-  policy:
-    Enabled:
-      ttl: 300s
+    policy:
+      Enabled:
+        ttl: 300s

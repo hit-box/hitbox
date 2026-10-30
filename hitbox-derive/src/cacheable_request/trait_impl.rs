@@ -24,26 +24,58 @@ impl<'a> ToTokens for CacheableRequestImpl<'a> {
 
         let expanded = quote! {
             impl #impl_generics hitbox::CacheableRequest for #name #ty_generics #where_clause {
-                async fn cache_policy<__P, __E>(
+                type CachePolicyFuture<'__a, __P, __E, __TE> = ::std::pin::Pin<
+                    ::std::boxed::Box<
+                        dyn ::std::future::Future<
+                            Output = (
+                                hitbox::RequestCachePolicy<Self>,
+                                ::std::vec::Vec<hitbox::tag::CacheTag>,
+                            )
+                        > + Send + '__a
+                    >
+                >
+                where
+                    Self: '__a,
+                    __P: hitbox::predicate::Predicate<Subject = Self> + Send + Sync + '__a,
+                    __E: hitbox::Extractor<Subject = Self> + Send + Sync + '__a,
+                    __TE: hitbox::tag::TagExtractor<Subject = Self> + Send + Sync + '__a;
+
+                fn cache_policy<'__a, __P, __E, __TE>(
                     self,
                     predicates: __P,
                     extractors: __E,
-                ) -> hitbox::RequestCachePolicy<Self>
+                    tag_extractor: ::std::option::Option<__TE>,
+                ) -> Self::CachePolicyFuture<'__a, __P, __E, __TE>
                 where
-                    __P: hitbox::predicate::Predicate<Subject = Self> + Send + Sync,
-                    __E: hitbox::Extractor<Subject = Self> + Send + Sync,
+                    Self: '__a,
+                    __P: hitbox::predicate::Predicate<Subject = Self> + Send + Sync + '__a,
+                    __E: hitbox::Extractor<Subject = Self> + Send + Sync + '__a,
+                    __TE: hitbox::tag::TagExtractor<Subject = Self> + Send + Sync + '__a,
                 {
-                    match predicates.check(self).await {
-                        hitbox::predicate::PredicateResult::Cacheable(subject) => {
-                            let (subject, key) = extractors.get(subject).await.into_cache_key();
-                            hitbox::CachePolicy::Cacheable(
-                                hitbox::CacheablePolicyData::new(key, subject)
-                            )
+                    ::std::boxed::Box::pin(async move {
+                        match predicates.check(self).await {
+                            hitbox::predicate::PredicateResult::Cacheable(subject) => {
+                                let (subject, key) = extractors.get(subject).await.into_cache_key();
+                                let (subject, tags) = match tag_extractor {
+                                    ::std::option::Option::Some(__te) => {
+                                        __te.extract_tags(subject).await
+                                    }
+                                    ::std::option::Option::None => {
+                                        (subject, ::std::vec::Vec::new())
+                                    }
+                                };
+                                (
+                                    hitbox::CachePolicy::Cacheable(
+                                        hitbox::CacheablePolicyData::new(key, subject)
+                                    ),
+                                    tags,
+                                )
+                            }
+                            hitbox::predicate::PredicateResult::NonCacheable(subject) => {
+                                (hitbox::CachePolicy::NonCacheable(subject), ::std::vec::Vec::new())
+                            }
                         }
-                        hitbox::predicate::PredicateResult::NonCacheable(subject) => {
-                            hitbox::CachePolicy::NonCacheable(subject)
-                        }
-                    }
+                    })
                 }
             }
         };

@@ -1,19 +1,23 @@
+pub use crate::predicates::response::predicate;
+
 use std::fmt::Debug;
 use std::future::Ready;
 
 use bytes::Bytes;
-use chrono::Utc;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use hitbox::{
-    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, predicate::PredicateResult,
+    CachePolicy, CacheValue, CacheableResponse, EntityPolicyConfig, Predicate, ResponseCachePolicy,
+    predicate::PredicateResult,
+    tag::{CacheTag, TagExtractor},
 };
-use http::{HeaderMap, Response, response::Parts};
+use http::{Extensions, HeaderMap, Response, response::Parts};
 use hyper::body::Body as HttpBody;
 use serde::{Deserialize, Serialize};
 
 use crate::CacheableSubject;
 use crate::body::BufferedBody;
+use crate::jq::ParsedBody;
 use crate::predicates::header::HasHeaders;
 use crate::predicates::version::HasVersion;
 
@@ -90,7 +94,9 @@ where
     ///
     /// Use this after cache policy evaluation to send the response to the client.
     pub fn into_response(self) -> Response<BufferedBody<ResBody>> {
-        Response::from_parts(self.parts, self.body)
+        let mut parts = self.parts;
+        ParsedBody::remove(&mut parts.extensions);
+        Response::from_parts(parts, self.body)
     }
 }
 
@@ -107,6 +113,10 @@ where
 
     fn from_parts(parts: Self::Parts, body: BufferedBody<Self::Body>) -> Self {
         Self { parts, body }
+    }
+
+    fn extensions_mut(parts: &mut Self::Parts) -> &mut Extensions {
+        &mut parts.extensions
     }
 }
 
@@ -394,6 +404,10 @@ pub struct SerializableHttpResponse {
     #[serde(with = "http_serde::header_map")]
     #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_header_map::AsHeaderVec))]
     headers: HeaderMap,
+    /// HTTP/2 trailers (e.g., gRPC's `grpc-status`). Empty for HTTP/1.1 responses.
+    #[serde(with = "http_serde::header_map", default)]
+    #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_header_map::AsHeaderVec))]
+    trailers: HeaderMap,
 }
 
 impl<ResBody> CacheableResponse for CacheableHttpResponse<ResBody>
@@ -407,31 +421,38 @@ where
     type IntoCachedFuture = BoxFuture<'static, CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = Ready<Self>;
 
-    async fn cache_policy<P>(
+    async fn cache_policy<P, TE>(
         self,
         predicates: P,
+        tag_extractor: Option<TE>,
         config: &EntityPolicyConfig,
-    ) -> hitbox::ResponseCachePolicy<Self>
+    ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where
-        P: hitbox::Predicate<Subject = Self::Subject> + Send + Sync,
+        P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
     {
         match predicates.check(self).await {
-            PredicateResult::Cacheable(cacheable) => match cacheable.into_cached().await {
-                CachePolicy::Cacheable(res) => CachePolicy::Cacheable(CacheValue::new(
-                    res,
-                    config.ttl.map(|duration| Utc::now() + duration),
-                    config.stale_ttl.map(|duration| Utc::now() + duration),
-                )),
-                CachePolicy::NonCacheable(res) => CachePolicy::NonCacheable(res),
-            },
-            PredicateResult::NonCacheable(res) => CachePolicy::NonCacheable(res),
+            PredicateResult::Cacheable(cacheable) => {
+                let (cacheable, tags) = match tag_extractor {
+                    Some(te) => te.extract_tags(cacheable).await,
+                    None => (cacheable, Vec::new()),
+                };
+                match cacheable.into_cached().await {
+                    CachePolicy::Cacheable(res) => (
+                        CachePolicy::Cacheable(CacheValue::from_config(res, config)),
+                        tags,
+                    ),
+                    CachePolicy::NonCacheable(res) => (CachePolicy::NonCacheable(res), tags),
+                }
+            }
+            PredicateResult::NonCacheable(res) => (CachePolicy::NonCacheable(res), Vec::new()),
         }
     }
 
     fn into_cached(self) -> Self::IntoCachedFuture {
         async move {
-            let body_bytes = match self.body.collect().await {
-                Ok(bytes) => bytes,
+            let collected = match self.body.collect().await {
+                Ok(collected) => collected,
                 Err(error_body) => {
                     // If collection fails, return NonCacheable with error body
                     return CachePolicy::NonCacheable(CacheableHttpResponse {
@@ -441,20 +462,27 @@ where
                 }
             };
 
-            // We can store the HeaderMap directly, including pseudo-headers
-            // HeaderMap is designed to handle pseudo-headers and http-serde will serialize them correctly
             CachePolicy::Cacheable(SerializableHttpResponse {
                 status: self.parts.status,
                 version: self.parts.version,
-                body: body_bytes,
+                body: collected.data,
                 headers: self.parts.headers,
+                trailers: collected.trailers.unwrap_or_default(),
             })
         }
         .boxed()
     }
 
     fn from_cached(cached: Self::Cached) -> Self::FromCachedFuture {
-        let body = BufferedBody::Complete(Some(cached.body));
+        let trailers = if cached.trailers.is_empty() {
+            None
+        } else {
+            Some(cached.trailers)
+        };
+        let body = BufferedBody::Complete {
+            data: Some(cached.body),
+            trailers,
+        };
         let mut response = Response::new(body);
         *response.status_mut() = cached.status;
         *response.version_mut() = cached.version;

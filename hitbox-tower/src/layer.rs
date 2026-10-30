@@ -11,22 +11,18 @@
 //! use hitbox::policy::PolicyConfig;
 //! use hitbox_tower::Cache;
 //! use hitbox_moka::MokaBackend;
-//! use hitbox_http::extractors::Method;
-//! use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+//! use hitbox_http::extractors::{MethodConfig, MethodExtractor};
+//! use hitbox_http::request;
 //!
 //! # use http_body_util::Full;
 //! # type Body = Full<bytes::Bytes>;
 //! let config = Config::builder()
-//!     .request_predicate(NeutralRequestPredicate::new())
-//!     .response_predicate(NeutralResponsePredicate::new())
-//!     .extractor(Method::new())
+//!     .request_predicate(request::predicate::<Body>())
+//!     .response_predicate(hitbox_http::response::predicate::<Body>())
+//!     .extractor(request::extractor::<Body>().method(MethodConfig::new()))
 //!     .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
 //!     .build();
-//! # let _: Config<
-//! #     hitbox_http::predicates::NeutralRequestPredicate<Body>,
-//! #     hitbox_http::predicates::NeutralResponsePredicate<Body>,
-//! #     Method<hitbox_http::extractors::NeutralExtractor<Body>>,
-//! # > = config;
+//!
 //!
 //! let cache_layer = Cache::builder()
 //!     .backend(MokaBackend::builder().max_entries(1000).build())
@@ -76,21 +72,17 @@ pub struct NotSet;
 /// use hitbox_tower::Cache;
 /// use hitbox_moka::MokaBackend;
 /// use hitbox::Config;
-/// use hitbox_http::extractors::Method;
-/// use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+/// use hitbox_http::extractors::{MethodConfig, MethodExtractor};
+/// use hitbox_http::request;
 /// # use http_body_util::Full;
 /// # type Body = Full<bytes::Bytes>;
 ///
 /// let config = Config::builder()
-///     .request_predicate(NeutralRequestPredicate::new())
-///     .response_predicate(NeutralResponsePredicate::new())
-///     .extractor(Method::new())
+///     .request_predicate(request::predicate::<Body>())
+///     .response_predicate(hitbox_http::response::predicate::<Body>())
+///     .extractor(request::extractor::<Body>().method(MethodConfig::new()))
 ///     .build();
-/// # let _: Config<
-/// #     NeutralRequestPredicate<Body>,
-/// #     NeutralResponsePredicate<Body>,
-/// #     Method<hitbox_http::extractors::NeutralExtractor<Body>>,
-/// # > = config;
+///
 ///
 /// let cache_layer = Cache::builder()
 ///     .backend(MokaBackend::builder().max_entries(1000).build())
@@ -150,21 +142,17 @@ impl Cache<NotSet, NotSet, NoopConcurrencyManager, DisabledOffload> {
     /// use hitbox_tower::Cache;
     /// use hitbox_moka::MokaBackend;
     /// use hitbox::Config;
-    /// use hitbox_http::extractors::Method;
-    /// use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+    /// use hitbox_http::extractors::{MethodConfig, MethodExtractor};
+    /// use hitbox_http::request;
     /// # use http_body_util::Full;
     /// # type Body = Full<bytes::Bytes>;
     ///
     /// let config = Config::builder()
-    ///     .request_predicate(NeutralRequestPredicate::new())
-    ///     .response_predicate(NeutralResponsePredicate::new())
-    ///     .extractor(Method::new())
+    ///     .request_predicate(request::predicate::<Body>())
+    ///     .response_predicate(hitbox_http::response::predicate::<Body>())
+    ///     .extractor(request::extractor::<Body>().method(MethodConfig::new()))
     ///     .build();
-    /// # let _: Config<
-    /// #     NeutralRequestPredicate<Body>,
-    /// #     NeutralResponsePredicate<Body>,
-    /// #     Method<hitbox_http::extractors::NeutralExtractor<Body>>,
-    /// # > = config;
+    ///
     ///
     /// let cache_layer = Cache::builder()
     ///     .backend(MokaBackend::builder().max_entries(1000).build())
@@ -198,23 +186,19 @@ impl Cache<NotSet, NotSet, NoopConcurrencyManager, DisabledOffload> {
 /// use hitbox_moka::MokaBackend;
 /// use hitbox::Config;
 /// use hitbox::policy::PolicyConfig;
-/// use hitbox_http::extractors::Method;
-/// use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+/// use hitbox_http::extractors::{MethodConfig, MethodExtractor};
+/// use hitbox_http::request;
 /// use http::header::HeaderName;
 /// # use http_body_util::Full;
 /// # type Body = Full<bytes::Bytes>;
 ///
 /// let config = Config::builder()
-///     .request_predicate(NeutralRequestPredicate::new())
-///     .response_predicate(NeutralResponsePredicate::new())
-///     .extractor(Method::new())
+///     .request_predicate(request::predicate::<Body>())
+///     .response_predicate(hitbox_http::response::predicate::<Body>())
+///     .extractor(request::extractor::<Body>().method(MethodConfig::new()))
 ///     .policy(PolicyConfig::builder().ttl(Duration::from_secs(300)).build())
 ///     .build();
-/// # let _: Config<
-/// #     NeutralRequestPredicate<Body>,
-/// #     NeutralResponsePredicate<Body>,
-/// #     Method<hitbox_http::extractors::NeutralExtractor<Body>>,
-/// # > = config;
+///
 ///
 /// let layer = Cache::builder()
 ///     .backend(MokaBackend::builder().max_entries(10_000).build())
@@ -294,22 +278,18 @@ impl<B, C, CM, O> CacheBuilder<B, C, CM, O> {
     /// use hitbox_moka::MokaBackend;
     /// use hitbox::Config;
     /// use hitbox::policy::PolicyConfig;
-    /// use hitbox_http::extractors::Method;
-    /// use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
+    /// use hitbox_http::extractors::{MethodConfig, MethodExtractor};
+    /// use hitbox_http::request;
     /// # use http_body_util::Full;
     /// # type Body = Full<bytes::Bytes>;
     ///
     /// let config = Config::builder()
-    ///     .request_predicate(NeutralRequestPredicate::new())
-    ///     .response_predicate(NeutralResponsePredicate::new())
-    ///     .extractor(Method::new())
+    ///     .request_predicate(request::predicate::<Body>())
+    ///     .response_predicate(hitbox_http::response::predicate::<Body>())
+    ///     .extractor(request::extractor::<Body>().method(MethodConfig::new()))
     ///     .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
     ///     .build();
-    /// # let _: Config<
-    /// #     NeutralRequestPredicate<Body>,
-    /// #     NeutralResponsePredicate<Body>,
-    /// #     Method<hitbox_http::extractors::NeutralExtractor<Body>>,
-    /// # > = config;
+    ///
     ///
     /// let layer = Cache::builder()
     ///     .backend(MokaBackend::builder().max_entries(1000).build())

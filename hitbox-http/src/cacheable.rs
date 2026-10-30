@@ -1,3 +1,4 @@
+use http::Extensions;
 use hyper::body::Body as HttpBody;
 
 use crate::BufferedBody;
@@ -53,4 +54,10 @@ pub trait CacheableSubject {
     ///
     /// This is the inverse of [`into_parts`](Self::into_parts).
     fn from_parts(parts: Self::Parts, body: BufferedBody<Self::Body>) -> Self;
+
+    /// Returns the extensions stored in the metadata.
+    ///
+    /// Body predicates and extractors keep per-subject state here, such as the
+    /// body parsed for jq, so it is computed once per subject.
+    fn extensions_mut(parts: &mut Self::Parts) -> &mut Extensions;
 }

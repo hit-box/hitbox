@@ -42,10 +42,10 @@ pub mod metrics;
 pub use error::CacheError;
 
 pub use hitbox_core::{
-    And, BackendLabel, CacheKey, CachePolicy, CacheState, CacheValue, CacheablePolicyData,
-    CacheableRequest, CacheableResponse, DisabledOffload, EntityPolicyConfig, Extractor, KeyPart,
-    KeyParts, Neutral, Not, Offload, Or, Predicate, PredicateExt, Raw, RequestCachePolicy,
-    ResponseCachePolicy,
+    And, BackendLabel, CacheKey, CachePolicy, CacheState, CacheValue, Cacheable,
+    CacheablePolicyData, CacheableRequest, CacheableResponse, DisabledOffload, EntityPolicyConfig,
+    Extractor, KeyPart, KeyParts, Neutral, Not, Offload, OffloadKey, Or, Predicate, PredicateExt,
+    Raw, RequestCachePolicy, ResponseCachePolicy, Upstream,
 };
 
 /// Hidden re-export of serde for derive macro generated code.
@@ -73,8 +73,9 @@ pub mod context;
 /// the [`OffloadManager`](offload::OffloadManager) for handling these background tasks.
 pub mod offload;
 
-pub use config::{CacheConfig, Config, ConfigBuilder, NotSet};
+pub use config::{Config, ConfigBuilder, NotSet, SelectiveConfig};
 pub use context::{BoxContext, CacheContext, CacheStatus, CacheStatusExt, Context, ResponseSource};
+pub use hitbox_core::{CacheConfig, CacheConfigs};
 
 /// Policy configuration for cache behavior.
 ///
@@ -103,6 +104,14 @@ pub mod predicate {
 /// Extractors pull components from requests to build unique cache keys.
 pub mod extractor {
     pub use hitbox_core::Extractor;
+}
+
+/// Cache tag types and tag extractors.
+///
+/// Re-exports the tag invalidation primitives from
+/// [`hitbox-core`](https://docs.rs/hitbox-core).
+pub mod tag {
+    pub use hitbox_core::tag::*;
 }
 
 /// The `hitbox` prelude.

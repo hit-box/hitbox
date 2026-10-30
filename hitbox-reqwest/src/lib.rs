@@ -16,9 +16,9 @@ pub use hitbox_http::{
 pub use reqwest::Body as ReqwestBody;
 
 // Re-export common types
-pub use hitbox::config::CacheConfig;
+pub use hitbox::config::{CacheConfig, CacheConfigs};
 pub use hitbox::policy::PolicyConfig;
-pub use hitbox::{Config, ConfigBuilder};
+pub use hitbox::{Config, ConfigBuilder, SelectiveConfig};
 pub use hitbox_core::DisabledOffload;
 
 // Re-export concurrency types

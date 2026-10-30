@@ -2,7 +2,7 @@
 
 use std::future::Future;
 
-use hitbox_core::Upstream;
+use hitbox::Upstream;
 
 /// Wrapper that adapts an async function to the [`Upstream`] trait.
 ///
@@ -11,11 +11,11 @@ use hitbox_core::Upstream;
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
 /// use hitbox_fn::FnUpstream;
 ///
-/// async fn fetch_data(id: u64) -> Data {
-///     // fetch from database
+/// async fn fetch_data(id: u64) -> String {
+///     format!("data_{id}")
 /// }
 ///
 /// let upstream = FnUpstream::new(fetch_data);
@@ -39,7 +39,7 @@ where
     type Response = Res;
     type Future = Fut;
 
-    fn call(&mut self, req: Args) -> Self::Future {
+    fn call(mut self, req: Args) -> Self::Future {
         (self.func)(req)
     }
 }

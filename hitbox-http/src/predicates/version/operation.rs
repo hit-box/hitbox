@@ -33,6 +33,25 @@ pub enum Operation {
 }
 
 impl Operation {
+    /// Match a specific HTTP version.
+    pub fn eq(version: Version) -> Self {
+        Operation::Eq(version)
+    }
+
+    /// Match any of the specified HTTP versions.
+    pub fn any(versions: Vec<Version>) -> Self {
+        Operation::In(versions)
+    }
+}
+
+impl From<Version> for Operation {
+    /// Shorthand for `Operation::eq(version)`.
+    fn from(version: Version) -> Self {
+        Operation::Eq(version)
+    }
+}
+
+impl Operation {
     /// Check if the operation matches the given version
     pub fn check(&self, version: Version) -> bool {
         match self {

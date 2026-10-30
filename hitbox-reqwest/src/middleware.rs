@@ -6,15 +6,15 @@
 //!
 //! See the [crate-level documentation](crate) for usage examples.
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use hitbox::CacheStatusExt;
 use hitbox::backend::CacheBackend;
 use hitbox::concurrency::{ConcurrencyManager, NoopConcurrencyManager};
-use hitbox::config::CacheConfig;
-use hitbox::fsm::CacheFuture;
-use hitbox_core::DisabledOffload;
+use hitbox::fsm::SelectiveCacheFuture;
+use hitbox_core::{CacheConfigs, DisabledOffload};
 use hitbox_http::{
     BufferedBody, CacheableHttpRequest, CacheableHttpResponse, DEFAULT_CACHE_STATUS_HEADER,
 };
@@ -91,18 +91,17 @@ where
     }
 }
 
+use async_trait::async_trait;
+
 #[async_trait]
 impl<B, C, CM> Middleware for CacheMiddleware<B, C, CM>
 where
     B: CacheBackend + Send + Sync + 'static,
-    C: CacheConfig<CacheableHttpRequest<reqwest::Body>, CacheableHttpResponse<reqwest::Body>>
+    C: CacheConfigs<CacheableHttpRequest<reqwest::Body>, CacheableHttpResponse<reqwest::Body>>
         + Clone
         + Send
         + Sync
         + 'static,
-    C::RequestPredicate: Clone + Send + Sync + 'static,
-    C::ResponsePredicate: Clone + Send + Sync + 'static,
-    C::Extractor: Clone + Send + Sync + 'static,
     CM: ConcurrencyManager<Result<CacheableHttpResponse<reqwest::Body>>>
         + Clone
         + Send
@@ -128,30 +127,17 @@ where
         // Create upstream wrapper
         let upstream = ReqwestUpstream::new(next.clone(), extensions.clone());
 
-        // Create CacheFuture with DisabledOffload (no background revalidation)
-        // This allows us to use non-'static lifetimes
-        let cache_future: CacheFuture<
-            '_,
-            B,
-            CacheableHttpRequest<reqwest::Body>,
-            Result<CacheableHttpResponse<reqwest::Body>>,
-            ReqwestUpstream<'_>,
-            C::RequestPredicate,
-            C::ResponsePredicate,
-            C::Extractor,
-            CM,
-            DisabledOffload,
-        > = CacheFuture::new(
-            self.backend.clone(),
-            cacheable_req,
-            upstream,
-            self.configuration.request_predicates(),
-            self.configuration.response_predicates(),
-            self.configuration.extractors(),
-            Arc::new(self.configuration.policy().clone()),
-            DisabledOffload,
-            self.concurrency_manager.clone(),
-        );
+        // Create the cache future and box it to erase the problematic types
+        // before capturing in the async_trait's boxed future
+        let cache_future: Pin<Box<dyn Future<Output = _> + Send + '_>> =
+            Box::pin(SelectiveCacheFuture::new(
+                self.configuration.clone(),
+                self.backend.clone(),
+                cacheable_req,
+                upstream,
+                DisabledOffload,
+                self.concurrency_manager.clone(),
+            ));
 
         // Execute cache future
         let (response, cache_context) = cache_future.await;

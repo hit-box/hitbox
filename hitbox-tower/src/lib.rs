@@ -11,8 +11,8 @@ pub mod service;
 pub mod upstream;
 
 pub use ::http::{Method, StatusCode};
-pub use hitbox::config::CacheConfig;
-pub use hitbox::{Config, ConfigBuilder};
+pub use hitbox::config::{CacheConfig, CacheConfigs};
+pub use hitbox::{Config, ConfigBuilder, SelectiveConfig};
 pub use hitbox_http::DEFAULT_CACHE_STATUS_HEADER;
 pub use layer::{Cache, CacheBuilder, NotSet};
 pub use upstream::TowerUpstream;

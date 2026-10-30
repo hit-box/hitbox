@@ -251,6 +251,9 @@ pub trait Format: std::fmt::Debug + Send + Sync {
     /// Serializes a value through a callback.
     ///
     /// Creates a serializer, passes it to the callback, and returns the serialized bytes.
+    ///
+    /// Return a buffer without spare capacity. In-process backends store it
+    /// as is, so spare capacity uses memory that their byte limits do not count.
     fn with_serializer(
         &self,
         f: &mut dyn FnMut(&mut FormatSerializer) -> Result<(), FormatError>,
@@ -375,5 +378,38 @@ impl Format for std::sync::Arc<dyn Format> {
 
     fn format_type_id(&self) -> FormatTypeId {
         (**self).format_type_id()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hitbox_core::CacheContext;
+
+    use super::*;
+
+    /// A large field followed by a small one, so the buffer grows past the
+    /// serialized size while the small field is written.
+    fn value() -> Vec<String> {
+        vec!["x".repeat(100_000), "tail".to_owned()]
+    }
+
+    /// Length of the serialized value and capacity of the allocation behind it.
+    fn len_and_capacity(format: &dyn Format) -> (usize, usize) {
+        let raw = format
+            .serialize(&value(), &CacheContext::default())
+            .unwrap();
+        let len = raw.len();
+        let capacity = raw.try_into_mut().expect("buffer is not shared").capacity();
+        (len, capacity)
+    }
+
+    #[test]
+    fn serialized_buffers_have_no_spare_capacity() {
+        let spare: Vec<_> = [&BincodeFormat as &dyn Format, &JsonFormat, &RonFormat]
+            .into_iter()
+            .map(|format| (format, len_and_capacity(format)))
+            .filter(|(_, (len, capacity))| capacity != len)
+            .collect();
+        assert!(spare.is_empty(), "(format, (len, capacity)): {spare:?}");
     }
 }

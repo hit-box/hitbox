@@ -1,4 +1,4 @@
-use crate::fsm::world::{CacheState, FsmWorld};
+use crate::fsm::world::{CacheState, FsmConfig, FsmWorld};
 use anyhow::{Error, anyhow};
 use cucumber::given;
 use hitbox::policy::ConcurrencyLimit;
@@ -180,6 +180,77 @@ fn layer_stale(world: &mut FsmWorld, layer: u8, value: u32) -> Result<(), Error>
         1 => world.composition.l1_state = state,
         2 => world.composition.l2_state = state,
         _ => return Err(anyhow::anyhow!("Unknown layer: L{}", layer)),
+    }
+    Ok(())
+}
+
+// =============================================================================
+// Selective Config Steps
+// =============================================================================
+
+fn ensure_selective_config(world: &mut FsmWorld, index: usize) -> Result<(), Error> {
+    if index == 0 {
+        return Err(anyhow!("Config index must be 1-based"));
+    }
+    if index > world.selective_configs.len() {
+        return Err(anyhow!(
+            "Config {} not initialized. Use 'Given N selective configs' first.",
+            index
+        ));
+    }
+    Ok(())
+}
+
+#[given(expr = "{int} selective configs")]
+fn selective_configs(world: &mut FsmWorld, count: usize) -> Result<(), Error> {
+    world.selective_configs = (0..count)
+        .map(|_| FsmConfig {
+            cache_enabled: true,
+            request_cacheable: true,
+            response_cacheable: true,
+            concurrency: world.config.concurrency,
+            ttl: world.config.ttl,
+            stale: world.config.stale,
+        })
+        .collect();
+    Ok(())
+}
+
+#[given(expr = "config {int} request is cacheable")]
+fn selective_request_cacheable(world: &mut FsmWorld, index: usize) -> Result<(), Error> {
+    ensure_selective_config(world, index)?;
+    world.selective_configs[index - 1].request_cacheable = true;
+    Ok(())
+}
+
+#[given(expr = "config {int} request is non-cacheable")]
+fn selective_request_non_cacheable(world: &mut FsmWorld, index: usize) -> Result<(), Error> {
+    ensure_selective_config(world, index)?;
+    world.selective_configs[index - 1].request_cacheable = false;
+    Ok(())
+}
+
+#[given(expr = "config {int} response is cacheable")]
+fn selective_response_cacheable(world: &mut FsmWorld, index: usize) -> Result<(), Error> {
+    ensure_selective_config(world, index)?;
+    world.selective_configs[index - 1].response_cacheable = true;
+    Ok(())
+}
+
+#[given(expr = "config {int} response is non-cacheable")]
+fn selective_response_non_cacheable(world: &mut FsmWorld, index: usize) -> Result<(), Error> {
+    ensure_selective_config(world, index)?;
+    world.selective_configs[index - 1].response_cacheable = false;
+    Ok(())
+}
+
+#[given(expr = "config {int} cache policy is {string}")]
+fn selective_cache_policy(world: &mut FsmWorld, index: usize, policy: String) -> Result<(), Error> {
+    ensure_selective_config(world, index)?;
+    match policy.as_str() {
+        "Enabled" => world.selective_configs[index - 1].cache_enabled = true,
+        "Disabled" => world.selective_configs[index - 1].cache_enabled = false,
+        _ => return Err(anyhow!("Unknown cache policy: {}", policy)),
     }
     Ok(())
 }

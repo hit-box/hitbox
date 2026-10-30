@@ -8,13 +8,15 @@
 //! Extract a single header:
 //!
 //! ```
-//! use hitbox_http::extractors::{Method, header::HeaderExtractor};
+//! use hitbox_http::extractors::{self, MethodConfig, MethodExtractor};
+//! use hitbox_http::extractors::header::HeaderExtractor;
 //!
 //! # use bytes::Bytes;
 //! # use http_body_util::Empty;
-//! # use hitbox_http::extractors::{NeutralExtractor, header::Header};
-//! let extractor = Method::new()
-//!     .header("x-api-key".to_string());
+//! # use hitbox_http::extractors::{NeutralExtractor, Method, header::Header};
+//! let extractor = extractors::extractor::<Empty<Bytes>>()
+//!     .method(MethodConfig::new())
+//!     .header("x-api-key");
 //! # let _: &Header<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
 //! ```
 
@@ -23,7 +25,6 @@ use hitbox::{Extractor, KeyPart, KeyParts};
 use http::HeaderValue;
 use regex::Regex;
 
-use super::NeutralExtractor;
 pub use super::transform::Transform;
 use super::transform::apply_transform_chain;
 use crate::CacheableHttpRequest;
@@ -39,6 +40,18 @@ pub enum NameSelector {
     Starts(String),
 }
 
+impl NameSelector {
+    /// Select by exact name.
+    pub fn exact(name: impl Into<String>) -> Self {
+        NameSelector::Exact(name.into())
+    }
+
+    /// Select by name prefix.
+    pub fn starts(prefix: impl Into<String>) -> Self {
+        NameSelector::Starts(prefix.into())
+    }
+}
+
 /// Extracts values from header content.
 #[derive(Debug, Clone)]
 pub enum ValueExtractor {
@@ -46,6 +59,119 @@ pub enum ValueExtractor {
     Full,
     /// Extract using regex (returns first capture group, or full match if no groups).
     Regex(Regex),
+}
+
+/// Configuration for the header extractor.
+///
+/// Builder with name selection, value extraction, and transform options.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, header::{HeaderConfig, HeaderExtractor, NameSelector}};
+/// use hitbox_http::extractors::transform::Transform;
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .header(HeaderConfig::name(NameSelector::exact("x-api-key")))
+///     .header(HeaderConfig::name(NameSelector::exact("accept")).transform(Transform::Lowercase));
+/// ```
+#[derive(Debug, Clone)]
+pub struct HeaderConfig {
+    pub(crate) name_selector: NameSelector,
+    pub(crate) value_extractor: ValueExtractor,
+    pub(crate) transforms: Vec<Transform>,
+}
+
+impl HeaderConfig {
+    /// Create a header configuration from explicit parts.
+    ///
+    /// Lets the configuration layer build a `HeaderConfig` for either the
+    /// request key extractor or the response tag extractor from one resolved
+    /// set of parts. For name-only configuration, use [`HeaderConfig::name`].
+    pub fn new(
+        name_selector: NameSelector,
+        value_extractor: ValueExtractor,
+        transforms: Vec<Transform>,
+    ) -> Self {
+        HeaderConfig {
+            name_selector,
+            value_extractor,
+            transforms,
+        }
+    }
+
+    /// Create a header extractor configuration with the given name selector.
+    pub fn name(selector: NameSelector) -> Self {
+        HeaderConfig {
+            name_selector: selector,
+            value_extractor: ValueExtractor::Full,
+            transforms: Vec::new(),
+        }
+    }
+
+    /// Set value extraction strategy.
+    pub fn value(mut self, extractor: ValueExtractor) -> Self {
+        self.value_extractor = extractor;
+        self
+    }
+
+    /// Add a transform to the chain.
+    pub fn transform(mut self, t: Transform) -> Self {
+        self.transforms.push(t);
+        self
+    }
+
+    /// Select header values into [`KeyPart`]s from a header map.
+    ///
+    /// The single home for header reading, shared by the request key
+    /// [`Header`] extractor and the response header tag extractor
+    /// ([`ResponseHeaderTagExtractor`](crate::tags::ResponseHeaderTagExtractor)).
+    ///
+    /// - [`Exact`](NameSelector::Exact): emits one part for the named header.
+    ///   The value is `None` when the header is absent (or the value extractor
+    ///   matched nothing).
+    /// - [`Starts`](NameSelector::Starts): emits one part per matching header,
+    ///   sorted by name for deterministic output.
+    pub fn select(&self, headers: &http::HeaderMap) -> Vec<KeyPart> {
+        let mut parts = Vec::new();
+        match &self.name_selector {
+            NameSelector::Exact(name) => {
+                let value = headers
+                    .get(name.as_str())
+                    .and_then(|v| extract_value(v, &self.value_extractor))
+                    .map(|v| apply_transform_chain(v, &self.transforms));
+                parts.push(KeyPart::new(name.clone(), value));
+            }
+            NameSelector::Starts(prefix) => {
+                for (name, value) in headers.iter() {
+                    let name_str = name.as_str();
+                    if name_str.starts_with(prefix.as_str()) {
+                        let extracted = extract_value(value, &self.value_extractor)
+                            .map(|v| apply_transform_chain(v, &self.transforms));
+                        parts.push(KeyPart::new(name_str, extracted));
+                    }
+                }
+                // Sort by header name for deterministic cache keys.
+                parts.sort_by(|a, b| a.key().cmp(b.key()));
+            }
+        }
+        parts
+    }
+}
+
+impl From<&str> for HeaderConfig {
+    fn from(name: &str) -> Self {
+        HeaderConfig::name(NameSelector::exact(name))
+    }
+}
+
+impl From<String> for HeaderConfig {
+    fn from(name: String) -> Self {
+        HeaderConfig::name(NameSelector::exact(name))
+    }
 }
 
 /// Extracts header values as cache key parts.
@@ -60,28 +186,7 @@ pub enum ValueExtractor {
 #[derive(Debug)]
 pub struct Header<E> {
     inner: E,
-    name_selector: NameSelector,
-    value_extractor: ValueExtractor,
-    transforms: Vec<Transform>,
-}
-
-impl<S> Header<NeutralExtractor<S>> {
-    /// Creates a header extractor for a single header by exact name.
-    ///
-    /// The header value becomes a cache key part with the header name
-    /// as key. For more complex extraction (prefix matching, regex, transforms),
-    /// use [`Header::new_with`].
-    ///
-    /// Chain onto existing extractors using [`HeaderExtractor::header`] instead
-    /// if you already have an extractor chain.
-    pub fn new(name: String) -> Self {
-        Self {
-            inner: NeutralExtractor::new(),
-            name_selector: NameSelector::Exact(name),
-            value_extractor: ValueExtractor::Full,
-            transforms: Vec::new(),
-        }
-    }
+    config: HeaderConfig,
 }
 
 impl<E> Header<E> {
@@ -92,8 +197,8 @@ impl<E> Header<E> {
     /// - Extract full values or use regex capture groups
     /// - Apply transformations (hash, lowercase, uppercase)
     ///
-    /// For simple exact-name extraction without transforms, use [`Header::new`]
-    /// or [`HeaderExtractor::header`] instead.
+    /// For simple exact-name extraction without transforms, use
+    /// [`HeaderExtractor::header`] instead.
     pub fn new_with(
         inner: E,
         name_selector: NameSelector,
@@ -102,9 +207,7 @@ impl<E> Header<E> {
     ) -> Self {
         Self {
             inner,
-            name_selector,
-            value_extractor,
-            transforms,
+            config: HeaderConfig::new(name_selector, value_extractor, transforms),
         }
     }
 }
@@ -121,20 +224,20 @@ impl<E> Header<E> {
 /// This trait is automatically implemented for all [`Extractor`]
 /// types. You don't need to implement it manually.
 pub trait HeaderExtractor: Sized {
-    /// Adds extraction for a single header by exact name.
-    fn header(self, name: String) -> Header<Self>;
+    /// Adds header extraction with the given configuration.
+    ///
+    /// Accepts a [`HeaderConfig`] or a string (exact header name) directly.
+    fn header(self, config: impl Into<HeaderConfig>) -> Header<Self>;
 }
 
 impl<E> HeaderExtractor for E
 where
     E: Extractor,
 {
-    fn header(self, name: String) -> Header<Self> {
+    fn header(self, config: impl Into<HeaderConfig>) -> Header<Self> {
         Header {
             inner: self,
-            name_selector: NameSelector::Exact(name),
-            value_extractor: ValueExtractor::Full,
-            transforms: Vec::new(),
+            config: config.into(),
         }
     }
 }
@@ -166,33 +269,7 @@ where
     type Subject = E::Subject;
 
     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
-        let headers = &subject.parts().headers;
-        let mut extracted_parts = Vec::new();
-
-        match &self.name_selector {
-            NameSelector::Exact(name) => {
-                let value = headers
-                    .get(name.as_str())
-                    .and_then(|v| extract_value(v, &self.value_extractor))
-                    .map(|v| apply_transform_chain(v, &self.transforms));
-
-                extracted_parts.push(KeyPart::new(name.clone(), value));
-            }
-            NameSelector::Starts(prefix) => {
-                for (name, value) in headers.iter() {
-                    let name_str = name.as_str();
-                    if name_str.starts_with(prefix.as_str()) {
-                        let extracted = extract_value(value, &self.value_extractor)
-                            .map(|v| apply_transform_chain(v, &self.transforms));
-
-                        extracted_parts.push(KeyPart::new(name_str, extracted));
-                    }
-                }
-                // Sort by header name for deterministic cache keys
-                extracted_parts.sort_by(|a, b| a.key().cmp(b.key()));
-            }
-        }
-
+        let mut extracted_parts = self.config.select(&subject.parts().headers);
         let mut parts = self.inner.get(subject).await;
         parts.append(&mut extracted_parts);
         parts

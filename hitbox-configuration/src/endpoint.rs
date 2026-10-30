@@ -2,8 +2,9 @@ use std::{fmt::Debug, sync::Arc};
 
 use hitbox::{
     Extractor, Predicate,
-    config::{BoxExtractor, BoxPredicate, CacheConfig},
+    config::{BoxExtractor, BoxPredicate, BoxTagExtractor, CacheConfig, CacheConfigs},
     policy::PolicyConfig,
+    tag::TagExtractor,
 };
 use hitbox_http::{CacheableHttpRequest, CacheableHttpResponse};
 
@@ -12,6 +13,8 @@ use crate::ConfigEndpoint;
 pub type RequestPredicate<ReqBody> = BoxPredicate<CacheableHttpRequest<ReqBody>>;
 pub type ResponsePredicate<ResBody> = BoxPredicate<CacheableHttpResponse<ResBody>>;
 pub type RequestExtractor<ReqBody> = BoxExtractor<CacheableHttpRequest<ReqBody>>;
+pub type RequestTagExtractor<ReqBody> = BoxTagExtractor<CacheableHttpRequest<ReqBody>>;
+pub type ResponseTagExtractor<ResBody> = BoxTagExtractor<CacheableHttpResponse<ResBody>>;
 
 pub type ArcRequestPredicate<ReqBody> =
     Arc<dyn Predicate<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>;
@@ -19,16 +22,29 @@ pub type ArcResponsePredicate<ResBody> =
     Arc<dyn Predicate<Subject = CacheableHttpResponse<ResBody>> + Send + Sync>;
 pub type ArcRequestExtractor<ReqBody> =
     Arc<dyn Extractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>;
+pub type ArcRequestTagExtractor<ReqBody> =
+    Arc<dyn TagExtractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync>;
+pub type ArcResponseTagExtractor<ResBody> =
+    Arc<dyn TagExtractor<Subject = CacheableHttpResponse<ResBody>> + Send + Sync>;
 
 pub struct Endpoint<ReqBody, ResBody>
 where
     ReqBody: hyper::body::Body,
     ResBody: hyper::body::Body,
 {
+    /// Optional identifier for this endpoint.
+    ///
+    /// Propagated from [`crate::ConfigEndpoint::name`] and surfaced in
+    /// `Debug` output and routing errors. Reserved for future use in
+    /// tracing spans and metrics labels; not currently consumed by
+    /// runtime routing.
+    pub name: Option<String>,
     pub request_predicates: ArcRequestPredicate<ReqBody>,
     pub response_predicates: ArcResponsePredicate<ResBody>,
     pub extractors: ArcRequestExtractor<ReqBody>,
-    pub policy: PolicyConfig,
+    pub request_tag_extractors: ArcRequestTagExtractor<ReqBody>,
+    pub response_tag_extractors: ArcResponseTagExtractor<ResBody>,
+    pub policy: Arc<PolicyConfig>,
 }
 
 impl<ReqBody, ResBody> Debug for Endpoint<ReqBody, ResBody>
@@ -38,6 +54,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Endpoint")
+            .field("name", &self.name)
             .field("request_predicates", &"...")
             .field("response_predicates", &"...")
             .field("extractors", &"...")
@@ -53,10 +70,13 @@ where
 {
     fn clone(&self) -> Self {
         Self {
+            name: self.name.clone(),
             request_predicates: Arc::clone(&self.request_predicates),
             response_predicates: Arc::clone(&self.response_predicates),
             extractors: Arc::clone(&self.extractors),
-            policy: self.policy.clone(),
+            request_tag_extractors: Arc::clone(&self.request_tag_extractors),
+            response_tag_extractors: Arc::clone(&self.response_tag_extractors),
+            policy: Arc::clone(&self.policy),
         }
     }
 }
@@ -90,6 +110,8 @@ where
     type RequestPredicate = ArcRequestPredicate<ReqBody>;
     type ResponsePredicate = ArcResponsePredicate<ResBody>;
     type Extractor = ArcRequestExtractor<ReqBody>;
+    type RequestTagExtractor = ArcRequestTagExtractor<ReqBody>;
+    type ResponseTagExtractor = ArcResponseTagExtractor<ResBody>;
 
     fn request_predicates(&self) -> Self::RequestPredicate {
         Arc::clone(&self.request_predicates)
@@ -103,8 +125,33 @@ where
         Arc::clone(&self.extractors)
     }
 
-    fn policy(&self) -> &PolicyConfig {
-        &self.policy
+    fn request_tag_extractors(&self) -> Self::RequestTagExtractor {
+        Arc::clone(&self.request_tag_extractors)
+    }
+
+    fn response_tag_extractors(&self) -> Self::ResponseTagExtractor {
+        Arc::clone(&self.response_tag_extractors)
+    }
+
+    fn policy(&self) -> Arc<PolicyConfig> {
+        Arc::clone(&self.policy)
+    }
+}
+
+impl<ReqBody, ResBody> CacheConfigs<CacheableHttpRequest<ReqBody>, CacheableHttpResponse<ResBody>>
+    for Endpoint<ReqBody, ResBody>
+where
+    ReqBody: hyper::body::Body + Send + 'static,
+    ReqBody::Error: Send,
+    ReqBody::Data: Send,
+    ResBody: hyper::body::Body + Send + 'static,
+    ResBody::Error: Send,
+    ResBody::Data: Send,
+{
+    type Config = Self;
+
+    fn configs(&self) -> &[Self::Config] {
+        std::slice::from_ref(self)
     }
 }
 
@@ -125,10 +172,13 @@ where
     ReqBody: hyper::body::Body,
     ResBody: hyper::body::Body,
 {
+    name: Option<String>,
     request_predicates: Option<ArcRequestPredicate<ReqBody>>,
     response_predicates: Option<ArcResponsePredicate<ResBody>>,
     extractors: Option<ArcRequestExtractor<ReqBody>>,
-    policy: PolicyConfig,
+    request_tag_extractors: Option<ArcRequestTagExtractor<ReqBody>>,
+    response_tag_extractors: Option<ArcResponseTagExtractor<ResBody>>,
+    policy: Arc<PolicyConfig>,
 }
 
 impl<ReqBody, ResBody> EndpointBuilder<ReqBody, ResBody>
@@ -139,10 +189,21 @@ where
     /// Create a new builder with default values.
     pub fn new() -> Self {
         Self {
+            name: None,
             request_predicates: None,
             response_predicates: None,
             extractors: None,
-            policy: PolicyConfig::default(),
+            request_tag_extractors: None,
+            response_tag_extractors: None,
+            policy: Arc::new(PolicyConfig::default()),
+        }
+    }
+
+    /// Set the endpoint name for debugging and tracing.
+    pub fn name(self, name: impl Into<String>) -> Self {
+        Self {
+            name: Some(name.into()),
+            ..self
         }
     }
 
@@ -179,9 +240,34 @@ where
         }
     }
 
+    /// Set the request-side tag extractor.
+    pub fn request_tag_extractor<T>(self, extractor: T) -> Self
+    where
+        T: TagExtractor<Subject = CacheableHttpRequest<ReqBody>> + Send + Sync + 'static,
+    {
+        Self {
+            request_tag_extractors: Some(Arc::new(extractor)),
+            ..self
+        }
+    }
+
+    /// Set the response-side tag extractor.
+    pub fn response_tag_extractor<T>(self, extractor: T) -> Self
+    where
+        T: TagExtractor<Subject = CacheableHttpResponse<ResBody>> + Send + Sync + 'static,
+    {
+        Self {
+            response_tag_extractors: Some(Arc::new(extractor)),
+            ..self
+        }
+    }
+
     /// Set the cache policy.
     pub fn policy(self, policy: PolicyConfig) -> Self {
-        Self { policy, ..self }
+        Self {
+            policy: Arc::new(policy),
+            ..self
+        }
     }
 
     /// Build the Endpoint, using defaults for any unset fields.
@@ -196,6 +282,7 @@ where
     {
         let default = Endpoint::<ReqBody, ResBody>::default();
         Endpoint {
+            name: self.name,
             request_predicates: self
                 .request_predicates
                 .unwrap_or(default.request_predicates),
@@ -203,6 +290,12 @@ where
                 .response_predicates
                 .unwrap_or(default.response_predicates),
             extractors: self.extractors.unwrap_or(default.extractors),
+            request_tag_extractors: self
+                .request_tag_extractors
+                .unwrap_or(default.request_tag_extractors),
+            response_tag_extractors: self
+                .response_tag_extractors
+                .unwrap_or(default.response_tag_extractors),
             policy: self.policy,
         }
     }

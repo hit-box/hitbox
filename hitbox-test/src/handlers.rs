@@ -102,6 +102,10 @@ pub(crate) async fn get_book(
                 parts
                     .headers
                     .insert("server", HeaderValue::from_static("hitbox-test"));
+                // Canonical response-tag source for tag-invalidation tests.
+                parts
+                    .headers
+                    .insert("etag", HeaderValue::from_static("book-v1"));
                 parts
                     .headers
                     .insert("x-empty", HeaderValue::from_static(""));

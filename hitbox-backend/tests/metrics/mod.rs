@@ -14,9 +14,10 @@ use hitbox_backend::{
     Backend, BackendResult, CacheBackend, CacheKeyFormat, Compressor, DeleteStatus,
     PassthroughCompressor, SyncBackend,
 };
+use hitbox_core::tag::{CacheTag, TagExtractor};
 use hitbox_core::{
     BackendLabel, BoxContext, CacheContext, CacheKey, CacheValue, CacheableResponse,
-    EntityPolicyConfig, Raw,
+    EntityPolicyConfig, Predicate, Raw, ResponseCachePolicy,
 };
 use metrics_util::debugging::{DebugValue, DebuggingRecorder};
 use metrics_util::{CompositeKey, MetricKind};
@@ -104,13 +105,15 @@ impl CacheableResponse for TestData {
     type IntoCachedFuture = std::future::Ready<hitbox_core::CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = std::future::Ready<Self>;
 
-    async fn cache_policy<P>(
+    async fn cache_policy<P, TE>(
         self,
         _predicates: P,
+        _tag_extractor: Option<TE>,
         _: &EntityPolicyConfig,
-    ) -> hitbox_core::ResponseCachePolicy<Self>
+    ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where
-        P: hitbox_core::Predicate<Subject = Self::Subject> + Send + Sync,
+        P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
     {
         todo!()
     }

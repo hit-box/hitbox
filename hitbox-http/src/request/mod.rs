@@ -1,13 +1,18 @@
+pub use crate::extractors::extractor;
+pub use crate::predicates::request::predicate;
+
 use hitbox::{
     CacheablePolicyData, RequestCachePolicy,
     predicate::{Predicate, PredicateResult},
+    tag::{CacheTag, TagExtractor},
     {CachePolicy, CacheableRequest, Extractor},
 };
-use http::{Request, request::Parts};
+use http::{Extensions, Request, request::Parts};
 use hyper::body::Body as HttpBody;
 
 use crate::CacheableSubject;
 use crate::body::BufferedBody;
+use crate::jq::ParsedBody;
 use crate::predicates::header::HasHeaders;
 use crate::predicates::version::HasVersion;
 
@@ -50,13 +55,15 @@ use crate::predicates::version::HasVersion;
 /// ```no_run
 /// use hitbox::Extractor;
 /// use hitbox_http::CacheableHttpRequest;
-/// use hitbox_http::extractors::{Method, path::PathExtractor};
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, PathExtractor};
 ///
 /// # use bytes::Bytes;
 /// # use http_body_util::Empty;
-/// # use hitbox_http::extractors::{NeutralExtractor, Path};
+/// # use hitbox_http::extractors::{NeutralExtractor, Method, Path};
 /// async fn example(cacheable: CacheableHttpRequest<Empty<Bytes>>) {
-///     let extractor = Method::new().path("/users/{user_id}");
+///     let extractor = extractors::extractor::<Empty<Bytes>>()
+///         .method(MethodConfig::new())
+///         .path("/users/{user_id}");
 ///     # let _: &Path<Method<NeutralExtractor<Empty<Bytes>>>> = &extractor;
 ///     let key_parts = extractor.get(cacheable).await;
 /// }
@@ -87,7 +94,9 @@ where
     ///
     /// Use this after cache policy evaluation to continue processing the request.
     pub fn into_request(self) -> Request<BufferedBody<ReqBody>> {
-        Request::from_parts(self.parts, self.body)
+        let mut parts = self.parts;
+        ParsedBody::remove(&mut parts.extensions);
+        Request::from_parts(parts, self.body)
     }
 
     /// Returns a reference to the request metadata.
@@ -119,6 +128,10 @@ where
     fn from_parts(parts: Self::Parts, body: BufferedBody<Self::Body>) -> Self {
         Self { parts, body }
     }
+
+    fn extensions_mut(parts: &mut Self::Parts) -> &mut Extensions {
+        &mut parts.extensions
+    }
 }
 
 impl<ReqBody> HasHeaders for CacheableHttpRequest<ReqBody>
@@ -144,18 +157,48 @@ where
     ReqBody: HttpBody + Send + 'static,
     ReqBody::Error: Send,
 {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    type CachePolicyFuture<'a, P, E, TE>
+        = std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = (RequestCachePolicy<Self>, Vec<CacheTag>)> + Send + 'a,
+        >,
+    >
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-        E: Extractor<Subject = Self> + Send + Sync,
-    {
-        let (request, key) = extractors.get(self).await.into_cache_key();
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
+        TE: TagExtractor<Subject = Self> + Send + Sync + 'a;
 
-        match predicates.check(request).await {
-            PredicateResult::Cacheable(request) => {
-                CachePolicy::Cacheable(CacheablePolicyData { key, request })
+    fn cache_policy<'a, P, E, TE>(
+        self,
+        predicates: P,
+        extractors: E,
+        tag_extractor: Option<TE>,
+    ) -> Self::CachePolicyFuture<'a, P, E, TE>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
+        TE: TagExtractor<Subject = Self> + Send + Sync + 'a,
+    {
+        Box::pin(async move {
+            let (request, key) = extractors.get(self).await.into_cache_key();
+
+            match predicates.check(request).await {
+                PredicateResult::Cacheable(request) => {
+                    let (request, tags) = match tag_extractor {
+                        Some(te) => te.extract_tags(request).await,
+                        None => (request, Vec::new()),
+                    };
+                    (
+                        CachePolicy::Cacheable(CacheablePolicyData { key, request }),
+                        tags,
+                    )
+                }
+                PredicateResult::NonCacheable(request) => {
+                    (CachePolicy::NonCacheable(request), Vec::new())
+                }
             }
-            PredicateResult::NonCacheable(request) => CachePolicy::NonCacheable(request),
-        }
+        })
     }
 }

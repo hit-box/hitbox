@@ -246,9 +246,17 @@ fn fsm_states_should_be(world: &mut FsmWorld, step: &Step) -> Result<(), Error> 
         .filter_map(|row| row.first().map(|s| parse_state_expectation(s.as_str())))
         .collect();
 
-    // Get actual FSM states from span collector
-    let actual_states = world.span_collector.fsm_states();
-    let captured_spans = world.span_collector.spans();
+    // Get actual FSM state spans (filtered to fsm.* prefix, in order)
+    let fsm_spans: Vec<_> = world
+        .span_collector
+        .spans()
+        .into_iter()
+        .filter(|s| s.name.starts_with("fsm."))
+        .collect();
+    let actual_states: Vec<&str> = fsm_spans
+        .iter()
+        .filter_map(|s| s.name.strip_prefix("fsm."))
+        .collect();
 
     // Check state count
     let expected_names: Vec<&str> = expected.iter().map(|e| e.name).collect();
@@ -262,10 +270,10 @@ fn fsm_states_should_be(world: &mut FsmWorld, step: &Step) -> Result<(), Error> 
         ));
     }
 
-    // Check each state name and its fields
+    // Check each state name and its fields (position-based)
     for (i, (exp, actual_name)) in expected.iter().zip(actual_states.iter()).enumerate() {
         // Check state name
-        if exp.name != actual_name {
+        if exp.name != *actual_name {
             return Err(anyhow!(
                 "FSM state mismatch at position {}.\nExpected: {}\nActual: {}\nFull expected: {:?}\nFull actual: {:?}",
                 i,
@@ -276,25 +284,22 @@ fn fsm_states_should_be(world: &mut FsmWorld, step: &Step) -> Result<(), Error> 
             ));
         }
 
-        // Check field assertions if any
+        // Check field assertions using position-based span lookup
         for (field_name, expected_value) in &exp.fields {
-            let span_name = format!("fsm.{}", exp.name);
-            let actual_value = captured_spans
+            let actual_span = &fsm_spans[i];
+            let actual_value = actual_span
+                .fields
                 .iter()
-                .find(|s| s.name == span_name)
-                .and_then(|s| {
-                    s.fields
-                        .iter()
-                        .find(|(k, _)| k == field_name)
-                        .map(|(_, v)| v.as_str())
-                });
+                .find(|(k, _)| k == field_name)
+                .map(|(_, v)| v.as_str());
 
             match actual_value {
                 Some(value) if value == *expected_value => {}
                 Some(value) => {
                     return Err(anyhow!(
-                        "FSM state {} field '{}' mismatch.\nExpected: {}\nActual: {}",
+                        "FSM state {} (position {}) field '{}' mismatch.\nExpected: {}\nActual: {}",
                         exp.name,
+                        i,
                         field_name,
                         expected_value,
                         value
@@ -302,14 +307,12 @@ fn fsm_states_should_be(world: &mut FsmWorld, step: &Step) -> Result<(), Error> 
                 }
                 None => {
                     return Err(anyhow!(
-                        "FSM state {} field '{}' not found.\nExpected value: {}\nAvailable fields: {:?}",
+                        "FSM state {} (position {}) field '{}' not found.\nExpected value: {}\nAvailable fields: {:?}",
                         exp.name,
+                        i,
                         field_name,
                         expected_value,
-                        captured_spans
-                            .iter()
-                            .find(|s| s.name == span_name)
-                            .map(|s| &s.fields)
+                        actual_span.fields
                     ));
                 }
             }

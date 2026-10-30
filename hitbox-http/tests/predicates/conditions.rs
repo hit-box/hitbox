@@ -4,7 +4,7 @@ use hitbox_http::predicates::NeutralRequestPredicate;
 use hitbox_http::predicates::request::header;
 use hitbox_http::predicates::request::query;
 use hitbox_http::predicates::request::{
-    HeaderPredicate, MethodPredicate, PathPredicate, QueryPredicate,
+    HeaderPredicate, MethodPredicate, PathPredicate, QueryPredicate, method, path,
 };
 use hitbox_http::{BufferedBody, CacheableHttpRequest};
 use http::Request;
@@ -18,8 +18,10 @@ async fn test_conditions_or_cacheable() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let correct_predicate = NeutralRequestPredicate::new().method(http::Method::GET);
-    let wrong_predicate = NeutralRequestPredicate::new().method(http::Method::POST);
+    let correct_predicate =
+        NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::GET));
+    let wrong_predicate =
+        NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::POST));
     let prediction = correct_predicate.or(wrong_predicate).check(request).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
@@ -33,8 +35,10 @@ async fn test_conditions_or_right_branch() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let wrong_predicate = NeutralRequestPredicate::new().method(http::Method::POST);
-    let correct_predicate = NeutralRequestPredicate::new().method(http::Method::GET);
+    let wrong_predicate =
+        NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::POST));
+    let correct_predicate =
+        NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::GET));
     let prediction = wrong_predicate.or(correct_predicate).check(request).await;
     assert!(matches!(prediction, PredicateResult::Cacheable(_)));
 }
@@ -47,8 +51,10 @@ async fn test_conditions_or_noncacheable() {
             .body(BufferedBody::Passthrough(Empty::<Bytes>::new()))
             .unwrap(),
     );
-    let wrong_predicate_one = NeutralRequestPredicate::new().method(http::Method::DELETE);
-    let wrong_predicate_two = NeutralRequestPredicate::new().method(http::Method::POST);
+    let wrong_predicate_one =
+        NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::DELETE));
+    let wrong_predicate_two =
+        NeutralRequestPredicate::new().method(method::Operation::eq(http::Method::POST));
     let prediction = wrong_predicate_one
         .or(wrong_predicate_two)
         .check(request)
@@ -70,7 +76,7 @@ async fn test_conditions_not() {
     let correct_query_predicate = NeutralRequestPredicate::<Empty<Bytes>>::new()
         .query(query::Operation::Eq("name".to_owned(), "value".to_owned()));
     let wrong_path_predicate =
-        NeutralRequestPredicate::<Empty<Bytes>>::new().path(expression.into());
+        NeutralRequestPredicate::<Empty<Bytes>>::new().path(path::Operation::pattern(expression));
     let wrong_header_predicate = NeutralRequestPredicate::new().header(header::Operation::Eq(
         "x-test".parse().unwrap(),
         "wrong-test-value".parse().unwrap(),

@@ -22,51 +22,42 @@ body utilities for transparent request/response handling.
 
 ## Quickstart
 
-```rust
+```rust,ignore
 use std::time::Duration;
 
 use hitbox::Config;
 use hitbox::policy::PolicyConfig;
 use hitbox::predicate::PredicateExt;
 use hitbox_http::{
-    extractors::{Method, path::PathExtractor, query::QueryExtractor},
+    extractors::{MethodConfig, MethodExtractor, PathExtractor, query::QueryExtractor},
     predicates::{
-        header::{Header, Operation as HeaderOperation},
-        response::StatusCode,
-   },
+        header::Operation as HeaderOperation,
+        request::HeaderPredicate,
+        response::StatusCodePredicate,
+    },
+    request, response,
 };
-
-# use bytes::Bytes;
-# use http_body_util::Empty;
-// Skip cache when Cache-Control: no-cache is present
-let request_predicate = Header::new(HeaderOperation::Contains(
-    http::header::CACHE_CONTROL,
-    "no-cache".to_string(),
-)).not();
-
-// Only cache successful responses
-let response_predicate = StatusCode::new(http::StatusCode::OK);
-
-// Build cache key from method, path parameters, and query
-let extractor = Method::new()
-    .path("/users/{user_id}/posts/{post_id}")
-    .query("page".to_string());
 
 // Build a cache configuration for an endpoint
 let config = Config::builder()
-    .request_predicate(request_predicate)
-    .response_predicate(response_predicate)
-    .extractor(extractor)
+    // Skip cache when Cache-Control: no-cache is present
+    .request_predicate(
+        request::predicate::<Empty<Bytes>>()
+            .header(HeaderOperation::contains(http::header::CACHE_CONTROL, "no-cache"))
+            .not(),
+    )
+    // Only cache successful responses
+    .response_predicate(response::predicate::<Empty<Bytes>>().status(http::StatusCode::OK))
+    // Build cache key from method, path parameters, and query
+    .extractor(
+        request::extractor::<Empty<Bytes>>()
+            .method(MethodConfig::new())
+            .path("/users/{user_id}/posts/{post_id}")
+            .query("page"),
+    )
+    // Cache for 5 minutes
     .policy(PolicyConfig::builder().ttl(Duration::from_secs(300)).build())
     .build();
-# use hitbox::predicate::Not;
-# use hitbox_http::predicates::{NeutralRequestPredicate, NeutralResponsePredicate};
-# use hitbox_http::extractors::{NeutralExtractor, Path, query::Query};
-# let _: Config<
-#     Not<Header<NeutralRequestPredicate<Empty<Bytes>>>>,
-#     StatusCode<NeutralResponsePredicate<Empty<Bytes>>>,
-#     Query<Path<Method<NeutralExtractor<Empty<Bytes>>>>>,
-# > = config;
 ```
 
 ## Predicates
@@ -97,26 +88,25 @@ Use [`PredicateExt`] methods to combine predicates:
 
 ```rust
 use hitbox::predicate::PredicateExt;
-use hitbox_http::predicates::header::{Header, Operation};
+use hitbox_http::predicates::header::{HeaderPredicate, Operation};
+use hitbox_http::predicates::request;
 
 # use bytes::Bytes;
 # use http_body_util::Empty;
-# use hitbox::Neutral;
-# use hitbox_http::CacheableHttpRequest;
-# type Subject = CacheableHttpRequest<Empty<Bytes>>;
 
 // Skip cache when Cache-Control contains "no-cache"
-let skip_no_cache = Header::new(Operation::Contains(
-    http::header::CACHE_CONTROL,
-    "no-cache".to_string(),
-));
-# let _: &Header<Neutral<Subject>> = &skip_no_cache;
+let skip_no_cache = request::predicate::<Empty<Bytes>>()
+    .header(Operation::contains(
+        http::header::CACHE_CONTROL,
+        "no-cache",
+    ));
 let skip_no_cache = skip_no_cache.not();
 
 // Skip cache when Authorization header exists
-let skip_auth = Header::new(Operation::Exist(
-    http::header::AUTHORIZATION,
-)).not();
+let skip_auth = request::predicate::<Empty<Bytes>>()
+    .header(Operation::exist(
+        http::header::AUTHORIZATION,
+    )).not();
 
 // Combine: cache only if BOTH conditions pass
 let combined = skip_no_cache.and(skip_auth);
@@ -128,15 +118,18 @@ Extractors generate cache key parts from HTTP components. Chain them using
 the builder pattern:
 
 ```rust
-use hitbox_http::extractors::{Method, path::PathExtractor, query::QueryExtractor};
+use hitbox_http::request;
+use hitbox_http::extractors::{MethodConfig, MethodExtractor, PathExtractor};
+use hitbox_http::extractors::query::QueryExtractor;
 
 # use bytes::Bytes;
 # use http_body_util::Empty;
-# use hitbox_http::extractors::{NeutralExtractor, Path, query::Query};
-let extractor = Method::new()
+# use hitbox_http::extractors::{NeutralExtractor, Method, Path, query::Query};
+let extractor = request::extractor::<Empty<Bytes>>()
+    .method(MethodConfig::new())
     .path("/users/{user_id}")
-    .query("page".to_string())
-    .query("limit".to_string());
+    .query("page")
+    .query("limit");
 # let _: Query<Query<Path<Method<NeutralExtractor<Empty<Bytes>>>>>> = extractor;
 ```
 

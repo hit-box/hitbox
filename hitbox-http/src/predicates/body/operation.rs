@@ -1,4 +1,5 @@
 use hitbox::predicate::PredicateResult;
+use http::Extensions;
 use hyper::body::Body as HttpBody;
 
 use super::{
@@ -118,10 +119,39 @@ pub enum Operation {
 }
 
 impl Operation {
+    /// Creates an operation that limits cached body size.
+    pub fn limit(bytes: usize) -> Self {
+        Operation::Limit { bytes }
+    }
+
+    /// Creates an operation matching raw body bytes.
+    pub fn plain(op: PlainOperation) -> Self {
+        Operation::Plain(op)
+    }
+
+    /// Creates an operation matching JSON body content using a JQ expression.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the JQ filter expression is invalid.
+    pub fn jq(filter: &str, operation: JqOperation) -> Result<Self, String> {
+        Ok(Operation::Jq {
+            filter: JqExpression::compile(filter)?,
+            operation,
+        })
+    }
+
     /// Check if the operation matches the body.
     /// Returns `PredicateResult::Cacheable` if the operation is satisfied,
     /// `PredicateResult::NonCacheable` otherwise.
-    pub async fn check<B>(&self, body: BufferedBody<B>) -> PredicateResult<BufferedBody<B>>
+    ///
+    /// `extensions` are the subject's; jq operations keep the parsed body
+    /// there (see [`JqOperation::check`]).
+    pub async fn check<B>(
+        &self,
+        body: BufferedBody<B>,
+        extensions: &mut Extensions,
+    ) -> PredicateResult<BufferedBody<B>>
     where
         B: HttpBody + Unpin,
         B::Data: Send,
@@ -160,7 +190,7 @@ impl Operation {
                 }
             }
             Operation::Plain(plain_op) => plain_op.check(body).await,
-            Operation::Jq { filter, operation } => operation.check(filter, body).await,
+            Operation::Jq { filter, operation } => operation.check(filter, body, extensions).await,
         }
     }
 }

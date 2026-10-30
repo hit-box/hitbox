@@ -13,8 +13,11 @@ pub mod header;
 pub mod method;
 pub mod path;
 pub mod query;
+pub mod tag;
 pub mod transform;
 pub mod version;
+
+pub use tag::{RequestTagExtractor, ResponseTagExtractor, TagsConfig};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Extractor {

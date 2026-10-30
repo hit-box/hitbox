@@ -14,24 +14,25 @@ use tracing::Span;
 
 use crate::fsm::states::{
     AwaitResponse, AwaitResponseFuture, CheckRequestCachePolicy, CheckResponseCachePolicy,
-    ConvertResponse, ConvertResponseFuture, HandleStale, PollCache, PollCacheFuture, PollUpstream,
-    RequestCachePolicyFuture, Response, State, UpdateCache, UpdateCacheFuture,
+    ConvertResponse, ConvertResponseFuture, HandleStale, PollCache, PollCacheWithTagsFuture,
+    PollUpstream, RequestCachePolicyFuture, Response, State, UpdateCache, UpdateCacheFuture,
 };
 use crate::{CacheKey, CacheableRequest, CacheableResponse, Extractor, Predicate};
+use hitbox_core::tag::TagExtractor;
 
 // =============================================================================
 // InitialTransition
 // =============================================================================
 
 /// Transitions from Initial state.
-pub enum InitialTransition<Req, U>
+pub enum InitialTransition<'req, Req, U>
 where
-    Req: CacheableRequest,
-    U: Upstream<Req>,
+    Req: CacheableRequest + 'req,
+    U: Upstream<Req> + 'req,
 {
     /// Cache is enabled - check request cache policy
     CheckRequestCachePolicy {
-        cache_policy_future: RequestCachePolicyFuture<Req>,
+        cache_policy_future: RequestCachePolicyFuture<'req, Req>,
         ctx: BoxContext,
         upstream: U,
     },
@@ -42,17 +43,21 @@ where
     },
 }
 
-impl<Req, U> InitialTransition<Req, U>
+impl<'req, Req, U> InitialTransition<'req, Req, U>
 where
-    Req: CacheableRequest,
-    U: Upstream<Req>,
+    Req: CacheableRequest + 'req,
+    U: Upstream<Req> + 'req,
 {
-    pub fn into_state<Res, ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<Res, ReqP, E, ReqTE>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E, ReqTE>
     where
         Res: CacheableResponse,
         U: Upstream<Req, Response = Res>,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
+        ReqTE: TagExtractor<Subject = Req>,
     {
         match self {
             InitialTransition::CheckRequestCachePolicy {
@@ -78,7 +83,7 @@ where
     }
 }
 
-impl<Req, U> std::fmt::Debug for InitialTransition<Req, U>
+impl<Req, U> std::fmt::Debug for InitialTransition<'_, Req, U>
 where
     Req: CacheableRequest,
     U: Upstream<Req>,
@@ -103,9 +108,9 @@ where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
 {
-    /// Request is cacheable - poll cache
+    /// Request is cacheable - poll cache (with parallel tag invalidation check)
     PollCache {
-        poll_cache: PollCacheFuture<Res::Cached>,
+        poll_cache: PollCacheWithTagsFuture<Res::Cached>,
         request: Req,
         cache_key: CacheKey,
         upstream: U,
@@ -122,11 +127,16 @@ where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E, ReqTE>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E, ReqTE>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
+        ReqTE: TagExtractor<Subject = Req>,
     {
         match self {
             CheckRequestCachePolicyTransition::PollCache {
@@ -216,11 +226,16 @@ where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E, ReqTE>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E, ReqTE>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
+        ReqTE: TagExtractor<Subject = Req>,
     {
         match self {
             PollCacheTransition::UpdateCache {
@@ -305,13 +320,17 @@ pub enum ConvertResponseTransition<Res> {
 }
 
 impl<Res> ConvertResponseTransition<Res> {
-    pub fn into_state<Req, U, ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E, ReqTE>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E, ReqTE>
     where
         Res: CacheableResponse,
-        Req: CacheableRequest,
-        U: Upstream<Req, Response = Res>,
+        Req: CacheableRequest + 'req,
+        U: Upstream<Req, Response = Res> + 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
+        ReqTE: TagExtractor<Subject = Req>,
     {
         match self {
             ConvertResponseTransition::Response(s) => {
@@ -356,11 +375,16 @@ where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E, ReqTE>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E, ReqTE>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
+        ReqTE: TagExtractor<Subject = Req>,
     {
         match self {
             HandleStaleTransition::Response(s) => {
@@ -416,11 +440,16 @@ where
     Res: CacheableResponse,
     U: Upstream<Req, Response = Res>,
 {
-    pub fn into_state<ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, ReqP, E, ReqTE>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E, ReqTE>
     where
-        Req: CacheableRequest,
+        Req: CacheableRequest + 'req,
+        U: 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
+        ReqTE: TagExtractor<Subject = Req>,
     {
         match self {
             AwaitResponseTransition::Response(s) => {
@@ -463,9 +492,19 @@ pub enum PollUpstreamTransition<Res>
 where
     Res: CacheableResponse,
 {
-    /// Proceed to check response cache policy
+    /// Proceed to check response cache policy.
+    ///
+    /// The future returns both the cache policy and any response tags
+    /// extracted from the upstream response (`Vec::new()` when no
+    /// response tag extractor is configured).
     CheckResponseCachePolicy {
-        cache_policy_future: BoxFuture<'static, ResponseCachePolicy<Res>>,
+        cache_policy_future: BoxFuture<
+            'static,
+            (
+                ResponseCachePolicy<Res>,
+                Option<Vec<hitbox_core::tag::CacheTag>>,
+            ),
+        >,
         permit: Option<OwnedSemaphorePermit>,
         ctx: BoxContext,
         cache_key: CacheKey,
@@ -478,12 +517,16 @@ impl<Res> PollUpstreamTransition<Res>
 where
     Res: CacheableResponse,
 {
-    pub fn into_state<Req, U, ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E, ReqTE>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E, ReqTE>
     where
-        Req: CacheableRequest,
-        U: Upstream<Req, Response = Res>,
+        Req: CacheableRequest + 'req,
+        U: Upstream<Req, Response = Res> + 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
+        ReqTE: TagExtractor<Subject = Req>,
     {
         match self {
             PollUpstreamTransition::CheckResponseCachePolicy {
@@ -539,12 +582,16 @@ impl<Res> CheckResponseCachePolicyTransition<Res>
 where
     Res: CacheableResponse,
 {
-    pub fn into_state<Req, U, ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E, ReqTE>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E, ReqTE>
     where
-        Req: CacheableRequest,
-        U: Upstream<Req, Response = Res>,
+        Req: CacheableRequest + 'req,
+        U: Upstream<Req, Response = Res> + 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
+        ReqTE: TagExtractor<Subject = Req>,
     {
         match self {
             CheckResponseCachePolicyTransition::UpdateCache {
@@ -584,13 +631,17 @@ pub enum UpdateCacheTransition<Res> {
 }
 
 impl<Res> UpdateCacheTransition<Res> {
-    pub fn into_state<Req, U, ReqP, E>(self, parent: &Span) -> State<Res, Req, U, ReqP, E>
+    pub fn into_state<'req, Req, U, ReqP, E, ReqTE>(
+        self,
+        parent: &Span,
+    ) -> State<'req, Res, Req, U, ReqP, E, ReqTE>
     where
         Res: CacheableResponse,
-        Req: CacheableRequest,
-        U: Upstream<Req, Response = Res>,
+        Req: CacheableRequest + 'req,
+        U: Upstream<Req, Response = Res> + 'req,
         ReqP: Predicate<Subject = Req>,
         E: Extractor<Subject = Req>,
+        ReqTE: TagExtractor<Subject = Req>,
     {
         match self {
             UpdateCacheTransition::Response(s) => {

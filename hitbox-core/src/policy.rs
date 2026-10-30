@@ -5,6 +5,7 @@
 //!
 //! - [`CachePolicy`] - Result of a cache decision (cacheable or not)
 //! - [`EntityPolicyConfig`] - TTL configuration for cached entities
+//! - [`PolicyConfig`] - Cache policy: enabled with settings or disabled
 //!
 //! ## Cache Policy
 //!
@@ -17,7 +18,11 @@
 //! [`EntityPolicyConfig`] provides TTL (time-to-live) settings for cached
 //! entries, supporting both expiration and staleness timeouts for
 //! stale-while-revalidate patterns.
+//!
+//! [`PolicyConfig`] controls overall cache behavior per endpoint: TTL,
+//! stale windows, concurrency limits, and stale-while-revalidate policy.
 
+use std::num::NonZeroU8;
 use std::time::Duration;
 
 /// Result of a cache decision.
@@ -88,4 +93,205 @@ pub struct EntityPolicyConfig {
     pub ttl: Option<Duration>,
     /// Time until cached entries become stale (for background refresh).
     pub stale_ttl: Option<Duration>,
+}
+
+// =============================================================================
+// Policy Configuration Types
+// =============================================================================
+
+/// Concurrency limit for dogpile prevention (1-255).
+/// A value of 1 means only one request can fetch from upstream at a time.
+pub type ConcurrencyLimit = NonZeroU8;
+
+/// Policy for handling stale cache entries.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+pub enum StalePolicy {
+    /// Return stale data without any revalidation.
+    #[default]
+    Return,
+    /// Treat stale as expired — block and wait for fresh data (synchronous revalidation).
+    Revalidate,
+    /// Return stale data immediately and revalidate in background (Stale-While-Revalidate).
+    OffloadRevalidate,
+}
+
+/// Whether tag-based invalidation runs at all.
+///
+/// Gates **both** sides end to end: tag extraction at write time and the
+/// invalidation timestamp queries/comparison at read time. When
+/// [`Skip`](TagInvalidation::Skip), no tag extractor future is constructed
+/// (the heavy request-body / response-body / JQ work never runs) and no
+/// `invalidated()` backend round-trips are issued.
+///
+/// [`Backend::invalidate`] still records timestamps when called explicitly,
+/// so flipping back to [`Check`](TagInvalidation::Check) is safe:
+/// request-side invalidation resumes immediately (request tags are
+/// re-derived on read), response-side self-heals within one TTL (entries
+/// written during `Skip` carry no response tags until they expire and
+/// refill).
+///
+/// [`Backend::invalidate`]: https://docs.rs/hitbox-backend
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+pub enum TagInvalidation {
+    /// Extract tags on write and consult invalidation timestamps on read
+    /// (default).
+    #[default]
+    Check,
+    /// Skip tag extraction and the read-time invalidation check entirely.
+    ///
+    /// Operational safety valve (clock skew / flaky tag store causing
+    /// false invalidations), latency/cost control (tag extraction can be
+    /// heavy; the read check adds backend round-trips), or staged rollout.
+    Skip,
+}
+
+/// Cache behavior policy configuration.
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+pub struct CacheBehaviorPolicy {
+    /// How to handle stale cache entries.
+    pub stale: StalePolicy,
+}
+
+/// Enabled cache configuration with TTL, stale window, and behavior settings.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct EnabledCacheConfig {
+    /// Total time-to-live for the cache entry.
+    /// After this duration the entry expires and becomes invalid.
+    pub ttl: Option<Duration>,
+    /// Time after which the cache entry becomes stale.
+    /// Between `stale` and `ttl`, the entry can be served as stale data.
+    pub stale: Option<Duration>,
+    /// Cache behavior policy.
+    pub policy: CacheBehaviorPolicy,
+    /// Concurrency limit for dogpile prevention.
+    pub concurrency: Option<ConcurrencyLimit>,
+    /// Whether tag-based invalidation runs (extraction + read check).
+    pub tag_invalidation: TagInvalidation,
+}
+
+impl Default for EnabledCacheConfig {
+    fn default() -> Self {
+        Self {
+            ttl: Some(Duration::from_secs(5)),
+            stale: None,
+            policy: CacheBehaviorPolicy::default(),
+            concurrency: None,
+            tag_invalidation: TagInvalidation::default(),
+        }
+    }
+}
+
+/// Cache policy: enabled with settings or completely disabled.
+///
+/// When `Disabled`, requests bypass the cache entirely and go directly to upstream.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum PolicyConfig {
+    /// Caching enabled with the specified configuration.
+    Enabled(EnabledCacheConfig),
+    /// Caching disabled — all requests go directly to upstream.
+    Disabled,
+}
+
+impl Default for PolicyConfig {
+    fn default() -> Self {
+        Self::Enabled(EnabledCacheConfig::default())
+    }
+}
+
+impl PolicyConfig {
+    /// Create a new builder for an enabled cache configuration.
+    pub fn builder() -> PolicyConfigBuilder {
+        PolicyConfigBuilder::default()
+    }
+
+    /// Create a disabled policy configuration.
+    pub fn disabled() -> Self {
+        Self::Disabled
+    }
+
+    /// Whether the FSM should run tag-based invalidation (tag extraction
+    /// on write and the invalidation timestamp check on read).
+    ///
+    /// `false` when caching is disabled (no cache reads happen anyway) or
+    /// when the enabled config selects [`TagInvalidation::Skip`].
+    pub fn tag_invalidation_enabled(&self) -> bool {
+        matches!(
+            self,
+            PolicyConfig::Enabled(EnabledCacheConfig {
+                tag_invalidation: TagInvalidation::Check,
+                ..
+            })
+        )
+    }
+}
+
+/// Builder for [`PolicyConfig`].
+#[derive(Debug, Clone, Default)]
+pub struct PolicyConfigBuilder {
+    ttl: Option<Duration>,
+    stale: Option<Duration>,
+    stale_policy: StalePolicy,
+    concurrency: Option<ConcurrencyLimit>,
+    tag_invalidation: TagInvalidation,
+}
+
+impl PolicyConfigBuilder {
+    /// Create a new builder with default values.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the total time-to-live for the cache entry.
+    pub fn ttl(self, ttl: Duration) -> Self {
+        Self {
+            ttl: Some(ttl),
+            ..self
+        }
+    }
+
+    /// Set the time after which the cache entry becomes stale.
+    pub fn stale(self, stale: Duration) -> Self {
+        Self {
+            stale: Some(stale),
+            ..self
+        }
+    }
+
+    /// Set the policy for handling stale cache entries.
+    pub fn stale_policy(self, policy: StalePolicy) -> Self {
+        Self {
+            stale_policy: policy,
+            ..self
+        }
+    }
+
+    /// Set the concurrency limit for dogpile prevention.
+    pub fn concurrency(self, limit: ConcurrencyLimit) -> Self {
+        Self {
+            concurrency: Some(limit),
+            ..self
+        }
+    }
+
+    /// Set whether tag-based invalidation runs (default
+    /// [`TagInvalidation::Check`]).
+    pub fn tag_invalidation(self, tag_invalidation: TagInvalidation) -> Self {
+        Self {
+            tag_invalidation,
+            ..self
+        }
+    }
+
+    /// Build the [`PolicyConfig`] with enabled caching.
+    pub fn build(self) -> PolicyConfig {
+        PolicyConfig::Enabled(EnabledCacheConfig {
+            ttl: self.ttl,
+            stale: self.stale,
+            policy: CacheBehaviorPolicy {
+                stale: self.stale_policy,
+            },
+            concurrency: self.concurrency,
+            tag_invalidation: self.tag_invalidation,
+        })
+    }
 }

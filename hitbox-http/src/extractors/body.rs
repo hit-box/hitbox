@@ -5,7 +5,7 @@
 //!
 //! # Extraction Modes
 //!
-//! - **Hash**: SHA256 hash of the entire body (truncated to 16 hex chars)
+//! - **Hash**: Full SHA256 hash of the entire body (64 hex characters)
 //! - **Jq**: Extract values from JSON bodies using jq expressions
 //! - **Regex**: Extract values using regular expression capture groups
 //!
@@ -16,15 +16,10 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::rc::Rc;
 
 use async_trait::async_trait;
 use hitbox::{Extractor, KeyPart, KeyParts};
 use hyper::body::Body as HttpBody;
-use jaq_core::box_iter::box_once;
-use jaq_core::load::{Arena, File, Loader};
-use jaq_core::{Bind, Ctx, Exn, Filter, Native, RcIter};
-use jaq_json::Val;
 use regex::Regex;
 use serde_json::Value;
 use tracing::warn;
@@ -32,6 +27,8 @@ use tracing::warn;
 pub use super::transform::Transform;
 use super::transform::{apply_hash, apply_transform_chain};
 use crate::CacheableHttpRequest;
+pub use crate::jq::JqExpression;
+use crate::jq::ParsedBody;
 
 /// Body extraction mode for generating cache key parts.
 ///
@@ -42,131 +39,12 @@ use crate::CacheableHttpRequest;
 /// - [`Regex`](Self::Regex): Extract using regular expression captures
 #[derive(Debug, Clone)]
 pub enum BodyExtraction {
-    /// Hash the entire body using SHA256 (truncated to 16 hex chars).
+    /// Hash the entire body using SHA256 (full 64 hex characters).
     Hash,
     /// Extract values from JSON body using a jq expression.
-    Jq(JqExtraction),
+    Jq(JqExpression),
     /// Extract values using regular expression captures.
     Regex(RegexExtraction),
-}
-
-/// A compiled jq expression for extracting values from JSON bodies.
-///
-/// Includes a custom `hash` function for hashing extracted values.
-///
-/// # Examples
-///
-/// ```
-/// use hitbox_http::extractors::body::JqExtraction;
-///
-/// // Extract user ID from JSON body
-/// let extraction = JqExtraction::compile(".user.id").unwrap();
-///
-/// // Extract and hash a sensitive field
-/// let extraction = JqExtraction::compile(".password | hash").unwrap();
-/// ```
-#[derive(Clone)]
-pub struct JqExtraction {
-    filter: Filter<Native<Val>>,
-}
-
-impl Debug for JqExtraction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("JqExtraction").finish_non_exhaustive()
-    }
-}
-
-/// Result type for jq functions.
-type JqResult = Result<Val, jaq_core::Error<Val>>;
-
-/// Custom jq functions for hitbox.
-fn custom_jq_funs() -> impl Iterator<Item = (&'static str, Box<[Bind]>, Native<Val>)> {
-    let v0: Box<[Bind]> = Box::new([]);
-
-    [
-        // hash: SHA256 hash of the string value (truncated to 16 hex chars)
-        (
-            "hash",
-            v0,
-            Native::new(|_, cv| {
-                let val = cv.1;
-                let result: JqResult = match &val {
-                    Val::Str(s) => {
-                        let hash = apply_hash(s);
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Int(n) => {
-                        let hash = apply_hash(&n.to_string());
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Float(f) => {
-                        let hash = apply_hash(&f.to_string());
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Bool(b) => {
-                        let hash = apply_hash(&b.to_string());
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Null => {
-                        let hash = apply_hash("null");
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Num(n) => {
-                        let hash = apply_hash(n);
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                    Val::Arr(_) | Val::Obj(_) => {
-                        // For arrays and objects, serialize to JSON string first
-                        let json: Value = val.clone().into();
-                        let hash = apply_hash(&json.to_string());
-                        Ok(Val::Str(Rc::new(hash)))
-                    }
-                };
-                box_once(result.map_err(Exn::from))
-            }),
-        ),
-    ]
-    .into_iter()
-}
-
-impl JqExtraction {
-    /// Compiles a jq expression for extracting values from JSON bodies.
-    ///
-    /// The compiled filter can be reused across multiple requests.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err(String)` if the expression is invalid:
-    /// - Parse errors (syntax errors in the jq expression)
-    /// - Compile errors (undefined functions, type mismatches)
-    ///
-    /// The error message includes details about the parsing or compilation failure.
-    pub fn compile(expression: &str) -> Result<Self, String> {
-        let program = File {
-            code: expression,
-            path: (),
-        };
-        let loader = Loader::new(jaq_std::defs().chain(jaq_json::defs()));
-        let arena = Arena::default();
-        let modules = loader
-            .load(&arena, program)
-            .map_err(|e| format!("jq parse error: {:?}", e))?;
-        let filter = jaq_core::Compiler::default()
-            .with_funs(
-                jaq_std::funs()
-                    .chain(jaq_json::funs())
-                    .chain(custom_jq_funs()),
-            )
-            .compile(modules)
-            .map_err(|e| format!("jq compile error: {:?}", e))?;
-        Ok(Self { filter })
-    }
-
-    fn apply(&self, input: Value) -> Vec<Value> {
-        let inputs = RcIter::new(core::iter::empty());
-        let out = self.filter.run((Ctx::new([], &inputs), Val::from(input)));
-        out.filter_map(|r| r.ok()).map(|v| v.into()).collect()
-    }
 }
 
 /// Configuration for regex-based body extraction.
@@ -204,6 +82,18 @@ pub struct RegexExtraction {
 ///
 /// Apply hash, lowercase, or other transforms to captured values
 /// before using them in cache keys.
+///
+/// Use [`Transforms::builder()`] for ergonomic construction:
+///
+/// ```
+/// use hitbox_http::extractors::body::Transforms;
+/// use hitbox_http::extractors::transform::Transform;
+///
+/// let t: Transforms = Transforms::builder()
+///     .full(Transform::Hash)
+///     .full(Transform::Truncate(16))
+///     .into();
+/// ```
 #[derive(Debug, Clone, Default)]
 pub enum Transforms {
     /// No transformations applied.
@@ -213,6 +103,293 @@ pub enum Transforms {
     FullBody(Vec<Transform>),
     /// Apply different transforms per capture group name.
     PerKey(HashMap<String, Vec<Transform>>),
+}
+
+impl Transforms {
+    /// Create a [`TransformBuilder`] for ergonomic construction.
+    pub fn builder() -> TransformBuilder<BuilderEmpty> {
+        TransformBuilder {
+            state: BuilderEmpty,
+        }
+    }
+}
+
+/// Builder for [`Transforms`], created via [`Transforms::builder()`].
+///
+/// Uses typestate to enforce at compile time that `.full()` and `.key()`
+/// cannot be mixed.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::body::Transforms;
+/// use hitbox_http::extractors::transform::Transform;
+///
+/// // Full-body transform chain
+/// let transforms = Transforms::builder()
+///     .full(Transform::Hash)
+///     .full(Transform::Truncate(16));
+///
+/// // Per-key transforms
+/// let transforms = Transforms::builder()
+///     .key("token", Transform::Hash)
+///     .key("name", Transform::Lowercase);
+/// ```
+#[derive(Debug, Clone)]
+pub struct TransformBuilder<S> {
+    state: S,
+}
+
+/// Initial state: no transforms added yet.
+#[derive(Debug, Clone)]
+pub struct BuilderEmpty;
+
+/// State after adding full-body transforms.
+#[derive(Debug, Clone)]
+pub struct BuilderFull(Vec<Transform>);
+
+/// State after adding per-key transforms.
+#[derive(Debug, Clone)]
+pub struct BuilderPerKey(HashMap<String, Vec<Transform>>);
+
+impl TransformBuilder<BuilderEmpty> {
+    /// Add a transform applied to all captured values.
+    ///
+    /// Transitions to full-body mode. Only `.full()` can be called after this.
+    pub fn full(self, t: Transform) -> TransformBuilder<BuilderFull> {
+        TransformBuilder {
+            state: BuilderFull(vec![t]),
+        }
+    }
+
+    /// Add a transform for a specific capture group by name.
+    ///
+    /// Transitions to per-key mode. Only `.key()` can be called after this.
+    pub fn key(self, name: impl Into<String>, t: Transform) -> TransformBuilder<BuilderPerKey> {
+        let mut map = HashMap::new();
+        map.insert(name.into(), vec![t]);
+        TransformBuilder {
+            state: BuilderPerKey(map),
+        }
+    }
+}
+
+impl TransformBuilder<BuilderFull> {
+    /// Add another transform to the full-body chain.
+    pub fn full(mut self, t: Transform) -> Self {
+        self.state.0.push(t);
+        self
+    }
+}
+
+impl TransformBuilder<BuilderPerKey> {
+    /// Add a transform for a specific capture group by name.
+    ///
+    /// Multiple calls for the same key chain transforms in order.
+    pub fn key(mut self, name: impl Into<String>, t: Transform) -> Self {
+        self.state.0.entry(name.into()).or_default().push(t);
+        self
+    }
+}
+
+impl From<TransformBuilder<BuilderEmpty>> for Transforms {
+    fn from(_: TransformBuilder<BuilderEmpty>) -> Self {
+        Transforms::None
+    }
+}
+
+impl From<TransformBuilder<BuilderFull>> for Transforms {
+    fn from(builder: TransformBuilder<BuilderFull>) -> Self {
+        Transforms::FullBody(builder.state.0)
+    }
+}
+
+impl From<TransformBuilder<BuilderPerKey>> for Transforms {
+    fn from(builder: TransformBuilder<BuilderPerKey>) -> Self {
+        Transforms::PerKey(builder.state.0)
+    }
+}
+
+/// Trait for converting a body extraction config into a [`BodyExtraction`].
+pub trait IntoBodyExtraction {
+    /// Convert into a [`BodyExtraction`].
+    fn into_extraction(self) -> BodyExtraction;
+}
+
+impl IntoBodyExtraction for BodyExtraction {
+    fn into_extraction(self) -> BodyExtraction {
+        self
+    }
+}
+
+/// Initial state for [`BodyConfig`] before a mode is chosen.
+#[derive(Debug, Clone)]
+pub struct NoMode;
+
+/// Hash mode for [`BodyConfig`].
+#[derive(Debug, Clone)]
+pub struct HashMode;
+
+/// JQ mode for [`BodyConfig`].
+#[derive(Debug, Clone)]
+pub struct JqMode {
+    extraction: JqExpression,
+}
+
+/// Regex mode for [`BodyConfig`].
+#[derive(Debug, Clone)]
+pub struct RegexMode {
+    regex: Regex,
+    global: bool,
+}
+
+/// Configuration for the body extractor, parameterized by extraction mode.
+///
+/// Start with [`BodyConfig::new()`] to set shared options (key, transforms),
+/// then choose a mode. Or use the mode constructors directly as shortcuts.
+///
+/// # Examples
+///
+/// ```
+/// use hitbox_http::extractors::{self, MethodConfig, MethodExtractor, body::{BodyConfig, BodyExtractor}};
+///
+/// # use bytes::Bytes;
+/// # use http_body_util::Empty;
+/// // Hash mode
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .body(BodyConfig::new().hash());
+///
+/// // Shared config then mode
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .body(BodyConfig::new().key("token").regex(r"(\w+)").unwrap().global());
+///
+/// // Mode-first shortcut with key
+/// let extractor = extractors::extractor::<Empty<Bytes>>()
+///     .method(MethodConfig::new())
+///     .body(BodyConfig::new().regex(r"token=(\w+)").unwrap().key("api-token").global());
+/// ```
+#[derive(Debug, Clone)]
+pub struct BodyConfig<M> {
+    key: Option<String>,
+    transforms: Transforms,
+    mode: M,
+}
+
+// Shared builder methods available on all states.
+impl<M> BodyConfig<M> {
+    /// Set the key name for generated key parts. Defaults to `"body"`.
+    ///
+    /// Behavior varies by mode:
+    /// - **Hash**: used as the key part name (replaces default `"body"`).
+    /// - **Regex**: used as the key part name for unnamed capture groups.
+    ///   Named captures use their own names regardless of this setting.
+    /// - **Jq**: used as the key part name for scalar and array-of-scalar
+    ///   outputs. Object outputs use their field names, and array-of-object
+    ///   outputs use each object's field names — this setting is ignored
+    ///   in those cases.
+    pub fn key(mut self, key: impl Into<String>) -> Self {
+        self.key = Some(key.into());
+        self
+    }
+
+    /// Set transforms for extracted values.
+    ///
+    /// Accepts [`Transforms`] directly or a [`TransformBuilder`].
+    pub fn transforms(mut self, transforms: impl Into<Transforms>) -> Self {
+        self.transforms = transforms.into();
+        self
+    }
+}
+
+impl BodyConfig<NoMode> {
+    /// Create a new body config without a mode. Set shared options,
+    /// then choose a mode with `.hash()`, `.jq()`, or `.regex()`.
+    pub fn new() -> Self {
+        BodyConfig {
+            key: None,
+            transforms: Transforms::None,
+            mode: NoMode,
+        }
+    }
+
+    /// Switch to hash mode.
+    pub fn hash(self) -> BodyConfig<HashMode> {
+        BodyConfig {
+            key: self.key,
+            transforms: self.transforms,
+            mode: HashMode,
+        }
+    }
+
+    /// Switch to jq mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the jq expression is invalid.
+    pub fn jq(self, expression: &str) -> Result<BodyConfig<JqMode>, String> {
+        Ok(BodyConfig {
+            key: self.key,
+            transforms: self.transforms,
+            mode: JqMode {
+                extraction: JqExpression::compile(expression)?,
+            },
+        })
+    }
+
+    /// Switch to regex mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the regex pattern is invalid.
+    pub fn regex(self, pattern: &str) -> Result<BodyConfig<RegexMode>, regex::Error> {
+        Ok(BodyConfig {
+            key: self.key,
+            transforms: self.transforms,
+            mode: RegexMode {
+                regex: Regex::new(pattern)?,
+                global: false,
+            },
+        })
+    }
+}
+
+impl Default for BodyConfig<NoMode> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BodyConfig<RegexMode> {
+    /// Enable global matching (extract all matches instead of first).
+    pub fn global(mut self) -> Self {
+        self.mode.global = true;
+        self
+    }
+}
+
+impl IntoBodyExtraction for BodyConfig<HashMode> {
+    fn into_extraction(self) -> BodyExtraction {
+        BodyExtraction::Hash
+    }
+}
+
+impl IntoBodyExtraction for BodyConfig<JqMode> {
+    fn into_extraction(self) -> BodyExtraction {
+        BodyExtraction::Jq(self.mode.extraction)
+    }
+}
+
+impl IntoBodyExtraction for BodyConfig<RegexMode> {
+    fn into_extraction(self) -> BodyExtraction {
+        BodyExtraction::Regex(RegexExtraction {
+            regex: self.mode.regex,
+            key: self.key,
+            global: self.mode.global,
+            transforms: self.transforms,
+        })
+    }
 }
 
 /// Extracts cache key parts from request bodies.
@@ -231,25 +408,15 @@ pub struct Body<E> {
     extraction: BodyExtraction,
 }
 
-impl<S> Body<super::NeutralExtractor<S>> {
-    /// Creates a body extractor with the given extraction mode.
-    pub fn new(extraction: BodyExtraction) -> Self {
-        Self {
-            inner: super::NeutralExtractor::new(),
-            extraction,
-        }
-    }
-}
-
 /// Extension trait for adding body extraction to an extractor chain.
 ///
 /// # For Callers
 ///
 /// Chain this to extract cache key parts from request bodies. Choose an
-/// extraction mode based on your needs:
-/// - [`BodyExtraction::Hash`] for opaque body identification
-/// - [`BodyExtraction::Jq`] for JSON content extraction
-/// - [`BodyExtraction::Regex`] for pattern-based extraction
+/// extraction mode via [`BodyConfig`]:
+/// - [`BodyConfig::hash()`] for opaque body identification
+/// - [`BodyConfig::jq()`] for JSON content extraction
+/// - [`BodyConfig::regex()`] for pattern-based extraction
 ///
 /// **Important**: Body extraction buffers the entire body into memory.
 /// The body is returned as [`BufferedBody::Complete`](crate::BufferedBody::Complete) after extraction.
@@ -259,18 +426,18 @@ impl<S> Body<super::NeutralExtractor<S>> {
 /// This trait is automatically implemented for all [`Extractor`]
 /// types. You don't need to implement it manually.
 pub trait BodyExtractor: Sized {
-    /// Adds body extraction with the specified mode.
-    fn body(self, extraction: BodyExtraction) -> Body<Self>;
+    /// Adds body extraction with the specified configuration.
+    fn body(self, config: impl IntoBodyExtraction) -> Body<Self>;
 }
 
 impl<E> BodyExtractor for E
 where
     E: hitbox::Extractor,
 {
-    fn body(self, extraction: BodyExtraction) -> Body<Self> {
+    fn body(self, config: impl IntoBodyExtraction) -> Body<Self> {
         Body {
             inner: self,
-            extraction,
+            extraction: config.into_extraction(),
         }
     }
 }
@@ -394,11 +561,11 @@ where
     type Subject = E::Subject;
 
     async fn get(&self, subject: Self::Subject) -> KeyParts<Self::Subject> {
-        let (parts, body) = subject.into_parts();
+        let (mut parts, body) = subject.into_parts();
 
         // Collect body
-        let payload = match body.collect().await {
-            Ok(bytes) => bytes,
+        let collected = match body.collect().await {
+            Ok(c) => c,
             Err(error_body) => {
                 let request = CacheableHttpRequest::from_request(http::Request::from_parts(
                     parts, error_body,
@@ -408,6 +575,7 @@ where
                 return key_parts;
             }
         };
+        let (payload, payload_trailers) = (collected.data, collected.trailers);
 
         let body_bytes = payload.to_vec();
         let body_str = String::from_utf8_lossy(&body_bytes);
@@ -417,17 +585,16 @@ where
                 let hash = apply_hash(&body_str);
                 vec![KeyPart::new("body", Some(hash))]
             }
-            BodyExtraction::Jq(jq) => match serde_json::from_str(&body_str) {
-                Ok(json_value) => {
-                    let results = jq.apply(json_value);
-                    extract_jq_parts(results)
+            BodyExtraction::Jq(jq) => {
+                match ParsedBody::get_or_parse(&mut parts.extensions, &payload) {
+                    Some(input) => extract_jq_parts(jq.outputs(input)),
+                    None => {
+                        warn!("Jq body extraction failed: invalid JSON, falling back to body hash");
+                        let hash = apply_hash(&body_str);
+                        vec![KeyPart::new("body", Some(hash))]
+                    }
                 }
-                Err(err) => {
-                    warn!(%err, "Jq body extraction failed: invalid JSON, falling back to body hash");
-                    let hash = apply_hash(&body_str);
-                    vec![KeyPart::new("body", Some(hash))]
-                }
-            },
+            }
             BodyExtraction::Regex(regex_ext) => extract_regex_parts(
                 &body_str,
                 &regex_ext.regex,
@@ -437,7 +604,10 @@ where
             ),
         };
 
-        let body = crate::BufferedBody::Complete(Some(payload));
+        let body = crate::BufferedBody::Complete {
+            data: Some(payload),
+            trailers: payload_trailers,
+        };
         let request = CacheableHttpRequest::from_request(http::Request::from_parts(parts, body));
 
         let mut key_parts = self.inner.get(request).await;

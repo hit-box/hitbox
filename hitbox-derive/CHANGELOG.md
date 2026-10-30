@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Generated `CacheableRequest` / `CacheableResponse` impls follow the tag-aware `cache_policy` signatures; derive users need no changes ([#280](https://github.com/hit-box/hitbox/pull/280))
+
+### Added
+- `#[cached]` macro support for generic type parameters and reference (`&'a T`) parameters ([#206](https://github.com/hit-box/hitbox/pull/206))
+
+### Changed
+- `#[cached]` codegen uses `CacheAccess` trait instead of concrete `Cache<B, CM, O>` type ([#206](https://github.com/hit-box/hitbox/pull/206))
+- `#[derive(CacheableRequest)]` generates GAT-based impl to support non-`'static` request types ([#206](https://github.com/hit-box/hitbox/pull/206))
+
 ## [0.2.1] - 2026-02-17
 
 ### Fixed

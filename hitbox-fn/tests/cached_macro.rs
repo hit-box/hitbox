@@ -81,7 +81,7 @@ pub async fn with_db_connection(_db: DbConnection, user_id: i64) -> String {
 // Generic type parameter support
 // =============================================================================
 
-use hitbox_core::KeyPart;
+use hitbox::KeyPart;
 use hitbox_fn::KeyExtract;
 
 /// A type that implements KeyExtract for use in generic tests.
@@ -128,7 +128,7 @@ pub async fn generic_with_skip<T: KeyExtract + Clone + std::fmt::Debug + Send + 
 // =============================================================================
 
 fn create_cache()
--> Cache<MokaBackend, hitbox::concurrency::NoopConcurrencyManager, hitbox_core::DisabledOffload> {
+-> Cache<MokaBackend, hitbox::concurrency::NoopConcurrencyManager, hitbox::DisabledOffload> {
     Cache::builder()
         .backend(MokaBackend::builder().max_entries(100).build())
         .policy(PolicyConfig::builder().ttl(Duration::from_secs(60)).build())
@@ -369,6 +369,164 @@ async fn test_generic_with_skip() {
 }
 
 // =============================================================================
+// Reference parameter support
+// =============================================================================
+
+/// Function with a reference parameter.
+#[cached(prefix = "ref_param")]
+pub async fn with_reference<'a>(data: &'a str) -> String {
+    data.to_uppercase()
+}
+
+/// Function with reference and owned parameters.
+#[cached(prefix = "ref_mixed")]
+pub async fn with_mixed_params<'a>(prefix: &'a str, id: i64) -> String {
+    format!("{}_{}", prefix, id)
+}
+
+/// Function with skipped reference parameter.
+#[cached(prefix = "ref_skip", skip(_ctx))]
+pub async fn with_skipped_reference<'a>(_ctx: &'a str, value: i64) -> i64 {
+    value * 2
+}
+
+#[tokio::test]
+async fn test_reference_param() {
+    let cache = create_cache();
+
+    let data = String::from("hello");
+    let (r1, c1) = with_reference(&data).cache(&cache).with_context().await;
+    let (r2, c2) = with_reference(&data).cache(&cache).with_context().await;
+
+    assert_eq!(r1, "HELLO");
+    assert_eq!(r2, "HELLO");
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+#[tokio::test]
+async fn test_reference_different_values() {
+    let cache = create_cache();
+
+    let (_, c1) = with_reference("hello").cache(&cache).with_context().await;
+    let (_, c2) = with_reference("world").cache(&cache).with_context().await;
+
+    // Different values = different cache keys
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Miss);
+}
+
+#[tokio::test]
+async fn test_mixed_ref_and_owned() {
+    let cache = create_cache();
+
+    let prefix = "user";
+    let (r1, c1) = with_mixed_params(prefix, 42)
+        .cache(&cache)
+        .with_context()
+        .await;
+    let (r2, c2) = with_mixed_params(prefix, 42)
+        .cache(&cache)
+        .with_context()
+        .await;
+
+    assert_eq!(r1, "user_42");
+    assert_eq!(r2, "user_42");
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+#[tokio::test]
+async fn test_skipped_reference() {
+    let cache = create_cache();
+
+    // Different context (skipped) should hit same cache key
+    let (r1, c1) = with_skipped_reference("ctx-1", 21)
+        .cache(&cache)
+        .with_context()
+        .await;
+    let (r2, c2) = with_skipped_reference("ctx-2", 21)
+        .cache(&cache)
+        .with_context()
+        .await;
+
+    assert_eq!(r1, 42);
+    assert_eq!(r2, 42);
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+// =============================================================================
+// Multiple lifetime parameters
+// =============================================================================
+
+#[cached]
+pub async fn with_two_lifetimes<'a, 'b>(prefix: &'a str, suffix: &'b str) -> String {
+    format!("{}-{}", prefix, suffix)
+}
+
+#[tokio::test]
+async fn test_two_lifetimes_passthrough() {
+    let p = String::from("hello");
+    let s = String::from("world");
+    let result = with_two_lifetimes(&p, &s).await;
+    assert_eq!(result, "hello-world");
+}
+
+#[tokio::test]
+async fn test_two_lifetimes_different_scopes() {
+    // The two references have genuinely different lifetimes:
+    // `"long"` is 'static while `&s` borrows a local.
+    // This exercises the synthetic '__hitbox lifetime (inferred as the shorter one).
+    let result = {
+        let s = String::from("short");
+        with_two_lifetimes("long", &s).await
+    };
+    assert_eq!(result, "long-short");
+}
+
+#[tokio::test]
+async fn test_two_lifetimes_cached() {
+    let cache = create_cache();
+
+    let p = String::from("key");
+    let s = String::from("val");
+
+    let (r1, c1) = with_two_lifetimes(&p, &s)
+        .cache(&cache)
+        .with_context()
+        .await;
+    let (r2, c2) = with_two_lifetimes(&p, &s)
+        .cache(&cache)
+        .with_context()
+        .await;
+
+    assert_eq!(r1, "key-val");
+    assert_eq!(r2, "key-val");
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Hit);
+}
+
+#[tokio::test]
+async fn test_two_lifetimes_different_values() {
+    let cache = create_cache();
+
+    let (r1, c1) = with_two_lifetimes("a", "b")
+        .cache(&cache)
+        .with_context()
+        .await;
+    let (r2, c2) = with_two_lifetimes("a", "c")
+        .cache(&cache)
+        .with_context()
+        .await;
+
+    assert_eq!(r1, "a-b");
+    assert_eq!(r2, "a-c");
+    assert_eq!(c1.status, CacheStatus::Miss);
+    assert_eq!(c2.status, CacheStatus::Miss);
+}
+
+// =============================================================================
 // CacheableResponse skip field tests
 // =============================================================================
 
@@ -588,8 +746,8 @@ mod spy_backend {
     use async_trait::async_trait;
     use dashmap::DashMap;
     use hitbox::backend::{Backend, BackendError, CacheBackend, DeleteStatus};
+    use hitbox::{CacheKey, CacheValue, Raw};
     use hitbox_backend::format::RonFormat;
-    use hitbox_core::{CacheKey, CacheValue, Raw};
 
     /// A backend that always misses but records keys and values.
     /// Uses RON format for human-readable value inspection.

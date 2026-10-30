@@ -5,13 +5,14 @@ use std::time::Duration;
 
 use chrono::Utc;
 use cucumber::World;
-use hitbox::CacheContext;
 use hitbox::concurrency::BroadcastConcurrencyManager;
-use hitbox::fsm::CacheFuture;
+use hitbox::fsm::{CacheFuture, SelectiveCacheFuture};
 use hitbox::policy::{ConcurrencyLimit, EnabledCacheConfig, PolicyConfig};
+use hitbox::{CacheContext, SelectiveConfig};
 use hitbox_backend::composition::CompositionPolicy;
 use hitbox_backend::composition::policy::RefillPolicy;
 use hitbox_backend::{CacheBackend, CompositionBackend};
+use hitbox_core::tag::{CacheTag, TagExtractor};
 use hitbox_core::{
     CacheKey, CachePolicy, CacheValue, CacheablePolicyData, CacheableRequest, CacheableResponse,
     EntityPolicyConfig, Extractor, KeyPart, KeyParts, Offload, Predicate, PredicateResult,
@@ -29,22 +30,52 @@ use crate::tracing::{SpanCollector, create_span_collector};
 pub struct SimpleRequest(pub u32);
 
 impl CacheableRequest for SimpleRequest {
-    async fn cache_policy<P, E>(self, predicates: P, extractors: E) -> RequestCachePolicy<Self>
+    type CachePolicyFuture<'a, P, E, TE>
+        = std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = (RequestCachePolicy<Self>, Vec<CacheTag>)> + Send + 'a,
+        >,
+    >
     where
-        P: Predicate<Subject = Self> + Send + Sync,
-        E: Extractor<Subject = Self> + Send + Sync,
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
+        TE: TagExtractor<Subject = Self> + Send + Sync + 'a;
+
+    fn cache_policy<'a, P, E, TE>(
+        self,
+        predicates: P,
+        extractors: E,
+        tag_extractor: Option<TE>,
+    ) -> Self::CachePolicyFuture<'a, P, E, TE>
+    where
+        Self: 'a,
+        P: Predicate<Subject = Self> + Send + Sync + 'a,
+        E: Extractor<Subject = Self> + Send + Sync + 'a,
+        TE: TagExtractor<Subject = Self> + Send + Sync + 'a,
     {
-        match predicates.check(self).await {
-            PredicateResult::Cacheable(request) => {
-                let key_parts = extractors.get(request).await;
-                let (request, cache_key) = key_parts.into_cache_key();
-                RequestCachePolicy::Cacheable(CacheablePolicyData {
-                    key: cache_key,
-                    request,
-                })
+        Box::pin(async move {
+            match predicates.check(self).await {
+                PredicateResult::Cacheable(request) => {
+                    let key_parts = extractors.get(request).await;
+                    let (request, cache_key) = key_parts.into_cache_key();
+                    let (request, tags) = match tag_extractor {
+                        Some(te) => te.extract_tags(request).await,
+                        None => (request, Vec::new()),
+                    };
+                    (
+                        RequestCachePolicy::Cacheable(CacheablePolicyData {
+                            key: cache_key,
+                            request,
+                        }),
+                        tags,
+                    )
+                }
+                PredicateResult::NonCacheable(request) => {
+                    (RequestCachePolicy::NonCacheable(request), Vec::new())
+                }
             }
-            PredicateResult::NonCacheable(request) => RequestCachePolicy::NonCacheable(request),
-        }
+        })
     }
 }
 
@@ -57,19 +88,30 @@ impl CacheableResponse for SimpleResponse {
     type IntoCachedFuture = Ready<CachePolicy<Self::Cached, Self>>;
     type FromCachedFuture = Ready<Self>;
 
-    async fn cache_policy<P>(
+    async fn cache_policy<P, TE>(
         self,
         predicates: P,
+        tag_extractor: Option<TE>,
         _config: &EntityPolicyConfig,
-    ) -> ResponseCachePolicy<Self>
+    ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
     where
         P: Predicate<Subject = Self::Subject> + Send + Sync,
+        TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
     {
         match predicates.check(self).await {
             PredicateResult::Cacheable(response) => {
-                CachePolicy::Cacheable(CacheValue::new(response.0, None, None))
+                let (response, tags) = match tag_extractor {
+                    Some(te) => te.extract_tags(response).await,
+                    None => (response, Vec::new()),
+                };
+                (
+                    CachePolicy::Cacheable(CacheValue::new(response.0, None, None)),
+                    tags,
+                )
             }
-            PredicateResult::NonCacheable(response) => CachePolicy::NonCacheable(response),
+            PredicateResult::NonCacheable(response) => {
+                (CachePolicy::NonCacheable(response), Vec::new())
+            }
         }
     }
 
@@ -162,8 +204,8 @@ impl Upstream<SimpleRequest> for ConfigurableUpstream {
     type Response = SimpleResponse;
     type Future = std::pin::Pin<Box<dyn std::future::Future<Output = SimpleResponse> + Send>>;
 
-    fn call(&mut self, request: SimpleRequest) -> Self::Future {
-        let call_count = self.call_count.clone();
+    fn call(self, request: SimpleRequest) -> Self::Future {
+        let call_count = self.call_count;
         let delay_ms = self.delay_ms;
         let response_value = request.0;
         Box::pin(async move {
@@ -282,6 +324,8 @@ pub struct FsmWorld {
     pub l2_backend: MokaBackend,
     /// Span collector for capturing FSM state transitions
     pub span_collector: SpanCollector,
+    /// Configs for SelectiveCacheFuture scenarios
+    pub selective_configs: Vec<FsmConfig>,
 }
 
 impl FsmWorld {
@@ -306,6 +350,7 @@ impl FsmWorld {
             l1_backend: MokaBackend::builder().max_entries(100).build(),
             l2_backend: MokaBackend::builder().max_entries(100).build(),
             span_collector: create_span_collector(),
+            selective_configs: Vec::new(),
         }
     }
 
@@ -331,6 +376,7 @@ impl FsmWorld {
                 stale: self.config.stale,
                 concurrency: self.config.concurrency,
                 policy: Default::default(),
+                tag_invalidation: Default::default(),
             })
         } else {
             PolicyConfig::Disabled
@@ -418,6 +464,98 @@ impl FsmWorld {
 
                                 cache_future.await
                             }
+                        })
+                    })
+                })
+            });
+
+            handles.push(handle);
+        }
+
+        let responses: Vec<_> = futures::future::join_all(handles)
+            .await
+            .into_iter()
+            .map(|r| r.expect("Task should not panic"))
+            .collect();
+
+        self.results = TestResults {
+            responses,
+            upstream_call_count: upstream_call_count.load(Ordering::SeqCst),
+        };
+    }
+
+    pub async fn run_selective_requests(&mut self, num_requests: usize, request_value: u32) {
+        let upstream_call_count = Arc::new(AtomicUsize::new(0));
+        let concurrency_manager = Arc::new(BroadcastConcurrencyManager::<SimpleResponse>::new());
+
+        // Build SelectiveConfig from selective_configs
+        let configs = SelectiveConfig::new(
+            self.selective_configs
+                .iter()
+                .map(|cfg| {
+                    let policy = if cfg.cache_enabled {
+                        PolicyConfig::Enabled(EnabledCacheConfig {
+                            ttl: cfg.ttl,
+                            stale: cfg.stale,
+                            concurrency: cfg.concurrency,
+                            policy: Default::default(),
+                            tag_invalidation: Default::default(),
+                        })
+                    } else {
+                        PolicyConfig::Disabled
+                    };
+                    hitbox::Config::builder()
+                        .request_predicate(ConfigurableRequestPredicate {
+                            cacheable: cfg.request_cacheable,
+                        })
+                        .response_predicate(ConfigurableResponsePredicate {
+                            cacheable: cfg.response_cacheable,
+                        })
+                        .extractor(FixedKeyExtractor)
+                        .policy(policy)
+                        .build()
+                })
+                .collect(),
+        );
+
+        // Pre-populate cache
+        let backend = Arc::new(self.backend.clone());
+        self.prepopulate_cache(&backend).await;
+
+        // Clear any previously captured spans
+        self.span_collector.clear();
+
+        let mut handles = Vec::new();
+
+        for i in 0..num_requests {
+            let configs = configs.clone();
+            let backend = backend.clone();
+            let concurrency_manager = concurrency_manager.clone();
+            let upstream_call_count = upstream_call_count.clone();
+            let upstream_delay_ms = self.upstream_delay_ms;
+            let request_delay_ms = self.request_delay_ms;
+            let dispatch = self.span_collector.dispatch().clone();
+
+            let handle = tokio::spawn(async move {
+                if request_delay_ms > 0 && i > 0 {
+                    tokio::time::sleep(Duration::from_millis(i as u64 * request_delay_ms)).await;
+                }
+
+                let upstream = ConfigurableUpstream::new(upstream_call_count, upstream_delay_ms);
+
+                tracing::dispatcher::with_default(&dispatch, || {
+                    tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async {
+                            let selective_future = SelectiveCacheFuture::new(
+                                configs,
+                                backend,
+                                SimpleRequest(request_value),
+                                upstream,
+                                hitbox_core::DisabledOffload,
+                                concurrency_manager,
+                            );
+
+                            selective_future.await
                         })
                     })
                 })
@@ -629,6 +767,7 @@ impl std::fmt::Debug for FsmWorld {
             .field("request_delay_ms", &self.request_delay_ms)
             .field("results", &self.results)
             .field("composition", &self.composition)
+            .field("selective_configs", &self.selective_configs)
             .finish_non_exhaustive()
     }
 }

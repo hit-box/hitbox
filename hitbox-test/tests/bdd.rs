@@ -1,3 +1,4 @@
+use cucumber::writer::Stats as _;
 use cucumber::writer::{Basic, JUnit};
 use cucumber::writer::{Verbosity, basic::Coloring};
 use cucumber::{World, WriterExt};
@@ -23,7 +24,7 @@ pub async fn main() {
     let junit_path = target_dir.join("cucumber-integration-junit.xml");
     let file = File::create(&junit_path).expect("Failed to create JUnit XML file");
 
-    HitboxWorld::cucumber()
+    let integration = HitboxWorld::cucumber()
         .max_concurrent_scenarios(None)
         .with_writer(
             Basic::new(stdout(), Coloring::Auto, Verbosity::Default)
@@ -46,7 +47,7 @@ pub async fn main() {
     let junit_path = target_dir.join("cucumber-fsm-junit.xml");
     let file = File::create(&junit_path).expect("Failed to create JUnit XML file");
 
-    FsmWorld::cucumber()
+    let fsm = FsmWorld::cucumber()
         .max_concurrent_scenarios(None)
         .with_writer(
             Basic::new(stdout(), Coloring::Auto, Verbosity::Default)
@@ -60,4 +61,8 @@ pub async fn main() {
         .await;
 
     println!("\n========== All BDD Tests Complete ==========\n");
+
+    if integration.execution_has_failed() || fsm.execution_has_failed() {
+        panic!("BDD tests had failures");
+    }
 }

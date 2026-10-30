@@ -7,9 +7,9 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 categories.workspace = true
-description = "Hitbox redis backend."
+description = "Distributed Redis cache backend for Hitbox with automatic TTL management."
 readme = "README.md"
-keywords = ["cache", "async", "cache-backend", "hitbox", "redis"]
+keywords = ["cache", "redis", "async", "distributed", "ttl"]
 
 [dependencies]
 hitbox-backend = { path = "../hitbox-backend", version = "0.2" }

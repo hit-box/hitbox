@@ -100,11 +100,11 @@ impl CompositionFormat {
         // Compress
         let compress_timer = Timer::new();
         let compressed = compressor
-            .compress(&serialized)
+            .compress(serialized)
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
         crate::metrics::record_compress(label, compress_timer.elapsed());
 
-        Ok(Bytes::from(compressed))
+        Ok(compressed)
     }
 
     /// Serialize data for both layers and return raw compressed bytes without Envelope.
@@ -129,14 +129,14 @@ impl CompositionFormat {
         let l1_compress_timer = Timer::new();
         let l1_compressed = self
             .l1_compressor
-            .compress(&l1_serialized)
+            .compress(l1_serialized.clone())
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
         crate::metrics::record_compress(&self.l1_label, l1_compress_timer.elapsed());
 
         // Serialize and compress for L2
         // If L1 and L2 use the same format, reuse the serialized data (skip second serialization)
         let l2_serialized = if self.same_format() {
-            l1_serialized.clone()
+            l1_serialized
         } else {
             let l2_serialize_timer = Timer::new();
             let serialized = self.l2_format.with_serializer(f, context)?;
@@ -147,11 +147,11 @@ impl CompositionFormat {
         let l2_compress_timer = Timer::new();
         let l2_compressed = self
             .l2_compressor
-            .compress(&l2_serialized)
+            .compress(l2_serialized)
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
         crate::metrics::record_compress(&self.l2_label, l2_compress_timer.elapsed());
 
-        Ok((Bytes::from(l1_compressed), Bytes::from(l2_compressed)))
+        Ok((l1_compressed, l2_compressed))
     }
 
     /// Deserialize data from a specific layer.
@@ -162,7 +162,7 @@ impl CompositionFormat {
     /// Metrics are recorded with the appropriate composed label.
     pub fn deserialize_layer(
         &self,
-        data: &[u8],
+        data: Raw,
         layer: CompositionLayer,
         f: &mut dyn FnMut(&mut FormatDeserializer) -> Result<(), FormatError>,
         ctx: &mut BoxContext,
@@ -214,12 +214,11 @@ impl Format for CompositionFormat {
             let compress_timer = Timer::new();
             let l1_compressed = self
                 .l1_compressor
-                .compress(&l1_serialized)
+                .compress(l1_serialized)
                 .map_err(|e| FormatError::Serialize(Box::new(e)))?;
             crate::metrics::record_compress(&self.l1_label, compress_timer.elapsed());
 
-            let composition =
-                CompositionEnvelope::L1(CacheValue::new(Bytes::from(l1_compressed), None, None));
+            let composition = CompositionEnvelope::L1(CacheValue::new(l1_compressed, None, None));
 
             return composition
                 .serialize()
@@ -235,14 +234,14 @@ impl Format for CompositionFormat {
         let l1_compress_timer = Timer::new();
         let l1_compressed = self
             .l1_compressor
-            .compress(&l1_serialized)
+            .compress(l1_serialized.clone())
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
         crate::metrics::record_compress(&self.l1_label, l1_compress_timer.elapsed());
 
         // Serialize and compress for L2
         // If L1 and L2 use the same format, reuse the serialized data instead of serializing again
         let l2_serialized = if self.same_format() {
-            l1_serialized.clone()
+            l1_serialized
         } else {
             let l2_serialize_timer = Timer::new();
             let serialized = self.l2_format.with_serializer(f, context)?;
@@ -253,14 +252,14 @@ impl Format for CompositionFormat {
         let l2_compress_timer = Timer::new();
         let l2_compressed = self
             .l2_compressor
-            .compress(&l2_serialized)
+            .compress(l2_serialized)
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
         crate::metrics::record_compress(&self.l2_label, l2_compress_timer.elapsed());
 
         // Pack both compressed values into CompositionEnvelope
         let composition = CompositionEnvelope::Both {
-            l1: CacheValue::new(Bytes::from(l1_compressed), None, None),
-            l2: CacheValue::new(Bytes::from(l2_compressed), None, None),
+            l1: CacheValue::new(l1_compressed, None, None),
+            l2: CacheValue::new(l2_compressed, None, None),
         };
 
         // Serialize the CompositionEnvelope using zero-copy repr(C) format
@@ -313,7 +312,7 @@ impl Format for CompositionFormat {
         // Decompress the data
         let decompress_timer = Timer::new();
         let decompressed = compressor
-            .decompress(compressed_data.as_ref())
+            .decompress(compressed_data.clone())
             .map_err(|e| FormatError::Deserialize(Box::new(e)))?;
         crate::metrics::record_decompress(label, decompress_timer.elapsed());
 
@@ -393,6 +392,57 @@ mod tests {
     }
 
     #[test]
+    fn test_same_format_shares_payload() {
+        let composition = CompositionFormat::new(
+            Arc::new(BincodeFormat),
+            Arc::new(BincodeFormat),
+            Arc::new(PassthroughCompressor),
+            Arc::new(PassthroughCompressor),
+            SmolStr::new_static("test.l1"),
+            SmolStr::new_static("test.l2"),
+        );
+
+        let serialized = composition
+            .serialize(&TestData::large(), &CacheContext::default())
+            .unwrap();
+
+        match CompositionEnvelope::deserialize(&serialized).unwrap() {
+            CompositionEnvelope::Both { l1, l2 } => {
+                assert_eq!(l1.data().as_ptr(), l2.data().as_ptr());
+            }
+            _ => panic!("Expected Both variant"),
+        }
+    }
+
+    #[cfg(feature = "gzip")]
+    #[test]
+    fn test_same_format_different_compressors_store_both_payloads() {
+        use crate::{Compressor, GzipCompressor};
+
+        let composition = CompositionFormat::new(
+            Arc::new(BincodeFormat),
+            Arc::new(BincodeFormat),
+            Arc::new(PassthroughCompressor),
+            Arc::new(GzipCompressor::new()),
+            SmolStr::new_static("test.l1"),
+            SmolStr::new_static("test.l2"),
+        );
+
+        let serialized = composition
+            .serialize(&TestData::large(), &CacheContext::default())
+            .unwrap();
+
+        match CompositionEnvelope::deserialize(&serialized).unwrap() {
+            CompositionEnvelope::Both { l1, l2 } => {
+                assert_ne!(l1.data(), l2.data());
+                let l2_decompressed = GzipCompressor::new().decompress(l2.data().clone()).unwrap();
+                assert_eq!(*l1.data(), l2_decompressed);
+            }
+            _ => panic!("Expected Both variant"),
+        }
+    }
+
+    #[test]
     fn test_different_formats() {
         let composition = CompositionFormat::new(
             Arc::new(JsonFormat),
@@ -442,10 +492,10 @@ mod tests {
         );
         let composition_diff_size = composition_diff.serialize(&data, &ctx).unwrap().len();
 
-        // Composition should be roughly 2x the single format size (plus small bincode overhead)
+        // Same format without compression stores the payload once (plus the envelope header)
         assert!(
-            composition_same_size < json_size * 2 + 100,
-            "Same format composition size should be ~2x single format"
+            composition_same_size < json_size + 100,
+            "Same format composition size should be ~1x single format"
         );
 
         assert!(
