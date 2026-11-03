@@ -14,7 +14,7 @@ use super::envelope::CompositionEnvelope;
 use crate::Compressor;
 use crate::context::Context;
 use crate::format::{Format, FormatDeserializer, FormatError, FormatSerializer, FormatTypeId};
-use crate::metrics::Timer;
+use crate::metrics::{MetricLabels, Timer};
 
 /// Format implementation for CompositionBackend that handles multi-layer serialization.
 ///
@@ -92,17 +92,19 @@ impl CompositionFormat {
             CompositionLayer::L2 => (&*self.l2_format, &*self.l2_compressor, &self.l2_label),
         };
 
+        let labels = MetricLabels::new(label);
+
         // Serialize
         let serialize_timer = Timer::new();
         let serialized = format.with_serializer(f, context)?;
-        crate::metrics::record_serialize(label, serialize_timer.elapsed());
+        crate::metrics::record_serialize(labels, serialize_timer.elapsed());
 
         // Compress
         let compress_timer = Timer::new();
         let compressed = compressor
             .compress(serialized)
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
-        crate::metrics::record_compress(label, compress_timer.elapsed());
+        crate::metrics::record_compress(labels, compress_timer.elapsed());
 
         Ok(compressed)
     }
@@ -121,17 +123,20 @@ impl CompositionFormat {
         f: &mut dyn FnMut(&mut FormatSerializer) -> Result<(), FormatError>,
         context: &dyn Context,
     ) -> Result<(Bytes, Bytes), FormatError> {
+        let l1_labels = MetricLabels::new(&self.l1_label);
+        let l2_labels = MetricLabels::new(&self.l2_label);
+
         // Serialize and compress for L1
         let l1_serialize_timer = Timer::new();
         let l1_serialized = self.l1_format.with_serializer(f, context)?;
-        crate::metrics::record_serialize(&self.l1_label, l1_serialize_timer.elapsed());
+        crate::metrics::record_serialize(l1_labels, l1_serialize_timer.elapsed());
 
         let l1_compress_timer = Timer::new();
         let l1_compressed = self
             .l1_compressor
             .compress(l1_serialized.clone())
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
-        crate::metrics::record_compress(&self.l1_label, l1_compress_timer.elapsed());
+        crate::metrics::record_compress(l1_labels, l1_compress_timer.elapsed());
 
         // Serialize and compress for L2
         // If L1 and L2 use the same format, reuse the serialized data (skip second serialization)
@@ -140,7 +145,7 @@ impl CompositionFormat {
         } else {
             let l2_serialize_timer = Timer::new();
             let serialized = self.l2_format.with_serializer(f, context)?;
-            crate::metrics::record_serialize(&self.l2_label, l2_serialize_timer.elapsed());
+            crate::metrics::record_serialize(l2_labels, l2_serialize_timer.elapsed());
             serialized
         };
 
@@ -149,7 +154,7 @@ impl CompositionFormat {
             .l2_compressor
             .compress(l2_serialized)
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
-        crate::metrics::record_compress(&self.l2_label, l2_compress_timer.elapsed());
+        crate::metrics::record_compress(l2_labels, l2_compress_timer.elapsed());
 
         Ok((l1_compressed, l2_compressed))
     }
@@ -172,17 +177,19 @@ impl CompositionFormat {
             CompositionLayer::L2 => (&*self.l2_format, &*self.l2_compressor, &self.l2_label),
         };
 
+        let labels = MetricLabels::new(label);
+
         // Decompress
         let decompress_timer = Timer::new();
         let decompressed = compressor
             .decompress(data)
             .map_err(|e| FormatError::Deserialize(Box::new(e)))?;
-        crate::metrics::record_decompress(label, decompress_timer.elapsed());
+        crate::metrics::record_decompress(labels, decompress_timer.elapsed());
 
         // Deserialize
         let deserialize_timer = Timer::new();
         format.with_deserializer(&decompressed, f, ctx)?;
-        crate::metrics::record_deserialize(label, deserialize_timer.elapsed());
+        crate::metrics::record_deserialize(labels, deserialize_timer.elapsed());
 
         // NOTE: Don't call upgrade_context here. For nested compositions,
         // the inner CompositionFormat::with_deserializer already upgraded the context.
@@ -207,16 +214,17 @@ impl Format for CompositionFormat {
         {
             // For refill operations, create an L1-only envelope
             // This data came from L2, so serialize and compress it for L1 storage
+            let l1_labels = MetricLabels::new(&self.l1_label);
             let serialize_timer = Timer::new();
             let l1_serialized = self.l1_format.with_serializer(f, context)?;
-            crate::metrics::record_serialize(&self.l1_label, serialize_timer.elapsed());
+            crate::metrics::record_serialize(l1_labels, serialize_timer.elapsed());
 
             let compress_timer = Timer::new();
             let l1_compressed = self
                 .l1_compressor
                 .compress(l1_serialized)
                 .map_err(|e| FormatError::Serialize(Box::new(e)))?;
-            crate::metrics::record_compress(&self.l1_label, compress_timer.elapsed());
+            crate::metrics::record_compress(l1_labels, compress_timer.elapsed());
 
             let composition = CompositionEnvelope::L1(CacheValue::new(l1_compressed, None, None));
 
@@ -226,17 +234,20 @@ impl Format for CompositionFormat {
         }
 
         // Normal write path: Create Both envelope with data for both layers
+        let l1_labels = MetricLabels::new(&self.l1_label);
+        let l2_labels = MetricLabels::new(&self.l2_label);
+
         // Serialize and compress for L1
         let l1_serialize_timer = Timer::new();
         let l1_serialized = self.l1_format.with_serializer(f, context)?;
-        crate::metrics::record_serialize(&self.l1_label, l1_serialize_timer.elapsed());
+        crate::metrics::record_serialize(l1_labels, l1_serialize_timer.elapsed());
 
         let l1_compress_timer = Timer::new();
         let l1_compressed = self
             .l1_compressor
             .compress(l1_serialized.clone())
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
-        crate::metrics::record_compress(&self.l1_label, l1_compress_timer.elapsed());
+        crate::metrics::record_compress(l1_labels, l1_compress_timer.elapsed());
 
         // Serialize and compress for L2
         // If L1 and L2 use the same format, reuse the serialized data instead of serializing again
@@ -245,7 +256,7 @@ impl Format for CompositionFormat {
         } else {
             let l2_serialize_timer = Timer::new();
             let serialized = self.l2_format.with_serializer(f, context)?;
-            crate::metrics::record_serialize(&self.l2_label, l2_serialize_timer.elapsed());
+            crate::metrics::record_serialize(l2_labels, l2_serialize_timer.elapsed());
             serialized
         };
 
@@ -254,7 +265,7 @@ impl Format for CompositionFormat {
             .l2_compressor
             .compress(l2_serialized)
             .map_err(|e| FormatError::Serialize(Box::new(e)))?;
-        crate::metrics::record_compress(&self.l2_label, l2_compress_timer.elapsed());
+        crate::metrics::record_compress(l2_labels, l2_compress_timer.elapsed());
 
         // Pack both compressed values into CompositionEnvelope
         let composition = CompositionEnvelope::Both {
@@ -309,17 +320,19 @@ impl Format for CompositionFormat {
             ),
         };
 
+        let labels = MetricLabels::new(label);
+
         // Decompress the data
         let decompress_timer = Timer::new();
         let decompressed = compressor
             .decompress(compressed_data.clone())
             .map_err(|e| FormatError::Deserialize(Box::new(e)))?;
-        crate::metrics::record_decompress(label, decompress_timer.elapsed());
+        crate::metrics::record_decompress(labels, decompress_timer.elapsed());
 
         // Use the appropriate format to deserialize the decompressed data
         let deserialize_timer = Timer::new();
         format.with_deserializer(&decompressed, f, ctx)?;
-        crate::metrics::record_deserialize(label, deserialize_timer.elapsed());
+        crate::metrics::record_deserialize(labels, deserialize_timer.elapsed());
 
         // Upgrade context to CompositionContext with source layer info
         upgrade_context(ctx, source, self.clone());

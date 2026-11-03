@@ -18,7 +18,7 @@ use hitbox_core::{
 use crate::{
     BackendError, CacheKeyFormat, Compressor, PassthroughCompressor,
     format::{BincodeFormat, Format, FormatExt},
-    metrics::Timer,
+    metrics::{MetricLabels, Timer},
 };
 
 /// Serialize cache tags to bincode bytes for backend storage.
@@ -400,25 +400,23 @@ pub trait CacheBackend: Backend {
     {
         async move {
             let backend_label = self.label();
+            let labels = MetricLabels::new(backend_label.as_str());
 
             let read_timer = Timer::new();
             let read_result = self.read(key).await;
-            crate::metrics::record_read(backend_label.as_str(), read_timer.elapsed());
+            crate::metrics::record_read(labels, read_timer.elapsed());
 
             match read_result {
                 Ok(Some(value)) => {
                     let (meta, raw_data) = value.into_parts();
                     let raw_len = raw_data.len();
-                    crate::metrics::record_read_bytes(backend_label.as_str(), raw_len);
+                    crate::metrics::record_read_bytes(labels, raw_len);
 
                     let format = self.value_format();
 
                     let decompress_timer = Timer::new();
                     let decompressed = self.compressor().decompress(raw_data)?;
-                    crate::metrics::record_decompress(
-                        backend_label.as_str(),
-                        decompress_timer.elapsed(),
-                    );
+                    crate::metrics::record_decompress(labels, decompress_timer.elapsed());
 
                     // Deserialize using with_deserializer - context may be upgraded
                     let deserialize_timer = Timer::new();
@@ -432,10 +430,7 @@ pub trait CacheBackend: Backend {
                         },
                         ctx,
                     )?;
-                    crate::metrics::record_deserialize(
-                        backend_label.as_str(),
-                        deserialize_timer.elapsed(),
-                    );
+                    crate::metrics::record_deserialize(labels, deserialize_timer.elapsed());
 
                     let deserialized = deserialized_opt.ok_or_else(|| {
                         BackendError::InternalError(Box::new(std::io::Error::other(
@@ -466,7 +461,7 @@ pub trait CacheBackend: Backend {
                 }
                 Ok(None) => Ok(None),
                 Err(e) => {
-                    crate::metrics::record_read_error(backend_label.as_str());
+                    crate::metrics::record_read_error(labels);
                     Err(e)
                 }
             }
@@ -496,15 +491,16 @@ pub trait CacheBackend: Backend {
             }
 
             let backend_label = self.label();
+            let labels = MetricLabels::new(backend_label.as_str());
             let format = self.value_format();
 
             let serialize_timer = Timer::new();
             let serialized_value = format.serialize(value.data(), &**ctx)?;
-            crate::metrics::record_serialize(backend_label.as_str(), serialize_timer.elapsed());
+            crate::metrics::record_serialize(labels, serialize_timer.elapsed());
 
             let compress_timer = Timer::new();
             let compressed_value = self.compressor().compress(serialized_value)?;
-            crate::metrics::record_compress(backend_label.as_str(), compress_timer.elapsed());
+            crate::metrics::record_compress(labels, compress_timer.elapsed());
 
             let compressed_len = compressed_value.len();
 
@@ -517,15 +513,15 @@ pub trait CacheBackend: Backend {
             )
             .with_optional_tags(value.tags().cloned());
             let result = self.write(key, raw_value).await;
-            crate::metrics::record_write(backend_label.as_str(), write_timer.elapsed());
+            crate::metrics::record_write(labels, write_timer.elapsed());
 
             match result {
                 Ok(()) => {
-                    crate::metrics::record_write_bytes(backend_label.as_str(), compressed_len);
+                    crate::metrics::record_write_bytes(labels, compressed_len);
                     Ok(())
                 }
                 Err(e) => {
-                    crate::metrics::record_write_error(backend_label.as_str());
+                    crate::metrics::record_write_error(labels);
                     Err(e)
                 }
             }
