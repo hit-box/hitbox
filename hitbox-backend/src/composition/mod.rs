@@ -421,9 +421,9 @@ where
 
         let read_l1_with_envelope = |k: CacheKey| async move {
             let ctx: BoxContext = CacheContext::default().boxed();
+            let labels = MetricLabels::new(&l1_label);
             let timer = Timer::new();
             let read_result = l1.read(&k).await;
-            let labels = MetricLabels::new(&l1_label);
             crate::metrics::record_read(labels, timer.elapsed());
 
             let result = match read_result {
@@ -455,9 +455,9 @@ where
 
         let read_l2_with_envelope = |k: CacheKey| async move {
             let ctx: BoxContext = CacheContext::default().boxed();
+            let labels = MetricLabels::new(&l2_label);
             let timer = Timer::new();
             let read_result = l2.read(&k).await;
-            let labels = MetricLabels::new(&l2_label);
             crate::metrics::record_read(labels, timer.elapsed());
 
             let result = match read_result {
@@ -521,9 +521,9 @@ where
                 let l2_len = l2.data().len();
 
                 let write_l1 = |k: CacheKey| async move {
+                    let labels = MetricLabels::new(&l1_label);
                     let timer = Timer::new();
                     let result = l1_backend.write(&k, l1).await;
-                    let labels = MetricLabels::new(&l1_label);
                     crate::metrics::record_write(labels, timer.elapsed());
                     match &result {
                         Ok(()) => crate::metrics::record_write_bytes(labels, l1_len),
@@ -532,9 +532,9 @@ where
                     result
                 };
                 let write_l2 = |k: CacheKey| async move {
+                    let labels = MetricLabels::new(&l2_label);
                     let timer = Timer::new();
                     let result = l2_backend.write(&k, l2).await;
-                    let labels = MetricLabels::new(&l2_label);
                     crate::metrics::record_write(labels, timer.elapsed());
                     match &result {
                         Ok(()) => crate::metrics::record_write_bytes(labels, l2_len),
@@ -549,9 +549,9 @@ where
             }
             CompositionEnvelope::L1(l1) => {
                 let l1_len = l1.data().len();
+                let labels = MetricLabels::new(&self.l1_label);
                 let timer = Timer::new();
                 let result = self.l1.write(key, l1).await;
-                let labels = MetricLabels::new(&self.l1_label);
                 crate::metrics::record_write(labels, timer.elapsed());
                 match &result {
                     Ok(()) => crate::metrics::record_write_bytes(labels, l1_len),
@@ -561,9 +561,9 @@ where
             }
             CompositionEnvelope::L2(l2) => {
                 let l2_len = l2.data().len();
+                let labels = MetricLabels::new(&self.l2_label);
                 let timer = Timer::new();
                 let result = self.l2.write(key, l2).await;
-                let labels = MetricLabels::new(&self.l2_label);
                 crate::metrics::record_write(labels, timer.elapsed());
                 match &result {
                     Ok(()) => crate::metrics::record_write_bytes(labels, l2_len),
@@ -691,9 +691,9 @@ where
             let mut internal_ctx = l1_ctx;
 
             // Read raw bytes from L1 with metrics
+            let labels = MetricLabels::new(&l1_label);
             let read_timer = Timer::new();
             let read_result = l1.read(&k).await;
-            let labels = MetricLabels::new(&l1_label);
             crate::metrics::record_read(labels, read_timer.elapsed());
 
             let result = match read_result {
@@ -764,9 +764,9 @@ where
             let mut internal_ctx = l2_ctx;
 
             // Read raw bytes from L2 with metrics
+            let labels = MetricLabels::new(&l2_label);
             let read_timer = Timer::new();
             let read_result = l2.read(&k).await;
-            let labels = MetricLabels::new(&l2_label);
             crate::metrics::record_read(labels, read_timer.elapsed());
 
             let result = match read_result {
@@ -899,9 +899,9 @@ where
                     .with_optional_tags(value.tags().cloned());
 
                     // Write to L1 with metrics
+                    let labels = MetricLabels::new(&self.l1_label);
                     let timer = Timer::new();
                     let result = self.l1.write(key, l1_value).await;
-                    let labels = MetricLabels::new(&self.l1_label);
                     crate::metrics::record_write(labels, timer.elapsed());
                     match &result {
                         Ok(()) => crate::metrics::record_write_bytes(labels, l1_len),
@@ -951,9 +951,9 @@ where
                     .with_optional_tags(value.tags().cloned());
 
                     // Write to L1 with metrics
+                    let labels = MetricLabels::new(&self.l1_label);
                     let timer = Timer::new();
                     let result = self.l1.write(key, l1_value).await;
-                    let labels = MetricLabels::new(&self.l1_label);
                     crate::metrics::record_write(labels, timer.elapsed());
                     match &result {
                         Ok(()) => crate::metrics::record_write_bytes(labels, l1_len),
@@ -1009,9 +1009,9 @@ where
 
         // Write closures using Backend::write directly with composed labels
         let write_l1 = |k: CacheKey| async move {
+            let labels = MetricLabels::new(&l1_label);
             let timer = Timer::new();
             let result = l1.write(&k, l1_value).await;
-            let labels = MetricLabels::new(&l1_label);
             crate::metrics::record_write(labels, timer.elapsed());
             match &result {
                 Ok(()) => crate::metrics::record_write_bytes(labels, l1_len),
@@ -1021,9 +1021,9 @@ where
         };
 
         let write_l2 = |k: CacheKey| async move {
+            let labels = MetricLabels::new(&l2_label);
             let timer = Timer::new();
             let result = l2.write(&k, l2_value).await;
-            let labels = MetricLabels::new(&l2_label);
             crate::metrics::record_write(labels, timer.elapsed());
             match &result {
                 Ok(()) => crate::metrics::record_write_bytes(labels, l2_len),
