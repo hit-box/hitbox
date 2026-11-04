@@ -114,5 +114,10 @@ harness = false
 name = "load_test"
 harness = false
 
+[[bench]]
+name = "metrics_overhead"
+harness = false
+
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_tokio"] }
+metrics-exporter-prometheus = { version = "0.18", default-features = false }
