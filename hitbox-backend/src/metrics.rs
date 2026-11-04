@@ -262,9 +262,7 @@ impl<'a> MetricLabels<'a> {
     fn key(&self, name: &'static str) -> Key {
         match self {
             Self::Interned(labels) => Key::from_static_labels(name, labels),
-            Self::Uninterned(backend) => {
-                Key::from_parts(name, vec![Label::new("backend", backend.to_string())])
-            }
+            Self::Uninterned(backend) => Key::from_parts(name, vec![backend_label(backend)]),
         }
     }
 
@@ -303,10 +301,15 @@ fn intern(backend: &str) -> Option<&'static [Label]> {
     if interned.len() >= MAX_INTERNED_LABELS {
         return None;
     }
-    let labels: &'static [Label] =
-        Box::leak(Box::new([Label::new("backend", backend.to_string())]));
+    let labels: &'static [Label] = Box::leak(Box::new([backend_label(backend)]));
     interned.insert(labels[0].value(), labels);
     Some(labels)
+}
+
+/// The `backend` label, built the same way for interned and uninterned keys.
+#[cfg(feature = "metrics")]
+fn backend_label(backend: &str) -> Label {
+    Label::new("backend", backend.to_string())
 }
 
 // Read metrics
@@ -457,9 +460,8 @@ mod tests {
 
     #[test]
     fn interned_and_uninterned_labels_build_the_same_key() {
-        let MetricLabels::Interned(labels) = MetricLabels::new("same") else {
-            panic!("the first label is interned");
-        };
+        // Leaked here, not interned: the cap test may already have filled the shared map.
+        let labels: &'static [Label] = Box::leak(Box::new([backend_label("same")]));
         assert_eq!(
             MetricLabels::Interned(labels).key("name"),
             MetricLabels::Uninterned("same").key("name"),
