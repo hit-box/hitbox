@@ -16,7 +16,7 @@ use futures::ready;
 use hitbox_core::tag::{NeutralTagExtractor, TagExtractor};
 use hitbox_core::{Cacheable, DisabledOffload, Offload, OffloadKey, Upstream};
 use pin_project::pin_project;
-use tracing::{Level, Span, debug, span, trace};
+use tracing::{Level, Span, debug, span, trace, warn};
 
 use crate::{
     CacheKey, CacheableRequest, Extractor, Predicate,
@@ -558,8 +558,12 @@ where
                 } => {
                     let state_ref = state.as_ref().expect(POLL_AFTER_READY_ERROR);
                     trace!(parent: &state_ref.span, "FSM state: UpdateCache");
-                    // TODO: check backend result
-                    let (_backend_result, response, ctx) = ready!(update_cache_future.poll(cx));
+                    let (backend_result, response, ctx) = ready!(update_cache_future.poll(cx));
+                    // The response is served either way, so a failed write must not fail the
+                    // request; log it so that a value the backend can't encode or store is seen.
+                    if let Err(err) = backend_result {
+                        warn!(parent: &state_ref.span, "Cache write error: {err:?}");
+                    }
                     let update_cache_state = state.take().expect(POLL_AFTER_READY_ERROR);
                     update_cache_state
                         .transition(response, ctx)

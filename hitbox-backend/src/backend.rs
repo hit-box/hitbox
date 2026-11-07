@@ -421,15 +421,17 @@ pub trait CacheBackend: Backend {
                     // Deserialize using with_deserializer - context may be upgraded
                     let deserialize_timer = Timer::new();
                     let mut deserialized_opt: Option<T::Cached> = None;
-                    format.with_deserializer(
-                        &decompressed,
-                        &mut |deserializer| {
-                            let value: T::Cached = deserializer.deserialize()?;
-                            deserialized_opt = Some(value);
-                            Ok(())
-                        },
-                        ctx,
-                    )?;
+                    format
+                        .with_deserializer(
+                            &decompressed,
+                            &mut |deserializer| {
+                                let value: T::Cached = deserializer.deserialize()?;
+                                deserialized_opt = Some(value);
+                                Ok(())
+                            },
+                            ctx,
+                        )
+                        .inspect_err(|_| crate::metrics::record_deserialize_error(labels))?;
                     crate::metrics::record_deserialize(labels, deserialize_timer.elapsed());
 
                     let deserialized = deserialized_opt.ok_or_else(|| {
@@ -495,7 +497,9 @@ pub trait CacheBackend: Backend {
             let format = self.value_format();
 
             let serialize_timer = Timer::new();
-            let serialized_value = format.serialize(value.data(), &**ctx)?;
+            let serialized_value = format
+                .serialize(value.data(), &**ctx)
+                .inspect_err(|_| crate::metrics::record_serialize_error(labels))?;
             crate::metrics::record_serialize(labels, serialize_timer.elapsed());
 
             let compress_timer = Timer::new();

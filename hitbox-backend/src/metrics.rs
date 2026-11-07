@@ -10,6 +10,8 @@
 //! - `hitbox_backend_read_*` - read operation metrics
 //! - `hitbox_backend_write_*` - write operation metrics
 //! - `hitbox_backend_{compress,decompress,serialize,deserialize}_duration_seconds` - processing metrics
+//! - `hitbox_backend_{serialize,deserialize}_errors_total` - values the backend's format couldn't
+//!   encode or decode
 
 use std::time::Duration;
 
@@ -190,6 +192,26 @@ lazy_static! {
             "Duration of serialization operations in seconds."
         );
         "hitbox_backend_serialize_duration_seconds"
+    };
+
+    // Processing error metrics
+
+    /// Metric name for deserialization errors counter.
+    pub static ref BACKEND_DESERIALIZE_ERRORS: &'static str = {
+        metrics::describe_counter!(
+            "hitbox_backend_deserialize_errors_total",
+            "Total number of cached values that failed to deserialize per backend."
+        );
+        "hitbox_backend_deserialize_errors_total"
+    };
+
+    /// Metric name for serialization errors counter.
+    pub static ref BACKEND_SERIALIZE_ERRORS: &'static str = {
+        metrics::describe_counter!(
+            "hitbox_backend_serialize_errors_total",
+            "Total number of values that failed to serialize per backend."
+        );
+        "hitbox_backend_serialize_errors_total"
     };
 }
 
@@ -451,6 +473,30 @@ pub fn record_serialize(labels: MetricLabels<'_>, duration: Duration) {
 #[cfg(not(feature = "metrics"))]
 #[inline]
 pub fn record_serialize(_labels: MetricLabels<'_>, _duration: Duration) {}
+
+/// Record a value that failed to deserialize.
+#[cfg(feature = "metrics")]
+#[inline]
+pub fn record_deserialize_error(labels: MetricLabels<'_>) {
+    labels.counter(*BACKEND_DESERIALIZE_ERRORS).increment(1);
+}
+
+/// Record a value that failed to deserialize (no-op when `metrics` feature disabled).
+#[cfg(not(feature = "metrics"))]
+#[inline]
+pub fn record_deserialize_error(_labels: MetricLabels<'_>) {}
+
+/// Record a value that failed to serialize.
+#[cfg(feature = "metrics")]
+#[inline]
+pub fn record_serialize_error(labels: MetricLabels<'_>) {
+    labels.counter(*BACKEND_SERIALIZE_ERRORS).increment(1);
+}
+
+/// Record a value that failed to serialize (no-op when `metrics` feature disabled).
+#[cfg(not(feature = "metrics"))]
+#[inline]
+pub fn record_serialize_error(_labels: MetricLabels<'_>) {}
 
 #[cfg(all(test, feature = "metrics"))]
 mod tests {
