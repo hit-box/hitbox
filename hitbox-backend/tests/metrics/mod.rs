@@ -21,7 +21,8 @@ use hitbox_core::{
 };
 use metrics_util::debugging::{DebugValue, DebuggingRecorder};
 use metrics_util::{CompositeKey, MetricKind};
-use serde::{Deserialize, Serialize};
+use serde::ser::Error as _;
+use serde::{Deserialize, Serialize, Serializer};
 
 use super::common::TestOffloadManager;
 
@@ -99,33 +100,58 @@ struct TestData {
     name: String,
 }
 
-impl CacheableResponse for TestData {
-    type Cached = Self;
-    type Subject = Self;
-    type IntoCachedFuture = std::future::Ready<hitbox_core::CachePolicy<Self::Cached, Self>>;
-    type FromCachedFuture = std::future::Ready<Self>;
+/// A value the backend's format can't encode.
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(
+    feature = "rkyv_format",
+    derive(Archive, RkyvSerialize, rkyv::Deserialize)
+)]
+struct Unencodable {
+    id: u32,
+}
 
-    async fn cache_policy<P, TE>(
-        self,
-        _predicates: P,
-        _tag_extractor: Option<TE>,
-        _: &EntityPolicyConfig,
-    ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
-    where
-        P: Predicate<Subject = Self::Subject> + Send + Sync,
-        TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
-    {
-        todo!()
-    }
-
-    fn into_cached(self) -> Self::IntoCachedFuture {
-        todo!()
-    }
-
-    fn from_cached(_cached: Self::Cached) -> Self::FromCachedFuture {
-        todo!()
+impl Serialize for Unencodable {
+    fn serialize<S: Serializer>(&self, _serializer: S) -> Result<S::Ok, S::Error> {
+        Err(S::Error::custom("this value can't be encoded"))
     }
 }
+
+/// Implements `CacheableResponse` for a stored test type; the tests only use `Cached`.
+macro_rules! impl_test_response {
+    ($ty:ty) => {
+        impl CacheableResponse for $ty {
+            type Cached = Self;
+            type Subject = Self;
+            type IntoCachedFuture =
+                std::future::Ready<hitbox_core::CachePolicy<Self::Cached, Self>>;
+            type FromCachedFuture = std::future::Ready<Self>;
+
+            async fn cache_policy<P, TE>(
+                self,
+                _predicates: P,
+                _tag_extractor: Option<TE>,
+                _: &EntityPolicyConfig,
+            ) -> (ResponseCachePolicy<Self>, Vec<CacheTag>)
+            where
+                P: Predicate<Subject = Self::Subject> + Send + Sync,
+                TE: TagExtractor<Subject = Self::Subject> + Send + Sync,
+            {
+                todo!()
+            }
+
+            fn into_cached(self) -> Self::IntoCachedFuture {
+                todo!()
+            }
+
+            fn from_cached(_cached: Self::Cached) -> Self::FromCachedFuture {
+                todo!()
+            }
+        }
+    };
+}
+
+impl_test_response!(TestData);
+impl_test_response!(Unencodable);
 
 /// Debug: print all metrics in a snapshot.
 /// Takes entries directly to avoid draining the snapshot multiple times.
@@ -658,6 +684,126 @@ fn test_composition_backend_read_metrics() {
         ),
         1,
         "decompress_duration should have 1 sample"
+    );
+}
+
+// =============================================================================
+// Encode and Decode Error Tests
+// =============================================================================
+
+/// Runs `operations` with a local recorder and returns everything it recorded.
+fn recorded(operations: impl Future<Output = ()>) -> Vec<SnapshotEntry> {
+    let recorder = DebuggingRecorder::new();
+    let snapshotter = recorder.snapshotter();
+    metrics::with_local_recorder(&recorder, || {
+        // Single-threaded, so all async code records on the thread with the local recorder.
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(operations)
+    });
+    snapshotter.snapshot().into_vec()
+}
+
+/// Bytes that no format decodes, as after a format change.
+fn undecodable() -> CacheValue<Raw> {
+    CacheValue::new(Raw::from_static(b"\xFFnot a value"), None, None)
+}
+
+#[test]
+fn test_basic_backend_counts_serialize_errors() {
+    let backend = TestBackend::new();
+    let key = CacheKey::from_str("test_key", "");
+    let entries = recorded(async {
+        let value = CacheValue::new(Unencodable { id: 1 }, None, None);
+        let mut ctx: BoxContext = CacheContext::default().boxed();
+        let result = backend.set::<Unencodable>(&key, &value, &mut ctx).await;
+        assert!(result.is_err());
+    });
+
+    assert_eq!(
+        find_counter_in_entries(&entries, "hitbox_backend_serialize_errors_total", "test"),
+        Some(1)
+    );
+    assert_eq!(
+        find_counter_in_entries(&entries, "hitbox_backend_write_total", "test"),
+        None,
+        "nothing reaches the backend"
+    );
+}
+
+#[test]
+fn test_basic_backend_counts_deserialize_errors() {
+    let backend = TestBackend::new();
+    let key = CacheKey::from_str("test_key", "");
+    let entries = recorded(async {
+        backend.write(&key, undecodable()).await.unwrap();
+        let mut ctx: BoxContext = CacheContext::default().boxed();
+        let result = backend.get::<TestData>(&key, &mut ctx).await;
+        assert!(result.is_err());
+    });
+
+    assert_eq!(
+        find_counter_in_entries(&entries, "hitbox_backend_deserialize_errors_total", "test"),
+        Some(1)
+    );
+    assert_eq!(
+        find_counter_in_entries(&entries, "hitbox_backend_read_errors_total", "test"),
+        None,
+        "the read itself succeeded"
+    );
+}
+
+#[test]
+fn test_composition_backend_counts_serialize_errors() {
+    let composition =
+        CompositionBackend::new(TestBackend::new(), TestBackend::new(), TestOffloadManager)
+            .label("comp");
+    let key = CacheKey::from_str("test_key", "");
+    let entries = recorded(async {
+        let value = CacheValue::new(Unencodable { id: 1 }, None, None);
+        let mut ctx: BoxContext = CacheContext::default().boxed();
+        let result = composition.set::<Unencodable>(&key, &value, &mut ctx).await;
+        assert!(result.is_err());
+    });
+
+    // Both layers use the same format, so the write stops at the first failure.
+    assert_eq!(
+        find_counter_in_entries(
+            &entries,
+            "hitbox_backend_serialize_errors_total",
+            "comp.test"
+        ),
+        Some(1)
+    );
+    assert_eq!(
+        find_counter_in_entries(&entries, "hitbox_backend_write_total", "comp.test"),
+        None,
+        "nothing reaches either layer"
+    );
+}
+
+#[test]
+fn test_composition_backend_counts_deserialize_errors() {
+    let l1 = TestBackend::new();
+    let composition =
+        CompositionBackend::new(l1.clone(), TestBackend::new(), TestOffloadManager).label("comp");
+    let key = CacheKey::from_str("test_key", "");
+    let entries = recorded(async {
+        l1.write(&key, undecodable()).await.unwrap();
+        let mut ctx: BoxContext = CacheContext::default().boxed();
+        // The read policy decides what a failed L1 decode returns; only the metric matters here.
+        let _ = composition.get::<TestData>(&key, &mut ctx).await;
+    });
+
+    assert_eq!(
+        find_counter_in_entries(
+            &entries,
+            "hitbox_backend_deserialize_errors_total",
+            "comp.test"
+        ),
+        Some(1)
     );
 }
 

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Backend::invalidate()` and `Backend::invalidated()` with default implementations that store tag invalidation timestamps as regular entries under `Backend::tag_key_prefix()` (`__hitbox_tag` by default), so every backend supports tag invalidation ([#280](https://github.com/hit-box/hitbox/pull/280))
 - `CompositionBackend` records invalidations in both layers and merges lookups so the latest timestamp per tag wins ([#280](https://github.com/hit-box/hitbox/pull/280))
 - `serialize_tags` / `deserialize_tags` helpers for backends that store tags alongside entries ([#280](https://github.com/hit-box/hitbox/pull/280))
+- With the `metrics` feature, `hitbox_backend_serialize_errors_total` and `hitbox_backend_deserialize_errors_total` count values the backend's format couldn't encode or decode ([#PR](https://github.com/hit-box/hitbox/pull/PR))
 
 ### Changed
 - **Breaking:** `Compressor::compress` and `Compressor::decompress` take and return `Raw` (`Bytes`) instead of `&[u8]` → `Vec<u8>`, so `PassthroughCompressor` returns the value without copying it ([#300](https://github.com/hit-box/hitbox/pull/300))
