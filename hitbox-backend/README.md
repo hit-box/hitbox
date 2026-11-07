@@ -11,7 +11,7 @@ The crate is organized around several key concepts:
 
 - **[`Backend`]** - Low-level dyn-compatible trait for raw byte storage operations (read/write/remove)
 - **[`CacheBackend`]** - High-level trait with typed operations that handle serialization
-- **[`Format`](format::Format)** - Serialization format abstraction (JSON, Bincode, RON, Rkyv)
+- **[`Format`](format::Format)** - Serialization format abstraction (JSON, Bincode, Postcard, RON, Rkyv)
 - **[`Compressor`]** - Compression abstraction (Passthrough, Gzip, Zstd)
 - **[`CompositionBackend`]** - Multi-tier caching (L1/L2)
 
@@ -71,11 +71,14 @@ This provides typed `get`, `set`, and `delete` operations with automatic seriali
 | Format | Speed | Size | Human-readable |
 |--------|-------|------|----------------|
 | [`BincodeFormat`](format::BincodeFormat) | Fast | Compact | No |
+| [`PostcardFormat`](format::PostcardFormat) | Fast | Compact | No** |
 | [`JsonFormat`](format::JsonFormat) | Slow | Large | Partial* |
 | [`RonFormat`](format::RonFormat) | Medium | Medium | Yes |
 | `RkyvFormat` | Fastest | Compact | No |
 
 *\* JSON serializes binary data as byte arrays `[104, 101, ...]`, not readable strings.*
+
+*\*\* Postcard isn't self-describing: types that use `#[serde(untagged)]`, `#[serde(flatten)]`, `#[serde(skip_serializing_if)]` or `serde_json::Value` fail at runtime. Use JSON for them.*
 
 ## Compression Options
 

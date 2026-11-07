@@ -38,6 +38,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 serde-saphyr = "0.0.17"
 bitcode = { version = "0.6", features = ["serde"] }
 bincode = { version = "2", features = ["serde", "alloc"] }
+postcard = { version = "1", default-features = false, features = ["alloc"] }
 rkyv = { version = "0.8", features = ["bytecheck", "alloc", "bytes-1"] }
 
 # HTTP and web

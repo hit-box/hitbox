@@ -21,6 +21,7 @@ serde_json = { workspace = true }
 serde-saphyr = { workspace = true }
 bincode = { workspace = true }
 bitcode = { workspace = true }
+postcard = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true, features = ["attributes"] }
 serde_urlencoded = { version = "0.7.1", default-features = false }
