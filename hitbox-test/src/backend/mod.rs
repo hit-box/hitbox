@@ -1,7 +1,7 @@
 use std::future::Ready;
 
 use chrono::{DateTime, Utc};
-use hitbox_backend::format::FormatExt;
+use hitbox_backend::format::{FormatExt, PostcardFormat};
 use hitbox_backend::{Backend, CacheBackend, CacheKeyFormat, DeleteStatus};
 use hitbox_core::tag::{CacheTag, CacheTags, TagExtractor};
 use hitbox_core::{
@@ -815,6 +815,42 @@ pub async fn test_bitcode_key_bincode_value<B: Backend + CacheBackend>(backend: 
         as_string.is_err() || !as_string.unwrap().contains("\"id\""),
         "Value should be in Bincode format (binary), not JSON"
     );
+
+    let mut ctx: BoxContext = CacheContext::default().boxed();
+    let result: Option<CacheValue<TestResponse>> = backend
+        .get::<TestResponse>(&key, &mut ctx)
+        .await
+        .expect("failed to deserialize");
+    assert!(result.is_some());
+    assert_eq!(*result.unwrap().data(), response);
+}
+
+/// Test Postcard value format with any key format: the stored value is exactly what
+/// `PostcardFormat` writes.
+pub async fn test_postcard_value<B: Backend + CacheBackend>(backend: &B) {
+    let key = CacheKey::from_str("format-test", "postcard");
+    let response = TestResponse::new(104, "postcard-test", vec![13, 14, 15]);
+    let value = CacheValue::new(response.clone(), None, None);
+
+    let mut ctx: BoxContext = CacheContext::default().boxed();
+    backend
+        .set::<TestResponse>(&key, &value, &mut ctx)
+        .await
+        .expect("failed to write");
+
+    let raw_value = backend
+        .read(&key)
+        .await
+        .expect("failed to read raw")
+        .expect("value should exist");
+    let decompressed = backend
+        .compressor()
+        .decompress(raw_value.data().clone())
+        .expect("failed to decompress");
+    let expected = PostcardFormat
+        .serialize(&response, &CacheContext::default())
+        .expect("failed to serialize");
+    assert_eq!(decompressed, expected, "Value should be in Postcard format");
 
     let mut ctx: BoxContext = CacheContext::default().boxed();
     let result: Option<CacheValue<TestResponse>> = backend
