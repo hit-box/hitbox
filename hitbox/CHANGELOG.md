@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `CacheFuture::revalidate` takes the response tag extractor, so background revalidation re-tags the refreshed entry ([#280](https://github.com/hit-box/hitbox/pull/280))
 
 ### Fixed
-- A cache write that fails, because the backend can't encode or store the value, is logged at warn level instead of being dropped silently ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+- A cache write that fails, because the backend can't encode or store the value, is logged at warn level instead of being dropped silently ([#310](https://github.com/hit-box/hitbox/pull/310))
 
 ### Added
 - `SelectiveCacheFuture` for multi-config routing with first-match-wins strategy ([#253](https://github.com/hit-box/hitbox/pull/253))
