@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - jq step and benches use `JqExpression`; direct jaq dependencies dropped ([#294](https://github.com/hit-box/hitbox/pull/294))
+- `backend_format` benchmark: a postcard row, groups with a valid JSON body (1 KB to 1 MB, 6 headers) and with 20 headers, and each backend is dropped after its row ([#311](https://github.com/hit-box/hitbox/pull/311))
 
 ### Added
 - Initial release

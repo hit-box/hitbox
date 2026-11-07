@@ -26,6 +26,7 @@ impl BincodeVecWriter {
 }
 
 impl ::bincode::enc::write::Writer for BincodeVecWriter {
+    #[inline]
     fn write(&mut self, bytes: &[u8]) -> Result<(), ::bincode::error::EncodeError> {
         self.0.extend_from_slice(bytes);
         Ok(())

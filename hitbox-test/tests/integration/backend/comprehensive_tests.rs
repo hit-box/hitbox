@@ -8,7 +8,8 @@ use hitbox_moka::MokaBackend;
 use hitbox_redis::RedisBackend;
 use hitbox_test::backend::{
     run_backend_tests, test_bitcode_key_bincode_value, test_bitcode_key_json_value,
-    test_compression_is_used, test_url_encoded_key_bincode_value, test_url_encoded_key_json_value,
+    test_compression_is_used, test_postcard_value, test_url_encoded_key_bincode_value,
+    test_url_encoded_key_json_value,
 };
 use std::sync::LazyLock;
 use testcontainers::{ContainerAsync, runners::AsyncRunner};
@@ -20,7 +21,11 @@ static TEST_CONFIGS: LazyLock<Vec<(KeySerialization, ValueSerialization, Compres
         let mut configs = Vec::new();
 
         let key_formats = [KeySerialization::UrlEncoded, KeySerialization::Bitcode];
-        let value_formats = [ValueSerialization::Json, ValueSerialization::Bincode];
+        let value_formats = [
+            ValueSerialization::Json,
+            ValueSerialization::Bincode,
+            ValueSerialization::Postcard,
+        ];
 
         for key_format in &key_formats {
             for value_format in &value_formats {
@@ -78,6 +83,7 @@ async fn run_comprehensive_backend_tests<B>(
         (KeySerialization::Bitcode, ValueSerialization::Bincode) => {
             test_bitcode_key_bincode_value(backend).await
         }
+        (_, ValueSerialization::Postcard) => test_postcard_value(backend).await,
         #[cfg(feature = "rkyv_format")]
         (KeySerialization::UrlEncoded, ValueSerialization::Rkyv) => {
             // Rkyv with UrlEncoded keys - basic tests already cover this
