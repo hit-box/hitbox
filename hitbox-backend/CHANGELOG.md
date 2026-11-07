@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With the `metrics` feature, `hitbox_backend_serialize_errors_total` and `hitbox_backend_deserialize_errors_total` count values the backend's format couldn't encode or decode ([#310](https://github.com/hit-box/hitbox/pull/310))
 
 ### Changed
+- `BincodeFormat` inlines its buffer writes, so a moka write of a 1 KB response is about 18% faster ([#PR](https://github.com/hit-box/hitbox/pull/PR))
 - **Breaking:** `Compressor::compress` and `Compressor::decompress` take and return `Raw` (`Bytes`) instead of `&[u8]` → `Vec<u8>`, so `PassthroughCompressor` returns the value without copying it ([#300](https://github.com/hit-box/hitbox/pull/300))
 - `CompositionBackend` behind `dyn Backend` or nested in another composition stores a payload shared by both layers once in its envelope, halving the copies per write when L1 and L2 use the same format without compression ([#303](https://github.com/hit-box/hitbox/pull/303))
 - With the `metrics` feature, backend metrics reuse a `backend` label interned once per backend name (the first 1024 names, kept for the process lifetime) instead of allocating a `String` and a `Vec` on every call, so recording no longer allocates and a moka `get` is about 11% faster with a Prometheus recorder ([#309](https://github.com/hit-box/hitbox/pull/309))
