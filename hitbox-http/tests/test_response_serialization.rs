@@ -1,10 +1,27 @@
 use bytes::Bytes;
 use hitbox::CacheableResponse;
-use hitbox_http::{BufferedBody, CacheableHttpResponse};
-use http::{HeaderValue, Response, StatusCode};
+#[cfg(feature = "rkyv_format")]
+use hitbox_backend::format::RkyvFormat;
+use hitbox_backend::format::{BincodeFormat, Format, FormatExt, JsonFormat, RonFormat};
+use hitbox_core::{BoxContext, CacheContext};
+use hitbox_http::{BufferedBody, CacheableHttpResponse, SerializableHttpResponse};
+use http::{HeaderMap, HeaderValue, Response, StatusCode};
 use http_body_util::Full;
 
 type TestBody = BufferedBody<Full<Bytes>>;
+
+/// Every built-in format, so each roundtrip below runs through all of them.
+fn formats() -> Vec<(&'static str, Box<dyn Format>)> {
+    #[allow(unused_mut)]
+    let mut formats: Vec<(&'static str, Box<dyn Format>)> = vec![
+        ("bincode", Box::new(BincodeFormat)),
+        ("json", Box::new(JsonFormat)),
+        ("ron", Box::new(RonFormat)),
+    ];
+    #[cfg(feature = "rkyv_format")]
+    formats.push(("rkyv", Box::new(RkyvFormat::new())));
+    formats
+}
 
 async fn body_to_string(body: TestBody) -> String {
     let collected = body.collect().await.unwrap();
@@ -100,6 +117,9 @@ async fn assert_responses_equal(original: Response<TestBody>, restored: Response
 }
 
 /// Full serialization roundtrip: Response -> Cacheable -> Serializable -> bytes -> Serializable -> Cacheable -> Response
+///
+/// Runs through every built-in format, and each must restore the same `SerializableHttpResponse`.
+/// Returns the response restored by the first format.
 async fn roundtrip_test(response: Response<TestBody>) -> Response<TestBody> {
     let cacheable = CacheableHttpResponse::from_response(response);
 
@@ -109,14 +129,26 @@ async fn roundtrip_test(response: Response<TestBody>) -> Response<TestBody> {
         hitbox::CachePolicy::NonCacheable(_) => panic!("Expected cacheable"),
     };
 
-    let serialized = bincode::serde::encode_to_vec(&serializable, bincode::config::standard())
-        .expect("Failed to serialize");
+    let expected = format!("{serializable:?}");
+    let mut restored = None;
+    for (name, format) in formats() {
+        let serialized = format
+            .serialize(&serializable, &CacheContext::default())
+            .unwrap_or_else(|err| panic!("{name}: failed to serialize: {err}"));
+        let mut ctx: BoxContext = CacheContext::default().boxed();
+        let deserialized: SerializableHttpResponse = format
+            .deserialize(&serialized, &mut ctx)
+            .unwrap_or_else(|err| panic!("{name}: failed to deserialize: {err}"));
+        assert_eq!(
+            format!("{deserialized:?}"),
+            expected,
+            "{name}: the roundtrip changed the response"
+        );
+        restored.get_or_insert(deserialized);
+    }
 
-    let (deserialized, _len): (_, _) =
-        bincode::serde::decode_from_slice(&serialized, bincode::config::standard())
-            .expect("Failed to deserialize");
-
-    let cacheable_restored = CacheableHttpResponse::<Full<Bytes>>::from_cached(deserialized).await;
+    let restored = restored.expect("at least one format");
+    let cacheable_restored = CacheableHttpResponse::<Full<Bytes>>::from_cached(restored).await;
 
     cacheable_restored.into_response()
 }
@@ -499,9 +531,44 @@ async fn test_comparison_detects_multivalue_count_mismatch() {
 }
 
 #[tokio::test]
-async fn test_roundtrip_preserves_trailers() {
-    use http::HeaderMap;
+async fn test_header_values_that_are_not_visible_ascii() {
+    // Raw UTF-8, as some servers send in `content-disposition`, and an obs-text byte (Latin-1 `é`).
+    let utf8 = HeaderValue::from_bytes("attachment; filename=\"résumé.pdf\"".as_bytes()).unwrap();
+    let latin1 = HeaderValue::from_bytes(b"caf\xe9").unwrap();
+    let detail = HeaderValue::from_bytes("ошибка".as_bytes()).unwrap();
 
+    let mut trailers = HeaderMap::new();
+    trailers.insert("x-detail", detail.clone());
+    let response = Response::builder()
+        .header("content-disposition", utf8.clone())
+        .header("x-latin1", latin1.clone())
+        .header("x-mixed", "plain")
+        .header("x-mixed", latin1.clone())
+        .body(BufferedBody::Complete {
+            data: Some(Bytes::from("body")),
+            trailers: Some(trailers),
+        })
+        .unwrap();
+
+    let restored = roundtrip_test(response).await;
+
+    let headers = restored.headers();
+    assert_eq!(headers.get("content-disposition"), Some(&utf8));
+    assert_eq!(headers.get("x-latin1"), Some(&latin1));
+    let mixed: Vec<_> = headers.get_all("x-mixed").iter().collect();
+    assert_eq!(mixed, [&HeaderValue::from_static("plain"), &latin1]);
+    let trailers = restored
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .trailers
+        .expect("trailers should survive the roundtrip");
+    assert_eq!(trailers.get("x-detail"), Some(&detail));
+}
+
+#[tokio::test]
+async fn test_roundtrip_preserves_trailers() {
     // Build a response with trailers (simulating a gRPC response)
     let mut trailer_map = HeaderMap::new();
     trailer_map.insert("grpc-status", HeaderValue::from_static("0"));
