@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - jq integer overflow near `i64::MAX`/`i64::MIN` ([#294](https://github.com/hit-box/hitbox/pull/294))
+- JSON and RON formats keep header and trailer values that aren't visible ASCII (such as a raw UTF-8 filename in `Content-Disposition`); `http_serde` dropped them, so cache hits returned responses without those headers ([#PR](https://github.com/hit-box/hitbox/pull/PR))
 
 ### Added
 - `ResponseHeaderTagExtractor` (`hitbox_http::tags`) tags cached entries by a response header such as `ETag`, with the same name selection, regex value extraction, and transforms as the request `Header` extractor ([#280](https://github.com/hit-box/hitbox/pull/280))
