@@ -379,7 +379,7 @@ mod rkyv_header_map {
 /// # Serialization Formats
 ///
 /// - **JSON/Bincode**: Standard serde serialization via [`http_serde`], except
-///   that text formats store a header value that isn't visible ASCII as an
+///   that text formats store a header value with non-ASCII bytes as an
 ///   array of bytes, where `http_serde` drops it
 /// - **rkyv** (feature `rkyv_format`): Zero-copy deserialization for maximum
 ///   performance when reading from cache
