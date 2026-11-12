@@ -21,6 +21,8 @@ use crate::jq::ParsedBody;
 use crate::predicates::header::HasHeaders;
 use crate::predicates::version::HasVersion;
 
+mod header_map;
+
 /// Wraps an HTTP response for cache storage and retrieval.
 ///
 /// This type holds the response metadata ([`Parts`]) and a [`BufferedBody`].
@@ -376,7 +378,9 @@ mod rkyv_header_map {
 ///
 /// # Serialization Formats
 ///
-/// - **JSON/Bincode**: Standard serde serialization via [`http_serde`]
+/// - **JSON/Bincode**: Standard serde serialization via [`http_serde`], except
+///   that text formats store a header value with non-ASCII bytes as an
+///   array of bytes, where `http_serde` drops it
 /// - **rkyv** (feature `rkyv_format`): Zero-copy deserialization for maximum
 ///   performance when reading from cache
 ///
@@ -401,11 +405,11 @@ pub struct SerializableHttpResponse {
     #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_version::VersionAsU8))]
     version: http::Version,
     body: Bytes,
-    #[serde(with = "http_serde::header_map")]
+    #[serde(with = "header_map")]
     #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_header_map::AsHeaderVec))]
     headers: HeaderMap,
     /// HTTP/2 trailers (e.g., gRPC's `grpc-status`). Empty for HTTP/1.1 responses.
-    #[serde(with = "http_serde::header_map", default)]
+    #[serde(with = "header_map", default)]
     #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_header_map::AsHeaderVec))]
     trailers: HeaderMap,
 }
