@@ -531,7 +531,35 @@ async fn test_comparison_detects_multivalue_count_mismatch() {
 }
 
 #[tokio::test]
-async fn test_header_values_that_are_not_visible_ascii() {
+async fn test_every_byte_a_header_value_may_hold() {
+    // RFC 9110 section 5.5: HTAB, SP, VCHAR (0x21-0x7E) and obs-text (0x80-0xFF).
+    let mut builder = Response::builder();
+    let mut expected = Vec::new();
+    for byte in (0x09..=0x09u8).chain(0x20..=0x7e).chain(0x80..=0xff) {
+        // One value per byte, alone and inside text, under a single repeated name.
+        for bytes in [vec![byte], vec![b'a', byte, b'b']] {
+            let value = HeaderValue::from_bytes(&bytes).unwrap();
+            builder = builder.header("x-byte", value.clone());
+            expected.push(value);
+        }
+    }
+    let response = builder
+        .body(BufferedBody::Passthrough(Full::new(Bytes::from("body"))))
+        .unwrap();
+
+    let restored = roundtrip_test(response).await;
+
+    let values: Vec<_> = restored
+        .headers()
+        .get_all("x-byte")
+        .iter()
+        .cloned()
+        .collect();
+    assert_eq!(values, expected);
+}
+
+#[tokio::test]
+async fn test_non_ascii_header_values() {
     // Raw UTF-8, as some servers send in `content-disposition`, and an obs-text byte (Latin-1 `é`).
     let utf8 = HeaderValue::from_bytes("attachment; filename=\"résumé.pdf\"".as_bytes()).unwrap();
     let latin1 = HeaderValue::from_bytes(b"caf\xe9").unwrap();

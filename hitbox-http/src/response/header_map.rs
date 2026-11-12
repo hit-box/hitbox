@@ -3,7 +3,7 @@
 //! Binary formats use [`http_serde`]'s layout unchanged: a map from each name to a sequence of
 //! byte strings.
 //!
-//! Text formats (JSON, RON) write what `http_serde` writes for values that are visible ASCII: a
+//! Text formats (JSON, RON) write what `http_serde` writes for ASCII values: a
 //! string for a single value, a sequence of strings for several. `http_serde` drops any other
 //! value; here such a value is written as an array of bytes, so a single one becomes a sequence
 //! holding one array:
@@ -59,7 +59,7 @@ impl Serialize for TextValues<'_> {
     }
 }
 
-/// One header value in a sequence: a string, or an array of bytes if it isn't visible ASCII.
+/// One header value in a sequence: a string, or an array of bytes if it has non-ASCII bytes (obs-text).
 struct TextValue<'a>(&'a HeaderValue);
 
 impl Serialize for TextValue<'_> {
@@ -200,7 +200,7 @@ mod tests {
     #[derive(Serialize, Deserialize, Debug)]
     struct HttpSerdeHeaders(#[serde(with = "http_serde::header_map")] HeaderMap);
 
-    fn visible_ascii() -> HeaderMap {
+    fn ascii() -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert("content-type", HeaderValue::from_static("text/plain"));
         headers.append("set-cookie", HeaderValue::from_static("a=1"));
@@ -208,25 +208,25 @@ mod tests {
         headers
     }
 
-    fn not_visible_ascii() -> HeaderMap {
-        let mut headers = visible_ascii();
+    fn non_ascii() -> HeaderMap {
+        let mut headers = ascii();
         headers.insert("x-name", HeaderValue::from_bytes(b"caf\xe9").unwrap());
         headers.append("set-cookie", HeaderValue::from_bytes(b"c=\xe9").unwrap());
         headers
     }
 
     #[test]
-    fn text_formats_write_visible_ascii_like_http_serde() {
+    fn text_formats_write_ascii_like_http_serde() {
         assert_eq!(
-            serde_json::to_value(Headers(visible_ascii())).unwrap(),
-            serde_json::to_value(HttpSerdeHeaders(visible_ascii())).unwrap(),
+            serde_json::to_value(Headers(ascii())).unwrap(),
+            serde_json::to_value(HttpSerdeHeaders(ascii())).unwrap(),
         );
     }
 
     #[test]
     fn text_formats_write_other_values_as_byte_arrays() {
         assert_eq!(
-            serde_json::to_value(Headers(not_visible_ascii())).unwrap(),
+            serde_json::to_value(Headers(non_ascii())).unwrap(),
             json!({
                 "content-type": "text/plain",
                 "set-cookie": ["a=1", "b=2", [99, 61, 233]],
@@ -237,27 +237,27 @@ mod tests {
 
     #[test]
     fn text_formats_read_what_http_serde_wrote() {
-        let written = serde_json::to_string(&HttpSerdeHeaders(visible_ascii())).unwrap();
+        let written = serde_json::to_string(&HttpSerdeHeaders(ascii())).unwrap();
         let Headers(read) = serde_json::from_str(&written).unwrap();
-        assert_eq!(read, visible_ascii());
+        assert_eq!(read, ascii());
     }
 
     #[test]
     fn text_formats_keep_every_value() {
-        let json = serde_json::to_string(&Headers(not_visible_ascii())).unwrap();
+        let json = serde_json::to_string(&Headers(non_ascii())).unwrap();
         let Headers(read) = serde_json::from_str(&json).unwrap();
-        assert_eq!(read, not_visible_ascii());
+        assert_eq!(read, non_ascii());
 
-        let ron = ron::to_string(&Headers(not_visible_ascii())).unwrap();
+        let ron = ron::to_string(&Headers(non_ascii())).unwrap();
         let Headers(read) = ron::from_str(&ron).unwrap();
-        assert_eq!(read, not_visible_ascii());
+        assert_eq!(read, non_ascii());
     }
 
     #[test]
     fn binary_formats_write_like_http_serde() {
         assert_eq!(
-            encode_to_vec(Headers(not_visible_ascii()), standard()).unwrap(),
-            encode_to_vec(HttpSerdeHeaders(not_visible_ascii()), standard()).unwrap(),
+            encode_to_vec(Headers(non_ascii()), standard()).unwrap(),
+            encode_to_vec(HttpSerdeHeaders(non_ascii()), standard()).unwrap(),
         );
     }
 }
