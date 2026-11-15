@@ -91,7 +91,7 @@ pub struct NotSet;
 /// ```
 ///
 /// [`Layer`]: tower::Layer
-/// [`MokaBackend`]: hitbox_moka::MokaBackend
+/// [`MokaBackend`]: https://docs.rs/hitbox-moka/latest/hitbox_moka/struct.MokaBackend.html
 /// [`CacheBackend`]: hitbox::backend::CacheBackend
 /// [`NoopConcurrencyManager`]: hitbox::concurrency::NoopConcurrencyManager
 /// [`BroadcastConcurrencyManager`]: hitbox::concurrency::BroadcastConcurrencyManager

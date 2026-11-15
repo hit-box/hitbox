@@ -30,7 +30,6 @@ thiserror = { workspace = true }
 humantime-serde = "1"
 regex = { workspace = true }
 bytes = { workspace = true }
-bytesize = { version = "2", features = ["serde"] }
 rkyv = { workspace = true, optional = true }
 
 [features]

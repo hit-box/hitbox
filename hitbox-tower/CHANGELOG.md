@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `CacheService` now requires `C: CacheConfigs` instead of `C: CacheConfig`, routing all requests through `SelectiveCacheFuture` ([#253](https://github.com/hit-box/hitbox/pull/253))
+- `hitbox-moka` is a dev-dependency only, so `hitbox-tower` no longer pulls Moka into every build ([#315](https://github.com/hit-box/hitbox/pull/315))
 
 ### Changed
 - Adapted to `Upstream::call(self)` API change ([#206](https://github.com/hit-box/hitbox/pull/206))

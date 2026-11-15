@@ -20,9 +20,9 @@ with a fluent API.
 [Request and response predicates]: hitbox_http::predicates
 [Cache key extraction]: hitbox_http::extractors
 [Multiple backend support]: hitbox_backend::composition
-[in-memory]: hitbox_moka
-[file storage]: hitbox_feoxdb
-[distributed]: hitbox_redis
+[in-memory]: https://docs.rs/hitbox-moka
+[file storage]: https://docs.rs/hitbox-feoxdb
+[distributed]: https://docs.rs/hitbox-redis
 [Dogpile prevention]: BroadcastConcurrencyManager
 
 ## Core Concepts

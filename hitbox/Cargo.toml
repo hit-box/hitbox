@@ -41,7 +41,6 @@ tokio = { workspace = true, features = [
     "rt",
     "time",
 ] }
-hitbox-moka = { path = "../hitbox-moka", version = "0.2" }
 futures = { workspace = true }
 
 [package.metadata.docs.rs]

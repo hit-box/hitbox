@@ -39,7 +39,7 @@ use crate::upstream::TowerUpstream;
 ///
 /// [`Cache`]: crate::Cache
 /// [`Service`]: tower::Service
-/// [`MokaBackend`]: hitbox_moka::MokaBackend
+/// [`MokaBackend`]: https://docs.rs/hitbox-moka/latest/hitbox_moka/struct.MokaBackend.html
 pub struct CacheService<S, B, C, CM, O = DisabledOffload> {
     upstream: S,
     backend: Arc<B>,
