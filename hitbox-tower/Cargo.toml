@@ -22,7 +22,6 @@ hitbox = { path = "../hitbox", version = "0.2" }
 hitbox-core = { path = "../hitbox-core", version = "0.2" }
 hitbox-http = { path = "../hitbox-http", version = "0.2" }
 hitbox-backend = { path = "../hitbox-backend", version = "0.2" }
-hitbox-moka = { path = "../hitbox-moka", version = "0.2" }
 hyper = { workspace = true }
 tracing = { workspace = true }
 http = { workspace = true }
@@ -36,6 +35,7 @@ bytes = { workspace = true }
 criterion = { workspace = true, features = ["async", "async_tokio"] }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 http-body-util = { workspace = true }
+hitbox-moka = { path = "../hitbox-moka", version = "0.2" }
 
 [[bench]]
 name = "cache_service_benchmark"

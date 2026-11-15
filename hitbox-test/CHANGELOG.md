@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - jq step and benches use `JqExpression`; direct jaq dependencies dropped ([#294](https://github.com/hit-box/hitbox/pull/294))
+- Drop the unused `reqwest`, `assert-json-diff` and `serial_test` dependencies; `tempfile` and `testcontainers-modules` move to dev-dependencies ([#PR](https://github.com/hit-box/hitbox/pull/PR))
 
 ### Added
 - Initial release

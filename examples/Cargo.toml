@@ -21,7 +21,6 @@ rkyv_format = ["dep:rkyv", "hitbox/rkyv_format", "hitbox-fn/rkyv_format"]
 
 [dev-dependencies]
 hitbox = { path = "../hitbox", features = ["metrics"] }
-hitbox-core = { path = "../hitbox-core" }
 hitbox-backend = { path = "../hitbox-backend" }
 hitbox-http = { path = "../hitbox-http" }
 hitbox-tower = { path = "../hitbox-tower" }
@@ -35,11 +34,8 @@ reqwest = { version = "0.13", features = ["json"] }
 reqwest-middleware = "0.5"
 
 axum = { workspace = true }
-log = "0.4"
 serde = { workspace = true }
-env_logger = "0.11"
 serde_json = { workspace = true }
-serde-saphyr = { workspace = true }
 hyper = { workspace = true, features = ["full"] }
 tokio = { workspace = true, features = ["full"] }
 tower = { workspace = true, features = ["full"] }
@@ -47,14 +43,12 @@ tower-http = { version = "0.6", features = ["full"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = { workspace = true }
 http = { workspace = true }
-http-body = { workspace = true }
 http-body-util = { workspace = true }
 bytes = { workspace = true }
-smol_str = { workspace = true }
 tempfile = "3"
 chrono = { workspace = true }
 hyper-util = { version = "0.1", features = ["tokio"] }
-async-trait = { workspace = true }
+# `#[cached]` expands to `pin_project` paths
 pin-project = { workspace = true }
 
 # Optional dependencies for features
