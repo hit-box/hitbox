@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** jq runs on jaq 3; some jq-derived keys change (indexing `null`, number literal text, big integers, `NaN` bodies) ([#294](https://github.com/hit-box/hitbox/pull/294))
 - **Breaking:** `JqExtraction` is replaced by `JqExpression` (`hitbox_http::jq`); `CacheableSubject` gains `extensions_mut`; `Operation::check` takes `&mut Extensions` ([#294](https://github.com/hit-box/hitbox/pull/294))
 - Drop the unused `axum`, `prost`, `prost-reflect`, `protox` and `serde_bytes` dependencies ([#315](https://github.com/hit-box/hitbox/pull/315))
+- **Breaking:** binary formats store a response as two byte strings, a postcard-encoded head (status, version, headers, trailers) and the body, so headers no longer pass through the outer format: a Moka read with 20 headers takes 1.3 µs instead of 2.2 µs, one with 6 headers 0.82 µs instead of 1.0 µs, and a 1 MB write 38 µs instead of 64 µs; JSON and RON keep their shape ([#PR](https://github.com/hit-box/hitbox/pull/PR))
 
 ### Fixed
 - jq integer overflow near `i64::MAX`/`i64::MIN` ([#294](https://github.com/hit-box/hitbox/pull/294))
