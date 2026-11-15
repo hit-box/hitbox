@@ -126,14 +126,6 @@ impl<'de> Visitor<'de> for TextValuesVisitor {
         Ok(TextValuesIn(vec![value.into_bytes()]))
     }
 
-    fn visit_bytes<E: de::Error>(self, value: &[u8]) -> Result<Self::Value, E> {
-        Ok(TextValuesIn(vec![value.to_vec()]))
-    }
-
-    fn visit_byte_buf<E: de::Error>(self, value: Vec<u8>) -> Result<Self::Value, E> {
-        Ok(TextValuesIn(vec![value]))
-    }
-
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
         let mut values = Vec::new();
         while let Some(TextValueIn(value)) = seq.next_element()? {
@@ -167,14 +159,6 @@ impl<'de> Visitor<'de> for TextValueVisitor {
 
     fn visit_string<E: de::Error>(self, value: String) -> Result<Self::Value, E> {
         Ok(TextValueIn(value.into_bytes()))
-    }
-
-    fn visit_bytes<E: de::Error>(self, value: &[u8]) -> Result<Self::Value, E> {
-        Ok(TextValueIn(value.to_vec()))
-    }
-
-    fn visit_byte_buf<E: de::Error>(self, value: Vec<u8>) -> Result<Self::Value, E> {
-        Ok(TextValueIn(value))
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -251,6 +235,30 @@ mod tests {
         let ron = ron::to_string(&Headers(non_ascii())).unwrap();
         let Headers(read) = ron::from_str(&ron).unwrap();
         assert_eq!(read, non_ascii());
+    }
+
+    #[test]
+    fn text_formats_reject_malformed_entries() {
+        let cases = [
+            (r#"["x"]"#, "a map of header names to values"),
+            (
+                r#"{"x": 5}"#,
+                "a header value or a sequence of header values",
+            ),
+            (
+                r#"{"x": [true]}"#,
+                "a header value as a string or an array of bytes",
+            ),
+            (r#"{"x": [[256]]}"#, "u8"),
+            (r#"{"x": [[10]]}"#, "failed to parse header value"),
+        ];
+        for (json, expected) in cases {
+            let err = serde_json::from_str::<Headers>(json).unwrap_err();
+            assert!(
+                err.to_string().contains(expected),
+                "{json}: `{err}` doesn't mention `{expected}`"
+            );
+        }
     }
 
     #[test]
