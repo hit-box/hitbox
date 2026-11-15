@@ -651,3 +651,46 @@ async fn test_roundtrip_without_trailers_still_works() {
     // No trailers expected
     assert!(collected.trailers.is_none());
 }
+
+/// Builds the cached form of a response, as `CacheableHttpResponse::into_cached` stores it.
+async fn into_serializable(response: Response<TestBody>) -> SerializableHttpResponse {
+    match CacheableHttpResponse::from_response(response)
+        .into_cached()
+        .await
+    {
+        hitbox::CachePolicy::Cacheable(serializable) => serializable,
+        hitbox::CachePolicy::NonCacheable(_) => panic!("Expected cacheable"),
+    }
+}
+
+#[tokio::test]
+async fn test_text_formats_keep_the_field_shape() {
+    let mut trailers = HeaderMap::new();
+    trailers.insert("grpc-status", HeaderValue::from_static("0"));
+    let response = Response::builder()
+        .status(201)
+        .header("content-type", "text/plain")
+        .header("set-cookie", "a=1")
+        .header("set-cookie", "b=2")
+        .body(BufferedBody::Complete {
+            data: Some(Bytes::from("hi")),
+            trailers: Some(trailers),
+        })
+        .unwrap();
+    let serializable = into_serializable(response).await;
+
+    assert_eq!(
+        serde_json::to_value(&serializable).unwrap(),
+        serde_json::json!({
+            "status": 201,
+            "version": "HTTP/1.1",
+            "body": [104, 105],
+            "headers": {"content-type": "text/plain", "set-cookie": ["a=1", "b=2"]},
+            "trailers": {"grpc-status": "0"},
+        })
+    );
+    assert_eq!(
+        ron::to_string(&serializable).unwrap(),
+        r#"(status:201,version:"HTTP/1.1",body:b"hi",headers:{"content-type":"text/plain","set-cookie":["a=1","b=2"]},trailers:{"grpc-status":"0"})"#
+    );
+}
