@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 use crate::RequestExtractor;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct Method {}
+pub struct Method;
 
 impl Method {
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 
     pub fn into_extractors<ReqBody>(
