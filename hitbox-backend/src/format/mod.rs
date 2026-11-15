@@ -26,6 +26,7 @@
 //! a unique identifier string to ensure your format can be distinguished from built-in ones.
 
 use hitbox_core::{Cacheable, Raw};
+use serde::Serialize;
 use thiserror::Error;
 
 use hitbox_core::BoxContext;
@@ -43,8 +44,13 @@ use ::bincode::enc::EncoderImpl;
 use ::bincode::serde::Compat;
 use ::bincode::{Decode, Encode};
 
+// Postcard imports for concrete types (use absolute paths to avoid conflict with our postcard module)
+use ::postcard::ser_flavors::AllocVec;
+use ::postcard::{Serializer as PostcardSerializer, take_from_bytes};
+
 // Import the BincodeVecWriter from bincode module
 use self::bincode::BincodeVecWriter;
+use self::postcard::TrailingBytes;
 
 /// Opaque bincode encoder wrapper.
 ///
@@ -60,14 +66,33 @@ pub struct BincodeEncoder<'a>(pub(crate) &'a mut EncoderImpl<BincodeVecWriter, C
 /// custom format implementations.
 pub struct BincodeDecoder<'a>(pub(crate) &'a mut DecoderImpl<SliceReader<'a>, Configuration, ()>);
 
+/// Opaque postcard encoder wrapper.
+///
+/// This type is exposed in [`FormatSerializer::Postcard`] but cannot be
+/// constructed outside this crate. Use [`FormatSerializer::Serde`] for
+/// custom format implementations.
+pub struct PostcardEncoder<'a>(pub(crate) &'a mut PostcardSerializer<AllocVec>);
+
+/// Opaque postcard decoder wrapper.
+///
+/// Holds the input; [`FormatDeserializer::deserialize`] decodes one value from it
+/// and rejects bytes left after that value.
+///
+/// This type is exposed in [`FormatDeserializer::Postcard`] but cannot be
+/// constructed outside this crate. Use [`FormatDeserializer::Serde`] for
+/// custom format implementations.
+pub struct PostcardDecoder<'a>(pub(crate) &'a [u8]);
+
 mod bincode;
 mod json;
+mod postcard;
 #[cfg(feature = "rkyv_format")]
 mod rkyv;
 mod ron;
 
 pub use bincode::BincodeFormat;
 pub use json::JsonFormat;
+pub use postcard::PostcardFormat;
 #[cfg(feature = "rkyv_format")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rkyv_format")))]
 pub use rkyv::RkyvFormat;
@@ -132,6 +157,8 @@ pub enum FormatTypeId {
     Json,
     /// Bincode format.
     Bincode,
+    /// Postcard format.
+    Postcard,
     /// RON format.
     Ron,
     /// Rkyv format.
@@ -142,7 +169,7 @@ pub enum FormatTypeId {
 
 /// Serializer passed to [`Format::with_serializer`] callbacks.
 ///
-/// Wraps different serialization backends (serde, rkyv, bincode) in a unified interface.
+/// Wraps different serialization backends (serde, rkyv, bincode, postcard) in a unified interface.
 /// Call [`serialize`](Self::serialize) with any [`Cacheable`] value.
 pub enum FormatSerializer<'a> {
     /// Serde-based serializer (used by JSON, RON).
@@ -152,6 +179,8 @@ pub enum FormatSerializer<'a> {
     Rkyv(&'a mut AlignedVec),
     /// Bincode serializer (opaque, cannot be constructed externally).
     Bincode(BincodeEncoder<'a>),
+    /// Postcard serializer (opaque, cannot be constructed externally).
+    Postcard(PostcardEncoder<'a>),
 }
 
 impl<'a> FormatSerializer<'a> {
@@ -185,6 +214,9 @@ impl<'a> FormatSerializer<'a> {
                 let compat = Compat(value);
                 Encode::encode(&compat, enc.0).map_err(|e| FormatError::Serialize(Box::new(e)))
             }
+            // With `rkyv_format`, `T` also has rkyv's `serialize`, so name the serde trait.
+            FormatSerializer::Postcard(enc) => Serialize::serialize(value, &mut *enc.0)
+                .map_err(|e| FormatError::Serialize(Box::new(e))),
         }
     }
 }
@@ -201,6 +233,8 @@ pub enum FormatDeserializer<'a> {
     Rkyv(&'a [u8]),
     /// Bincode deserializer (opaque, cannot be constructed externally).
     Bincode(BincodeDecoder<'a>),
+    /// Postcard deserializer (opaque, cannot be constructed externally).
+    Postcard(PostcardDecoder<'a>),
 }
 
 impl<'a> FormatDeserializer<'a> {
@@ -227,6 +261,17 @@ impl<'a> FormatDeserializer<'a> {
                 let compat: Compat<T> =
                     Decode::decode(dec.0).map_err(|e| FormatError::Deserialize(Box::new(e)))?;
                 Ok(compat.0)
+            }
+            FormatDeserializer::Postcard(dec) => {
+                let (value, rest) = take_from_bytes::<T>(dec.0)
+                    .map_err(|e| FormatError::Deserialize(Box::new(e)))?;
+                if rest.is_empty() {
+                    Ok(value)
+                } else {
+                    Err(FormatError::Deserialize(Box::new(TrailingBytes(
+                        rest.len(),
+                    ))))
+                }
             }
         }
     }
@@ -405,11 +450,16 @@ mod tests {
 
     #[test]
     fn serialized_buffers_have_no_spare_capacity() {
-        let spare: Vec<_> = [&BincodeFormat as &dyn Format, &JsonFormat, &RonFormat]
-            .into_iter()
-            .map(|format| (format, len_and_capacity(format)))
-            .filter(|(_, (len, capacity))| capacity != len)
-            .collect();
+        let spare: Vec<_> = [
+            &BincodeFormat as &dyn Format,
+            &JsonFormat,
+            &PostcardFormat,
+            &RonFormat,
+        ]
+        .into_iter()
+        .map(|format| (format, len_and_capacity(format)))
+        .filter(|(_, (len, capacity))| capacity != len)
+        .collect();
         assert!(spare.is_empty(), "(format, (len, capacity)): {spare:?}");
     }
 }

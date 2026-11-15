@@ -1,5 +1,5 @@
 use hitbox_backend::CacheKeyFormat;
-use hitbox_backend::format::{BincodeFormat, Format, JsonFormat};
+use hitbox_backend::format::{BincodeFormat, Format, JsonFormat, PostcardFormat};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -45,6 +45,7 @@ impl KeySerialization {
 pub enum ValueSerialization {
     Json,
     Bincode,
+    Postcard,
     #[cfg(feature = "rkyv_format")]
     Rkyv,
 }
@@ -54,6 +55,7 @@ impl ValueSerialization {
         match self {
             ValueSerialization::Json => Arc::new(JsonFormat),
             ValueSerialization::Bincode => Arc::new(BincodeFormat),
+            ValueSerialization::Postcard => Arc::new(PostcardFormat),
             #[cfg(feature = "rkyv_format")]
             ValueSerialization::Rkyv => {
                 use hitbox_backend::format::RkyvFormat;

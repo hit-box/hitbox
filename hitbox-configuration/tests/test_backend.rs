@@ -1,3 +1,4 @@
+use hitbox_backend::format::FormatTypeId;
 use hitbox_configuration::backend::{
     Backend, BackendConfig, Compression, KeyFormat, KeySerialization, Moka, ReadPolicy,
     RefillPolicyConfig, ValueFormat, ValueSerialization, WritePolicy,
@@ -55,6 +56,29 @@ value:
         }
         _ => panic!("expected FeOxDb backend"),
     }
+}
+
+#[test]
+fn test_postcard_value_format() {
+    let yaml = r#"
+type: Moka
+max_capacity: 100
+key:
+  format: Bitcode
+value:
+  format: Postcard
+"#;
+
+    let backend: Backend = serde_saphyr::from_str(yaml).expect("failed to deserialize");
+
+    let Backend::Moka(config) = backend else {
+        panic!("expected Moka backend");
+    };
+    assert_eq!(config.value.format, ValueSerialization::Postcard);
+    assert_eq!(
+        config.value.format.to_serializer().format_type_id(),
+        FormatTypeId::Postcard
+    );
 }
 
 #[test]
