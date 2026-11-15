@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - jq predicates and extractors share one parse of the body per request or response ([#294](https://github.com/hit-box/hitbox/pull/294))
 - **Breaking:** jq runs on jaq 3; some jq-derived keys change (indexing `null`, number literal text, big integers, `NaN` bodies) ([#294](https://github.com/hit-box/hitbox/pull/294))
 - **Breaking:** `JqExtraction` is replaced by `JqExpression` (`hitbox_http::jq`); `CacheableSubject` gains `extensions_mut`; `Operation::check` takes `&mut Extensions` ([#294](https://github.com/hit-box/hitbox/pull/294))
-- Drop the unused `axum`, `prost`, `prost-reflect`, `protox` and `serde_bytes` dependencies ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+- Drop the unused `axum`, `prost`, `prost-reflect`, `protox` and `serde_bytes` dependencies ([#315](https://github.com/hit-box/hitbox/pull/315))
 
 ### Fixed
 - jq integer overflow near `i64::MAX`/`i64::MIN` ([#294](https://github.com/hit-box/hitbox/pull/294))

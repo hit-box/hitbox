@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Breaking:** `Config` and `ConfigBuilder` gain type parameters for the request and response tag extractors ([#280](https://github.com/hit-box/hitbox/pull/280))
 - **Breaking:** `CacheFuture::revalidate` takes the response tag extractor, so background revalidation re-tags the refreshed entry ([#280](https://github.com/hit-box/hitbox/pull/280))
-- Drop the unused `hitbox-moka` dev-dependency ([#PR](https://github.com/hit-box/hitbox/pull/PR))
+- Drop the unused `hitbox-moka` dev-dependency ([#315](https://github.com/hit-box/hitbox/pull/315))
 
 ### Fixed
 - A cache write that fails, because the backend can't encode or store the value, is logged at warn level instead of being dropped silently ([#310](https://github.com/hit-box/hitbox/pull/310))
