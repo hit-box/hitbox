@@ -2,7 +2,9 @@ use bytes::Bytes;
 use hitbox::CacheableResponse;
 #[cfg(feature = "rkyv_format")]
 use hitbox_backend::format::RkyvFormat;
-use hitbox_backend::format::{BincodeFormat, Format, FormatExt, JsonFormat, RonFormat};
+use hitbox_backend::format::{
+    BincodeFormat, Format, FormatExt, JsonFormat, PostcardFormat, RonFormat,
+};
 use hitbox_core::{BoxContext, CacheContext};
 use hitbox_http::{BufferedBody, CacheableHttpResponse, SerializableHttpResponse};
 use http::{HeaderMap, HeaderValue, Response, StatusCode};
@@ -16,6 +18,7 @@ fn formats() -> Vec<(&'static str, Box<dyn Format>)> {
     let mut formats: Vec<(&'static str, Box<dyn Format>)> = vec![
         ("bincode", Box::new(BincodeFormat)),
         ("json", Box::new(JsonFormat)),
+        ("postcard", Box::new(PostcardFormat)),
         ("ron", Box::new(RonFormat)),
     ];
     #[cfg(feature = "rkyv_format")]
