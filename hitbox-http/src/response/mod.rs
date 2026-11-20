@@ -13,7 +13,7 @@ use hitbox::{
 };
 use http::{Extensions, HeaderMap, Response, response::Parts};
 use hyper::body::Body as HttpBody;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::CacheableSubject;
 use crate::body::BufferedBody;
@@ -21,6 +21,9 @@ use crate::jq::ParsedBody;
 use crate::predicates::header::HasHeaders;
 use crate::predicates::version::HasVersion;
 
+use self::head::{Head, HeadBytes};
+
+mod head;
 mod header_map;
 
 /// Wraps an HTTP response for cache storage and retrieval.
@@ -378,9 +381,13 @@ mod rkyv_header_map {
 ///
 /// # Serialization Formats
 ///
-/// - **JSON/Bincode**: Standard serde serialization via [`http_serde`], except
-///   that text formats store a header value with non-ASCII bytes as an
-///   array of bytes, where `http_serde` drops it
+/// - **Binary formats** (Postcard, Bincode, ...): two byte strings, the head
+///   and the body. The head holds the status, version, headers and trailers,
+///   encoded with postcard by hitbox-http itself, so headers never pass through
+///   the outer format.
+/// - **Human-readable formats** (JSON, RON): one field per part, with
+///   [`http_serde`] for the status and version. A header value with non-ASCII
+///   bytes is stored as an array of bytes, where `http_serde` drops it.
 /// - **rkyv** (feature `rkyv_format`): Zero-copy deserialization for maximum
 ///   performance when reading from cache
 ///
@@ -392,26 +399,66 @@ mod rkyv_header_map {
 /// - Headers are stored as `Vec<(String, Vec<u8>)>` for zero-copy access
 ///
 /// This allows cache hits to avoid most allocations during deserialization.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(
     feature = "rkyv_format",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
 pub struct SerializableHttpResponse {
-    #[serde(with = "http_serde::status_code")]
     #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_status_code::StatusCodeAsU16))]
     status: http::StatusCode,
-    #[serde(with = "http_serde::version")]
     #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_version::VersionAsU8))]
     version: http::Version,
     body: Bytes,
-    #[serde(with = "header_map")]
     #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_header_map::AsHeaderVec))]
     headers: HeaderMap,
     /// HTTP/2 trailers (e.g., gRPC's `grpc-status`). Empty for HTTP/1.1 responses.
-    #[serde(with = "header_map", default)]
     #[cfg_attr(feature = "rkyv_format", rkyv(with = rkyv_header_map::AsHeaderVec))]
     trailers: HeaderMap,
+}
+
+/// The field shape of [`SerializableHttpResponse`], used by human-readable formats.
+#[derive(Serialize, Deserialize)]
+#[serde(
+    remote = "SerializableHttpResponse",
+    rename = "SerializableHttpResponse"
+)]
+struct TextShape {
+    #[serde(with = "http_serde::status_code")]
+    status: http::StatusCode,
+    #[serde(with = "http_serde::version")]
+    version: http::Version,
+    body: Bytes,
+    #[serde(with = "header_map")]
+    headers: HeaderMap,
+    #[serde(with = "header_map", default)]
+    trailers: HeaderMap,
+}
+
+impl Serialize for SerializableHttpResponse {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            return TextShape::serialize(self, serializer);
+        }
+        let head = head::encode(self.status, self.version, &self.headers, &self.trailers);
+        (HeadBytes(&head), &self.body).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for SerializableHttpResponse {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        if deserializer.is_human_readable() {
+            return TextShape::deserialize(deserializer);
+        }
+        let (head, body): (Head, Bytes) = Deserialize::deserialize(deserializer)?;
+        Ok(Self {
+            status: head.status,
+            version: head.version,
+            body,
+            headers: head.headers,
+            trailers: head.trailers,
+        })
+    }
 }
 
 impl<ResBody> CacheableResponse for CacheableHttpResponse<ResBody>

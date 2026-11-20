@@ -45,6 +45,8 @@ sha2 = "0.10"
 hex = "0.4"
 
 http-serde = "2.1.1"
+postcard = { workspace = true }
+serde_bytes = "0.11"
 
 # Optional rkyv support
 rkyv = { workspace = true, optional = true }
