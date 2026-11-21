@@ -1,11 +1,17 @@
 use bytes::Bytes;
 use hitbox_core::{BoxContext, Raw};
+use thiserror::Error;
 
 use super::{
     BincodeDecoder, BincodeEncoder, Format, FormatDeserializer, FormatError, FormatSerializer,
     FormatTypeId,
 };
 use crate::context::Context;
+
+/// Bincode input with bytes left after the decoded value.
+#[derive(Debug, Error)]
+#[error("bytes left after the decoded value")]
+pub(super) struct BincodeTrailingBytes;
 
 /// Writer wrapper for bincode serialization.
 ///
@@ -87,5 +93,33 @@ impl Format for BincodeFormat {
 
     fn format_type_id(&self) -> FormatTypeId {
         FormatTypeId::Bincode
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hitbox_core::{BoxContext, CacheContext};
+
+    use super::*;
+    use crate::format::FormatExt;
+
+    #[test]
+    fn trailing_bytes_are_an_error() {
+        let value = (42u32, "hitbox".to_owned());
+        let bytes = BincodeFormat
+            .serialize(&value, &CacheContext::default())
+            .unwrap();
+
+        let mut ctx: BoxContext = CacheContext::default().boxed();
+        let decoded: (u32, String) = BincodeFormat.deserialize(&bytes, &mut ctx).unwrap();
+        assert_eq!(decoded, value);
+
+        let mut longer = bytes.to_vec();
+        longer.push(0);
+        let err = BincodeFormat
+            .deserialize::<(u32, String)>(&Bytes::from(longer), &mut ctx)
+            .err()
+            .unwrap();
+        assert_eq!(err.to_string(), "bytes left after the decoded value");
     }
 }

@@ -11,6 +11,9 @@ pub mod format;
 pub mod key;
 pub(crate) mod metrics;
 
+#[cfg(test)]
+mod golden;
+
 pub use backend::{
     Backend, BackendResult, CacheBackend, DeleteStatus, SyncBackend, UnsyncBackend,
     deserialize_tags, serialize_tags,
@@ -27,4 +30,4 @@ pub use error::BackendError;
 #[cfg(feature = "rkyv_format")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rkyv_format")))]
 pub use format::RkyvFormat;
-pub use key::CacheKeyFormat;
+pub use key::{CacheKeyFormat, WIRE_VERSION};

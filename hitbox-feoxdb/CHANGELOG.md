@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Breaking:** Require `feoxdb` 0.6; `FeOxDbError::FeOxDb` now wraps its `FeoxError`. `feoxdb` 0.6 can refuse to open a 0.5 data file with ambiguous deletion markers: delete the cache file or convert it with feoxdb's `feox-migrate` tool ([#293](https://github.com/hit-box/hitbox/pull/293))
 - **Breaking:** `FeOxDbBackend::flush` returns `Result<(), FeOxDbError>` instead of discarding sync errors ([#293](https://github.com/hit-box/hitbox/pull/293))
+- **Breaking:** keys are encoded with the backend's `key_format` (Bitcode by default), so they carry `WIRE_VERSION`; before, `key_format` was ignored and keys were bincode, so entries in an existing file miss after upgrading ([#318](https://github.com/hit-box/hitbox/pull/318))
 
 ### Fixed
 - Deadlock when a write batch overflows `max_file_size`, caused by `feoxdb` 0.5.3+ re-locking its free-space map while still holding it ([#293](https://github.com/hit-box/hitbox/pull/293))

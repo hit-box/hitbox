@@ -38,8 +38,8 @@ use ::rkyv::{api::high::to_bytes_in, from_bytes, rancor, util::AlignedVec};
 
 // Bincode imports for concrete types (use absolute paths to avoid conflict with our bincode module)
 use ::bincode::config::Configuration;
-use ::bincode::de::DecoderImpl;
-use ::bincode::de::read::SliceReader;
+use ::bincode::de::read::{Reader, SliceReader};
+use ::bincode::de::{Decoder, DecoderImpl};
 use ::bincode::enc::EncoderImpl;
 use ::bincode::serde::Compat;
 use ::bincode::{Decode, Encode};
@@ -49,7 +49,7 @@ use ::postcard::ser_flavors::AllocVec;
 use ::postcard::{Serializer as PostcardSerializer, take_from_bytes};
 
 // Import the BincodeVecWriter from bincode module
-use self::bincode::BincodeVecWriter;
+use self::bincode::{BincodeTrailingBytes, BincodeVecWriter};
 use self::postcard::TrailingBytes;
 
 /// Opaque bincode encoder wrapper.
@@ -258,8 +258,13 @@ impl<'a> FormatDeserializer<'a> {
             }
             FormatDeserializer::Bincode(dec) => {
                 // Use Compat wrapper to decode from bincode
-                let compat: Compat<T> =
-                    Decode::decode(dec.0).map_err(|e| FormatError::Deserialize(Box::new(e)))?;
+                let compat: Compat<T> = Decode::decode(&mut *dec.0)
+                    .map_err(|e| FormatError::Deserialize(Box::new(e)))?;
+                // Like postcard, reject input with bytes left over: without this, bincode can
+                // read the start of another format's bytes as a different value.
+                if dec.0.reader().peek_read(1).is_some() {
+                    return Err(FormatError::Deserialize(Box::new(BincodeTrailingBytes)));
+                }
                 Ok(compat.0)
             }
             FormatDeserializer::Postcard(dec) => {

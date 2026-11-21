@@ -369,8 +369,7 @@ where
     async fn read(&self, key: &CacheKey) -> BackendResult<Option<CacheValue<Raw>>> {
         let store = self.store.clone();
 
-        let key_bytes = encode_to_vec(key, bincode_config())
-            .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+        let key_bytes = self.key_format.serialize(key)?;
 
         tokio::task::spawn_blocking(move || match store.get(&key_bytes) {
             Ok(encoded) => {
@@ -395,8 +394,7 @@ where
     async fn write(&self, key: &CacheKey, value: CacheValue<Raw>) -> BackendResult<()> {
         let store = self.store.clone();
 
-        let key_bytes = encode_to_vec(key, bincode_config())
-            .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+        let key_bytes = self.key_format.serialize(key)?;
 
         // Compute TTL from value.ttl() (derived from value.expire)
         let ttl = value.ttl();
@@ -419,8 +417,7 @@ where
     async fn remove(&self, key: &CacheKey) -> BackendResult<DeleteStatus> {
         let store = self.store.clone();
 
-        let key_bytes = encode_to_vec(key, bincode_config())
-            .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+        let key_bytes = self.key_format.serialize(key)?;
 
         tokio::task::spawn_blocking(move || match store.delete(&key_bytes) {
             Ok(()) => Ok(DeleteStatus::Deleted(1)),
