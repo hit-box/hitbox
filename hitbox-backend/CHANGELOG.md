@@ -20,11 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CompositionBackend` behind `dyn Backend` or nested in another composition stores a payload shared by both layers once in its envelope, halving the copies per write when L1 and L2 use the same format without compression ([#303](https://github.com/hit-box/hitbox/pull/303))
 - With the `metrics` feature, backend metrics reuse a `backend` label interned once per backend name (the first 1024 names, kept for the process lifetime) instead of allocating a `String` and a `Vec` on every call, so recording no longer allocates and a moka `get` is about 11% faster with a Prometheus recorder ([#309](https://github.com/hit-box/hitbox/pull/309))
 - Drop the unused `serde-saphyr` dependency and the unused `http`, `http-serde`, `flexbuffers` and `serial_test` dev-dependencies ([#315](https://github.com/hit-box/hitbox/pull/315))
-- **Breaking:** `CacheKeyFormat` starts every key with `WIRE_VERSION` (one byte for Bitcode, a leading `_wire` pair for UrlEncoded), so 0.2 entries are never read, and `deserialize` rejects keys of another version ([#318](https://github.com/hit-box/hitbox/pull/318))
+- **Breaking:** `CacheKeyFormat` starts every key with `WIRE_VERSION` (one byte for Bitcode, a leading `_wire` pair for UrlEncoded), so releases with another storage layout never read each other's entries, and `deserialize` rejects keys of another version. 0.2 keys carry no version and in rare cases equal a 0.3 key: flush the store when upgrading from 0.2 ([#318](https://github.com/hit-box/hitbox/pull/318))
 - `BincodeFormat` rejects input with bytes left after the decoded value, like `PostcardFormat` ([#318](https://github.com/hit-box/hitbox/pull/318))
 
 ### Fixed
 - Bincode, JSON and RON formats and the gzip and zstd compressors return buffers without spare capacity, so in-process backends such as moka no longer hold up to 2× the memory their byte limit counts ([#302](https://github.com/hit-box/hitbox/pull/302))
+- `CacheKeyFormat::UrlEncoded` reads `_prefix` and `_version` by position, so key parts with those names round-trip instead of replacing the key's metadata ([#318](https://github.com/hit-box/hitbox/pull/318))
 
 ## [0.2.2] - 2026-10-30
 

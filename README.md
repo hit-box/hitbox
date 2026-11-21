@@ -620,8 +620,8 @@ Cache keys can be serialized as Bitcode (compact) or UrlEncoded (readable):
 
 | Key Complexity | Bitcode | UrlEncoded | Savings |
 |----------------|---------|------------|---------|
-| Simple (method + path) | 32 bytes | 50 bytes | 36% |
-| Complex (9 parts) | 302 bytes | 345 bytes | 12% |
+| Simple (method + path) | 33 bytes | 58 bytes | 43% |
+| Complex (9 parts) | 303 bytes | 353 bytes | 14% |
 
 Bitcode is the default. Use UrlEncoded if you need to inspect keys in Redis.
 
