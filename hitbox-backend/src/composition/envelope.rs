@@ -453,8 +453,43 @@ impl CompositionEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::golden::assert_golden;
     use chrono::Duration;
     use hitbox_core::{CacheTag, CacheTags};
+
+    /// A value with fixed timestamps and tags, so its encoding doesn't depend on the clock.
+    fn fixed_value(data: &'static [u8]) -> CacheValue<Raw> {
+        let created = DateTime::from_timestamp(1_767_225_600, 123_000_000).unwrap();
+        let expire = DateTime::from_timestamp(1_767_229_200, 0);
+        let stale = DateTime::from_timestamp(1_767_227_400, 500);
+        CacheValue::with_created(Bytes::from_static(data), created, expire, stale)
+            .with_tags(CacheTags::response_only(vec![CacheTag::new("user:1")]))
+    }
+
+    #[test]
+    fn layout_is_stable() {
+        let both = CompositionEnvelope::Both {
+            l1: fixed_value(b"l1 payload"),
+            l2: fixed_value(b"l2"),
+        };
+        assert_golden("composition_envelope_both.bin", &both.serialize().unwrap());
+
+        let shared = Bytes::from_static(b"one payload for both layers");
+        let value = CacheValue::with_created(
+            shared.clone(),
+            DateTime::from_timestamp(1_767_225_600, 0).unwrap(),
+            None,
+            None,
+        );
+        let shared = CompositionEnvelope::Both {
+            l1: value.clone(),
+            l2: value,
+        };
+        assert_golden(
+            "composition_envelope_shared.bin",
+            &shared.serialize().unwrap(),
+        );
+    }
 
     #[test]
     fn test_envelope_header_size() {

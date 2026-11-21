@@ -1,5 +1,9 @@
+use std::path::Path;
+use std::{env, fs};
+
 use bytes::Bytes;
 use hitbox::CacheableResponse;
+use hitbox_backend::WIRE_VERSION;
 #[cfg(feature = "rkyv_format")]
 use hitbox_backend::format::RkyvFormat;
 use hitbox_backend::format::{
@@ -7,7 +11,7 @@ use hitbox_backend::format::{
 };
 use hitbox_core::{BoxContext, CacheContext};
 use hitbox_http::{BufferedBody, CacheableHttpResponse, SerializableHttpResponse};
-use http::{HeaderMap, HeaderValue, Response, StatusCode};
+use http::{HeaderMap, HeaderValue, Response, StatusCode, Version};
 use http_body_util::Full;
 
 type TestBody = BufferedBody<Full<Bytes>>;
@@ -693,4 +697,55 @@ async fn test_text_formats_keep_the_field_shape() {
         ron::to_string(&serializable).unwrap(),
         r#"(status:201,version:"HTTP/1.1",body:b"hi",headers:{"content-type":"text/plain","set-cookie":["a=1","b=2"]},trailers:{"grpc-status":"0"})"#
     );
+}
+
+/// Asserts that `bytes` equal `tests/golden/v{WIRE_VERSION}/<name>`, or writes the file when
+/// `HITBOX_BLESS_GOLDEN` is set. Files in `v1/` may change until 0.3.0 ships; after that a changed
+/// layout needs a new `WIRE_VERSION`.
+fn assert_golden(name: &str, bytes: &[u8]) {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("tests/golden/v{WIRE_VERSION}"))
+        .join(name);
+    if env::var_os("HITBOX_BLESS_GOLDEN").is_some() {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, bytes).unwrap();
+        return;
+    }
+    let expected = fs::read(&path).unwrap_or_else(|err| {
+        panic!(
+            "{}: {err}; run with HITBOX_BLESS_GOLDEN=1 to create it",
+            path.display()
+        )
+    });
+    assert!(
+        expected == bytes,
+        "the stored layout `{name}` changed: {} bytes now, {} in {}",
+        bytes.len(),
+        expected.len(),
+        path.display()
+    );
+}
+
+#[tokio::test]
+async fn test_stored_layout_is_stable() {
+    let mut trailers = HeaderMap::new();
+    trailers.insert("grpc-status", HeaderValue::from_static("0"));
+    let response = Response::builder()
+        .status(201)
+        .version(Version::HTTP_2)
+        .header("content-type", "application/json")
+        .header("set-cookie", "a=1")
+        .header("set-cookie", "b=2")
+        .header("x-latin1", HeaderValue::from_bytes(b"caf\xe9").unwrap())
+        .body(BufferedBody::Complete {
+            data: Some(Bytes::from(r#"{"id":42}"#)),
+            trailers: Some(trailers),
+        })
+        .unwrap();
+    let serializable = into_serializable(response).await;
+
+    let bytes = PostcardFormat
+        .serialize(&serializable, &CacheContext::default())
+        .unwrap();
+    assert_golden("response_postcard.bin", &bytes);
 }
