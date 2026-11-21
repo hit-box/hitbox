@@ -552,3 +552,30 @@ impl CacheBackend for Box<dyn Backend> {}
 
 impl CacheBackend for Arc<UnsyncBackend> {}
 impl CacheBackend for Arc<SyncBackend> {}
+
+#[cfg(test)]
+mod tests {
+    use hitbox_core::tag::{CacheTag, CacheTags};
+
+    use super::*;
+    use crate::golden::assert_golden;
+
+    #[test]
+    fn tag_timestamp_layout_is_stable() {
+        let ts = DateTime::from_timestamp_millis(1_767_225_600_123).unwrap();
+        let bytes = TagTimestamp::encode(ts);
+        assert_golden("tag_timestamp.bin", &bytes);
+        assert_eq!(TagTimestamp::decode(&bytes), Some(ts));
+    }
+
+    #[test]
+    fn tags_layout_is_stable() {
+        let tags = CacheTags::new(
+            vec![CacheTag::new("tenant=acme")],
+            vec![CacheTag::new("user:42"), CacheTag::new("etag=\"v7\"")],
+        );
+        let bytes = serialize_tags(Some(&tags)).unwrap().unwrap();
+        assert_golden("tags.bin", &bytes);
+        assert_eq!(deserialize_tags(Some(&bytes)).unwrap(), Some(tags));
+    }
+}
