@@ -8,7 +8,7 @@
 //! ## Format Layout
 //!
 //! ```text
-//! [EnvelopeHeader (56 bytes)][L1 data][L2 data (if Both variant)][Tags bincode (if tags_len > 0)]
+//! [EnvelopeHeader (56 bytes)][L1 data][L2 data (if Both variant)][Tags postcard (if tags_len > 0)]
 //! ```
 //!
 //! When both layers of a Both variant hold the same buffer, the payload is
@@ -38,7 +38,7 @@ use crate::{BackendError, BackendResult};
 /// - _pad1: 3 bytes (align to u32)
 /// - l1_len: 4 bytes (u32 little-endian)
 /// - l2_len: 4 bytes (u32 little-endian)
-/// - tags_len: 4 bytes (u32 little-endian) - length of bincode tag bytes after data; 0 = no tags
+/// - tags_len: 4 bytes (u32 little-endian) - length of postcard tag bytes after data; 0 = no tags
 /// - created_secs: 8 bytes (i64 little-endian) - seconds since Unix epoch
 /// - expire_secs: 8 bytes (i64 little-endian) - 0 if None
 /// - stale_secs: 8 bytes (i64 little-endian) - 0 if None
@@ -58,7 +58,7 @@ struct EnvelopeHeader {
     _pad1: [u8; 3],
     l1_len: u32,
     l2_len: u32,
-    tags_len: u32, // length of bincode-serialized CacheTags after L1+L2 data; 0 = no tags
+    tags_len: u32, // length of postcard-serialized CacheTags after L1+L2 data; 0 = no tags
     // i64 fields grouped together (8-byte aligned, no inter-field padding)
     created_secs: i64,
     expire_secs: i64,

@@ -49,7 +49,7 @@ automatically created as `cache.db` within that directory.
 | `max_file_size` | 1 GB | Maximum disk storage capacity |
 | `max_memory` | 1 GB | Maximum RAM usage |
 | `key_format` | [`Bitcode`] | Cache key serialization format |
-| `value_format` | [`JsonFormat`] | Value serialization format |
+| `value_format` | [`PostcardFormat`] | Value serialization format |
 | `compressor` | [`PassthroughCompressor`] | Compression strategy |
 | `label` | `"feoxdb"` | Backend label for multi-tier composition |
 
@@ -86,12 +86,16 @@ are provided by [`hitbox_backend::format`]:
 
 | Format | Speed | Size | Human-readable | Use case |
 |--------|-------|------|----------------|----------|
+| [`PostcardFormat`] | Fast | Compact | No** | General purpose (default) |
 | [`JsonFormat`] | Slow | Large | Partial* | Debugging, interoperability |
-| [`BincodeFormat`] | Fast | Compact | No | General purpose (recommended) |
 | [`RonFormat`] | Medium | Medium | Yes | Config files, debugging |
 | [`RkyvFormat`] | Fastest | Compact | No | Zero-copy, max performance |
 
 *\* JSON serializes binary data as byte arrays `[104, 101, ...]`, not readable strings.*
+
+*\*\* Postcard isn't self-describing: types that use `#[serde(untagged)]`, `#[serde(flatten)]`, `#[serde(skip_serializing_if)]` or `serde_json::Value` fail at runtime. Use JSON for them.*
+
+**Changing the format.** Stored entries don't record which format or compressor wrote them. When you change `value_format` or the compressor, or change a cached type, use a new file or delete the current one: otherwise old entries are read with the new settings, and while most fail to decode and get replaced, some can decode into wrong values.
 
 **Note:** [`RkyvFormat`] requires enabling the `rkyv_format` feature on `hitbox-backend`.
 
@@ -159,7 +163,7 @@ operations are performed in blocking tasks to avoid blocking the async runtime.
 
 [`Bitcode`]: hitbox_backend::CacheKeyFormat::Bitcode
 [`JsonFormat`]: hitbox_backend::format::JsonFormat
-[`BincodeFormat`]: hitbox_backend::format::BincodeFormat
+[`PostcardFormat`]: hitbox_backend::format::PostcardFormat
 [`RonFormat`]: hitbox_backend::format::RonFormat
 [`RkyvFormat`]: https://docs.rs/hitbox-backend/latest/hitbox_backend/format/struct.RkyvFormat.html
 [`PassthroughCompressor`]: hitbox_backend::PassthroughCompressor

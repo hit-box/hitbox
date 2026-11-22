@@ -70,8 +70,8 @@ This provides typed `get`, `set`, and `delete` operations with automatic seriali
 
 | Format | Speed | Size | Human-readable |
 |--------|-------|------|----------------|
+| [`PostcardFormat`](format::PostcardFormat) (default) | Fast | Compact | No** |
 | [`BincodeFormat`](format::BincodeFormat) | Fast | Compact | No |
-| [`PostcardFormat`](format::PostcardFormat) | Fast | Compact | No** |
 | [`JsonFormat`](format::JsonFormat) | Slow | Large | Partial* |
 | [`RonFormat`](format::RonFormat) | Medium | Medium | Yes |
 | `RkyvFormat` | Fastest | Compact | No |

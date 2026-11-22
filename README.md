@@ -162,7 +162,7 @@ See the [memoization_derive](./examples/examples/memoization_derive.rs) example 
 - [Tag Invalidation](#tag-invalidation) Expire every entry carrying a tag, with tags derived from requests or responses
 - [Pluggable Backends](#pluggable-backends) Choose Moka, Redis, FeOxDB, or implement the Backend trait for your own storage
 - [Composable Backends](#composable-backends) Combine backends into L1/L2/L3 tiers for optimal performance
-- [Serialization](#serialization) Choose between bincode, rkyv, JSON, or RON formats
+- [Serialization](#serialization) Choose between postcard (default), rkyv, JSON, or RON formats
 - [Compression](#compression) Reduce storage size with zstd or gzip compression
 - [Observability](#observability) Track cache status, latency, backend I/O, and offload tasks
 - [Predicate and Extractor Traits](#predicate-and-extractor-traits) Protocol-agnostic traits to control caching and generate cache keys
@@ -278,7 +278,7 @@ backend.invalidate(&CacheTag::new("user_id=42")).await?;
 
 ## Pluggable Backends
 
-Backends store cached data. Each backend implements the `Backend` trait with `read`, `write`, and `remove` operations. All backends support configurable serialization format (Bincode, JSON, RON, Rkyv), key format (Bitcode, UrlEncoded), compression (Gzip, Zstd), and custom naming for metrics. Implement the `Backend` trait to add your own storage.
+Backends store cached data. Each backend implements the `Backend` trait with `read`, `write`, and `remove` operations. All backends support configurable serialization format (Postcard by default, JSON, RON, Rkyv), key format (Bitcode, UrlEncoded), compression (Gzip, Zstd), and custom naming for metrics. Implement the `Backend` trait to add your own storage.
 
 | Backend | Type | Configuration |
 |---------|------|---------------|
@@ -292,14 +292,12 @@ Backends store cached data. Each backend implements the `Backend` trait with `re
 // Moka (in-memory)
 let moka = MokaBackend::builder()
     .max_entries(10_000)
-    .value_format(BincodeFormat)
     .compressor(ZstdCompressor::default())
     .build();
 
 // Redis (distributed)
 let redis = RedisBackend::builder()
     .connection(ConnectionMode::single("redis://127.0.0.1/"))
-    .value_format(BincodeFormat)
     .build()?;
 
 // FeOxDB (embedded persistent)
@@ -352,7 +350,7 @@ let cache = Cache::builder()
 
 ## Serialization
 
-Hitbox supports multiple serialization formats via the `Format` trait. Bincode offers the best write throughput and excellent read performance. Rkyv provides zero-copy deserialization for maximum read speed but slower writes. RON balances performance with human-readable output. JSON is slowest but useful for debugging. Choose based on your read/write ratio and debugging needs.
+Hitbox supports multiple serialization formats via the `Format` trait. Postcard, the default, is compact and fast; it isn't self-describing, so types that use `#[serde(untagged)]`, `#[serde(flatten)]`, `#[serde(skip_serializing_if)]` or `serde_json::Value` need JSON. Rkyv provides zero-copy deserialization for maximum read speed but slower writes. RON balances performance with human-readable output. JSON is slowest but useful for debugging. Choose based on your read/write ratio and debugging needs. Stored entries don't record which format or compressor wrote them: when you change either, or change a cached type, use a fresh store or flush the old one.
 
 ## Compression
 
@@ -463,7 +461,7 @@ backend:
   key:
     format: Bitcode
   value:
-    format: Bincode
+    format: Postcard
     compression:
       type: Zstd
       level: 3
@@ -588,7 +586,7 @@ For comparison: localhost Redis adds ~150 µs, same-datacenter Redis adds ~20 ms
 
 | Choose | When | Read (5KB) | Write (5KB) |
 |--------|------|------------|-------------|
-| **Bincode** | Default choice, balanced performance | 1.8 µs | 4.9 µs |
+| **Bincode** | Default before 0.3, balanced performance | 1.8 µs | 4.9 µs |
 | **Rkyv** | Read-heavy, large payloads | 1.1 µs | 4.9 µs |
 | **RON** | Debugging, human-readable | 3.0 µs | 3.9 µs |
 
@@ -599,6 +597,8 @@ For comparison: localhost Redis adds ~150 µs, same-datacenter Redis adds ~20 ms
 | Rkyv | 166 µs | 301 µs | Zero-copy deserialization shines |
 | Bincode | 197 µs | 215 µs | Fastest writes |
 | RON | 308 µs | 2.21 ms | Human-readable, good for debugging |
+
+*Postcard, the default since 0.3, isn't in these tables yet; in our codec benchmarks it encodes and decodes cached HTTP responses faster than bincode.*
 
 *Note: JSON format is also supported but ~300x slower on reads — not recommended for production. Use RON instead if you need human-readable cache values for debugging.*
 

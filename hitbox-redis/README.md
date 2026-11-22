@@ -58,7 +58,7 @@ let backend = RedisBackend::builder()
 | `username` | None | Redis 6+ ACL username |
 | `password` | None | Redis password |
 | `key_format` | [`Bitcode`] | Cache key serialization format |
-| `value_format` | [`BincodeFormat`] | Value serialization format |
+| `value_format` | [`PostcardFormat`] | Value serialization format |
 | `compressor` | [`PassthroughCompressor`] | Compression strategy |
 | `label` | `"redis"` | Backend label for multi-tier composition |
 
@@ -69,12 +69,16 @@ are provided by [`hitbox_backend::format`]:
 
 | Format | Speed | Size | Human-readable | Use case |
 |--------|-------|------|----------------|----------|
-| [`BincodeFormat`] | Fast | Compact | No | Production (default, recommended) |
+| [`PostcardFormat`] | Fast | Compact | No** | General purpose (default) |
 | [`JsonFormat`] | Slow | Large | Partial* | Debugging, interoperability |
 | [`RonFormat`] | Medium | Medium | Yes | Config files, debugging |
 | [`RkyvFormat`] | Fastest | Compact | No | Zero-copy, max performance |
 
 *\* JSON serializes binary data as byte arrays `[104, 101, ...]`, not readable strings.*
+
+*\*\* Postcard isn't self-describing: types that use `#[serde(untagged)]`, `#[serde(flatten)]`, `#[serde(skip_serializing_if)]` or `serde_json::Value` fail at runtime. Use JSON for them.*
+
+**Changing the format.** Stored entries don't record which format or compressor wrote them. When you change `value_format` or the compressor, or change a cached type, use a new Redis database or flush the current one: otherwise old entries are read with the new settings, and while most fail to decode and get replaced, some can decode into wrong values.
 
 **Note:** [`RkyvFormat`] requires enabling the `rkyv_format` feature on `hitbox-backend`.
 
@@ -145,7 +149,7 @@ let composed = l1.compose(l2, offload);
 [Hitbox]: hitbox
 [`Bitcode`]: hitbox_backend::CacheKeyFormat::Bitcode
 [`UrlEncoded`]: hitbox_backend::CacheKeyFormat::UrlEncoded
-[`BincodeFormat`]: hitbox_backend::format::BincodeFormat
+[`PostcardFormat`]: hitbox_backend::format::PostcardFormat
 [`JsonFormat`]: hitbox_backend::format::JsonFormat
 [`RonFormat`]: hitbox_backend::format::RonFormat
 [`RkyvFormat`]: https://docs.rs/hitbox-backend/latest/hitbox_backend/format/struct.RkyvFormat.html

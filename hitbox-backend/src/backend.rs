@@ -12,43 +12,45 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use hitbox_core::{
     BackendLabel, BoxContext, CacheKey, CacheStatus, CacheTag, CacheValue, Cacheable,
-    CacheableResponse, Raw, ReadMode, ResponseSource,
+    CacheableResponse, Raw, ReadMode, ResponseSource, tag::CacheTags,
 };
+use postcard::{take_from_bytes, to_allocvec};
 
 use crate::{
     BackendError, CacheKeyFormat, Compressor, PassthroughCompressor,
-    format::{BincodeFormat, Format, FormatExt},
+    format::{Format, FormatExt, PostcardFormat, TrailingBytes},
     metrics::{MetricLabels, Timer},
 };
 
-/// Serialize cache tags to bincode bytes for backend storage.
+/// Serialize cache tags to postcard bytes for backend storage.
 ///
 /// Returns `None` if tags are `None`. Used by backends that store tags
 /// as a separate hash field or payload section.
-pub fn serialize_tags(
-    tags: Option<&hitbox_core::tag::CacheTags>,
-) -> BackendResult<Option<Vec<u8>>> {
+pub fn serialize_tags(tags: Option<&CacheTags>) -> BackendResult<Option<Vec<u8>>> {
     match tags {
         None => Ok(None),
         Some(tags) => {
-            let bytes = bincode::serde::encode_to_vec(tags, bincode::config::standard())
-                .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+            let bytes = to_allocvec(tags).map_err(|e| BackendError::InternalError(Box::new(e)))?;
             Ok(Some(bytes))
         }
     }
 }
 
-/// Deserialize cache tags from bincode bytes.
+/// Deserialize cache tags from postcard bytes.
 ///
-/// Returns `Ok(None)` for empty input or absence of tag data.
-pub fn deserialize_tags(
-    bytes: Option<&[u8]>,
-) -> BackendResult<Option<hitbox_core::tag::CacheTags>> {
+/// Returns `Ok(None)` for empty input or absence of tag data. Input with bytes
+/// left after the tags is an error.
+pub fn deserialize_tags(bytes: Option<&[u8]>) -> BackendResult<Option<CacheTags>> {
     match bytes {
         None | Some([]) => Ok(None),
         Some(bytes) => {
-            let (tags, _) = bincode::serde::decode_from_slice(bytes, bincode::config::standard())
-                .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+            let (tags, rest) =
+                take_from_bytes(bytes).map_err(|e| BackendError::InternalError(Box::new(e)))?;
+            if !rest.is_empty() {
+                return Err(BackendError::InternalError(Box::new(TrailingBytes(
+                    rest.len(),
+                ))));
+            }
             Ok(Some(tags))
         }
     }
@@ -130,9 +132,9 @@ pub trait Backend: Sync + Send {
         BackendLabel::new_static("backend")
     }
 
-    /// Serialization format for cached values. Default: [`BincodeFormat`].
+    /// Serialization format for cached values. Default: [`PostcardFormat`].
     fn value_format(&self) -> &dyn Format {
-        &BincodeFormat
+        &PostcardFormat
     }
 
     /// Key serialization format. Default: [`CacheKeyFormat::Bitcode`].
@@ -555,7 +557,7 @@ impl CacheBackend for Arc<SyncBackend> {}
 
 #[cfg(test)]
 mod tests {
-    use hitbox_core::tag::{CacheTag, CacheTags};
+    use hitbox_core::tag::CacheTag;
 
     use super::*;
     use crate::golden::assert_golden;
@@ -570,12 +572,21 @@ mod tests {
 
     #[test]
     fn tags_layout_is_stable() {
+        // A tag of 128 bytes or more, where postcard's length prefix differs from bincode's.
+        let long = format!("path=/{}", "a".repeat(200));
         let tags = CacheTags::new(
             vec![CacheTag::new("tenant=acme")],
-            vec![CacheTag::new("user:42"), CacheTag::new("etag=\"v7\"")],
+            vec![
+                CacheTag::new("user:42"),
+                CacheTag::new("etag=\"v7\""),
+                CacheTag::new(long),
+            ],
         );
-        let bytes = serialize_tags(Some(&tags)).unwrap().unwrap();
+        let mut bytes = serialize_tags(Some(&tags)).unwrap().unwrap();
         assert_golden("tags.bin", &bytes);
         assert_eq!(deserialize_tags(Some(&bytes)).unwrap(), Some(tags));
+
+        bytes.push(0);
+        assert!(deserialize_tags(Some(&bytes)).is_err());
     }
 }

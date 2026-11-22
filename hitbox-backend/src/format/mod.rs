@@ -50,7 +50,7 @@ use ::postcard::{Serializer as PostcardSerializer, take_from_bytes};
 
 // Import the BincodeVecWriter from bincode module
 use self::bincode::{BincodeTrailingBytes, BincodeVecWriter};
-use self::postcard::TrailingBytes;
+pub(crate) use self::postcard::TrailingBytes;
 
 /// Opaque bincode encoder wrapper.
 ///

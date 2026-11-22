@@ -9,7 +9,7 @@ use moka::policy::EvictionPolicy;
 
 use crate::backend::MokaBackend;
 use hitbox::{BackendLabel, CacheKey, CacheValue, Raw};
-use hitbox_backend::format::{Format, JsonFormat};
+use hitbox_backend::format::{Format, PostcardFormat};
 use hitbox_backend::{CacheKeyFormat, Compressor, PassthroughCompressor};
 use hitbox_core::CacheTag;
 
@@ -129,21 +129,21 @@ pub struct ByteCapacity(pub(crate) u64);
 ///
 /// ```ignore
 /// use hitbox_moka::MokaBackend;
-/// use hitbox_backend::format::BincodeFormat;
+/// use hitbox_backend::format::JsonFormat;
 /// use hitbox_backend::{CacheKeyFormat, GzipCompressor};
 ///
 /// let backend = MokaBackend::builder()
 ///     .label("sessions")
 ///     .max_bytes(50_000_000)
 ///     .key_format(CacheKeyFormat::UrlEncoded)
-///     .value_format(BincodeFormat)
+///     .value_format(JsonFormat)
 ///     .compressor(GzipCompressor::default())
 ///     .build();
 /// ```
 ///
 /// **Note:** `GzipCompressor` and `ZstdCompressor` require enabling the `gzip`
 /// or `zstd` feature on `hitbox-backend`.
-pub struct MokaBackendBuilder<Cap, S = JsonFormat, C = PassthroughCompressor>
+pub struct MokaBackendBuilder<Cap, S = PostcardFormat, C = PassthroughCompressor>
 where
     S: Format,
     C: Compressor,
@@ -156,7 +156,7 @@ where
     eviction_policy: Option<EvictionPolicy>,
 }
 
-impl MokaBackendBuilder<NoCapacity, JsonFormat, PassthroughCompressor> {
+impl MokaBackendBuilder<NoCapacity, PostcardFormat, PassthroughCompressor> {
     /// Creates a new builder with no capacity configured.
     ///
     /// You must call [`max_entries()`](Self::max_entries) or
@@ -165,7 +165,7 @@ impl MokaBackendBuilder<NoCapacity, JsonFormat, PassthroughCompressor> {
         Self {
             capacity: NoCapacity,
             key_format: CacheKeyFormat::Bitcode,
-            serializer: JsonFormat,
+            serializer: PostcardFormat,
             compressor: PassthroughCompressor,
             label: BackendLabel::new_static("moka"),
             eviction_policy: None,
@@ -173,7 +173,7 @@ impl MokaBackendBuilder<NoCapacity, JsonFormat, PassthroughCompressor> {
     }
 }
 
-impl Default for MokaBackendBuilder<NoCapacity, JsonFormat, PassthroughCompressor> {
+impl Default for MokaBackendBuilder<NoCapacity, PostcardFormat, PassthroughCompressor> {
     fn default() -> Self {
         Self::new()
     }
@@ -324,15 +324,19 @@ where
     ///
     /// # Default
     ///
-    /// [`JsonFormat`]
+    /// [`PostcardFormat`]
     ///
     /// # Options
     ///
     /// | Format | Speed | Size | Human-readable |
     /// |--------|-------|------|----------------|
-    /// | [`JsonFormat`] | Slow | Large | Yes |
-    /// | [`BincodeFormat`](hitbox_backend::format::BincodeFormat) | Fast | Compact | No |
+    /// | [`PostcardFormat`] | Fast | Compact | No |
+    /// | [`JsonFormat`](hitbox_backend::format::JsonFormat) | Slow | Large | Yes |
     /// | [`RonFormat`](hitbox_backend::format::RonFormat) | Medium | Medium | Yes |
+    ///
+    /// Postcard bytes carry no field names, so types that use `#[serde(untagged)]`,
+    /// `#[serde(flatten)]`, `#[serde(skip_serializing_if)]` or `serde_json::Value`
+    /// need `JsonFormat`.
     pub fn value_format<NewS>(self, serializer: NewS) -> MokaBackendBuilder<Cap, NewS, C>
     where
         NewS: Format,
