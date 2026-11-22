@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use hitbox::{BackendLabel, CacheKey, CacheValue, Raw};
 use hitbox_backend::Backend;
-use hitbox_backend::format::{Format, JsonFormat};
+use hitbox_backend::format::{Format, PostcardFormat};
 use hitbox_backend::{
     BackendResult, CacheKeyFormat, Compressor, DeleteStatus, PassthroughCompressor,
 };
@@ -25,7 +25,7 @@ use crate::metrics::{record_capacity, record_tag_records};
 /// # Type Parameters
 ///
 /// * `S` - Serialization format for cache values. Implements [`Format`].
-///   Default: [`JsonFormat`].
+///   Default: [`PostcardFormat`].
 /// * `C` - Compression strategy for cache values. Implements [`Compressor`].
 ///   Default: [`PassthroughCompressor`] (no compression).
 ///
@@ -43,11 +43,11 @@ use crate::metrics::{record_capacity, record_tag_records};
 ///
 /// ```
 /// use hitbox_moka::MokaBackend;
-/// use hitbox_backend::format::BincodeFormat;
+/// use hitbox_backend::format::JsonFormat;
 ///
 /// let backend = MokaBackend::builder()
 ///     .max_entries(10_000)
-///     .value_format(BincodeFormat)
+///     .value_format(JsonFormat)
 ///     .build();
 /// ```
 ///
@@ -77,12 +77,12 @@ use crate::metrics::{record_capacity, record_tag_records};
 ///   until Moka's background eviction runs
 ///
 /// [`Format`]: hitbox_backend::format::Format
-/// [`JsonFormat`]: hitbox_backend::format::JsonFormat
+/// [`PostcardFormat`]: hitbox_backend::format::PostcardFormat
 /// [`Compressor`]: hitbox_backend::Compressor
 /// [`PassthroughCompressor`]: hitbox_backend::PassthroughCompressor
 /// [`tag_record_count()`]: MokaBackend::tag_record_count
 #[derive(Clone)]
-pub struct MokaBackend<S = JsonFormat, C = PassthroughCompressor>
+pub struct MokaBackend<S = PostcardFormat, C = PassthroughCompressor>
 where
     S: Format,
     C: Compressor,
@@ -186,7 +186,7 @@ where
     }
 }
 
-impl MokaBackend<JsonFormat, PassthroughCompressor> {
+impl MokaBackend<PostcardFormat, PassthroughCompressor> {
     /// Creates a new builder for `MokaBackend`.
     ///
     /// You must configure capacity using [`max_entries()`] or [`max_bytes()`] before
@@ -196,7 +196,7 @@ impl MokaBackend<JsonFormat, PassthroughCompressor> {
     /// [`max_bytes()`]: crate::builder::MokaBackendBuilder::max_bytes
     pub fn builder() -> crate::builder::MokaBackendBuilder<
         crate::builder::NoCapacity,
-        JsonFormat,
+        PostcardFormat,
         PassthroughCompressor,
     > {
         crate::builder::MokaBackendBuilder::new()

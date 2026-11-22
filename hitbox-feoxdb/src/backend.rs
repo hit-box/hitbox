@@ -4,56 +4,41 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bincode::{
-    config::standard as bincode_config,
-    error::DecodeError,
-    serde::{decode_from_slice, encode_to_vec},
-};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use feoxdb::{FeoxError, FeoxStore};
-use hitbox_backend::format::{Format, JsonFormat};
+use hitbox_backend::format::{Format, PostcardFormat};
 use hitbox_backend::{
     Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus,
     PassthroughCompressor,
 };
 use hitbox_core::tag::CacheTags;
 use hitbox_core::{BackendLabel, CacheKey, CacheValue, Raw};
+use postcard::{take_from_bytes, to_allocvec};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::FeOxDbError;
 
-/// On-disk record.
+/// On-disk record, encoded with postcard.
 ///
-/// bincode decodes fields by position, never by name, and ignores
-/// `#[serde(default)]`. Fields may therefore only be **appended**, never
-/// inserted or reordered: a binary that predates a field then reads the
-/// leading fields it knows and ignores the trailing bytes. Records written
-/// before an appended field fail to decode with this shape and are read via
-/// [`LegacyCacheValue`].
+/// Postcard decodes fields by position, so adding, removing or reordering a
+/// field changes the stored layout. Such a change needs a new
+/// `hitbox_backend::WIRE_VERSION`; the golden-bytes test fails until then.
 #[derive(Serialize, Deserialize)]
 struct SerializableCacheValue {
     #[serde(with = "serde_bytes")]
     data: Vec<u8>,
     stale: Option<DateTime<Utc>>,
     expire: Option<DateTime<Utc>>,
-    // Appended for tag invalidation.
     created: DateTime<Utc>,
     tags: Option<CacheTags>,
 }
 
-/// Record shape written before tag invalidation: `data, stale, expire`.
-///
-/// Such records carry no creation time, so they are read as created at the
-/// Unix epoch: any invalidation of a matching request tag expires them.
-#[derive(Deserialize)]
-#[cfg_attr(test, derive(Serialize))]
-struct LegacyCacheValue {
-    #[serde(with = "serde_bytes")]
-    data: Vec<u8>,
-    stale: Option<DateTime<Utc>>,
-    expire: Option<DateTime<Utc>>,
-}
+/// A stored record followed by more bytes.
+#[derive(Debug, Error)]
+#[error("{0} bytes left after the record")]
+struct TrailingBytes(usize);
 
 impl From<CacheValue<Raw>> for SerializableCacheValue {
     fn from(value: CacheValue<Raw>) -> Self {
@@ -82,29 +67,21 @@ impl From<SerializableCacheValue> for CacheValue<Raw> {
     }
 }
 
-impl From<LegacyCacheValue> for CacheValue<Raw> {
-    fn from(value: LegacyCacheValue) -> Self {
-        CacheValue::with_created(
-            Bytes::from(value.data),
-            DateTime::UNIX_EPOCH,
-            value.expire,
-            value.stale,
-        )
-    }
+fn encode_record(value: CacheValue<Raw>) -> BackendResult<Vec<u8>> {
+    to_allocvec(&SerializableCacheValue::from(value))
+        .map_err(|e| BackendError::InternalError(Box::new(e)))
 }
 
-/// Decodes a stored record, falling back to the pre-tag layout.
-///
-/// A legacy record is always shorter than the current layout, so decoding it
-/// with [`SerializableCacheValue`] fails with `UnexpectedEnd` rather than
-/// misreading fields. On failure the current-layout error is returned.
-fn decode_record(bytes: &[u8]) -> Result<CacheValue<Raw>, DecodeError> {
-    match decode_from_slice::<SerializableCacheValue, _>(bytes, bincode_config()) {
-        Ok((record, _)) => Ok(record.into()),
-        Err(err) => decode_from_slice::<LegacyCacheValue, _>(bytes, bincode_config())
-            .map(|(legacy, _)| legacy.into())
-            .map_err(|_| err),
+/// Decodes a stored record. Bytes left after it are an error.
+fn decode_record(bytes: &[u8]) -> BackendResult<CacheValue<Raw>> {
+    let (record, rest) = take_from_bytes::<SerializableCacheValue>(bytes)
+        .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+    if !rest.is_empty() {
+        return Err(BackendError::InternalError(Box::new(TrailingBytes(
+            rest.len(),
+        ))));
     }
+    Ok(record.into())
 }
 
 /// Disk-based cache backend using FeOxDB.
@@ -131,7 +108,7 @@ fn decode_record(bytes: &[u8]) -> Result<CacheValue<Raw>, DecodeError> {
 ///
 /// Cloning is cheap — clones share the same underlying database.
 #[derive(Clone)]
-pub struct FeOxDbBackend<S = JsonFormat, C = PassthroughCompressor>
+pub struct FeOxDbBackend<S = PostcardFormat, C = PassthroughCompressor>
 where
     S: Format,
     C: Compressor,
@@ -165,9 +142,9 @@ where
     }
 }
 
-impl FeOxDbBackend<JsonFormat, PassthroughCompressor> {
+impl FeOxDbBackend<PostcardFormat, PassthroughCompressor> {
     /// Starts building a new backend.
-    pub fn builder() -> FeOxDbBackendBuilder<JsonFormat, PassthroughCompressor> {
+    pub fn builder() -> FeOxDbBackendBuilder<PostcardFormat, PassthroughCompressor> {
         FeOxDbBackendBuilder::default()
     }
 
@@ -187,7 +164,7 @@ impl FeOxDbBackend<JsonFormat, PassthroughCompressor> {
         Ok(Self {
             store: Arc::new(store),
             key_format: CacheKeyFormat::Bitcode,
-            serializer: JsonFormat,
+            serializer: PostcardFormat,
             compressor: PassthroughCompressor,
             label: BackendLabel::new_static("feoxdb"),
         })
@@ -198,17 +175,17 @@ impl FeOxDbBackend<JsonFormat, PassthroughCompressor> {
 ///
 /// ```no_run
 /// use hitbox_feoxdb::FeOxDbBackend;
-/// use hitbox_backend::format::BincodeFormat;
+/// use hitbox_backend::format::JsonFormat;
 ///
 /// let backend = FeOxDbBackend::builder()
 ///     .path("/var/cache/myapp")
 ///     .max_file_size(5 * 1024 * 1024 * 1024)  // 5 GB
 ///     .max_memory(256 * 1024 * 1024)          // 256 MB
-///     .value_format(BincodeFormat)
+///     .value_format(JsonFormat)
 ///     .build()?;
 /// # Ok::<(), hitbox_feoxdb::FeOxDbError>(())
 /// ```
-pub struct FeOxDbBackendBuilder<S = JsonFormat, C = PassthroughCompressor>
+pub struct FeOxDbBackendBuilder<S = PostcardFormat, C = PassthroughCompressor>
 where
     S: Format,
     C: Compressor,
@@ -222,14 +199,14 @@ where
     label: BackendLabel,
 }
 
-impl Default for FeOxDbBackendBuilder<JsonFormat, PassthroughCompressor> {
+impl Default for FeOxDbBackendBuilder<PostcardFormat, PassthroughCompressor> {
     fn default() -> Self {
         Self {
             path: None,
             max_file_size: None,
             max_memory: None,
             key_format: CacheKeyFormat::Bitcode,
-            serializer: JsonFormat,
+            serializer: PostcardFormat,
             compressor: PassthroughCompressor,
             label: BackendLabel::new_static("feoxdb"),
         }
@@ -289,8 +266,10 @@ where
 
     /// Value serialization format.
     ///
-    /// `BincodeFormat` is a good default for production — fast and compact.
-    /// `JsonFormat` (default) is useful for debugging since values are readable.
+    /// `PostcardFormat` (default) is fast and compact. Its bytes carry no field
+    /// names, so types that use `#[serde(untagged)]`, `#[serde(flatten)]`,
+    /// `#[serde(skip_serializing_if)]` or `serde_json::Value` need `JsonFormat`,
+    /// which also keeps values readable for debugging.
     pub fn value_format<NewS>(self, serializer: NewS) -> FeOxDbBackendBuilder<NewS, C>
     where
         NewS: Format,
@@ -373,8 +352,7 @@ where
 
         tokio::task::spawn_blocking(move || match store.get(&key_bytes) {
             Ok(encoded) => {
-                let cache_value = decode_record(&encoded)
-                    .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+                let cache_value = decode_record(&encoded)?;
 
                 if let Some(expire_time) = cache_value.expire()
                     && expire_time < Utc::now()
@@ -399,9 +377,7 @@ where
         // Compute TTL from value.ttl() (derived from value.expire)
         let ttl = value.ttl();
 
-        let serializable: SerializableCacheValue = value.into();
-        let value_bytes = encode_to_vec(&serializable, bincode_config())
-            .map_err(|e| BackendError::InternalError(Box::new(e)))?;
+        let value_bytes = encode_record(value)?;
 
         tokio::task::spawn_blocking(move || {
             ttl.map(|ttl_duration| ttl_duration.as_secs())
@@ -455,29 +431,59 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+    use std::{env, fs};
+
     use super::*;
-    use chrono::Utc;
+    use chrono::{Duration, Utc};
+    use hitbox_backend::WIRE_VERSION;
     use hitbox_core::tag::CacheTag;
     use tempfile::TempDir;
 
+    /// A record with fixed times, so its bytes don't change between runs. The payload is
+    /// 128 bytes or more, where postcard's length prefix differs from bincode's.
     fn tagged_value() -> CacheValue<Raw> {
+        let created = DateTime::from_timestamp_millis(1_767_225_600_123).unwrap();
         CacheValue::with_created(
-            Bytes::from_static(b"payload"),
-            Utc::now() - chrono::Duration::hours(2),
-            Some(Utc::now() + chrono::Duration::minutes(5)),
-            Some(Utc::now() + chrono::Duration::minutes(1)),
+            Bytes::from(vec![b'p'; 200]),
+            created,
+            Some(created + Duration::minutes(5)),
+            Some(created + Duration::minutes(1)),
         )
         .with_tags(CacheTags::response_only(vec![CacheTag::new("etag=v1")]))
     }
 
+    /// Compares `bytes` with `tests/golden/v{WIRE_VERSION}/<name>`, or writes the file when
+    /// `HITBOX_BLESS_GOLDEN` is set.
+    fn assert_golden(name: &str, bytes: &[u8]) {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("tests/golden/v{WIRE_VERSION}"))
+            .join(name);
+        if env::var_os("HITBOX_BLESS_GOLDEN").is_some() {
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(&path, bytes).unwrap();
+            return;
+        }
+        let expected = fs::read(&path).unwrap_or_else(|err| {
+            panic!(
+                "{}: {err}; run with HITBOX_BLESS_GOLDEN=1 to create it",
+                path.display()
+            )
+        });
+        assert!(
+            expected == bytes,
+            "the stored layout `{name}` changed: {} bytes now, {} in {}",
+            bytes.len(),
+            expected.len(),
+            path.display()
+        );
+    }
+
     #[test]
-    fn current_record_round_trips() {
+    fn record_layout_is_stable() {
         let value = tagged_value();
-        let bytes = encode_to_vec(
-            SerializableCacheValue::from(value.clone()),
-            bincode_config(),
-        )
-        .unwrap();
+        let bytes = encode_record(value.clone()).unwrap();
+        assert_golden("record.bin", &bytes);
 
         let decoded = decode_record(&bytes).unwrap();
         assert_eq!(decoded.data(), value.data());
@@ -487,41 +493,12 @@ mod tests {
         assert_eq!(decoded.tags(), value.tags());
     }
 
-    /// Records written before tag invalidation stay readable.
     #[test]
-    fn legacy_record_reads_as_created_at_epoch() {
-        let value = tagged_value();
-        let legacy = LegacyCacheValue {
-            data: value.data().to_vec(),
-            stale: value.stale(),
-            expire: value.expire(),
-        };
-        let bytes = encode_to_vec(&legacy, bincode_config()).unwrap();
-
-        let decoded = decode_record(&bytes).unwrap();
-        assert_eq!(decoded.data(), value.data());
-        assert_eq!(decoded.stale(), value.stale());
-        assert_eq!(decoded.expire(), value.expire());
-        assert_eq!(decoded.created(), DateTime::UNIX_EPOCH);
-        assert!(decoded.tags().is_none());
-    }
-
-    /// A binary from before tag invalidation decodes current records with the
-    /// legacy shape; its fields must land unshifted (rollback safety).
-    #[test]
-    fn pre_tag_binary_reads_current_record_prefix() {
-        let value = tagged_value();
-        let bytes = encode_to_vec(
-            SerializableCacheValue::from(value.clone()),
-            bincode_config(),
-        )
-        .unwrap();
-
-        let (legacy, _): (LegacyCacheValue, _) =
-            decode_from_slice(&bytes, bincode_config()).unwrap();
-        assert_eq!(legacy.data, value.data().to_vec());
-        assert_eq!(legacy.stale, value.stale());
-        assert_eq!(legacy.expire, value.expire());
+    fn record_with_trailing_bytes_is_an_error() {
+        let mut bytes = encode_record(tagged_value()).unwrap();
+        bytes.push(0);
+        let err = decode_record(&bytes).err().unwrap();
+        assert!(err.to_string().contains("1 bytes left"), "{err}");
     }
 
     #[tokio::test]
@@ -743,12 +720,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_builder_with_custom_format() {
-        use hitbox_backend::format::BincodeFormat;
+        use hitbox_backend::format::JsonFormat;
 
         let temp_dir = TempDir::new().unwrap();
         let backend = FeOxDbBackend::builder()
             .path(temp_dir.path())
-            .value_format(BincodeFormat)
+            .value_format(JsonFormat)
             .build()
             .unwrap();
 

@@ -9,7 +9,7 @@ use hitbox::{BackendLabel, CacheKey, CacheValue, Raw};
 use hitbox_backend::{
     Backend, BackendError, BackendResult, CacheKeyFormat, Compressor, DeleteStatus,
     PassthroughCompressor,
-    format::{BincodeFormat, Format},
+    format::{Format, PostcardFormat},
 };
 use redis::Client;
 use redis::aio::ConnectionManager;
@@ -328,7 +328,7 @@ impl RedisConnection {
 /// # Type Parameters
 ///
 /// * `S` - Serialization format for cache values. Implements [`Format`].
-///   Default: [`BincodeFormat`] (compact binary, recommended for production).
+///   Default: [`PostcardFormat`] (compact binary, recommended for production).
 /// * `C` - Compression strategy for cache values. Implements [`Compressor`].
 ///   Default: [`PassthroughCompressor`] (no compression).
 ///
@@ -404,11 +404,11 @@ impl RedisConnection {
 ///   calculated as `now + PTTL`, which may drift by the network round-trip time
 ///
 /// [`Format`]: hitbox_backend::format::Format
-/// [`BincodeFormat`]: hitbox_backend::format::BincodeFormat
+/// [`PostcardFormat`]: hitbox_backend::format::PostcardFormat
 /// [`Compressor`]: hitbox_backend::Compressor
 /// [`PassthroughCompressor`]: hitbox_backend::PassthroughCompressor
 #[derive(Clone)]
-pub struct RedisBackend<S = BincodeFormat, C = PassthroughCompressor>
+pub struct RedisBackend<S = PostcardFormat, C = PassthroughCompressor>
 where
     S: Format,
     C: Compressor,
@@ -439,13 +439,13 @@ where
     label: BackendLabel,
 }
 
-impl RedisBackend<BincodeFormat, PassthroughCompressor> {
+impl RedisBackend<PostcardFormat, PassthroughCompressor> {
     /// Creates a new builder for `RedisBackend`.
     ///
     /// Use the builder to configure the connection mode, serialization format,
     /// key format, compression, and label. See [`RedisBackend`] for examples.
     #[must_use]
-    pub fn builder() -> RedisBackendBuilder<BincodeFormat, PassthroughCompressor> {
+    pub fn builder() -> RedisBackendBuilder<PostcardFormat, PassthroughCompressor> {
         RedisBackendBuilder::default()
     }
 }
@@ -534,7 +534,7 @@ where
 ///
 /// Use [`RedisBackend::builder`] to create a new builder instance.
 /// See [`RedisBackend`] for usage examples.
-pub struct RedisBackendBuilder<S = BincodeFormat, C = PassthroughCompressor>
+pub struct RedisBackendBuilder<S = PostcardFormat, C = PassthroughCompressor>
 where
     S: Format,
     C: Compressor,
@@ -553,11 +553,11 @@ where
     password: Option<String>,
 }
 
-impl Default for RedisBackendBuilder<BincodeFormat, PassthroughCompressor> {
+impl Default for RedisBackendBuilder<PostcardFormat, PassthroughCompressor> {
     fn default() -> Self {
         Self {
             mode: None,
-            serializer: BincodeFormat,
+            serializer: PostcardFormat,
             key_format: CacheKeyFormat::default(),
             compressor: PassthroughCompressor,
             label: BackendLabel::new_static("redis"),
@@ -661,17 +661,21 @@ where
     ///
     /// # Default
     ///
-    /// [`BincodeFormat`] (compact binary, recommended for production)
+    /// [`PostcardFormat`] (compact binary, recommended for production)
     ///
     /// # Options
     ///
     /// | Format | Speed | Size | Human-readable |
     /// |--------|-------|------|----------------|
-    /// | [`BincodeFormat`] | Fast | Compact | No |
+    /// | [`PostcardFormat`] | Fast | Compact | No |
     /// | [`JsonFormat`](hitbox_backend::format::JsonFormat) | Slow | Large | Yes |
     /// | [`RonFormat`](hitbox_backend::format::RonFormat) | Medium | Medium | Yes |
     ///
-    /// [`BincodeFormat`]: hitbox_backend::format::BincodeFormat
+    /// Postcard bytes carry no field names, so types that use `#[serde(untagged)]`,
+    /// `#[serde(flatten)]`, `#[serde(skip_serializing_if)]` or `serde_json::Value`
+    /// need `JsonFormat`.
+    ///
+    /// [`PostcardFormat`]: hitbox_backend::format::PostcardFormat
     pub fn value_format<NewS>(self, serializer: NewS) -> RedisBackendBuilder<NewS, C>
     where
         NewS: Format,

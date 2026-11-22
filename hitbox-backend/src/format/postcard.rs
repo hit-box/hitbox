@@ -26,7 +26,7 @@ pub struct PostcardFormat;
 /// Input that holds more than one value.
 #[derive(Debug, Error)]
 #[error("{0} bytes left after the decoded value")]
-pub(super) struct TrailingBytes(pub(super) usize);
+pub(crate) struct TrailingBytes(pub(crate) usize);
 
 impl Format for PostcardFormat {
     fn with_serializer(

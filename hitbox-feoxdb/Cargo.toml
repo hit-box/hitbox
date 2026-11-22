@@ -29,7 +29,7 @@ chrono.workspace = true
 # Serialization
 serde = { workspace = true }
 serde_bytes = "0.11"
-bincode.workspace = true
+postcard.workspace = true
 bytes = { workspace = true }
 
 # Error handling

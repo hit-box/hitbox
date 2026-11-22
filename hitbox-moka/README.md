@@ -39,7 +39,7 @@ expiration times during cache operations.
 | `max_entries` / `max_bytes` | Required | Cache capacity (entry count or byte limit) |
 | `eviction_policy` | TinyLFU / LRU* | Entry eviction strategy |
 | `key_format` | [`Bitcode`] | Cache key serialization format |
-| `value_format` | [`JsonFormat`] | Value serialization format |
+| `value_format` | [`PostcardFormat`] | Value serialization format |
 | `compressor` | [`PassthroughCompressor`] | Compression strategy |
 | `label` | `"moka"` | Backend label for multi-tier composition |
 
@@ -62,12 +62,14 @@ are provided by [`hitbox_backend::format`]:
 
 | Format | Speed | Size | Human-readable | Use case |
 |--------|-------|------|----------------|----------|
+| [`PostcardFormat`] | Fast | Compact | No** | General purpose (default) |
 | [`JsonFormat`] | Slow | Large | Partial* | Debugging, interoperability |
-| [`BincodeFormat`] | Fast | Compact | No | General purpose (recommended) |
 | [`RonFormat`] | Medium | Medium | Yes | Config files, debugging |
 | [`RkyvFormat`] | Fastest | Compact | No | Zero-copy, max performance |
 
 *\* JSON serializes binary data as byte arrays `[104, 101, ...]`, not readable strings.*
+
+*\*\* Postcard isn't self-describing: types that use `#[serde(untagged)]`, `#[serde(flatten)]`, `#[serde(skip_serializing_if)]` or `serde_json::Value` fail at runtime. Use JSON for them.*
 
 **Note:** [`RkyvFormat`] requires enabling the `rkyv_format` feature on `hitbox-backend`.
 
@@ -91,7 +93,7 @@ access is fast and compression adds CPU overhead. Consider compression when:
 
 [`Bitcode`]: hitbox_backend::CacheKeyFormat::Bitcode
 [`JsonFormat`]: hitbox_backend::format::JsonFormat
-[`BincodeFormat`]: hitbox_backend::format::BincodeFormat
+[`PostcardFormat`]: hitbox_backend::format::PostcardFormat
 [`RonFormat`]: hitbox_backend::format::RonFormat
 [`RkyvFormat`]: https://docs.rs/hitbox-backend/latest/hitbox_backend/format/struct.RkyvFormat.html
 [`PassthroughCompressor`]: hitbox_backend::PassthroughCompressor
